@@ -4,32 +4,135 @@ import '../models/generated_contracts.dart';
 import '../services/shell_core_client.dart';
 import 'shared.dart';
 
-class SetupDoctor extends StatelessWidget {
+class SetupDoctor extends StatefulWidget {
   const SetupDoctor({super.key, required this.client});
 
   final ShellCoreClient client;
 
   @override
+  State<SetupDoctor> createState() => _SetupDoctorState();
+}
+
+class _SetupDoctorState extends State<SetupDoctor> {
+  bool _isRefreshing = false;
+  int _requestGeneration = 0;
+  String? _refreshedStatus;
+  List<SetupDoctorCheckRecord>? _refreshedChecks;
+  String? _auditEventId;
+  String? _reportId;
+  String? _generatedAt;
+  String? _refreshFailure;
+
+  @override
+  void didUpdateWidget(covariant SetupDoctor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.client, widget.client)) {
+      _requestGeneration++;
+      _isRefreshing = false;
+      _refreshedStatus = null;
+      _refreshedChecks = null;
+      _auditEventId = null;
+      _reportId = null;
+      _generatedAt = null;
+      _refreshFailure = null;
+    }
+  }
+
+  Future<void> _refresh() async {
+    final client = widget.client;
+    final generation = ++_requestGeneration;
+    setState(() => _isRefreshing = true);
+    try {
+      final report = await client.refreshSetupDoctorReport();
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() {
+        _refreshedStatus = report.status;
+        _refreshedChecks = report.checks;
+        _auditEventId = report.auditEventId;
+        _reportId = report.reportId;
+        _generatedAt = report.generatedAt;
+        _refreshFailure = null;
+      });
+    } on Object {
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() {
+        _refreshedStatus = 'unknown';
+        _refreshedChecks = const <SetupDoctorCheckRecord>[];
+        _auditEventId = null;
+        _reportId = null;
+        _generatedAt = null;
+        _refreshFailure = '最新の診断を取得できません。Broker接続を確認して再試行してください。';
+      });
+    } finally {
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final snapshot = client.getSnapshot();
+    final snapshot = widget.client.getSnapshot();
     final installedEvidence = snapshot.evidence
         .where((item) => item.kind == 'installed-path')
         .toList(growable: false);
-    final checks = snapshot.setupDoctorChecks;
+    final checks = _refreshedChecks ?? snapshot.setupDoctorChecks;
+    final status = _refreshedStatus ?? snapshot.setupDoctorStatus;
+    final brokerMode = widget.client.mode == 'broker';
+    final initialSource = switch (snapshot.snapshotSource) {
+      'broker' => '起動時にBrokerから取得したSnapshot（更新操作まで古くなる場合があります）',
+      'mock' => '試験用Snapshot（実Brokerの現在状態ではありません）',
+      'in_memory_diagnostic' => 'メモリ内診断Snapshot（実Brokerの現在状態ではありません）',
+      'fallback' => '固定代替Snapshot（実Brokerの現在状態ではありません）',
+      _ => 'Broker Snapshotを確認できません',
+    };
 
     return ShellPage(
       title: '環境診断',
       children: [
-        _ReportSummary(status: snapshot.setupDoctorStatus, checks: checks),
+        _ReportSummary(status: status, checks: checks),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const ValueKey('setup-doctor-refresh'),
+            onPressed: brokerMode && !_isRefreshing ? _refresh : null,
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+            label: Text(_isRefreshing ? '取得中…' : 'Brokerから最新診断を取得'),
+          ),
+        ),
+        SectionList(
+          title: '診断データ',
+          rows: [
+            if (_refreshedStatus == null)
+              '表示元: $initialSource'
+            else if (_refreshFailure != null)
+              '表示元: 最新のBroker取得に失敗（前回の診断結果は破棄しました）'
+            else
+              '表示元: 認証Brokerから再取得した診断報告',
+            if (_reportId != null) '診断報告ID: $_reportId',
+            if (_generatedAt != null) 'Broker報告時刻: $_generatedAt',
+            if (_auditEventId != null) '監査イベントID: $_auditEventId',
+            if (_refreshFailure != null) _refreshFailure!,
+            'この再取得はSetup Doctor報告だけを更新します。下の他の状態一覧はSnapshotです。',
+            if (!brokerMode) '最新状態の再取得には、製品Brokerへの認証済み接続が必要です。',
+          ],
+        ),
         const SectionList(
           title: 'この診断で分かること',
           rows: [
-            'Brokerが取得できた現在の実行状態と、確認が必要な項目を表示します。',
+            '診断項目は起動時Snapshotまたは再取得したBroker報告を表示します。',
+            '証拠種別は各項目の観測元を示し、製品全体の完成判定ではありません。',
             'この診断はPermissionやApprovalを作らず、製品リリースの完成判定にも使いません。',
           ],
         ),
         SectionList(
-          title: '実行状態',
+          title: 'Snapshotの実行状態',
           rows: [
             '取得元: ${_snapshotSourceLabel(snapshot.snapshotSource)}',
             '鮮度: ${_snapshotFreshnessLabel(snapshot.snapshotFreshness)}',
@@ -52,7 +155,7 @@ class SetupDoctor extends StatelessWidget {
         SectionList(
           title: '診断結果',
           rows: checks.isEmpty
-              ? const ['Brokerから診断項目を取得できません。']
+              ? const ['診断項目を表示できません。上の取得状態と復旧案内を確認してください。']
               : ['${checks.length}項目を確認しました。'],
         ),
         for (final check in checks) _SetupDoctorCheckCard(check: check),
@@ -201,6 +304,11 @@ class _SetupDoctorCheckCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(check.message),
+            const SizedBox(height: 8),
+            Chip(
+              visualDensity: VisualDensity.compact,
+              label: Text(_evidenceClassLabel(check.evidenceClass)),
+            ),
             if (check.status != 'pass' && recovery != null) ...[
               const SizedBox(height: 12),
               Text(
@@ -248,6 +356,13 @@ String _statusLabel(String status) => switch (status) {
       'warning' => '確認が必要',
       'fail' => '問題あり',
       _ => '不明',
+    };
+
+String _evidenceClassLabel(String? evidenceClass) => switch (evidenceClass) {
+      'CONFIG' => '証拠種別: 設定情報',
+      'INTERNAL_STATE' => '証拠種別: Broker内部状態',
+      'LIVE_RUNTIME' => '証拠種別: Broker実行時観測',
+      _ => '証拠種別: 不明',
     };
 
 String _checkTitle(String checkId) => switch (checkId) {

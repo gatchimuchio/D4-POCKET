@@ -1,0 +1,336 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:gui_shell_desktop/screens/setup_doctor.dart';
+import 'package:gui_shell_desktop/services/broker_client.dart';
+import 'package:gui_shell_desktop/services/shell_core_client.dart';
+
+void main() {
+  testWidgets('Setup DoctorはBrokerから最新報告と証拠種別・監査IDを再取得する', (tester) async {
+    final transport = _SetupDoctorTransport();
+    final client = await ShellCoreClient.product(transport: transport);
+    transport.nextReportResponse = _setupDoctorResponse(
+      status: 'pass',
+      message: 'Brokerが再取得した最新状態です。',
+      auditId: 'audit-setup-doctor-refresh',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SetupDoctor(client: client)),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('setup-doctor-refresh')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('診断状態: 正常'), findsOneWidget);
+    expect(find.text('Brokerが再取得した最新状態です。'), findsWidgets);
+    expect(find.text('証拠種別: Broker実行時観測'), findsWidgets);
+    expect(find.text('監査イベントID: audit-setup-doctor-refresh'), findsOneWidget);
+    expect(
+      find.text('診断報告ID: setup-doctor-${'a' * 64}'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('起動時のSnapshot'), findsNothing);
+    final requests = transport.requests
+        .where((request) => request['operation'] == 'Setup Doctor報告取得')
+        .toList();
+    expect(requests, hasLength(2));
+    expect(requests.last['payload'], const <String, Object?>{'version': 1});
+  });
+
+  testWidgets('Setup Doctor再取得失敗時は前回結果を捨てunknownに閉じる', (tester) async {
+    final transport = _SetupDoctorTransport();
+    final client = await ShellCoreClient.product(transport: transport);
+    transport.nextReportResponse = {
+      'request_id': 'test-setup-doctor-rejected',
+      'operation': 'Setup Doctor報告取得',
+      'status': 'rejected',
+      'evidence_source': 'LIVE_RUNTIME',
+      'audit_event_id': 'audit-setup-doctor-rejected',
+      'error': {
+        'code': 'fixture_failure',
+        'message': 'SENSITIVE_SYNTHETIC_BROKER_DETAIL',
+      },
+      'body': null,
+    };
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SetupDoctor(client: client)),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('setup-doctor-refresh')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('診断状態: 不明'), findsOneWidget);
+    expect(find.text('最新の診断を取得できません。Broker接続を確認して再試行してください。'), findsOneWidget);
+    expect(find.text('起動時の診断です。'), findsNothing);
+    expect(
+        find.textContaining('SENSITIVE_SYNTHETIC_BROKER_DETAIL'), findsNothing);
+    expect(find.textContaining('監査イベントID:'), findsNothing);
+  });
+
+  testWidgets('LIVE_RUNTIME以外のSetup Doctor応答は表示しない', (tester) async {
+    final transport = _SetupDoctorTransport();
+    final client = await ShellCoreClient.product(transport: transport);
+    final wrongEvidence = _setupDoctorResponse(
+      status: 'pass',
+      message: '誤った証拠種別の結果です。',
+      auditId: 'audit-setup-doctor-wrong-evidence',
+    );
+    wrongEvidence['evidence_source'] = 'INTERNAL_STATE';
+    transport.nextReportResponse = wrongEvidence;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SetupDoctor(client: client)),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('setup-doctor-refresh')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('診断状態: 不明'), findsOneWidget);
+    expect(find.text('誤った証拠種別の結果です。'), findsNothing);
+    expect(find.text('起動時の診断です。'), findsNothing);
+    expect(
+      find.textContaining('audit-setup-doctor-wrong-evidence'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('Broker client切替後に旧報告の遅延応答を表示しない', (tester) async {
+    final firstTransport = _SetupDoctorTransport();
+    final firstClient =
+        await ShellCoreClient.product(transport: firstTransport);
+    final secondClient = await ShellCoreClient.product(
+      transport: _SetupDoctorTransport(initialMessage: '切替先BrokerのSnapshotです。'),
+    );
+    final pending = Completer<Map<String, Object?>>();
+    firstTransport.holdNextReport = pending;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SetupDoctor(client: firstClient)),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('setup-doctor-refresh')));
+    await tester.pump();
+    expect(
+      firstTransport.requests
+          .where((request) => request['operation'] == 'Setup Doctor報告取得'),
+      hasLength(2),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SetupDoctor(client: secondClient)),
+      ),
+    );
+    pending.complete(
+      _setupDoctorResponse(
+        status: 'pass',
+        message: '旧Brokerの遅延報告です。',
+        auditId: 'audit-stale-setup-doctor',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('切替先BrokerのSnapshotです。'), findsWidgets);
+    expect(find.text('旧Brokerの遅延報告です。'), findsNothing);
+  });
+
+  testWidgets('Broker以外のSnapshotでは再取得要求を送らない', (tester) async {
+    final transport = _SetupDoctorTransport();
+    final client = ShellCoreClient.mock(transport: transport);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SetupDoctor(client: client)),
+      ),
+    );
+
+    final button = tester.widget<OutlinedButton>(
+      find.byKey(const ValueKey('setup-doctor-refresh')),
+    );
+    expect(button.onPressed, isNull);
+    expect(find.textContaining('試験用Snapshot'), findsOneWidget);
+    expect(transport.requests, isEmpty);
+  });
+}
+
+class _SetupDoctorTransport implements BrokerTransport {
+  _SetupDoctorTransport({this.initialMessage = '起動時の診断です。'});
+
+  final String initialMessage;
+  final requests = <Map<String, Object?>>[];
+  int _reportCount = 0;
+  Map<String, Object?>? nextReportResponse;
+  Completer<Map<String, Object?>>? holdNextReport;
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) async {
+    requests.add({
+      'operation': operation,
+      if (payload != null) 'payload': Map<String, Object?>.from(payload),
+    });
+    if (operation == 'Setup Doctor報告取得') {
+      _reportCount++;
+      final next = nextReportResponse;
+      if (next != null) {
+        nextReportResponse = null;
+        return next;
+      }
+      final pending = holdNextReport;
+      if (pending != null) {
+        holdNextReport = null;
+        return pending.future;
+      }
+      return _setupDoctorResponse(
+        status: 'warning',
+        message: initialMessage,
+        unknownFirstCheck: true,
+        auditId: 'audit-setup-doctor-$_reportCount',
+      );
+    }
+    if (operation == 'health') {
+      return {
+        ..._accepted(operation, const <String, Object?>{}),
+        'health': {
+          'broker_id': 'test-broker',
+          'status': 'ready',
+          'authority_cutover_status': 'active',
+          'command_dispatch_enabled': false,
+          'persistence_ready': true,
+          'evidence_source': 'LIVE_RUNTIME',
+        },
+        'body': null,
+      };
+    }
+    if (operation == '初回設定取得') {
+      return _accepted(operation, {
+        'version': 1,
+        'product': 'D4 Pocket',
+        'ui_preferences': {
+          'theme': 'system',
+          'density': 'compact',
+          'locale': 'ja-JP',
+        },
+      });
+    }
+    if (operation == 'ホスト能力') {
+      return _accepted(operation, {
+        '版': 1,
+        'ホストID': 'fixture-host',
+        '表示名': '試験Host',
+        'プラットフォーム': 'windows',
+        '状態': 'ready',
+        '能力': <Map<String, Object?>>[],
+      });
+    }
+    if (operation == 'Host一覧') {
+      return _accepted(operation, {'版': 1, 'Host一覧': <Object?>[]});
+    }
+    if (operation == 'アダプター一覧') {
+      return _accepted(operation, {'Adapter一覧': <Object?>[]});
+    }
+    if (operation == 'Agent一覧') {
+      return _accepted(operation, {'Agent': <Object?>[]});
+    }
+    if (operation == '対話セッション一覧') {
+      return {
+        ..._accepted(operation, {'版': 1, '対話セッション': <Object?>[]}),
+        'evidence_source': 'INTERNAL_STATE',
+      };
+    }
+    if (operation == 'normalize_payload') {
+      return _accepted(operation, {'quarantined': false});
+    }
+    if (operation == 'content_projection') {
+      return _accepted(operation, {'redacted_payload': <String, Object?>{}});
+    }
+    if (operation == 'approval_edit') {
+      return _accepted(operation, {'ok': false});
+    }
+    if (operation == 'command_envelope') {
+      return {
+        'request_id': 'test-$operation',
+        'operation': operation,
+        'status': 'suspended',
+        'evidence_source': 'LIVE_RUNTIME',
+        'audit_event_id': 'audit-$operation',
+        'error': {'code': 'suspended', 'message': 'fixture'},
+        'body': null,
+      };
+    }
+    throw BrokerClientException('Unexpected fixture operation: $operation');
+  }
+}
+
+Map<String, Object?> _accepted(
+  String operation,
+  Map<String, Object?> body,
+) =>
+    {
+      'request_id': 'test-$operation',
+      'operation': operation,
+      'status': 'accepted',
+      'evidence_source': 'LIVE_RUNTIME',
+      'audit_event_id': 'audit-$operation',
+      'error': null,
+      'body': body,
+    };
+
+Map<String, Object?> _setupDoctorResponse({
+  required String status,
+  required String message,
+  required String auditId,
+  bool unknownFirstCheck = false,
+}) {
+  const checkIds = <String>[
+    'setup_doctor.ran_from_installed_app_path',
+    'setup_doctor.runtime_connection',
+    'setup_doctor.authority_boundary',
+    'setup_doctor.network_public_bind',
+    'setup_doctor.recovery_instruction',
+    'setup_doctor.audit_storage',
+    'setup_doctor.config_created',
+  ];
+  final checks = [
+    for (var index = 0; index < checkIds.length; index++)
+      {
+        'check_id': checkIds[index],
+        'status': unknownFirstCheck && index == 0 ? 'unknown' : 'pass',
+        'message': message,
+        'recovery_instruction': 'Broker接続後に再取得してください。',
+        'evidence_class': switch (index) {
+          1 || 5 => 'LIVE_RUNTIME',
+          2 || 4 || 6 => 'CONFIG',
+          _ => 'INTERNAL_STATE',
+        },
+        'grants_authority': false,
+      },
+  ];
+  return {
+    'request_id': 'test-Setup Doctor報告取得',
+    'operation': 'Setup Doctor報告取得',
+    'status': 'accepted',
+    'evidence_source': 'LIVE_RUNTIME',
+    'audit_event_id': auditId,
+    'error': null,
+    'body': {
+      'version': 1,
+      'report_id': 'setup-doctor-${'a' * 64}',
+      'generated_at': '2026-11-15T00:00:00Z',
+      'status': status,
+      'evidence_source': 'LIVE_RUNTIME',
+      'checks': checks,
+      'installer_grants_authority': false,
+      'installer_silently_approves_permissions': false,
+    },
+  };
+}

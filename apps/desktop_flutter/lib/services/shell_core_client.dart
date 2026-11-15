@@ -62,12 +62,8 @@ class ShellCoreClient {
           'Setup Doctor報告取得',
           payload: const <String, Object?>{'version': 1},
         );
-        setupDoctorReport = _validatedSetupDoctorReport(
-          _acceptedResponseBodyMap(
-            setupDoctorResponse,
-            'Setup Doctor報告取得',
-          ),
-        );
+        setupDoctorReport =
+            _setupDoctorReportProjectionFromResponse(setupDoctorResponse);
       } on Object {
         setupDoctorReport = _unknownSetupDoctorReport(
           'Rust Brokerから有効なSetup Doctor報告を取得できません。',
@@ -219,6 +215,40 @@ class ShellCoreClient {
   }
 
   ShellSnapshot getSnapshot() => snapshot;
+
+  Future<SetupDoctorReportRecord> refreshSetupDoctorReport() async {
+    final broker = brokerTransport;
+    if (mode != 'broker' || broker == null) {
+      throw const BrokerClientException(
+        'Setup Doctorの最新状態は認証Broker接続時だけ取得できます',
+      );
+    }
+    final response = await broker.request(
+      'Setup Doctor報告取得',
+      payload: const <String, Object?>{'version': 1},
+    );
+    final projection = _setupDoctorReportProjectionFromResponse(response);
+    final checks = projection['checks'];
+    final auditEventId = projection['audit_event_id'];
+    if (checks is! List ||
+        auditEventId is! String ||
+        !_isSafeAuditIdentifier(auditEventId)) {
+      throw const BrokerClientException('Setup Doctor報告の投影を確認できません');
+    }
+    return SetupDoctorReportRecord(
+      status: projection['status'] as String? ?? 'unknown',
+      checks: List<SetupDoctorCheckRecord>.unmodifiable(
+        checks.map(
+          (item) => SetupDoctorCheckRecord.fromJson(
+            Map<String, Object?>.from(item as Map),
+          ),
+        ),
+      ),
+      auditEventId: auditEventId,
+      reportId: projection['report_id'] as String?,
+      generatedAt: projection['generated_at'] as String?,
+    );
+  }
 
   Future<List<AgentSessionRecord>> refreshAgentSessions() async {
     final broker = brokerTransport;
@@ -894,6 +924,30 @@ Map<String, Object?> _unknownSetupDoctorReport(String message) {
   };
 }
 
+Map<String, Object?> _setupDoctorReportProjectionFromResponse(
+  Map<String, Object?> response,
+) {
+  const operation = 'Setup Doctor報告取得';
+  final auditEventId = response['audit_event_id'];
+  if (response['operation'] != operation ||
+      response['status'] != 'accepted' ||
+      response['error'] != null ||
+      response['evidence_source'] != 'LIVE_RUNTIME' ||
+      auditEventId is! String ||
+      !_isSafeAuditIdentifier(auditEventId)) {
+    throw const BrokerClientException(
+      'Broker Setup Doctor応答のoperation・状態・証拠種別・監査参照が不正です',
+    );
+  }
+  final report = _validatedSetupDoctorReport(
+    _acceptedResponseBodyMap(response, operation),
+  );
+  return <String, Object?>{
+    ...report,
+    'audit_event_id': auditEventId,
+  };
+}
+
 D4PocketUiConfiguration _validatedFirstRunConfiguration(
     Map<String, Object?> configuration) {
   const expectedFields = <String>{'version', 'product', 'ui_preferences'};
@@ -1001,7 +1055,12 @@ Map<String, Object?> _validatedSetupDoctorReport(Map<String, Object?> report) {
     return _unknownSetupDoctorReport(
         'Brokerが返したSetup Doctor report全体の状態が一致しません。');
   }
-  return <String, Object?>{'status': expectedStatus, 'checks': normalized};
+  return <String, Object?>{
+    'status': expectedStatus,
+    'checks': normalized,
+    'report_id': reportId,
+    'generated_at': generatedAt,
+  };
 }
 
 ShellSnapshot _brokerSnapshot({

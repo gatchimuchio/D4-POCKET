@@ -406,6 +406,7 @@ class SetupDoctorCheckRecord {
     required this.message,
     required this.recoveryInstruction,
     required this.grantsAuthority,
+    this.evidenceClass,
   });
 
   final String checkId;
@@ -413,6 +414,7 @@ class SetupDoctorCheckRecord {
   final String message;
   final String? recoveryInstruction;
   final bool grantsAuthority;
+  final String? evidenceClass;
 
   factory SetupDoctorCheckRecord.fromJson(Map<String, Object?> json) {
     return SetupDoctorCheckRecord(
@@ -421,8 +423,25 @@ class SetupDoctorCheckRecord {
       message: json['message'] as String? ?? '',
       recoveryInstruction: json['recovery_instruction'] as String?,
       grantsAuthority: json['grants_authority'] as bool? ?? false,
+      evidenceClass: json['evidence_class'] as String?,
     );
   }
+}
+
+class SetupDoctorReportRecord {
+  const SetupDoctorReportRecord({
+    required this.status,
+    required this.checks,
+    required this.auditEventId,
+    this.reportId,
+    this.generatedAt,
+  });
+
+  final String status;
+  final List<SetupDoctorCheckRecord> checks;
+  final String auditEventId;
+  final String? reportId;
+  final String? generatedAt;
 }
 
 class TrustRecord {
