@@ -1521,7 +1521,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "4542a8798770e608bcfc6ebe876d910b34d212fb9589e006bec64ed7082d689a"
+      "sha256": "411174cb21571d619e0bf3259f8c840ecf5866a97538a1373ffced9d71ee8245"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5701,7 +5701,7 @@
     },
     {
       "path": "tooling/package_android_product_candidate.py",
-      "sha256": "62df020befaa2cf8aff71d8e8fb988d912119cc5ec6236e12900fca35a61a0fb"
+      "sha256": "bb288351e15f5b732d8622da176aae9c0a00f36b63daf095cbb4524478e6a1c2"
     },
     {
       "path": "tooling/package_ios_product_candidate.py",
@@ -5817,7 +5817,7 @@
     },
     {
       "path": "tooling/tests/test_android_product_candidate.py",
-      "sha256": "b69248b7d316fce052098451ae2ba652034db1d1511b58bf253da71503a3bfbd"
+      "sha256": "816538a8f82d707cfa5cff90f932f9e9fa10988a57b3c1e94bed65e6c03e5d64"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",

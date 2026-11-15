@@ -357,7 +357,9 @@ def _inspect_apk(
     combined = f"{signature.stdout}\n{signature.stderr}"
     if variant == "debug":
         signer_dns = re.findall(
-            r"(?mi)^Signer #[0-9]+ certificate DN:\s*(.+?)\s*$", combined
+            r"(?mi)^(?:Signer #[0-9]+\s+|V[0-9]+(?:\.[0-9]+)? Signer:\s+)"
+            r"certificate DN:\s*(.+?)\s*$",
+            combined,
         )
         normalized_dns = [_certificate_dn_parts(dn) for dn in signer_dns]
         if signature.returncode != 0 or normalized_dns != [DEBUG_CERTIFICATE_DN]:

@@ -40,6 +40,7 @@ class AndroidProductCandidateTests(unittest.TestCase):
         self._write_apk(self.debug_apk)
         self._write_apk(self.release_apk, marker=b"release-build")
         self.app_id, self.version_name, self.version_code = candidate._application_identity()
+        self.debug_dn_prefix = "V2 Signer: certificate DN: "
         sdk_tools = self.root / "sdk" / "build-tools" / "37.0.0"
         sdk_tools.mkdir(parents=True)
         self.aapt = sdk_tools / "aapt"
@@ -75,7 +76,7 @@ class AndroidProductCandidateTests(unittest.TestCase):
             return subprocess.CompletedProcess(
                 arguments,
                 0,
-                stdout="Signer #1 certificate DN: C=US, O=Android, CN=Android Debug\n",
+                stdout=f"{self.debug_dn_prefix}C=US, O=Android, CN=Android Debug\n",
                 stderr="",
             )
         return subprocess.CompletedProcess(
@@ -124,6 +125,11 @@ class AndroidProductCandidateTests(unittest.TestCase):
         self.assertEqual(record["application_identity_confirmed"], False)
         self.assertEqual(record["credential_included"], False)
         self.assertEqual(record["installed_product_verified"], False)
+
+    def test_accepts_legacy_apksigner_debug_signer_line(self) -> None:
+        self.debug_dn_prefix = "Signer #1 certificate DN: "
+        evidence = self._package()
+        self.assertEqual(evidence["release_signature_state"], "unsigned")
 
     def test_schema_fixtures_separate_candidate_from_distribution_readiness(self) -> None:
         schema = json.loads(candidate.SCHEMA_PATH.read_text(encoding="utf-8"))
