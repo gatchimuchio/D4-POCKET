@@ -32,6 +32,77 @@ void main() {
     }
   });
 
+  test('全体検索はBrokerのAgent Adapter一覧を権限なしの表示metadataとして検索する', () {
+    final snapshot = ShellCoreClient.mock().getSnapshot().copyWith(
+      snapshotSource: 'broker',
+      agentAdapters: const [
+        AgentAdapterRecord(
+          adapterId: 'anthropic-adapter',
+          agentId: 'claude-agent',
+          provider: 'Anthropic',
+          version: '1.2',
+          model: 'claude-sonnet',
+          status: 'ready',
+          capabilities: [
+            AgentCapabilitySupportRecord(
+              capabilityId: 'task_execution',
+              status: 'supported',
+              reason: 'free-form capability reason must not enter search',
+            ),
+          ],
+          evidenceSource: 'LIVE_RUNTIME',
+          evidenceReason: 'credential-secret-marker',
+          authenticationMethod: 'credential-reference-secret-marker',
+          authenticationStatus: 'configured',
+        ),
+      ],
+    );
+
+    final results = GlobalSearchIndex.search(snapshot, 'claude-sonnet');
+
+    expect(results, hasLength(1));
+    expect(results.single.category, 'Agent Adapter');
+    expect(results.single.title, 'claude-agent');
+    expect(results.single.recordId, 'anthropic-adapter');
+    expect(results.single.pageIndex, 5);
+    expect(results.single.evidenceSource, 'INTERNAL_STATE');
+    expect(results.single.detail, contains('能力metadataは権限ではありません'));
+    expect(results.single.detail, isNot(contains('credential-secret-marker')));
+    expect(
+      GlobalSearchIndex.search(snapshot, 'credential-secret-marker'),
+      isEmpty,
+    );
+    expect(
+      GlobalSearchIndex.search(snapshot, 'free-form capability reason'),
+      isEmpty,
+    );
+  });
+
+  test('Agent Adapterの表示metadataから不可視・双方向制御文字を除去する', () {
+    final snapshot = ShellCoreClient.mock().getSnapshot().copyWith(
+      agentAdapters: const [
+        AgentAdapterRecord(
+          adapterId: 'adapter-safe',
+          agentId: 'agent-safe',
+          provider: 'Anthro\u202Epic',
+          version: '1',
+          model: 'claude\u200Bsonnet',
+          status: 'ready',
+          capabilities: [],
+          evidenceSource: 'FIXTURE',
+          evidenceReason: '',
+        ),
+      ],
+    );
+
+    final results = GlobalSearchIndex.search(snapshot, 'claudesonnet');
+
+    expect(results, hasLength(1));
+    expect(results.single.detail, contains('Anthropic'));
+    expect(results.single.detail, isNot(contains('\u202E')));
+    expect(results.single.detail, isNot(contains('\u200B')));
+  });
+
   test('取込JSONのsnapshot_source自己申告はBroker証拠へ昇格しない', () {
     final snapshot = ShellSnapshot.fromJson({
       'snapshot_source': 'broker',

@@ -147,6 +147,37 @@ class GlobalSearchIndex {
         pageIndex: 3,
       );
     }
+    for (final adapter in snapshot.agentAdapters) {
+      final adapterId = _safeUntrustedLabel(adapter.adapterId, 128);
+      final agentId = _safeUntrustedLabel(adapter.agentId, 128);
+      final recordId = adapterId.isNotEmpty ? adapterId : agentId;
+      if (recordId.isEmpty) continue;
+      final provider = _safeUntrustedLabel(adapter.provider, 96);
+      final model = _safeUntrustedLabel(adapter.model, 128);
+      final version = _safeUntrustedLabel(adapter.version, 64);
+      final status = _safeUntrustedLabel(adapter.status, 48);
+      final capabilityIds = adapter.capabilities
+          .take(16)
+          .map((capability) => _safeUntrustedLabel(capability.capabilityId, 96))
+          .where((capabilityId) => capabilityId.isNotEmpty)
+          .toList(growable: false);
+      final title = agentId.isNotEmpty ? agentId : adapterId;
+      final providerModel =
+          [provider, model].where((value) => value.isNotEmpty);
+      add(
+        category: 'Agent Adapter',
+        title: title,
+        detail: [
+          ...providerModel,
+          if (version.isNotEmpty) 'version=$version',
+          if (status.isNotEmpty) 'status=$status',
+          if (capabilityIds.isNotEmpty) '宣言能力=${capabilityIds.join(', ')}',
+          '能力metadataは権限ではありません',
+        ].join(' / '),
+        recordId: recordId,
+        pageIndex: 5,
+      );
+    }
     for (final setting in snapshot.settings) {
       add(
         category: 'プロファイル',
@@ -214,3 +245,17 @@ String _bounded(String value, int limit) {
   if (value.length <= limit) return value;
   return value.substring(0, limit);
 }
+
+String _safeUntrustedLabel(String value, int limit) => String.fromCharCodes(
+      value.runes.where((rune) {
+        final control = rune < 0x20 || (rune >= 0x7f && rune <= 0x9f);
+        final directionalOrInvisible = rune == 0x061c ||
+            (rune >= 0x200b && rune <= 0x200f) ||
+            rune == 0x2028 ||
+            rune == 0x2029 ||
+            (rune >= 0x202a && rune <= 0x202e) ||
+            (rune >= 0x2066 && rune <= 0x2069) ||
+            rune == 0xfeff;
+        return !control && !directionalOrInvisible;
+      }).take(limit),
+    ).trim();
