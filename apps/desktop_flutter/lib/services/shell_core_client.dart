@@ -172,9 +172,9 @@ class ShellCoreClient {
         broker,
         initialUiConfiguration,
       );
-    } on Object catch (error) {
+    } on Object {
       return ShellCoreClient._(
-        _brokerUnavailableSnapshot(error.toString()),
+        _brokerUnavailableSnapshot(),
         'broker_unavailable',
       );
     }
@@ -1506,7 +1506,7 @@ ShellSnapshot _brokerSnapshot({
   }).copyWith(snapshotSource: 'broker');
 }
 
-ShellSnapshot _brokerUnavailableSnapshot(String reason) {
+ShellSnapshot _brokerUnavailableSnapshot() {
   final now = DateTime.now().toUtc().toIso8601String();
   final problem = _releaseProblemJson(
     problemId: 'broker-product-path-unavailable',
@@ -1544,21 +1544,13 @@ ShellSnapshot _brokerUnavailableSnapshot(String reason) {
         'name': 'Rust Security Broker',
         'status': 'unavailable',
         'adapter_id': 'restricted_ipc',
-        'diagnostic_summary': reason,
+        'diagnostic_summary': '認証済みBroker IPCを確立できず、最新のBroker状態を取得できません。',
       },
     ],
     'agent_sessions': [],
     'permissions': [],
     'pending_approvals': [],
-    'audit_events': [
-      {
-        'event_id': 'broker-product-path-unavailable',
-        'action': 'broker.connect',
-        'result': 'rejected',
-        'payload_hash':
-            'sha256:0000000000000000000000000000000000000000000000000000000000000000',
-      },
-    ],
+    'audit_events': <Object?>[],
     'recovery_actions': [
       {
         'recovery_id': 'recover-broker-product-path',
@@ -1614,16 +1606,7 @@ ShellSnapshot _brokerUnavailableSnapshot(String reason) {
     'adapter_catalog': [],
     'permission_diffs': [],
     'problems': [problem],
-    'evidence': [
-      {
-        'evidence_id': 'broker-unavailable-fail-closed',
-        'kind': 'LIVE_RUNTIME',
-        'status': 'pass',
-        'path': 'broker://127.0.0.1/connect',
-        'hash': '',
-        'exportable': false,
-      },
-    ],
+    'evidence': <Object?>[],
     'settings': [],
     'audit_chain_status': 'not_ready',
     'network_exposure': '127.0.0.1 restricted broker IPC',
@@ -1637,7 +1620,7 @@ ShellSnapshot _brokerUnavailableSnapshot(String reason) {
       'validate_all': '製品UIでは未評価',
       'strict_windows_release': 'pending',
       'missing_measured_windows_evidence': true,
-      'missing_setup_doctor_evidence': false,
+      'missing_setup_doctor_evidence': true,
       'owner_go': 'missing',
     },
     'recovery_playbook': [_problemToRecoveryPlaybookJson(problem)],
