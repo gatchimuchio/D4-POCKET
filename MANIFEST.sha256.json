@@ -744,6 +744,10 @@
       "sha256": "deaba0f20f3295bdcbf8173ac10c14e23dc1baefae6104e2d04cc1264b7609d7"
     },
     {
+      "path": "apps/desktop_flutter/test/support/d4p_receipt_fixtures.dart",
+      "sha256": "3caa26fcdf5a9ed3abff94719f8b3eadb2dfa895fa86522e2d887624602d6f4b"
+    },
+    {
       "path": "apps/desktop_flutter/test/support/real_broker_mcp_probe.dart",
       "sha256": "e17ca6cfd5bea617ee10a1b1edafede97bfc6f171a8a7817546578c42da4b6b7"
     },
@@ -1513,7 +1517,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "7183cd0cda645740bde66e09a8a95bded9f2782f9d251616ad82c230dc27a6cb"
+      "sha256": "ebd3d4545ba3757aab321b744cfa73b4ed2d7ce120665553521e0ec2a4d597fa"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -2330,6 +2334,14 @@
     {
       "path": "examples/contracts/gui_shell_windows_export_build.valid.json",
       "sha256": "bd1a6aa35f6f9b27b60f05ad9bd30bf6f4de445a442a63cf8027516520efa96e"
+    },
+    {
+      "path": "examples/contracts/gui_shell_windows_setup_export.negative.json",
+      "sha256": "2b2e6339685a2f26f88089426c0ed5c5dc60f4c8ac4a87329bb7a8527818af00"
+    },
+    {
+      "path": "examples/contracts/gui_shell_windows_setup_export.valid.json",
+      "sha256": "410292c290f0a91b8fdd655048e91c945e20538efcdf3529fe339361429e85aa"
     },
     {
       "path": "examples/contracts/host_capability.valid.json",
@@ -3705,7 +3717,7 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "a9a6bf7d72e6519c86c2243f1142c38556bf4bcb22c40dd44898ab09b4b77a09"
+      "sha256": "d34d4cc320acf2fcd6dd3eafbd9cc568bf26b087f10e30647a6e76e072f9a884"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
@@ -5128,6 +5140,10 @@
       "sha256": "d1f10c697cb1e26cfe4c28ece051fa44b16f9e7a604e940a6b61b620821fef70"
     },
     {
+      "path": "specs/gui_shell_windows_setup_export.schema.json",
+      "sha256": "dec265ccd4729b9340016faa449a9a2918dea625afc0b28faf000178aba4af67"
+    },
+    {
       "path": "specs/host_capability.schema.json",
       "sha256": "0e5ae0411f251cb1a2ad59e178936d9a3d88dfe9feefc9b59d8c1cf0dca3d205"
     },
@@ -5516,6 +5532,10 @@
       "sha256": "aeda7d439d71d1ef1d1b19a0b155424f1171107d1ca0cc4f9cca61650075300d"
     },
     {
+      "path": "tooling/build_windows_setup_from_export.py",
+      "sha256": "f72ae8a5aa62b81cb874d11688a3acc6915426195cc4e282947334949ff3c6db"
+    },
+    {
       "path": "tooling/canonicalization_vectors/runtime_resource_observation_decimal.json",
       "sha256": "0a4cf0ef4c1098a5c9c59297dd049ac7ebd340b7a113e84b628c9529d9b2643b"
     },
@@ -5794,6 +5814,10 @@
     {
       "path": "tooling/tests/test_windows_bootstrap_setup.py",
       "sha256": "64185fd3b63ce29c926ed9252b1ee8222d0d84ab0da944f7b730306d431aed54"
+    },
+    {
+      "path": "tooling/tests/test_windows_export_setup_pipeline.py",
+      "sha256": "681dd40a749de4d1326ed8c00afff6c28347632c31962c137165352732cede06"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",

@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "evidence_type": "d4_pocket_windows_setup_export",
+  "evidence_source": "INTERNAL_STATE",
+  "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "export_id": "export-01",
+  "app_id": "d4-pocket-app-11111111111111111111111111111111",
+  "audit_store_id": "audit-store-22222222222222222222222222222222",
+  "target_platform": "windows",
+  "product_version": "1.2.3+4",
+  "module_plan": {
+    "catalog_version": 1,
+    "selection_mode": "explicit_optional",
+    "requested_optional_module_ids": ["shell.history"],
+    "unprunable_core_ids": ["core.security_broker"],
+    "included_module_ids": ["core.security_broker", "shell.dashboard", "shell.history"],
+    "excluded_optional_module_ids": ["shell.trace_inspector"]
+  },
+  "portable_bundle_tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "setup_file": {
+    "name": "D4Pocket-Setup-1.2.3+4.exe",
+    "size_bytes": 4096,
+    "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "authenticode": "not_signed_by_this_build_recipe"
+  },
+  "signed": false,
+  "formal_distribution_claimed": false,
+  "product_installed_runtime": "not_exercised",
+  "portable_bundle_preserved": false
+}

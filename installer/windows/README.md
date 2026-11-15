@@ -41,15 +41,17 @@ python -X utf8 tooling/export_windows_product.py `
 
 Setupは`PrivilegesRequired=lowest`で動き、payloadをInno Setup自身のrun固有`{tmp}`下へ展開してRust Desktop Launcherを通常起動する。Launcherが終了するまでSetupは待機し、Setup終了時にその一時rootをInno Setupが削除する。Setupは固定製品root、Start Menu、registry、AppDataへ直接書き込まず、別uninstallerも登録しない。初回導入・更新・修復・rollback・アンインストールは、起動後のD4 Pocket UIから既存Brokerの署名検証・native Owner確認・Audit経路へ接続する。インストール後のStart Menu shortcutと削除はBrokerの既存管理経路が所有する。
 
-現行mainのclean Exportからbundleを作成した後、Repository／OneDrive外の**未作成output directory**を用意し、次を実行する。
+現行mainのclean Broker Export Receiptと、そのReceiptが束縛するManifestから、portable bundle生成とbootstrap Setup compileを一続きで行うには、Repository／OneDrive外の**未作成output directory**を指定して次を実行する。Builderは一時bundleでExport evidence／Setup evidenceを照合し、署名なしSetup.exeと`d4_pocket_windows_setup_export.json`だけを同一directoryへ原子的に公開する。中間portable bundleは保持しない。実行する開発機にはPython、Cargo／Rust、Flutter、Inno Setup 6が必要だが、生成Setupの利用者には要求しない。
 
 ```powershell
-$installerOutput = '<Repository／OneDrive外の未作成output directory>'
-New-Item -ItemType Directory -Path $installerOutput | Out-Null
-python -B -X utf8 tooling/build_windows_installer.py `
-  --source-dir $bundle `
-  --output-dir $installerOutput
+$setupOutput = '<Repository／OneDrive外の未作成output directory>'
+python -B -X utf8 tooling/build_windows_setup_from_export.py `
+  --receipt $receipt `
+  --manifest-file $manifest `
+  --output-dir $setupOutput
 ```
+
+個別の`tooling/export_windows_product.py`と`tooling/build_windows_installer.py`は引き続き、それぞれportable bundleとSetupを別々に作るDeveloper用手段として使用できる。統合toolは、実Broker ReceiptからSetup候補へつながる手順をまとめるだけで、署名、Owner authority、正式配布、installed runtimeを証明しない。
 
 このsource/build recipeは通常Setupの配布候補生成までであり、実bundleからのSetup実生成・署名、別profileのinstalled first-run、実AI Task、Update／Repair／Rollback／Uninstallの一気通貫LIVE_RUNTIME受入れを意味しない。実出力はAuthenticode未署名で、未確定のPublisher identityも埋め込まない。これらとW06/G6-WINは未完のまま保持する。署名identityがないことを理由にsource施工を停止せず、署名・公開はRelease側で別判定する。
 
