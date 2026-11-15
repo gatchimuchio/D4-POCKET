@@ -273,7 +273,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/host_operation_center.dart",
-      "sha256": "4f22b64dfdc8735de0b457470dfcf7d9d2f59fe057e963685713a36743f7dcc0"
+      "sha256": "7b42fd08d3d180b19028ce84b3690a366efc86db2ed61c848c98e6de3a29d8ba"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
@@ -429,7 +429,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "25723e715c3a3bd99d2bb7333f7be4c216a1b9c40fa8949ea320b4d37a816654"
+      "sha256": "d7823c70e431e4285768de271448ffcc4c65bbb31fda95a5d612d0a0932bd984"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
@@ -693,7 +693,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/host_registration_test.dart",
-      "sha256": "bc96c1142ae1a1d8dd91ab3167cdfcfe3fcf616a4437bdd2e62439c1d1048c72"
+      "sha256": "f7277efe9453ce5284a59bf368dac98b08977923c01ce922ef4555787ecb2c7c"
     },
     {
       "path": "apps/desktop_flutter/test/linux_credential_vault_test.dart",
@@ -1525,7 +1525,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "be7a109812e9e9761e9471ca1dbda6f1b58f50903b65c7c9d5b1db97ec2bdf5a"
+      "sha256": "22ca8ecfb30600edd478dd2698ac12f0a14c8400817c21a74022a5fb258faa6d"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",

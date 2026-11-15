@@ -110,10 +110,10 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
             'Host切替を監査しました。監査ID=${receipt.auditId} / 承認=${receipt.approvalState} / 権限生成=${receipt.authorityGenerated}';
         _busy = false;
       });
-    } on Object catch (error) {
+    } on Object {
       if (!mounted) return;
       setState(() {
-        _message = 'Host切替を拒否しました。$error';
+        _message = 'Host切替の結果を確認できません。Brokerから最新状態を取得してください。';
         _busy = false;
       });
     }

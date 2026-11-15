@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gui_shell_desktop/models/generated_contracts.dart';
 import 'package:gui_shell_desktop/screens/host_operation_center.dart';
 import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/host_registration_client.dart';
@@ -40,9 +41,18 @@ Map<String, Object?> receipt({String platform = 'macos'}) => {
     };
 
 class PublicHostBroker implements BrokerTransport {
-  PublicHostBroker({this.reject = false, this.change});
+  PublicHostBroker({
+    this.reject = false,
+    this.change,
+    this.rejectionCode = 'owner_denied',
+    this.rejectionMessage = 'fixture rejection',
+    this.rejectionError,
+  });
   final bool reject;
   final void Function(Map<String, Object?>)? change;
+  final String rejectionCode;
+  final String rejectionMessage;
+  final Object? rejectionError;
   final operations = <String>[];
   Map<String, Object?>? registration;
   String registeredPlatform = 'macos';
@@ -83,7 +93,10 @@ class PublicHostBroker implements BrokerTransport {
     return {
       'operation': operation,
       'status': reject ? 'rejected' : 'accepted',
-      'error': null,
+      'error': reject
+          ? rejectionError ??
+              {'code': rejectionCode, 'message': rejectionMessage}
+          : null,
       'evidence_source': 'INTERNAL_STATE',
       'audit_event_id':
           operation == 'Host登録' ? 'audit-host-register' : 'audit-host-list',
@@ -198,6 +211,78 @@ void main() {
     expect(find.textContaining('Host登録または一覧更新は未成立です。'), findsWidgets);
     expect(find.textContaining('Host metadataを登録しました。'), findsNothing);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+  test('Host切替の拒否例外からBroker自由記述を除く', () async {
+    const marker = 'secret-marker path and raw broker detail';
+    const codeMarker = 'secret_marker';
+    for (final rejectionError in <Object?>[
+      {'code': codeMarker, 'message': marker},
+      marker,
+    ]) {
+      final broker = PublicHostBroker(
+        reject: true,
+        rejectionError: rejectionError,
+      );
+      final client = ShellCoreClient.mock(transport: broker);
+      final host = client.getSnapshot().hosts.single;
+
+      await expectLater(
+        client.selectHost(host.hostId, selectedHost: host),
+        throwsA(
+          isA<BrokerClientException>()
+              .having((error) => error.message, 'message', contains('Host切替'))
+              .having(
+                  (error) => error.message, 'message', isNot(contains(marker)))
+              .having((error) => error.message, 'message',
+                  isNot(contains(codeMarker))),
+        ),
+      );
+    }
+  });
+  testWidgets('Host切替の拒否詳細を画面へ露出しない', (tester) async {
+    const marker = 'secret-marker path and raw broker detail';
+    final broker = PublicHostBroker(
+      reject: true,
+      rejectionMessage: marker,
+    );
+    final baseClient = ShellCoreClient.mock(transport: broker);
+    final currentHost = baseClient.getSnapshot().hosts.single;
+    const otherHost = HostRegistryRecord(
+      hostId: 'other-host-fixture',
+      displayName: '別登録Host',
+      platform: 'linux',
+      connectionState: 'pending_review',
+      trustState: 'pending_review',
+      runtimeCount: 0,
+      agentCount: 0,
+      evidenceSource: 'INTERNAL_STATE',
+      visibility: 'metadata_only',
+      authorityStrip: true,
+    );
+    final client = ShellCoreClient.mock(
+      transport: broker,
+      snapshot:
+          baseClient.getSnapshot().copyWith(hosts: [currentHost, otherHost]),
+    );
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: HostOperationCenter(client: client),
+      ),
+    ));
+
+    await tester.tap(find.text('別登録Host'));
+    await tester.pumpAndSettle();
+    final switchButton = find.widgetWithText(FilledButton, 'Host切替');
+    await tester.ensureVisible(switchButton);
+    await tester.tap(switchButton);
+    await tester.pumpAndSettle();
+
+    expect(broker.operations, ['Host切替']);
+    expect(find.textContaining(marker), findsNothing);
+    expect(
+      find.textContaining('Host切替の結果を確認できません。'),
+      findsWidgets,
+    );
+  });
   testWidgets('LinuxにHost登録入口を表示しLinux metadataをBrokerへ送る', (tester) async {
     final broker = PublicHostBroker();
     await tester.pumpWidget(MaterialApp(

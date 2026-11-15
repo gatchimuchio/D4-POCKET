@@ -201,8 +201,16 @@ class ShellCoreClient {
     );
   }
 
-  factory ShellCoreClient.mock({BrokerTransport? transport}) {
-    return ShellCoreClient._(_mockSnapshot, 'mock', null, transport);
+  factory ShellCoreClient.mock({
+    BrokerTransport? transport,
+    ShellSnapshot? snapshot,
+  }) {
+    return ShellCoreClient._(
+      snapshot ?? _mockSnapshot,
+      'mock',
+      null,
+      transport,
+    );
   }
 
   ShellSnapshot getSnapshot() => snapshot;
@@ -1058,12 +1066,8 @@ Map<String, Object?> _hostRegistryRecordSnapshotJson(Map item) {
 
 void _requireAccepted(Map<String, Object?> response, String operation) {
   if (response['status'] != 'accepted') {
-    final error = response['error'];
-    final message = error is Map
-        ? error['message']?.toString() ?? response.toString()
-        : response.toString();
     throw BrokerClientException(
-      '$operation の broker request が拒否されました: $message',
+      '$operation の broker request が拒否されました',
     );
   }
 }
