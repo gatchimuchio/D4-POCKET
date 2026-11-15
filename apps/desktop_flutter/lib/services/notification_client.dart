@@ -9,17 +9,12 @@ class NotificationClient {
   Future<Map<String, Object?>> list({
     bool unreadOnly = false,
     int limit = 200,
-  }) async {
-    final response = await _transport.request(
-      '通知一覧',
-      payload: {
+  }) =>
+      _request('通知一覧', {
         '版': 1,
         '未読のみ': unreadOnly,
         '上限': limit,
-      },
-    );
-    return _acceptedBody(response, '通知一覧');
-  }
+      });
 
   Future<Map<String, Object?>> markRead({
     required String notificationId,
@@ -48,36 +43,32 @@ class NotificationClient {
     String operation,
     Map<String, Object?> payload,
   ) async {
-    final response = await _transport.request(operation, payload: payload);
+    late final Map<String, Object?> response;
+    try {
+      response = await _transport.request(operation, payload: payload);
+    } on Object {
+      throw BrokerClientException(_failureMessage(operation));
+    }
     if (response['status'] != 'accepted') {
-      final error = response['error'];
-      final message = error is Map
-          ? error['message']?.toString() ?? response.toString()
-          : response.toString();
-      throw BrokerClientException('$operation が拒否されました: $message');
+      throw BrokerClientException(_failureMessage(operation));
     }
     return _body(response, operation);
   }
 }
 
-Map<String, Object?> _acceptedBody(
-  Map<String, Object?> response,
-  String operation,
-) {
-  if (response['status'] != 'accepted') {
-    final error = response['error'];
-    final message = error is Map
-        ? error['message']?.toString() ?? response.toString()
-        : response.toString();
-    throw BrokerClientException('$operation が拒否されました: $message');
-  }
-  return _body(response, operation);
-}
+String _failureMessage(String operation) => switch (operation) {
+      '通知一覧' => '通知一覧を取得できません。Broker接続と通知状態を確認してください。',
+      _ => '通知の状態を更新できません。Broker接続と通知状態を確認してください。',
+    };
 
 Map<String, Object?> _body(Map<String, Object?> response, String operation) {
   final body = response['body'];
   if (body is! Map) {
-    throw BrokerClientException('$operation 応答bodyがobjectではありません');
+    throw BrokerClientException('$operation 応答の通知形式が不正です。表示を停止しました。');
   }
-  return Map<String, Object?>.from(body);
+  try {
+    return Map<String, Object?>.from(body);
+  } on Object {
+    throw BrokerClientException('$operation 応答の通知形式が不正です。表示を停止しました。');
+  }
 }

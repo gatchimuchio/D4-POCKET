@@ -18,6 +18,8 @@ Desktop Flutterの通知画面 → 通常認証済みBroker IPC → Rust Notific
 
 監査走査は直近4096 event、返却は最大256件に制限する。通知表示状態の未知field、重複ID、hash不正、malformed file、stale hashはfail-closedで扱う。native Windows toastは既存Broker host capabilityが未接続のため、本単位では実装済みと主張しない。
 
+Desktop Client／画面はBroker拒否文、transport例外、malformed response由来の例外詳細を操作者向け表示へ流さず、固定の通知失敗文へ正規化する。診断詳細を新しいログやAuditへ複製しない。
+
 ## 検証
 
 `notification.schema.json`、`notification_list.schema.json`、`notification_action.schema.json`、負例fixture、Rust Notification Center単体試験、Desktop client／navigation試験、Schema／Conformanceへ接続する。

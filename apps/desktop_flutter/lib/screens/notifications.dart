@@ -52,9 +52,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _message = '通知の表示状態を更新しました。';
         _refresh();
       });
-    } on Object catch (error) {
+    } on Object {
       if (!mounted) return;
-      setState(() => _message = error.toString());
+      setState(() {
+        _message = '通知の状態を更新できません。Broker接続と通知状態を確認してください。';
+      });
     }
   }
 
@@ -82,8 +84,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 return const BorderedPanel(child: LinearProgressIndicator());
               }
               if (snapshot.hasError) {
-                return BorderedPanel(
-                  child: Text('通知一覧を取得できません: ${snapshot.error}'),
+                return const BorderedPanel(
+                  child: Text(
+                    '通知一覧を取得できません。Broker接続と通知状態を確認してください。',
+                  ),
                 );
               }
               final body = snapshot.data ?? const <String, Object?>{};
