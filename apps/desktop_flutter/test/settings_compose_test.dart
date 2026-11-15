@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -50,6 +51,57 @@ void main() {
     expect(
       find.text('Brokerが署名検証済み候補を取得しました（2件）。'),
       findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('SettingsのBroker切替で旧Compose catalogの遅延応答を破棄する', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final oldTransport = _ComposeScreenTransport(
+      mcpServerDisplayName: 'Broker A MCP',
+      holdMcpCatalog: true,
+    );
+    final newTransport = _ComposeScreenTransport(
+      mcpServerDisplayName: 'Broker B MCP',
+    );
+
+    Widget settingsFor(BrokerTransport transport) => MaterialApp(
+          home: Scaffold(
+            body: SettingsScreen(
+              client: ShellCoreClient.mock(transport: transport),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(settingsFor(oldTransport));
+    await tester.pumpAndSettle();
+    final refresh = find.byKey(
+      const ValueKey('compose-mcp-catalog-refresh'),
+    );
+    await tester.ensureVisible(refresh);
+    await tester.tap(refresh);
+    await tester.pump();
+    await oldTransport.mcpCatalogRequestStarted.future.timeout(
+      const Duration(seconds: 2),
+    );
+
+    await tester.pumpWidget(settingsFor(newTransport));
+    await tester.pumpAndSettle();
+    oldTransport.releasePendingMcpCatalog();
+    await tester.pumpAndSettle();
+    expect(find.text('Broker A MCP'), findsNothing);
+
+    await _tap(tester, 'compose-mcp-catalog-refresh');
+    expect(find.text('Broker B MCP'), findsOneWidget);
+    expect(
+      newTransport.requests
+          .where((request) => request['operation'] == 'MCP接続一覧'),
+      hasLength(1),
     );
     expect(tester.takeException(), isNull);
   });
@@ -522,8 +574,30 @@ Future<void> _tap(WidgetTester tester, String key) async {
 }
 
 class _ComposeScreenTransport implements BrokerTransport {
+  _ComposeScreenTransport({
+    this.mcpServerDisplayName = 'Fixture MCP',
+    this.holdMcpCatalog = false,
+  });
+
   final List<Map<String, Object?>> requests = [];
   final String composeToolId = 'tool-${List<String>.filled(142, "a").join()}';
+  final String mcpServerDisplayName;
+  final bool holdMcpCatalog;
+  final Completer<void> mcpCatalogRequestStarted = Completer<void>();
+  final Completer<Map<String, Object?>> _pendingMcpCatalog =
+      Completer<Map<String, Object?>>();
+
+  void releasePendingMcpCatalog() {
+    if (_pendingMcpCatalog.isCompleted) return;
+    _pendingMcpCatalog.complete(_mcpConnectionListBody());
+  }
+
+  Future<Map<String, Object?>> _waitForMcpCatalog() {
+    if (!mcpCatalogRequestStarted.isCompleted) {
+      mcpCatalogRequestStarted.complete();
+    }
+    return _pendingMcpCatalog.future;
+  }
 
   Map<String, Object?> lastPayload(String operation) => requests
           .lastWhere((request) => request['operation'] == operation)['payload']!
@@ -590,7 +664,8 @@ class _ComposeScreenTransport implements BrokerTransport {
           'authority_strip': true,
           'permission_generated': false,
         },
-      'MCP接続一覧' => _mcpConnectionListBody(),
+      'MCP接続一覧' =>
+        holdMcpCatalog ? await _waitForMcpCatalog() : _mcpConnectionListBody(),
       'MCP Tool実行' => <String, Object?>{
           '版': 1,
           '契約種別': 'MCP Tool実行receipt',
@@ -735,7 +810,10 @@ class _ComposeScreenTransport implements BrokerTransport {
           {
             '版': 1,
             '契約種別': 'MCP外部概念射影',
-            'Server': {'server_id': 'mcp.local', '表示名': 'Fixture MCP'},
+            'Server': {
+              'server_id': 'mcp.local',
+              '表示名': mcpServerDisplayName,
+            },
             'Transport': {'kind': 'stdio'},
             'Tool': [
               {

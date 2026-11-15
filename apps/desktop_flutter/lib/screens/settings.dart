@@ -44,7 +44,7 @@ const guiShellProductVersion = String.fromEnvironment(
   defaultValue: '開発版',
 );
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
     super.key,
     required this.client,
@@ -68,10 +68,47 @@ class SettingsScreen extends StatefulWidget {
   final ValueChanged<AiEditProposalReview>? onPrepareAiEditTask;
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  Widget build(BuildContext context) => _SettingsScreenStateful(
+        key: ObjectKey(client.brokerTransport ?? client),
+        client: client,
+        active: active,
+        requestApplicationExit: requestApplicationExit,
+        focusUpdateCenterRequest: focusUpdateCenterRequest,
+        focusMcpCenterRequest: focusMcpCenterRequest,
+        focusComposeCenterRequest: focusComposeCenterRequest,
+        focusExportCenterRequest: focusExportCenterRequest,
+        onPrepareAiEditTask: onPrepareAiEditTask,
+      );
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenStateful extends StatefulWidget {
+  const _SettingsScreenStateful({
+    super.key,
+    required this.client,
+    this.active = true,
+    this.requestApplicationExit,
+    this.focusUpdateCenterRequest = 0,
+    this.focusMcpCenterRequest = 0,
+    this.focusComposeCenterRequest = 0,
+    this.focusExportCenterRequest = 0,
+    this.onPrepareAiEditTask,
+  });
+
+  final ShellCoreClient client;
+  final bool active;
+  final Future<ui.AppExitResponse> Function(ui.AppExitType)?
+      requestApplicationExit;
+  final int focusUpdateCenterRequest;
+  final int focusMcpCenterRequest;
+  final int focusComposeCenterRequest;
+  final int focusExportCenterRequest;
+  final ValueChanged<AiEditProposalReview>? onPrepareAiEditTask;
+
+  @override
+  State<_SettingsScreenStateful> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<_SettingsScreenStateful> {
   final GlobalKey _updateCenterKey = GlobalKey();
   final GlobalKey _composeCenterKey = GlobalKey();
   final GlobalKey _exportCenterKey = GlobalKey();
@@ -167,7 +204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   @override
-  void didUpdateWidget(covariant SettingsScreen oldWidget) {
+  void didUpdateWidget(covariant _SettingsScreenStateful oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!oldWidget.active && widget.active) {
       _updatesFuture = _updateClient?.list();
