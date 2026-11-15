@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_ios_product_candidate.schema.json",
+  "title": "iOS製品build候補証拠（IosProductBuildCandidate）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_type",
+    "source_commit",
+    "toolchain",
+    "bundle_identity",
+    "simulator_artifact",
+    "device_artifact",
+    "relationship",
+    "distribution_ready",
+    "formal_distribution_claimed",
+    "installed_product_verified"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "evidence_type": { "const": "d4_pocket_ios_product_build_candidate" },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flutter_version", "xcode_version", "host_platform"],
+      "properties": {
+        "flutter_version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$" },
+        "xcode_version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$" },
+        "host_platform": { "const": "macos" }
+      }
+    },
+    "bundle_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundle_identifier", "owner_confirmed", "distribution_identity"],
+      "properties": {
+        "bundle_identifier": { "type": "string", "pattern": "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+){1,7}$" },
+        "owner_confirmed": { "const": false },
+        "distribution_identity": { "const": false }
+      }
+    },
+    "simulator_artifact": {
+      "allOf": [
+        { "$ref": "#/$defs/artifact" },
+        { "properties": { "platform": { "const": "IOSSIMULATOR" } } }
+      ]
+    },
+    "device_artifact": {
+      "allOf": [
+        { "$ref": "#/$defs/artifact" },
+        { "properties": { "platform": { "const": "IOS" } } }
+      ]
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["same_source_commit", "same_bundle_identifier", "distinct_artifact_hashes", "distinct_main_executable_hashes"],
+      "properties": {
+        "same_source_commit": { "const": true },
+        "same_bundle_identifier": { "const": true },
+        "distinct_artifact_hashes": { "const": true },
+        "distinct_main_executable_hashes": { "const": true }
+      }
+    },
+    "distribution_ready": { "const": false },
+    "formal_distribution_claimed": { "const": false },
+    "installed_product_verified": { "const": false }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_name", "sha256", "size_bytes", "bundle_identifier", "main_executable_sha256", "bundle_tree_sha256", "bundle_file_count", "bundle_uncompressed_bytes", "architectures", "platform", "app_bundle_signed", "provisioning_profile_present"],
+      "properties": {
+        "file_name": { "type": "string", "pattern": "^d4-pocket-ios-(simulator-app|device-unsigned-app)\\.zip$" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size_bytes": { "type": "integer", "minimum": 1, "maximum": 2000000000 },
+        "bundle_identifier": { "type": "string", "pattern": "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+){1,7}$" },
+        "main_executable_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "bundle_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "bundle_file_count": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "bundle_uncompressed_bytes": { "type": "integer", "minimum": 1, "maximum": 2000000000 },
+        "architectures": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["arm64", "arm64e", "x86_64", "i386", "armv7", "armv7s"] } },
+        "platform": { "enum": ["IOS", "IOSSIMULATOR"] },
+        "app_bundle_signed": { "const": false },
+        "provisioning_profile_present": { "const": false }
+      }
+    }
+  }
+}

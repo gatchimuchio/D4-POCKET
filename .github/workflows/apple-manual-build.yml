@@ -10,6 +10,7 @@ name: Apple platform 手動補助build
           - all
           - ios_mobile
           - ios_product_ui
+          - ios_product_candidate
           - macos_product
           - macos_export
           - macos_owner
@@ -946,7 +947,7 @@ jobs:
           if-no-files-found: error
 
   ios-mobile-validation:
-    if: ${{ inputs.target == 'all' || inputs.target == 'ios_mobile' || inputs.target == 'ios_product_ui' }}
+    if: ${{ inputs.target == 'all' || inputs.target == 'ios_mobile' || inputs.target == 'ios_product_ui' || inputs.target == 'ios_product_candidate' }}
     runs-on: macos-15
     timeout-minutes: 35
     steps:
@@ -1007,6 +1008,16 @@ jobs:
           flutter analyze --no-pub 2>&1 | tee ../../evidence/mobile-analyze.txt
           flutter test --no-pub --reporter expanded 2>&1 | tee ../../evidence/mobile-test.txt
           flutter build ios --simulator --debug --no-pub 2>&1 | tee ../../evidence/ios-simulator-build.txt
+
+      - name: iOS候補生成
+        if: ${{ inputs.target == 'ios_product_candidate' }}
+        working-directory: apps/mobile_flutter
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build ios --simulator --release --no-codesign --no-pub
+          flutter build ios --release --no-codesign --no-pub
+          python3 -B -X utf8 ../../tooling/package_ios_product_candidate.py --simulator-app "$PWD/build/ios/iphonesimulator/Runner.app" --device-app "$PWD/build/ios/iphoneos/Runner.app" --output-dir "$RUNNER_TEMP/ios-product-candidate" --flutter-version 3.44.0 --xcode-version "$(xcodebuild -version | sed -n '1s/Xcode //p')"
 
       - name: iOS native XCTest・実Broker接続
         shell: bash
@@ -1069,6 +1080,8 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ios-mobile-validation-${{ github.sha }}
-          path: evidence/
+          path: |
+            evidence/
+            ${{ runner.temp }}/ios-product-candidate/
           retention-days: 3
           if-no-files-found: error

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "evidence_type": "d4_pocket_ios_product_build_candidate",
+  "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "toolchain": { "flutter_version": "3.44.0", "xcode_version": "16.4", "host_platform": "macos" },
+  "bundle_identity": { "bundle_identifier": "com.example.guiShellMobile", "owner_confirmed": false, "distribution_identity": false },
+  "simulator_artifact": { "file_name": "d4-pocket-ios-simulator-app.zip", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size_bytes": 104857600, "bundle_identifier": "com.example.guiShellMobile", "main_executable_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "bundle_tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "bundle_file_count": 240, "bundle_uncompressed_bytes": 310000000, "architectures": ["arm64"], "platform": "IOSSIMULATOR", "app_bundle_signed": false, "provisioning_profile_present": false },
+  "device_artifact": { "file_name": "d4-pocket-ios-device-unsigned-app.zip", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "size_bytes": 99000000, "bundle_identifier": "com.example.guiShellMobile", "main_executable_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "bundle_tree_sha256": "1111111111111111111111111111111111111111111111111111111111111111", "bundle_file_count": 240, "bundle_uncompressed_bytes": 300000000, "architectures": ["arm64"], "platform": "IOS", "app_bundle_signed": false, "provisioning_profile_present": false },
+  "relationship": { "same_source_commit": true, "same_bundle_identifier": true, "distinct_artifact_hashes": true, "distinct_main_executable_hashes": true },
+  "distribution_ready": true,
+  "formal_distribution_claimed": true,
+  "installed_product_verified": false
+}
