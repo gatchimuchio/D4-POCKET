@@ -5,6 +5,16 @@ import 'broker_client.dart';
 const _visibilities = {'none', 'hash_only', 'summary', 'redacted', 'full'};
 final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
 final _id = RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$');
+final _auditEventId = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$');
+const _unavailableAuditEventId = 'broker-audit-unavailable';
+const _workspaceFailureCodes = {
+  '作業領域拒否',
+  '権限拒否',
+  'broker_persistence_unavailable',
+  '監査失敗',
+  'broker_audit_append_failed',
+  '作業領域期限超過',
+};
 Never _invalid() => throw const BrokerClientException('作業領域の応答を確認できません');
 Map<String, Object?> _map(Object? value) {
   if (value is! Map<String, Object?>) {
@@ -24,6 +34,104 @@ String _string(Object? value) {
     _invalid();
   }
   return value;
+}
+
+/// Broker拒否から、秘密を含み得る自由記述messageを除いて画面へ渡す情報。
+class WorkspaceClientFailure implements Exception {
+  const WorkspaceClientFailure({
+    required this.operation,
+    required this.status,
+    required this.code,
+    required this.recoverable,
+    required this.auditEventId,
+  });
+
+  final String operation;
+  final String status;
+  final String code;
+  final bool recoverable;
+  final String? auditEventId;
+
+  String get recoveryAction {
+    if (status == 'suspended') {
+      return 'Broker状態が復旧しAudit可用性を確認するまで作業領域操作を停止してください。再送はせず、復旧後に別要求として再開してください。';
+    }
+    if (auditEventId == null ||
+        code == 'broker_persistence_unavailable' ||
+        code == '監査失敗' ||
+        code == 'broker_audit_append_failed') {
+      return 'Broker永続監査を復旧し、状態を確認するまで内容操作を停止してください。再送はせず、確認後に別要求として再開してください。';
+    }
+    return switch (code) {
+      '権限拒否' => 'native Owner確認を完了した後、登録状態を更新してください。自動再試行はしていません。',
+      '作業領域期限超過' => '登録状態を更新し、必要なら新しい期限付きWorkspace読取Approvalを要求してください。',
+      '作業領域拒否' =>
+        '現在の登録・Workspace範囲・読取Approvalを更新して確認してください。再試行は状態確認後に別要求として行ってください。',
+      _ when !recoverable => '自動再試行していません。Broker状態とAuditを確認してから、操作を判断してください。',
+      _ => '登録・Approval状態を更新して確認してください。再試行は状態確認後に別要求として行ってください。',
+    };
+  }
+
+  String get userMessage => [
+        status == 'suspended'
+            ? 'Brokerが作業領域操作を一時停止しました。'
+            : 'Brokerが作業領域操作を拒否しました。',
+        '操作: $operation',
+        'Broker code: $code',
+        '復旧可能: ${recoverable ? 'yes' : 'no'}',
+        if (auditEventId == null)
+          'Audit: 利用不可（Brokerの監査状態を確認してください）'
+        else
+          'Audit: $auditEventId',
+        '復旧: $recoveryAction',
+      ].join('\n');
+
+  @override
+  String toString() => userMessage;
+}
+
+WorkspaceClientFailure? _workspaceFailure(
+    String operation, Map<String, Object?> response) {
+  final status = response['status'];
+  if (status != 'rejected' && status != 'suspended') return null;
+  if (response['operation'] != operation ||
+      response['evidence_source'] != 'INTERNAL_STATE') {
+    _invalid();
+  }
+  final error = _map(response['error']);
+  final rawCode = error['code'];
+  final rawMessage = error['message'];
+  final recoverable = error['recoverable'];
+  if (rawCode is! String ||
+      rawCode.isEmpty ||
+      rawCode.length > 128 ||
+      rawMessage is! String ||
+      utf8.encode(rawMessage).length > 4096 ||
+      recoverable is! bool ||
+      error['audit_event_required'] != true ||
+      error['fail_closed'] != true) {
+    _invalid();
+  }
+
+  final rawAuditId = response['audit_event_id'];
+  final String? auditId;
+  if (rawAuditId == _unavailableAuditEventId) {
+    auditId = null;
+  } else if (rawAuditId is String && _auditEventId.hasMatch(rawAuditId)) {
+    auditId = rawAuditId;
+  } else {
+    _invalid();
+  }
+
+  return WorkspaceClientFailure(
+    operation: operation,
+    status: status as String,
+    code: _workspaceFailureCodes.contains(rawCode)
+        ? rawCode
+        : 'unknown_broker_error',
+    recoverable: recoverable,
+    auditEventId: auditId,
+  );
 }
 
 class WorkspaceRegistration {
@@ -97,9 +205,13 @@ class WorkspaceClient {
   Future<Map<String, Object?>> _request(
       String operation, Map<String, Object?> payload) async {
     final response = await transport.request(operation, payload: payload);
-    if (response['status'] != 'accepted' ||
-        response['operation'] != operation ||
-        response['error'] != null ||
+    if (response['operation'] != operation) _invalid();
+    if (response['status'] != 'accepted') {
+      final failure = _workspaceFailure(operation, response);
+      if (failure != null) throw failure;
+      _invalid();
+    }
+    if (response['error'] != null ||
         response['audit_event_id'] is! String ||
         (response['audit_event_id'] as String).isEmpty) {
       _invalid();

@@ -39,6 +39,9 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   int _nextCheck = 0;
   int _viewLimit = 0;
 
+  String _failureMessage(Object error, String fallback) =>
+      error is WorkspaceClientFailure ? error.userMessage : fallback;
+
   @override
   void initState() {
     super.initState();
@@ -208,12 +211,15 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
             ? '登録済み作業領域はありません。'
             : '読取には所有者による現在登録の承認が必要です。';
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted || generation != _generation) return;
       setState(() {
         _registrations = [];
         _view = null;
-        _message = '登録状態を確認できないため表示を停止しました。';
+        _message = _failureMessage(
+          error,
+          '登録状態を確認できないため表示を停止しました。Broker接続と現在状態を確認してください。',
+        );
       });
     } finally {
       if (mounted && generation == _generation) {
@@ -254,11 +260,14 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         _viewLimit = _elapsed.elapsedMilliseconds + 300000;
         _message = '取得時点の表示です。承認状態を定期確認しています。';
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted || generation != _generation) return;
       setState(() {
         _view = null;
-        _message = '取得または現在の承認を確認できません。登録状態を更新してください。';
+        _message = _failureMessage(
+          error,
+          '取得または現在の承認を確認できません。登録状態を更新してください。',
+        );
       });
     } finally {
       if (mounted && generation == _generation) {
@@ -301,7 +310,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
             .toList(growable: false);
         _message = '現在のWorkspace読取Approvalを確認しました。Task実行権は付与していません。';
       });
-    } on Object {
+    } on Object catch (error) {
       if (!mounted) return;
       if (generation != _generation || activeGeneration != _activeGeneration) {
         // native Owner確認中に画面が非activeになった後で要求が失敗しても、
@@ -311,7 +320,10 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         }
         return;
       }
-      setState(() => _message = 'Workspace読取Approvalを確認できません。本文表示を停止しました。');
+      setState(() => _message = _failureMessage(
+            error,
+            'Workspace読取Approvalを確認できません。本文表示を停止しました。',
+          ));
     } finally {
       if (mounted && generation == _generation) {
         setState(() => _busy = false);
@@ -358,9 +370,12 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
             .toList(growable: false);
         _message = 'Workspace読取ApprovalとBroker baselineを失効しました。';
       });
-    } on Object {
+    } on Object catch (error) {
       if (!mounted || generation != _generation) return;
-      setState(() => _message = 'Workspace失効状態を確認できません。表示を停止しました。');
+      setState(() => _message = _failureMessage(
+            error,
+            'Workspace失効状態を確認できません。登録状態を更新して現在の承認を確認してください。',
+          ));
     } finally {
       if (mounted && generation == _generation) {
         setState(() => _busy = false);
@@ -386,9 +401,12 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         _viewLimit = _elapsed.elapsedMilliseconds + 300000;
         _message = 'Broker内の比較baselineを作成しました。Task実行・Workspace変更は行っていません。';
       });
-    } on Object {
+    } on Object catch (error) {
       if (!mounted || generation != _generation) return;
-      setState(() => _message = 'Workspace baselineを作成できません。');
+      setState(() => _message = _failureMessage(
+            error,
+            'Workspace baselineを作成できません。Broker状態と現在の承認を確認してください。',
+          ));
     } finally {
       if (mounted && generation == _generation) {
         setState(() {

@@ -20,6 +20,12 @@ class TestBroker implements BrokerTransport {
   int expires = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 240;
   bool revokeAfterRead = false;
   bool failApprovalResponseAfterCommit = false;
+  String? failureOperation;
+  String failureStatus = 'rejected';
+  String failureCode = '作業領域拒否';
+  String failureMessage = 'Workspace operation rejected';
+  bool failureRecoverable = true;
+  String failureAuditId = 'broker-audit-123';
   List<Map<String, Object?>> additionalRegistrations = [];
   void Function(Map<String, Object?>)? mutate;
   Completer<void>? pendingRead;
@@ -38,6 +44,22 @@ class TestBroker implements BrokerTransport {
   Future<Map<String, Object?>> request(String operation,
       {Map<String, Object?>? payload}) async {
     operations.add(operation);
+    if (failureOperation == operation) {
+      return {
+        'status': failureStatus,
+        'operation': operation,
+        'error': {
+          'code': failureCode,
+          'message': failureMessage,
+          'recoverable': failureRecoverable,
+          'audit_event_required': true,
+          'fail_closed': true,
+        },
+        'audit_event_id': failureAuditId,
+        'evidence_source': 'INTERNAL_STATE',
+        'body': null,
+      };
+    }
     Map<String, Object?> body;
     String evidence = 'INTERNAL_STATE';
     if (operation == '作業領域一覧') {
@@ -203,6 +225,87 @@ Future<void> _scrollRootTo(WidgetTester tester, Finder target) async {
 }
 
 void main() {
+  test('Broker拒否は安全なcodeとAudit参照を保持し自由記述を隠す', () async {
+    final broker = TestBroker()
+      ..failureOperation = '作業領域一覧'
+      ..failureCode = '作業領域拒否'
+      ..failureMessage = 'secret-marker path=C:\\private\\workspace'
+      ..failureAuditId = 'broker-audit-123';
+    final client = WorkspaceClient(broker);
+
+    await expectLater(
+      client.list(),
+      throwsA(
+        isA<WorkspaceClientFailure>()
+            .having((failure) => failure.code, 'code', '作業領域拒否')
+            .having((failure) => failure.status, 'status', 'rejected')
+            .having((failure) => failure.auditEventId, 'audit id',
+                'broker-audit-123')
+            .having((failure) => failure.recoverable, 'recoverable', isTrue)
+            .having(
+              (failure) => failure.userMessage,
+              'safe user message',
+              allOf(contains('broker-audit-123'), contains('復旧:'),
+                  isNot(contains('secret-marker'))),
+            ),
+      ),
+    );
+  });
+
+  test('未知codeとAudit unavailableを一般化しraw errorを露出しない', () async {
+    final broker = TestBroker()
+      ..failureOperation = '作業領域一覧'
+      ..failureStatus = 'suspended'
+      ..failureCode = 'secret-marker-unknown-code'
+      ..failureMessage = 'secret-marker raw Broker detail'
+      ..failureAuditId = 'broker-audit-unavailable';
+    final client = WorkspaceClient(broker);
+
+    await expectLater(
+      client.list(),
+      throwsA(
+        isA<WorkspaceClientFailure>()
+            .having(
+                (failure) => failure.code, 'safe code', 'unknown_broker_error')
+            .having((failure) => failure.status, 'status', 'suspended')
+            .having((failure) => failure.auditEventId, 'audit id', isNull)
+            .having(
+              (failure) => failure.userMessage,
+              'safe user message',
+              allOf(
+                contains('Audit: 利用不可'),
+                contains('一時停止'),
+                contains('Broker状態が復旧'),
+                isNot(contains('secret-marker')),
+              ),
+            ),
+      ),
+    );
+  });
+
+  testWidgets('Workspace Inspectorは拒否code・Audit・復旧を表示しraw messageを隠す',
+      (tester) async {
+    final broker = TestBroker()
+      ..failureOperation = '作業領域一覧'
+      ..failureCode = '権限拒否'
+      ..failureMessage = 'secret-marker owner detail'
+      ..failureAuditId = 'broker-audit-456';
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: WorkspaceInspector(client: WorkspaceClient(broker)),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Broker code: 権限拒否'), findsOneWidget);
+    expect(find.textContaining('Audit: broker-audit-456'), findsOneWidget);
+    expect(find.textContaining('native Owner確認'), findsOneWidget);
+    expect(find.textContaining('secret-marker'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   test('Workspace読取Approval・baseline・失効をそれぞれBrokerで照合する', () async {
     final broker = TestBroker()
       ..approval = null
