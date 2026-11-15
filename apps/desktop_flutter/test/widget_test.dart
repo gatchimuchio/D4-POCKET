@@ -2499,33 +2499,59 @@ void main() {
         'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const resultHashB =
         'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+    const compareFailureMarker =
+        'COMPARE_FAILURE_SECRET_MARKER C:\\private\\runtime';
+    const resourceFailureMarker =
+        'RESOURCE_FAILURE_SECRET_MARKER C:\\private\\runtime';
+    const applyFailureMarker =
+        'APPLY_FAILURE_SECRET_MARKER C:\\private\\runtime';
+    var remainingComparePreflightFailures = 2;
+    var failNextResourceObservation = true;
+    var failNextSelectedApplyPreflight = false;
+    var resourceResponseCount = 0;
     Map<String, Object?> resourceResponse({
       required String runtimeId,
       required String auditId,
       required int workingSetBytes,
+      String? bindingReason,
     }) {
       Map<String, Object?> measured(num value,
               {String source = 'LIVE_RUNTIME'}) =>
           {'状態': 'measured', '値': value, '証拠種別': source};
-      Map<String, Object?> unknown(String reason) => {
+      Map<String, Object?> unknown(
+        String reason, {
+        String source = 'INTERNAL_STATE',
+      }) =>
+          {
             '状態': 'unknown',
             '値': null,
-            '証拠種別': 'INTERNAL_STATE',
+            '証拠種別': source,
             '理由': reason,
           };
+      final unsupportedBinding = bindingReason != null;
       final body = <String, Object?>{
         '版': 1,
         '実行系ID': runtimeId,
         '観測時刻UnixMillis': 1700000001000,
         '観測監査ID': auditId,
-        '結合': {
-          '状態': 'bound',
-          '根拠': 'loopback_tcp_listener_owner_pid',
-          'PID': runtimeId == 'codex-agent-a' ? 4201 : 4202,
-          'PID作成時刻UnixMillis': 1700000000000,
-          '登録時刻UnixMillis': 1700000000000,
-          '登録監査ID': 'registration-$runtimeId',
-        },
+        '結合': unsupportedBinding
+            ? {
+                '状態': 'unsupported',
+                '根拠': 'unsupported',
+                'PID': null,
+                'PID作成時刻UnixMillis': null,
+                '登録時刻UnixMillis': 1700000000000,
+                '登録監査ID': 'registration-$runtimeId',
+                '理由': bindingReason,
+              }
+            : {
+                '状態': 'bound',
+                '根拠': 'loopback_tcp_listener_owner_pid',
+                'PID': runtimeId == 'codex-agent-a' ? 4201 : 4202,
+                'PID作成時刻UnixMillis': 1700000000000,
+                '登録時刻UnixMillis': 1700000000000,
+                '登録監査ID': 'registration-$runtimeId',
+              },
         '統治': {
           '能力ID': 'runtime.resource.observe',
           '権限ID': 'permission.runtime.resource.observe',
@@ -2533,18 +2559,27 @@ void main() {
           '復旧ID': 'recover-runtime-resource-binding',
         },
         '計測': {
-          '稼働時間Millis': measured(30000),
-          'CPU累積時間Millis': measured(3000),
-          'CPU利用率Percent': measured(runtimeId == 'codex-agent-a' ? 25.5 : 6.25),
-          'RAMWorkingSetBytes': measured(workingSetBytes),
-          'RAMPrivateBytes': measured(workingSetBytes ~/ 2),
+          '稼働時間Millis': unsupportedBinding ? unknown('未取得') : measured(30000),
+          'CPU累積時間Millis': unsupportedBinding ? unknown('未取得') : measured(3000),
+          'CPU利用率Percent': unsupportedBinding
+              ? unknown('未取得')
+              : unknown(resourceFailureMarker, source: 'LIVE_RUNTIME'),
+          'RAMWorkingSetBytes':
+              unsupportedBinding ? unknown('未取得') : measured(workingSetBytes),
+          'RAMPrivateBytes': unsupportedBinding
+              ? unknown('未取得')
+              : measured(workingSetBytes ~/ 2),
           'DiskIOBytes': unknown('未対応'),
           'NetworkIOBytes': unknown('未対応'),
           'GPU利用率Percent': unknown('未対応'),
           'VRAMBytes': unknown('未対応'),
-          '処理中要求数': measured(0, source: 'INTERNAL_STATE'),
+          '処理中要求数': unsupportedBinding
+              ? unknown('未取得')
+              : measured(0, source: 'INTERNAL_STATE'),
           '平均応答Millis': unknown('未対応'),
-          '失敗要求数': measured(0, source: 'INTERNAL_STATE'),
+          '失敗要求数': unsupportedBinding
+              ? unknown('未取得')
+              : measured(0, source: 'INTERNAL_STATE'),
         },
         '短期履歴': <Object?>[],
       };
@@ -2552,7 +2587,8 @@ void main() {
         'request_id': 'test-resource-$runtimeId',
         'operation': '実行系資源観測',
         'status': 'accepted',
-        'evidence_source': 'LIVE_RUNTIME',
+        'evidence_source':
+            unsupportedBinding ? 'INTERNAL_STATE' : 'LIVE_RUNTIME',
         'audit_event_id': auditId,
         'error': null,
         'health': null,
@@ -2877,6 +2913,35 @@ void main() {
         trackApplyInspectionResponse = false;
         applyInspectionResponseReceived.complete();
       }
+    }, failureForOperation: (operation, payload) {
+      if (operation == 'Agent作業要求検査' && remainingComparePreflightFailures > 0) {
+        remainingComparePreflightFailures--;
+        return const BrokerClientException(compareFailureMarker);
+      }
+      if (operation == 'Agent作業要求検査' &&
+          failNextSelectedApplyPreflight &&
+          payload?['session_id'] == sessionC) {
+        failNextSelectedApplyPreflight = false;
+        return const BrokerClientException(applyFailureMarker);
+      }
+      if (operation == '実行系資源観測' && failNextResourceObservation) {
+        failNextResourceObservation = false;
+        return const BrokerClientException(resourceFailureMarker);
+      }
+      return null;
+    }, responseForOperation: (operation, _) {
+      if (operation == '実行系資源観測') {
+        resourceResponseCount++;
+        if (resourceResponseCount == 2) {
+          return resourceResponse(
+            runtimeId: runtimeId,
+            auditId: 'audit-resource-unbound',
+            workingSetBytes: 0,
+            bindingReason: resourceFailureMarker,
+          );
+        }
+      }
+      return null;
     });
     final client = await ShellCoreClient.product(transport: transport);
 
@@ -2885,6 +2950,20 @@ void main() {
     ));
     final prepareComparison =
         find.byKey(const ValueKey('prepare-agent-comparison'));
+    await tester.ensureVisible(prepareComparison);
+    await tester.tap(prepareComparison);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField),
+      '独立Compare用の安全なTask',
+    );
+    await tester.tap(find.text('両Agentを事前検査'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Agent A/Bの比較事前検査を確認できません。Broker状態とAuditを確認してください。'),
+      findsOneWidget,
+    );
+    expect(find.textContaining(compareFailureMarker), findsNothing);
     await tester.ensureVisible(prepareComparison);
     await tester.tap(prepareComparison);
     await tester.pumpAndSettle();
@@ -2971,24 +3050,46 @@ void main() {
     await tester.tap(observeResources);
     await tester.pumpAndSettle();
     expect(
+      find.textContaining(
+        'Runtime資源観測を取得できません。値はunknownのままです。Runtime状態とAuditを確認してください。',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining(resourceFailureMarker), findsNothing);
+    await tester.ensureVisible(observeResources);
+    await tester.tap(observeResources);
+    await tester.pumpAndSettle();
+    expect(
       find.textContaining('A/B共有Runtimeの資源値を一度観測しました'),
       findsOneWidget,
     );
     expect(find.text('Agent A/B共有Runtime観測'), findsOneWidget);
     expect(find.text('RAM Working Set: 8192 bytes (LIVE_RUNTIME)'),
         findsOneWidget);
-    expect(find.text('CPU利用率: 6.25 % (LIVE_RUNTIME)'), findsOneWidget);
+    expect(find.text('CPU利用率: unknown'), findsOneWidget);
+    expect(find.textContaining(resourceFailureMarker), findsNothing);
     expect(find.text('観測Audit ID: audit-resource-shared'), findsOneWidget);
     expect(find.textContaining('Task個別の使用量はunknown'), findsOneWidget);
     final resourceRequests = transport.requests
         .where((request) => request['operation'] == '実行系資源観測')
         .toList(growable: false);
-    expect(resourceRequests, hasLength(1));
+    expect(resourceRequests, hasLength(2));
     expect(
       resourceRequests.map((request) => request['payload']).toList(),
       [
         {'版': 1, '実行系ID': runtimeId},
+        {'版': 1, '実行系ID': runtimeId},
       ],
+    );
+    await tester.ensureVisible(observeResources);
+    await tester.tap(observeResources);
+    await tester.pumpAndSettle();
+    expect(find.text('Process結合: unsupported'), findsOneWidget);
+    expect(find.text('CPU利用率: unknown'), findsOneWidget);
+    expect(find.textContaining(resourceFailureMarker), findsNothing);
+    expect(
+      transport.requests.where((request) => request['operation'] == '実行系資源観測'),
+      hasLength(3),
     );
 
     final selectedA = find.byKey(
@@ -3137,6 +3238,22 @@ void main() {
     await tester.tap(showResultA);
     await tester.pumpAndSettle();
     expect(find.textContaining('candidate patch body'), findsWidgets);
+
+    await tester.ensureVisible(prepareApply);
+    await tester.tap(prepareApply);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField),
+      'このcandidate patchだけを適用する',
+    );
+    failNextSelectedApplyPreflight = true;
+    await tester.tap(find.text('適用先Taskを事前検査'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('選択結果の適用Task事前検査を確認できません。Broker状態とAuditを確認してください。'),
+      findsOneWidget,
+    );
+    expect(find.textContaining(applyFailureMarker), findsNothing);
 
     await tester.ensureVisible(prepareApply);
     await tester.tap(prepareApply);
@@ -6183,6 +6300,7 @@ class _FakeBrokerTransport implements BrokerTransport {
     this.beforeResponse,
     this.afterResponse,
     this.responseForOperation,
+    this.failureForOperation,
   });
 
   final List<Map<String, Object?>> _responses;
@@ -6193,6 +6311,10 @@ class _FakeBrokerTransport implements BrokerTransport {
     String operation,
     Map<String, Object?>? payload,
   )? responseForOperation;
+  final Object? Function(
+    String operation,
+    Map<String, Object?>? payload,
+  )? failureForOperation;
   final List<String> operations = [];
   final List<Map<String, Object?>> requests = [];
   final List<Map<String, Object?>> returnedResponses = [];
@@ -6220,6 +6342,8 @@ class _FakeBrokerTransport implements BrokerTransport {
     operations.add(operation);
     requests.add({'operation': operation, 'payload': payload});
     onRequest?.call(operation);
+    final failure = failureForOperation?.call(operation, payload);
+    if (failure != null) throw failure;
     final responseWaiter = beforeResponse;
     if (responseWaiter != null) await responseWaiter(operation);
     final selectedResponse = responseForOperation?.call(operation, payload);

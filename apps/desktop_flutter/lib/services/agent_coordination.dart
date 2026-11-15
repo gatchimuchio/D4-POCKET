@@ -2,6 +2,9 @@ import '../models/generated_contracts.dart';
 import 'package:agent_orchestration/agent_task_client.dart'
     show AgentTaskRecord, AgentTaskResultProjection;
 
+String agentComparisonFailureMessage(Object? _) =>
+    'Agent Taskの操作結果を確認できません。Task状態とAuditを確認し、結果確認前に再送しないでください。';
+
 class AgentComparisonProjection {
   const AgentComparisonProjection({
     required this.available,

@@ -799,14 +799,11 @@ class _AgentCenterState extends State<_AgentCenterScreen>
         _comparisonStatus =
             '同じTask本文を別Sessionで検査しました。各AgentのWorkspace PermissionとTask Approvalを個別に行ってください。';
       });
-    } on Object catch (error) {
+    } on Object {
       if (!mounted) return;
-      final message = error is BrokerClientException
-          ? error.message
-          : 'Agent A/Bの比較事前検査に失敗しました。';
       setState(() {
         _comparison = null;
-        _comparisonStatus = message;
+        _comparisonStatus = 'Agent A/Bの比較事前検査を確認できません。Broker状態とAuditを確認してください。';
       });
     } finally {
       if (mounted) setState(() => _comparisonPending = false);
@@ -922,7 +919,7 @@ class _AgentCenterState extends State<_AgentCenterScreen>
   }
 
   String _comparisonStartFailure(Object? outcome) =>
-      outcome is BrokerClientException ? outcome.message : '開始結果不明';
+      agentComparisonFailureMessage(outcome);
 
   Future<void> _observeComparisonResources() async {
     if (_comparisonResourcePending) return;
@@ -963,11 +960,13 @@ class _AgentCenterState extends State<_AgentCenterScreen>
             transport,
           ).observe(session.agentRuntimeId),
         );
-      } on BrokerClientException catch (error) {
-        return _ComparisonRuntimeResourceState(error: error.message);
+      } on BrokerClientException {
+        return const _ComparisonRuntimeResourceState(
+          error: 'Runtime資源観測を取得できません。値はunknownのままです。Runtime状態とAuditを確認してください。',
+        );
       } on Object {
         return const _ComparisonRuntimeResourceState(
-          error: 'Runtime資源観測を取得できません。',
+          error: 'Runtime資源観測を取得できません。値はunknownのままです。Runtime状態とAuditを確認してください。',
         );
       }
     }
@@ -1016,7 +1015,7 @@ class _AgentCenterState extends State<_AgentCenterScreen>
       if (observation == null) return 'unknown';
       final metric = observation.metric(key);
       if (!metric.isMeasured) {
-        return 'unknown: ${metric.reason}';
+        return 'unknown';
       }
       return '${metric.value} $unit (${metric.evidenceSource})';
     }
@@ -1042,8 +1041,6 @@ class _AgentCenterState extends State<_AgentCenterScreen>
               ),
               Text('RAM Private: ${metricValue('RAMPrivateBytes', 'bytes')}'),
               Text('観測Audit ID: ${observation.auditId}'),
-              if (observation.binding.reason case final reason?)
-                Text('結合理由: $reason'),
             ],
           ],
         ),
@@ -1325,13 +1322,10 @@ class _AgentCenterState extends State<_AgentCenterScreen>
         _comparisonApplyStatus =
             '適用先Taskを事前検査しました。Workspace PermissionとTask Approvalを新規に取得してください。';
       });
-    } on Object catch (error) {
+    } on Object {
       if (!mounted) return;
-      setState(
-        () => _comparisonApplyStatus = error is BrokerClientException
-            ? error.message
-            : '選択結果の適用Task事前検査に失敗しました。',
-      );
+      setState(() => _comparisonApplyStatus =
+          '選択結果の適用Task事前検査を確認できません。Broker状態とAuditを確認してください。');
     } finally {
       if (mounted) setState(() => _comparisonPending = false);
     }

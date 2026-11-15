@@ -37,6 +37,18 @@ AgentSessionRecord _session(
 }
 
 void main() {
+  test('Compare失敗projectionはBroker自由記述を画面向け文へ含めない', () {
+    const marker = 'COMPARE_FAILURE_SECRET_MARKER C:/private/runtime';
+
+    final message = agentComparisonFailureMessage(
+      const BrokerClientException(marker),
+    );
+
+    expect(message, contains('Task状態とAudit'));
+    expect(message, contains('再送しないでください'));
+    expect(message, isNot(contains(marker)));
+  });
+
   test('Compare取消はA/Bを並行実行し、同Session重複を拒否して個別に解放する', () async {
     const sessionA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const sessionB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
