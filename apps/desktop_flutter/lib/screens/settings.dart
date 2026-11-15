@@ -1521,7 +1521,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (snapshot.connectionState == ConnectionState.waiting)
                 const LinearProgressIndicator()
               else if (snapshot.hasError)
-                Text('Profile一覧を取得できません: ${snapshot.error}')
+                const Text('Profile一覧を取得できません。Broker接続とProfile状態を確認してください。')
               else if (profiles.isEmpty)
                 const Text('保存済みProfileはありません。')
               else
@@ -1615,7 +1615,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (snapshot.connectionState == ConnectionState.waiting)
                 const LinearProgressIndicator()
               else if (snapshot.hasError)
-                Text('更新一覧を取得できません: ${snapshot.error}')
+                const Text('更新一覧を取得できません。Broker接続と更新状態を確認してください。')
               else if (updates.isEmpty)
                 const Text('署名検査済みの更新候補はありません。')
               else
@@ -1819,8 +1819,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ? 'Brokerに署名済み配布元が構成されていません。'
             : 'Brokerが署名検証済み候補を取得しました（${count ?? 0}件）。',
       );
-    } catch (error) {
-      _setUpdateMessage('更新候補の取得に失敗しました: $error');
+    } on Object {
+      _setUpdateMessage('更新候補の取得に失敗しました。Broker接続と更新状態を確認してください。');
     } finally {
       if (mounted) {
         setState(() {
@@ -1870,10 +1870,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           );
         }
       }
-    } catch (error) {
+    } on Object {
       _setUpdateMessage(initialInstallAccepted
           ? 'インストール済み版は登録されましたが、切替のための画面終了に失敗しました。固定起動項目から起動してください。'
-          : '更新操作失敗: $error');
+          : '更新操作に失敗しました。状態を更新して確認してください。');
     } finally {
       if (mounted && !handoffToInstalledVersion) {
         setState(() => _updateOperationInProgress = false);
@@ -1932,10 +1932,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           );
         }
       }
-    } catch (error) {
+    } on Object {
       _setUpdateMessage(uninstallAuthorized
           ? '削除許可は記録されましたが、アプリを終了できませんでした。製品fileはまだ削除されていません。再度アンインストールを要求してください。'
-          : 'アンインストール要求に失敗しました: $error');
+          : 'アンインストール要求に失敗しました。Broker接続と製品状態を確認してください。');
     } finally {
       if (mounted && !applicationExitAccepted) {
         setState(() => _updateOperationInProgress = false);
@@ -1960,8 +1960,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _setUpdateMessage(restored.isEmpty
           ? '固定root起動器とOS起動項目は既に有効です。変更はありません。'
           : '${restored.join('、')}を復元しました。版本体と利用者dataは変更していません。');
-    } catch (error) {
-      _setUpdateMessage('起動項目を修復できませんでした。既存のfileは上書きしていません: $error');
+    } on Object {
+      _setUpdateMessage('起動項目を修復できませんでした。既存のfileは上書きしていません。');
     } finally {
       if (mounted) {
         setState(() => _updateOperationInProgress = false);
@@ -2042,8 +2042,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       });
       _setProfileMessage('Profileを作成しました。');
-    } catch (error) {
-      _setProfileMessage('Profile作成失敗: $error');
+    } on Object {
+      _setProfileFailure('Profile作成');
     }
     _refreshProfiles();
   }
@@ -2056,8 +2056,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         profileHash: profile['profile_hash']?.toString() ?? '',
       );
       _setProfileMessage('Profile適用要求を記録しました。権限は変更していません。');
-    } catch (error) {
-      _setProfileMessage('Profile適用要求失敗: $error');
+    } on Object {
+      _setProfileFailure('Profile適用要求');
     }
   }
 
@@ -2073,8 +2073,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         displayName: '${profile['表示名'] ?? sourceId} の複製',
       );
       _setProfileMessage('Profileを複製しました。');
-    } catch (error) {
-      _setProfileMessage('Profile複製失敗: $error');
+    } on Object {
+      _setProfileFailure('Profile複製');
     }
     _refreshProfiles();
   }
@@ -2087,8 +2087,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ? profileJson(Map<String, Object?>.from(profile))
           : null;
       _setProfileMessage('Profile設定をexportしました。');
-    } catch (error) {
-      _setProfileMessage('Profile export失敗: $error');
+    } on Object {
+      _setProfileFailure('Profile export');
     }
   }
 
@@ -2096,54 +2096,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await client.delete(profileId: id);
       _setProfileMessage('Profileを削除しました。');
-    } catch (error) {
-      _setProfileMessage('Profile削除失敗: $error');
+    } on Object {
+      _setProfileFailure('Profile削除');
     }
     _refreshProfiles();
   }
 
   Future<void> _runProfileImport(ProfileClient client) async {
-    final controller = TextEditingController();
     final raw = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Profile設定をimport'),
-        content: TextField(
-          controller: controller,
-          minLines: 5,
-          maxLines: 12,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'exportしたProfile JSONを貼り付けてください',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: const Text('import'),
-          ),
-        ],
-      ),
+      builder: (_) => const _ProfileImportDialog(),
     );
-    controller.dispose();
     if (raw == null || raw.trim().isEmpty) return;
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! Map) throw const FormatException('objectではありません');
       await client.importProfile(Map<String, Object?>.from(decoded));
       _setProfileMessage('Profileをimportしました。');
-    } catch (error) {
-      _setProfileMessage('Profile import失敗: $error');
+    } on Object {
+      _setProfileFailure('Profile import');
     }
     _refreshProfiles();
   }
 
   void _setProfileMessage(String message) {
     if (mounted) setState(() => _profileMessage = message);
+  }
+
+  void _setProfileFailure(String operation) {
+    _setProfileMessage(
+      '$operationに失敗しました。入力とProfile状態を確認してください。',
+    );
   }
 
   bool _matchesFilters(SettingRecord setting) {
@@ -2199,4 +2182,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ];
     return flags.isEmpty ? 'なし' : flags.join(', ');
   }
+}
+
+class _ProfileImportDialog extends StatefulWidget {
+  const _ProfileImportDialog();
+
+  @override
+  State<_ProfileImportDialog> createState() => _ProfileImportDialogState();
+}
+
+class _ProfileImportDialogState extends State<_ProfileImportDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Profile設定をimport'),
+        content: TextField(
+          controller: _controller,
+          minLines: 5,
+          maxLines: 12,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: 'exportしたProfile JSONを貼り付けてください',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(_controller.text),
+            child: const Text('import'),
+          ),
+        ],
+      );
 }

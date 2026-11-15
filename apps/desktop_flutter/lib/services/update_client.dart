@@ -146,7 +146,7 @@ class UpdateClient {
       };
 
   Future<Map<String, Object?>> list() async {
-    final response = await _transport.request('更新一覧', payload: const {'版': 1});
+    final response = await _send('更新一覧', const {'版': 1});
     return _acceptedBody(response, '更新一覧');
   }
 
@@ -228,19 +228,29 @@ class UpdateClient {
     String operation,
     Map<String, Object?> payload,
   ) async {
-    final response = await _transport.request(operation, payload: payload);
+    final response = await _send(operation, payload);
     if (response['status'] != 'accepted' && response['status'] != 'suspended') {
-      final error = response['error'];
-      final message = error is Map
-          ? error['message']?.toString() ?? response.toString()
-          : response.toString();
-      throw BrokerClientException('$operation が拒否されました: $message');
+      throw BrokerClientException('$operation が拒否されました');
+    }
+    if (response['error'] != null) {
+      throw BrokerClientException('$operation 応答にerrorが含まれています');
     }
     final body = response['body'];
     if (body is! Map) {
       throw BrokerClientException('$operation 応答bodyがobjectではありません');
     }
     return Map<String, Object?>.from(body);
+  }
+
+  Future<Map<String, Object?>> _send(
+    String operation,
+    Map<String, Object?> payload,
+  ) async {
+    try {
+      return await _transport.request(operation, payload: payload);
+    } on Object {
+      throw BrokerClientException('$operation のBroker通信を確認できません');
+    }
   }
 }
 
@@ -249,11 +259,10 @@ Map<String, Object?> _acceptedBody(
   String operation,
 ) {
   if (response['status'] != 'accepted') {
-    final error = response['error'];
-    final message = error is Map
-        ? error['message']?.toString() ?? response.toString()
-        : response.toString();
-    throw BrokerClientException('$operation が拒否されました: $message');
+    throw BrokerClientException('$operation が拒否されました');
+  }
+  if (response['error'] != null) {
+    throw BrokerClientException('$operation 応答にerrorが含まれています');
   }
   final body = response['body'];
   if (body is! Map) {

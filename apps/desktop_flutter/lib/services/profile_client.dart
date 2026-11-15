@@ -11,11 +11,7 @@ class ProfileClient {
   final BrokerTransport _transport;
 
   Future<List<Map<String, Object?>>> list() async {
-    final response = await _transport.request(
-      'プロファイル一覧',
-      payload: const {'版': 1},
-    );
-    final body = _acceptedBody(response, 'プロファイル一覧');
+    final body = await _request('プロファイル一覧', const {'版': 1});
     final profiles = body['Profiles'];
     if (profiles is! List) {
       throw const BrokerClientException('Profile一覧のProfilesがarrayではありません');
@@ -75,7 +71,12 @@ class ProfileClient {
     String operation,
     Map<String, Object?> payload,
   ) async {
-    final response = await _transport.request(operation, payload: payload);
+    late final Map<String, Object?> response;
+    try {
+      response = await _transport.request(operation, payload: payload);
+    } on Object {
+      throw BrokerClientException('$operation のBroker通信を確認できません');
+    }
     return _acceptedBody(response, operation);
   }
 }
@@ -85,11 +86,10 @@ Map<String, Object?> _acceptedBody(
   String operation,
 ) {
   if (response['status'] != 'accepted') {
-    final error = response['error'];
-    final message = error is Map
-        ? error['message']?.toString() ?? response.toString()
-        : response.toString();
-    throw BrokerClientException('$operation が拒否されました: $message');
+    throw BrokerClientException('$operation が拒否されました');
+  }
+  if (response['error'] != null) {
+    throw BrokerClientException('$operation accepted応答にerrorが含まれています');
   }
   final body = response['body'];
   if (body is! Map) {

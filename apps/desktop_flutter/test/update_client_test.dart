@@ -1,8 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/services/update_client.dart';
-import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
+import 'package:gui_shell_ui/runtime_dialogue_client.dart'
+    show BrokerClientException, BrokerTransport;
 
 class _UpdateTransport implements BrokerTransport {
+  _UpdateTransport({
+    this.rejectedOperation,
+    this.rejectionError,
+    this.acceptedError,
+    this.throwOnOperation,
+    this.transportError,
+  });
+
+  final String? rejectedOperation;
+  final Object? rejectionError;
+  final Object? acceptedError;
+  final String? throwOnOperation;
+  final Object? transportError;
   final operations = <String>[];
   final payloads = <Map<String, Object?>?>[];
 
@@ -13,6 +27,16 @@ class _UpdateTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     payloads.add(payload);
+    if (operation == throwOnOperation) {
+      throw transportError ?? StateError('secret-marker update transport');
+    }
+    if (operation == rejectedOperation) {
+      return {
+        'status': 'rejected',
+        'error': rejectionError ??
+            {'code': 'denied', 'message': 'secret-marker update rejection'},
+      };
+    }
     if (operation == '更新一覧') {
       return {
         'status': 'accepted',
@@ -79,6 +103,7 @@ class _UpdateTransport implements BrokerTransport {
     if (operation == '製品起動項目修復要求') {
       return {
         'status': 'accepted',
+        if (acceptedError != null) 'error': acceptedError,
         'body': {
           '版': 1,
           '状態': 'product_launch_entries_repaired',
@@ -95,6 +120,59 @@ class _UpdateTransport implements BrokerTransport {
 }
 
 void main() {
+  test('UpdateClientはBroker拒否・accepted error・transport例外を秘匿する', () async {
+    const marker = 'secret-marker C:/private/update path';
+
+    for (final error in <Object?>[
+      {'code': 'denied', 'message': marker},
+      marker,
+    ]) {
+      final rejectedClient = UpdateClient(_UpdateTransport(
+        rejectedOperation: '更新候補取得',
+        rejectionError: error,
+      ));
+      await expectLater(
+        rejectedClient.fetchCandidates(),
+        throwsA(
+          isA<BrokerClientException>().having(
+            (exception) => exception.message,
+            'message',
+            isNot(contains(marker)),
+          ),
+        ),
+      );
+    }
+
+    final acceptedErrorClient = UpdateClient(_UpdateTransport(
+      acceptedError: {'message': marker},
+    ));
+    await expectLater(
+      acceptedErrorClient.requestProductRepair(),
+      throwsA(
+        isA<BrokerClientException>().having(
+          (exception) => exception.message,
+          'message',
+          isNot(contains(marker)),
+        ),
+      ),
+    );
+
+    final transportFailureClient = UpdateClient(_UpdateTransport(
+      throwOnOperation: '更新一覧',
+      transportError: StateError(marker),
+    ));
+    await expectLater(
+      transportFailureClient.list(),
+      throwsA(
+        isA<BrokerClientException>().having(
+          (exception) => exception.message,
+          'message',
+          isNot(contains(marker)),
+        ),
+      ),
+    );
+  });
+
   test('Install操作は既知の未導入状態だけに表示する', () {
     expect(
       UpdateClient.isFirstInstall({
