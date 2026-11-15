@@ -1015,7 +1015,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter build ios --simulator --release --no-codesign --no-pub
+          flutter build ios --simulator --debug --no-codesign --no-pub
           flutter build ios --release --no-codesign --no-pub
           python3 -B -X utf8 ../../tooling/package_ios_product_candidate.py --simulator-app "$PWD/build/ios/iphonesimulator/Runner.app" --device-app "$PWD/build/ios/iphoneos/Runner.app" --output-dir "$RUNNER_TEMP/ios-product-candidate" --flutter-version 3.44.0 --xcode-version "$(xcodebuild -version | sed -n '1s/Xcode //p')"
 

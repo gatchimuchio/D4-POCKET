@@ -47,6 +47,7 @@ class BundleFacts:
     total_bytes: int
     architectures: tuple[str, ...]
     platform: str
+    build_configuration: str
 
 
 def _sha256_file(path: Path) -> str:
@@ -57,7 +58,12 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _safe_app_bundle(path: Path, *, expected_platform: str) -> BundleFacts:
+def _safe_app_bundle(
+    path: Path,
+    *,
+    expected_platform: str,
+    build_configuration: str,
+) -> BundleFacts:
     input_metadata = path.lstat()
     if not stat.S_ISDIR(input_metadata.st_mode) or stat.S_ISLNK(input_metadata.st_mode):
         raise ValueError("iOS app bundle rootが通常directoryではない")
@@ -162,6 +168,7 @@ def _safe_app_bundle(path: Path, *, expected_platform: str) -> BundleFacts:
         total_bytes=total_bytes,
         architectures=architectures,
         platform=expected_platform,
+        build_configuration=build_configuration,
     )
 
 
@@ -209,6 +216,7 @@ def _artifact_record(path: Path, bundle: BundleFacts) -> dict[str, Any]:
         "bundle_uncompressed_bytes": bundle.total_bytes,
         "architectures": list(bundle.architectures),
         "platform": bundle.platform,
+        "build_configuration": bundle.build_configuration,
         "app_bundle_signed": False,
         "provisioning_profile_present": False,
     }
@@ -245,8 +253,16 @@ def build_ios_product_candidate(
         raise ValueError("iOS candidate toolchain versionが不正")
 
     output, parent = _validate_output_directory(output_dir)
-    simulator = _safe_app_bundle(simulator_app, expected_platform="IOSSIMULATOR")
-    device = _safe_app_bundle(device_app, expected_platform="IOS")
+    simulator = _safe_app_bundle(
+        simulator_app,
+        expected_platform="IOSSIMULATOR",
+        build_configuration="debug",
+    )
+    device = _safe_app_bundle(
+        device_app,
+        expected_platform="IOS",
+        build_configuration="release",
+    )
     if simulator.bundle_identifier != device.bundle_identifier:
         raise ValueError("Simulatorとdevice appのBundle Identifierが異なる")
     if simulator.executable_sha256 == device.executable_sha256:

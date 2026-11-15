@@ -81,7 +81,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "b23b20bb0e7b02c15828c64af61641b0adf9580ccf1af4901faa54ca4dd34483"
+      "sha256": "6023e9699146d399286ae82314ba09f3e3fe2152fcf87d12f0a8f6a799d574f9"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
@@ -1517,7 +1517,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "9a70678be162672713765cf9e9440f05aa682ccaa6da72dc503442fa64a80cbb"
+      "sha256": "afe3147883870881c5639709dac0cc467d1462570fde3d71904a56f09491022c"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -2305,7 +2305,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_ios_product_candidate.valid.json",
-      "sha256": "1422e91bd560ed5941709fff359065bb1ce90b3261d6602fc46c4a8555d442f4"
+      "sha256": "f83be4737552e47f9521abe6229403e0594015f24cb266a21b0645d787e002fd"
     },
     {
       "path": "examples/contracts/gui_shell_linux_export_build.valid.json",
@@ -2809,7 +2809,7 @@
     },
     {
       "path": "examples/contracts/invalid/gui_shell_ios_product_candidate_distribution_claim.invalid.json",
-      "sha256": "712eb9df1ef5b62800ed356535ada55b1924a2b9bc75716313d14aec0a8aec4a"
+      "sha256": "0370474afa7f3b6652be3c2d56b6229001ed64e4e0bf31acf1c1b3731950ce2c"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_linux_export_build_authority.invalid.json",
@@ -5113,7 +5113,7 @@
     },
     {
       "path": "specs/gui_shell_ios_product_candidate.schema.json",
-      "sha256": "6a9f9a3dc806d09491831e0f57978a38e729dab41fc97f66f2deecbbce1465b2"
+      "sha256": "90978de6f2a1c14765bbd981a8da2d0a57f04f2954d44e7cd518f498b29bc988"
     },
     {
       "path": "specs/gui_shell_linux_export_build.schema.json",
@@ -5681,7 +5681,7 @@
     },
     {
       "path": "tooling/package_ios_product_candidate.py",
-      "sha256": "923be083a3790f3e98fcbcf832c779b1ea34d9d70535bc1bce35b6c3d0905fce"
+      "sha256": "7341aa94008a2638374389c750e01fda524763c8f969e9ec9df0457c1365b09e"
     },
     {
       "path": "tooling/package_linux_deb_setup.py",
@@ -5801,7 +5801,7 @@
     },
     {
       "path": "tooling/tests/test_ios_product_candidate.py",
-      "sha256": "ad977582273976318c1266123f2a60d24c7a216dd1200bb1de2e35774ac63e71"
+      "sha256": "e91b5ece862ce87b147205b3487cbc13e05399682c68b568a203b35d8a449cf3"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",

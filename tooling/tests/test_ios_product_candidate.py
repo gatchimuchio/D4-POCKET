@@ -80,6 +80,8 @@ class IosProductCandidateTests(unittest.TestCase):
         self.assertTrue(self.output.is_dir())
         self.assertEqual(evidence["distribution_ready"], False)
         self.assertEqual(evidence["formal_distribution_claimed"], False)
+        self.assertEqual(evidence["simulator_artifact"]["build_configuration"], "debug")
+        self.assertEqual(evidence["device_artifact"]["build_configuration"], "release")
         self.assertNotEqual(
             evidence["simulator_artifact"]["sha256"],
             evidence["device_artifact"]["sha256"],
