@@ -757,7 +757,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/support/real_broker_mcp_probe.dart",
-      "sha256": "e17ca6cfd5bea617ee10a1b1edafede97bfc6f171a8a7817546578c42da4b6b7"
+      "sha256": "7eed8b017a0a765006f739e7b5b6b31c2b562af92135de37cc71cdc0a739bf0f"
     },
     {
       "path": "apps/desktop_flutter/test/support/test_broker_tcp_transport.dart",
@@ -1525,7 +1525,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "ddd235635929b901da500984db6ebb8f6fdbd0231ca5a2b405f73ce1017f9ac5"
+      "sha256": "4d2f4def8111b7d66bd62feb12f75041f26a374e131ff7f9243355a295263e45"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1674,6 +1674,10 @@
     {
       "path": "docs/specs/audit-checkpoint.md",
       "sha256": "f668d7378f7f34d6f1f2159fdacddd19908bd5f68a64f0e61464cfb19acaaae1"
+    },
+    {
+      "path": "docs/specs/audit-inspection.md",
+      "sha256": "acdb6e5f7f54a320f4df1b6f94b1d31de8d6cf11a1a7b4b0e82a200bccc6362a"
     },
     {
       "path": "docs/specs/authority-strip-conformance.md",
@@ -2156,6 +2160,14 @@
       "sha256": "b619e028482854db1bc4da0256d3a1b056448481e5e7d164c4df69ae550c6cc8"
     },
     {
+      "path": "examples/contracts/audit_inspection_request.valid.json",
+      "sha256": "a6285d2062b00fbb30a608b85f17d3b0bd662cf017d57045b56bb93350198f57"
+    },
+    {
+      "path": "examples/contracts/audit_inspection_response.valid.json",
+      "sha256": "f08d1fb177d5921ae75bb205716694a52559d5429bc6258b500c98cc28b0fab6"
+    },
+    {
       "path": "examples/contracts/broker_command_envelope.valid.json",
       "sha256": "c0d22420a4babf74ea70534fd6ce23f56d96eaf48ee22c05328dbaa73b320bd1"
     },
@@ -2606,6 +2618,18 @@
     {
       "path": "examples/contracts/invalid/audit_checkpoint_zero_sequence.invalid.json",
       "sha256": "e17949e23aae974c32587165fdf66adca64deff1655c097970086fbc1c1e276b"
+    },
+    {
+      "path": "examples/contracts/invalid/audit_inspection_request_null_cursor.invalid.json",
+      "sha256": "5dbad954e1b44d3abbf68a577fd730e26ab48112e169c889a34cf17ec4225d9e"
+    },
+    {
+      "path": "examples/contracts/invalid/audit_inspection_request_zero_limit.invalid.json",
+      "sha256": "bfc0d6846fc2ebfaca37436f7eb4bd6f2face7821eddeace14c1a5e98b3e1374"
+    },
+    {
+      "path": "examples/contracts/invalid/audit_inspection_response_authority.invalid.json",
+      "sha256": "e31dbd283a40d3d2e9bd7e35d8b2f5fed4b4e6f62b83a8fb01598c5fd3789d96"
     },
     {
       "path": "examples/contracts/invalid/broker_command_envelope_dispatch_enabled.invalid.json",
@@ -4017,7 +4041,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "d0f7998992ba541e97c32c3af66cc251552cdec7d5732c8dac5bd1dfbf701fd9"
+      "sha256": "3cc1f2b5992b2922534478e2e8a771c275adcfd13a0240e42f015f22d09e74e7"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -4970,6 +4994,14 @@
     {
       "path": "specs/audit_checkpoint.schema.json",
       "sha256": "36522407e6db1ab066a5cdfa601e2fe8fa0d817cf49bb09f2bac609fbeb6779a"
+    },
+    {
+      "path": "specs/audit_inspection_request.schema.json",
+      "sha256": "e16116b20e1f7f99295dbcdc75aa377d259cc789bd6f872572e47536219a1851"
+    },
+    {
+      "path": "specs/audit_inspection_response.schema.json",
+      "sha256": "0cb221a3874fda2d9c3a1822279794fda8ed1e7a1affeb1b171a926c709bcc60"
     },
     {
       "path": "specs/broker_command_envelope.schema.json",

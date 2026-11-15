@@ -915,7 +915,11 @@ mod tests {
             std::thread::sleep(Duration::from_millis(50));
         }
         let output = child.wait_with_output().expect("Dart probe出力");
-        assert!(output.status.success(), "Dart probeが失敗した");
+        assert!(
+            output.status.success(),
+            "Dart probeが失敗した: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         assert_eq!(
             String::from_utf8_lossy(&output.stdout).trim(),
             "D4P_REAL_BROKER_DART_PROBE_PASS",
@@ -939,6 +943,16 @@ mod tests {
                 .count(),
             1,
             "実BrokerがDart consumerのnormal要求を一度だけ受理する"
+        );
+        assert_eq!(
+            audit_events
+                .iter()
+                .filter(|event| {
+                    event["operation"] == "監査一覧取得" && event["decision"] == "accepted"
+                })
+                .count(),
+            1,
+            "実BrokerがDart consumerの監査一覧要求を一度だけ受理する"
         );
         assert_eq!(
             audit_events
