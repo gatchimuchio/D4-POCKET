@@ -8,6 +8,8 @@ import 'package:gui_shell_desktop/services/broker_client.dart'
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
+import 'support/d4p_receipt_fixtures.dart';
+
 void main() {
   testWidgets('更新センターからBrokerへ配布元候補取得を要求し一覧を更新する', (
     tester,
@@ -202,10 +204,12 @@ void main() {
         findsOneWidget,
       );
 
+      await _select(tester, 'export-target-platform', 'Linux');
       await _tap(tester, 'compose-preview-button');
       final preview = transport.lastPayload('GUI Shell構成Preview');
       expect(preview['current_manifest'], compose);
       expect(preview['candidate_manifest'], compose);
+      expect(preview['build_target'], 'desktop');
       expect(preview['preview_mode'], 'version_rollback');
 
       final historyModule = find.byKey(
@@ -231,7 +235,6 @@ void main() {
         'export-update-source',
         'https://updates.example.com/d4-pocket/stable',
       );
-      await _select(tester, 'export-target-platform', 'Linux');
       await _tap(tester, 'compose-export-button');
       final export = transport.lastPayload('GUI Shell書出し');
       expect(export['target_platform'], 'linux');
@@ -532,6 +535,9 @@ class _ComposeScreenTransport implements BrokerTransport {
     Map<String, Object?>? payload,
   }) async {
     requests.add({'operation': operation, 'payload': payload ?? {}});
+    if (operation == 'GUI Shell書出し') {
+      return exportBrokerResponse(payload!);
+    }
     final body = switch (operation) {
       'プロファイル一覧' => <String, Object?>{'Profiles': <Object?>[]},
       '更新一覧' => <String, Object?>{'更新一覧': <Object?>[]},
@@ -612,24 +618,75 @@ class _ComposeScreenTransport implements BrokerTransport {
           '候補件数': 2,
         },
       'GUI Shell構成' => <String, Object?>{
+          'version': 1,
+          'operation': operation,
+          'status': 'accepted',
           'compose_manifest': Map<String, Object?>.fromEntries(
             payload!.entries.toList().reversed,
           ),
           'build_status': 'not_started',
           'app_identity_status': 'not_generated',
           'permission_generated': false,
+          'authority_strip': true,
+          'inheritance_policy': const {
+            'authority': 'none',
+            'permission': 'none',
+            'approval': 'none',
+            'credential': 'none',
+            'audit_chain': 'none',
+          },
+          'evidence_source': 'INTERNAL_STATE',
+          'audit_id': 'broker-audit-compose',
         },
       'GUI Shell構成Preview' => <String, Object?>{
+          'version': 1,
+          'operation': operation,
+          'status': 'accepted',
+          'current_manifest': payload!['current_manifest'],
+          'candidate_manifest': payload['candidate_manifest'],
+          'build_target': payload['build_target'],
           'preview_mode': 'version_rollback',
+          'diff': const {
+            'runtime_added': <String>[],
+            'runtime_removed': <String>[],
+            'agent_added': <String>[],
+            'agent_removed': <String>[],
+            'tool_added': <String>[],
+            'tool_removed': <String>[],
+            'mcp_added': <String>[],
+            'mcp_removed': <String>[],
+            'capability_added': <String>[],
+            'capability_removed': <String>[],
+            'changed_fields': <String>[],
+          },
+          'permission_requirements': [
+            for (final capability in (payload['candidate_manifest']!
+                as Map<String, Object?>)['capability_requirements']! as List)
+              {
+                'capability': capability,
+                'permission_status': 'not_generated',
+                'approval_status': 'not_requested',
+              },
+          ],
+          'version_preview': {
+            'current_version': payload['current_manifest'] == null ? null : 1,
+            'candidate_version': 1,
+            'rollback_available': false,
+            'rollback_status': 'not_executable',
+            'rollback_reason': 'Previewはrollback要求を実行しない',
+          },
           'build_status': 'not_started',
           'export_status': 'not_started',
-          'version_preview': {'rollback_available': false},
-        },
-      'GUI Shell書出し' => <String, Object?>{
-          'manifest_file': {
-            'path': 'fixture/manifest.json',
-            'temporary_file_status': 'removed',
+          'authority_strip': true,
+          'inheritance_policy': const {
+            'authority': 'none',
+            'permission': 'none',
+            'approval': 'none',
+            'credential': 'none',
+            'audit_chain': 'none',
           },
+          'evidence_source': 'INTERNAL_STATE',
+          'audit_id': 'broker-audit-compose',
         },
       'GUI Shell編集提案' => <String, Object?>{
           'version': 1,
@@ -659,6 +716,10 @@ class _ComposeScreenTransport implements BrokerTransport {
       if (operation == 'MCP接続一覧') 'evidence_source': 'INTERNAL_STATE',
       if (operation == 'GUI Shell構成Catalog')
         'evidence_source': 'INTERNAL_STATE',
+      if (operation == 'GUI Shell構成' || operation == 'GUI Shell構成Preview')
+        'evidence_source': 'INTERNAL_STATE',
+      if (operation == 'GUI Shell構成' || operation == 'GUI Shell構成Preview')
+        'audit_event_id': 'broker-audit-compose',
       if (operation == 'MCP Tool実行') 'evidence_source': 'LIVE_RUNTIME',
       if (operation == 'GUI Shell編集提案') 'evidence_source': 'INTERNAL_STATE',
       if (operation == 'GUI Shell編集提案')

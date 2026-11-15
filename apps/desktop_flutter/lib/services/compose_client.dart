@@ -29,6 +29,29 @@ class ComposeClient {
 
   final BrokerTransport _transport;
 
+  static const _inheritanceFields = {
+    'authority',
+    'permission',
+    'approval',
+    'credential',
+    'audit_chain',
+  };
+
+  static const _composeManifestFields = {
+    'version',
+    'compose_id',
+    'display_name',
+    'runtime_ids',
+    'agent_ids',
+    'tool_ids',
+    'mcp_connection_ids',
+    'theme',
+    'capability_requirements',
+    'settings',
+    'inheritance_policy',
+    'output_mode',
+  };
+
   Future<ComposeRuntimeAgentCatalog> refreshRuntimeAgentCatalog() async {
     final response = await _transport.request(
       'GUI Shell構成Catalog',
@@ -127,7 +150,39 @@ class ComposeClient {
       'GUI Shell構成',
       payload: manifest,
     );
-    return _acceptedBody(response, 'GUI Shell構成');
+    final body = _acceptedAuditedBody(response, 'GUI Shell構成');
+    const fields = {
+      'version',
+      'operation',
+      'status',
+      'compose_manifest',
+      'build_status',
+      'app_identity_status',
+      'permission_generated',
+      'authority_strip',
+      'inheritance_policy',
+      'evidence_source',
+      'audit_id',
+    };
+    final acceptedManifest = _objectMap(body['compose_manifest']);
+    if (!_hasExactKeys(body, fields) ||
+        body['version'] != 1 ||
+        body['operation'] != 'GUI Shell構成' ||
+        body['status'] != 'accepted' ||
+        body['build_status'] != 'not_started' ||
+        body['app_identity_status'] != 'not_generated' ||
+        body['permission_generated'] != false ||
+        body['authority_strip'] != true ||
+        !_hasNoInheritedAuthority(body['inheritance_policy']) ||
+        body['evidence_source'] != 'INTERNAL_STATE' ||
+        acceptedManifest == null ||
+        !_isComposeManifest(acceptedManifest) ||
+        !_sameJson(acceptedManifest, manifest)) {
+      throw const BrokerClientException(
+        'GUI Shell構成receiptが要求またはAuthority境界と一致しません',
+      );
+    }
+    return body;
   }
 
   Future<Map<String, Object?>> preview({
@@ -135,6 +190,9 @@ class ComposeClient {
     required Map<String, Object?> candidateManifest,
     String buildTarget = 'windows',
   }) async {
+    if (!const {'windows', 'desktop', 'mobile'}.contains(buildTarget)) {
+      throw const BrokerClientException('Compose Preview対象platformが不正です');
+    }
     final response = await _transport.request(
       'GUI Shell構成Preview',
       payload: {
@@ -145,7 +203,71 @@ class ComposeClient {
         'preview_mode': 'version_rollback',
       },
     );
-    return _acceptedBody(response, 'GUI Shell構成Preview');
+    final body = _acceptedAuditedBody(response, 'GUI Shell構成Preview');
+    const fields = {
+      'version',
+      'operation',
+      'status',
+      'current_manifest',
+      'candidate_manifest',
+      'build_target',
+      'preview_mode',
+      'diff',
+      'permission_requirements',
+      'version_preview',
+      'build_status',
+      'export_status',
+      'authority_strip',
+      'inheritance_policy',
+      'evidence_source',
+      'audit_id',
+    };
+    final current = body['current_manifest'];
+    final currentMap = current == null ? null : _objectMap(current);
+    final candidate = _objectMap(body['candidate_manifest']);
+    if (!_hasExactKeys(body, fields) ||
+        body['version'] != 1 ||
+        body['operation'] != 'GUI Shell構成Preview' ||
+        body['status'] != 'accepted' ||
+        body['build_target'] != buildTarget ||
+        body['preview_mode'] != 'version_rollback' ||
+        body['build_status'] != 'not_started' ||
+        body['export_status'] != 'not_started' ||
+        body['authority_strip'] != true ||
+        !_hasNoInheritedAuthority(body['inheritance_policy']) ||
+        body['evidence_source'] != 'INTERNAL_STATE' ||
+        (current != null &&
+            (currentMap == null || !_isComposeManifest(currentMap))) ||
+        !_sameJson(current, currentManifest) ||
+        candidate == null ||
+        !_isComposeManifest(candidate) ||
+        !_sameJson(candidate, candidateManifest) ||
+        !_validPreviewDiff(body['diff']) ||
+        !_validPreviewPermissions(
+          body['permission_requirements'],
+          candidate['capability_requirements'] as List,
+        ) ||
+        !_validVersionPreview(body['version_preview'], current != null)) {
+      throw const BrokerClientException(
+        'GUI Shell構成Preview receiptが要求またはAuthority境界と一致しません',
+      );
+    }
+    return body;
+  }
+
+  Map<String, Object?> _acceptedAuditedBody(
+    Map<String, Object?> response,
+    String operation,
+  ) {
+    final body = _acceptedBody(response, operation);
+    final auditId = response['audit_event_id'];
+    if (response['evidence_source'] != 'INTERNAL_STATE' ||
+        auditId is! String ||
+        !_validAuditId(auditId) ||
+        body['audit_id'] != auditId) {
+      throw BrokerClientException('$operation 応答の証拠または監査参照が不正です');
+    }
+    return body;
   }
 }
 
@@ -202,16 +324,207 @@ Map<String, Object?> _acceptedBody(
   Map<String, Object?> response,
   String operation,
 ) {
+  if (response['operation'] != operation) {
+    throw BrokerClientException('$operation 応答の操作識別が不正です');
+  }
   if (response['status'] != 'accepted') {
     final error = response['error'];
-    final message = error is Map
-        ? error['message']?.toString() ?? response.toString()
-        : response.toString();
-    throw BrokerClientException('$operation が拒否されました: $message');
+    final code = error is Map ? error['code'] : null;
+    final safeCode =
+        code is String && RegExp(r'^[a-z0-9_]{1,96}$').hasMatch(code)
+            ? ' ($code)'
+            : '';
+    throw BrokerClientException('$operation がBrokerに拒否されました$safeCode');
+  }
+  if (response['error'] != null) {
+    throw BrokerClientException('$operation accepted応答にerrorが含まれています');
   }
   final body = response['body'];
-  if (body is! Map) {
+  final result = _objectMap(body);
+  if (result == null) {
     throw BrokerClientException('$operation 応答bodyがobjectではありません');
   }
-  return Map<String, Object?>.from(body);
+  return result;
+}
+
+Map<String, Object?>? _objectMap(Object? value) {
+  if (value is! Map || value.keys.any((key) => key is! String)) return null;
+  return Map<String, Object?>.from(value);
+}
+
+bool _hasExactKeys(Map<String, Object?> value, Set<String> expected) =>
+    value.length == expected.length &&
+    value.keys.every((key) => expected.contains(key));
+
+bool _validAuditId(String value) =>
+    RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$').hasMatch(value);
+
+bool _hasNoInheritedAuthority(Object? value) {
+  final policy = _objectMap(value);
+  return policy != null &&
+      policy.length == ComposeClient._inheritanceFields.length &&
+      policy.keys.every(ComposeClient._inheritanceFields.contains) &&
+      policy.values.every((item) => item == 'none');
+}
+
+bool _isComposeManifest(Map<String, Object?> value) {
+  if (value.length != ComposeClient._composeManifestFields.length ||
+      !value.keys.every(ComposeClient._composeManifestFields.contains) ||
+      value['version'] != 1 ||
+      value['output_mode'] != 'manifest_only' ||
+      !_hasNoInheritedAuthority(value['inheritance_policy'])) {
+    return false;
+  }
+  final composeId = value['compose_id'];
+  final displayName = value['display_name'];
+  if (composeId is! String ||
+      !RegExp(r'^[A-Za-z0-9._-]{1,64}$').hasMatch(composeId) ||
+      displayName is! String ||
+      displayName.trim().isEmpty ||
+      displayName.runes.length > 128) {
+    return false;
+  }
+  if (!_isUniqueStringList(value['runtime_ids'], 32, 128) ||
+      !_isUniqueStringList(value['agent_ids'], 32, 128) ||
+      !_isUniqueStringList(value['tool_ids'], 64, 147) ||
+      !_isUniqueStringList(value['mcp_connection_ids'], 32, 128) ||
+      !_isUniqueStringList(value['capability_requirements'], 64, 128)) {
+    return false;
+  }
+  final theme = _objectMap(value['theme']);
+  if (theme == null ||
+      !_hasExactKeys(theme, const {'theme_id', 'mode'}) ||
+      theme['theme_id'] is! String ||
+      (theme['theme_id']! as String).trim().isEmpty ||
+      (theme['theme_id']! as String).runes.length > 64 ||
+      !const {'system', 'light', 'dark'}.contains(theme['mode'])) {
+    return false;
+  }
+  final settings = _objectMap(value['settings']);
+  if (settings == null ||
+      !_hasExactKeys(
+        settings,
+        const {'locale', 'density', 'content_visibility'},
+      ) ||
+      settings['locale'] is! String ||
+      !RegExp(r'^[A-Za-z]{2}-[A-Za-z]{2}$')
+          .hasMatch(settings['locale']! as String) ||
+      !const {'compact', 'comfortable'}.contains(settings['density']) ||
+      !const {'none', 'hash_only', 'summary', 'redacted', 'full'}
+          .contains(settings['content_visibility'])) {
+    return false;
+  }
+  return true;
+}
+
+bool _isUniqueStringList(Object? value, int maxItems, int maxCharacters) {
+  if (value is! List || value.length > maxItems) return false;
+  final items = <String>[];
+  for (final item in value) {
+    if (item is! String ||
+        item.trim().isEmpty ||
+        item.runes.length > maxCharacters) {
+      return false;
+    }
+    items.add(item);
+  }
+  return items.toSet().length == items.length;
+}
+
+bool _validPreviewDiff(Object? value) {
+  final diff = _objectMap(value);
+  if (diff == null ||
+      !_hasExactKeys(diff, const {
+        'runtime_added',
+        'runtime_removed',
+        'agent_added',
+        'agent_removed',
+        'tool_added',
+        'tool_removed',
+        'mcp_added',
+        'mcp_removed',
+        'capability_added',
+        'capability_removed',
+        'changed_fields',
+      })) {
+    return false;
+  }
+  for (final entry in diff.entries) {
+    final maximum = entry.key.startsWith('tool_')
+        ? 64
+        : entry.key.startsWith('capability_')
+            ? 64
+            : entry.key == 'changed_fields'
+                ? 32
+                : 32;
+    if (!_isUniqueStringList(entry.value, maximum, 147)) return false;
+  }
+  return true;
+}
+
+bool _validPreviewPermissions(Object? value, List requirements) {
+  if (value is! List ||
+      value.length != requirements.length ||
+      value.length > 64) {
+    return false;
+  }
+  for (var index = 0; index < value.length; index++) {
+    final item = _objectMap(value[index]);
+    if (item == null ||
+        !_hasExactKeys(
+          item,
+          const {'capability', 'permission_status', 'approval_status'},
+        ) ||
+        item['capability'] != requirements[index] ||
+        item['permission_status'] != 'not_generated' ||
+        item['approval_status'] != 'not_requested') {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _validVersionPreview(Object? value, bool hasCurrentManifest) {
+  final preview = _objectMap(value);
+  return preview != null &&
+      _hasExactKeys(
+        preview,
+        const {
+          'current_version',
+          'candidate_version',
+          'rollback_available',
+          'rollback_status',
+          'rollback_reason',
+        },
+      ) &&
+      preview['current_version'] == (hasCurrentManifest ? 1 : null) &&
+      preview['candidate_version'] == 1 &&
+      preview['rollback_available'] == false &&
+      preview['rollback_status'] == 'not_executable' &&
+      preview['rollback_reason'] == 'Previewはrollback要求を実行しない';
+}
+
+bool _sameJson(Object? left, Object? right) {
+  try {
+    return jsonEncode(_orderedJson(left)) == jsonEncode(_orderedJson(right));
+  } on Object {
+    return false;
+  }
+}
+
+Object? _orderedJson(Object? value) {
+  if (value is Map) {
+    if (value.keys.any((key) => key is! String)) {
+      throw const FormatException('JSON object key must be a string');
+    }
+    final keys = value.keys.cast<String>().toList()..sort();
+    return <String, Object?>{
+      for (final key in keys) key: _orderedJson(value[key]),
+    };
+  }
+  if (value is List) return value.map(_orderedJson).toList(growable: false);
+  if (value == null || value is String || value is bool || value is num) {
+    return value;
+  }
+  throw const FormatException('Value is not JSON-compatible');
 }

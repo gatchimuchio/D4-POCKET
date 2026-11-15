@@ -1020,6 +1020,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final receipt = await client.preview(
         currentManifest: _lastAcceptedComposeManifest,
         candidateManifest: _composeManifest(),
+        buildTarget: _exportTargetPlatform == 'windows' ? 'windows' : 'desktop',
       );
       _previewJson = composeJson(receipt);
       _setComposeMessage(

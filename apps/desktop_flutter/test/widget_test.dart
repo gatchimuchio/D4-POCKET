@@ -30,6 +30,8 @@ import 'package:gui_shell_desktop/services/agent_task_execution_coordinator.dart
 import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 
+import 'support/d4p_receipt_fixtures.dart';
+
 const _requiredSurfaceSemanticsLabels = [
   'Dashboard',
   'NavigationRail',
@@ -1485,7 +1487,11 @@ void main() {
       ],
     );
     expect(
-        find.textContaining('fixture://d4-pocket/export.json'), findsWidgets);
+      find.textContaining(
+        r'C:\D4Pocket\Exports\d4-pocket-app-11111111111111111111111111111111.json',
+      ),
+      findsWidgets,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -6591,33 +6597,10 @@ class _ComposeExportNavigationTransport implements BrokerTransport {
       };
     }
     if (operation == 'GUI Shell構成') {
-      return {
-        'request_id': 'fixture-compose',
-        'operation': operation,
-        'status': 'accepted',
-        'evidence_source': 'FIXTURE',
-        'audit_event_id': 'fixture-compose-audit',
-        'error': null,
-        'body': {'compose_manifest': payload},
-        'shutdown_requested': false,
-      };
+      return composeBrokerResponse(payload!);
     }
     if (operation == 'GUI Shell書出し') {
-      return {
-        'request_id': 'fixture-export',
-        'operation': operation,
-        'status': 'accepted',
-        'evidence_source': 'FIXTURE',
-        'audit_event_id': 'fixture-export-audit',
-        'error': null,
-        'body': {
-          'manifest_file': {
-            'path': 'fixture://d4-pocket/export.json',
-            'temporary_file_status': 'cleaned',
-          },
-        },
-        'shutdown_requested': false,
-      };
+      return exportBrokerResponse(payload!);
     }
     throw BrokerClientException('fixtureでは未対応の要求です: $operation');
   }
