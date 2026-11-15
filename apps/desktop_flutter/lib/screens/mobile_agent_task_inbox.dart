@@ -1,10 +1,11 @@
+import 'dart:async';
+
 import 'package:agent_orchestration/agent_orchestration.dart'
     show
         AgentTaskClient,
         AgentTaskDeclaredResult,
         AgentTaskPreflight,
         AgentTaskRecord,
-        AgentTaskRequest,
         AgentTaskResultProjection,
         MobileAgentTaskClient,
         MobileAgentTaskDraft;
@@ -27,28 +28,54 @@ class _MobileAgentTaskInboxState extends State<MobileAgentTaskInbox> {
   List<MobileAgentTaskDraft> _requests = const [];
   bool _busy = false;
   String? _message;
+  int _generation = 0;
+
+  @override
+  void didUpdateWidget(covariant MobileAgentTaskInbox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.transport, widget.transport)) return;
+
+    final generation = ++_generation;
+    _requests = const [];
+    _busy = false;
+    _message = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _generation) return;
+      unawaited(_reload());
+    });
+  }
+
+  bool _isCurrent(int generation, BrokerTransport transport) =>
+      mounted &&
+      generation == _generation &&
+      identical(widget.transport, transport);
 
   Future<void> _reload() async {
     if (_busy) return;
+    final transport = widget.transport;
+    final generation = _generation;
     setState(() {
       _busy = true;
       _message = null;
     });
     try {
       final client = MobileAgentTaskClient(
-        (operation, payload) =>
-            widget.transport.request(operation, payload: payload),
+        (operation, payload) => transport.request(operation, payload: payload),
       );
       final requests = await client.desktopInbox();
-      if (!mounted) return;
+      if (!_isCurrent(generation, transport)) return;
       setState(() {
         _requests = requests;
         _message = requests.isEmpty ? '有効なDevice Link申請はありません。' : null;
       });
     } catch (_) {
-      if (mounted) setState(() => _message = 'Device Link申請をBrokerから取得できません。');
+      if (_isCurrent(generation, transport)) {
+        setState(() => _message = 'Device Link申請をBrokerから取得できません。');
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (_isCurrent(generation, transport)) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -115,84 +142,152 @@ class _MobileAgentTaskInboxEntryState
   AgentTaskRecord? _task;
   AgentTaskResultProjection? _result;
   String? _error;
+  int _generation = 0;
+  DialogRoute<void>? _resultDialogRoute;
 
-  AgentTaskClient get _client => AgentTaskClient(widget.transport);
-  AgentTaskRequest get _request => widget.draft.toAgentTaskRequest();
+  bool _sameDraft(MobileAgentTaskDraft left, MobileAgentTaskDraft right) =>
+      left.requestId == right.requestId &&
+      left.deviceId == right.deviceId &&
+      left.runtimeId == right.runtimeId &&
+      left.sessionId == right.sessionId &&
+      left.workspaceId == right.workspaceId &&
+      left.instruction == right.instruction &&
+      left.instructionHash == right.instructionHash &&
+      left.createdAt == right.createdAt &&
+      left.expiresAt == right.expiresAt &&
+      left.taskId == right.taskId;
+
+  bool _isCurrent(
+    int generation,
+    BrokerTransport transport,
+    MobileAgentTaskDraft draft,
+  ) =>
+      mounted &&
+      generation == _generation &&
+      identical(widget.transport, transport) &&
+      _sameDraft(widget.draft, draft);
+
+  void _dismissStaleResultDialog() {
+    final route = _resultDialogRoute;
+    _resultDialogRoute = null;
+    if (route == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = route.navigator;
+      if (route.isActive && navigator != null) navigator.removeRoute(route);
+    });
+  }
 
   @override
   void didUpdateWidget(covariant _MobileAgentTaskInboxEntry oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.draft.taskId != widget.draft.taskId) {
-      _reviewed = false;
-      _preflight = null;
-      _task = null;
-      _result = null;
+    if (identical(oldWidget.transport, widget.transport) &&
+        _sameDraft(oldWidget.draft, widget.draft)) {
+      return;
     }
+
+    _generation++;
+    _expanded = false;
+    _reviewed = false;
+    _busy = false;
+    _preflight = null;
+    _task = null;
+    _result = null;
+    _error = null;
+    _dismissStaleResultDialog();
   }
 
-  Future<void> _perform(Future<void> Function() action) async {
+  @override
+  void dispose() {
+    _generation++;
+    _dismissStaleResultDialog();
+    super.dispose();
+  }
+
+  Future<void> _perform(
+    Future<void> Function(
+      AgentTaskClient client,
+      MobileAgentTaskDraft draft,
+      bool Function() isCurrent,
+    ) action,
+  ) async {
     if (_busy) return;
+    final transport = widget.transport;
+    final draft = widget.draft;
+    final generation = _generation;
+    final client = AgentTaskClient(transport);
+    bool isCurrent() => _isCurrent(generation, transport, draft);
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await action();
+      await action(client, draft, isCurrent);
     } on BrokerClientException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      if (isCurrent()) setState(() => _error = error.message);
     } catch (_) {
-      if (mounted) setState(() => _error = 'Broker操作の結果を確認できません。状態を更新してください。');
+      if (isCurrent()) {
+        setState(() => _error = 'Broker操作の結果を確認できません。状態を更新してください。');
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (isCurrent()) setState(() => _busy = false);
     }
   }
 
-  Future<void> _refresh() => _perform(() async {
-        final taskId = widget.draft.taskId;
+  Future<void> _refresh() => _perform((client, draft, isCurrent) async {
+        final taskId = draft.taskId;
         if (taskId != null) {
-          final task = await _client.state(taskId);
-          if (mounted) setState(() => _task = task);
+          final task = await client.state(taskId);
+          if (isCurrent()) setState(() => _task = task);
         } else {
-          final preflight = await _client.inspect(_request);
-          if (mounted) setState(() => _preflight = preflight);
+          final preflight = await client.inspect(draft.toAgentTaskRequest());
+          if (isCurrent()) setState(() => _preflight = preflight);
         }
       });
 
-  Future<void> _grantPermission() => _perform(() async {
+  Future<void> _grantPermission() => _perform((client, draft, isCurrent) async {
         if (!_reviewed) throw const BrokerClientException('先に申請本文を確認してください');
-        await _client.grantWorkspacePermission(_request);
-        final preflight = await _client.inspect(_request);
-        if (mounted) setState(() => _preflight = preflight);
+        final request = draft.toAgentTaskRequest();
+        await client.grantWorkspacePermission(request);
+        if (!isCurrent()) return;
+        final preflight = await client.inspect(request);
+        if (isCurrent()) setState(() => _preflight = preflight);
       });
 
-  Future<void> _grantApproval() => _perform(() async {
+  Future<void> _grantApproval() => _perform((client, draft, isCurrent) async {
         if (!_reviewed) throw const BrokerClientException('先に申請本文を確認してください');
-        final preflight = await _client.inspect(_request);
+        final request = draft.toAgentTaskRequest();
+        final preflight = await client.inspect(request);
+        if (!isCurrent()) return;
         if (preflight.permissionStatus != '有効') {
-          if (mounted) setState(() => _preflight = preflight);
+          setState(() => _preflight = preflight);
           throw const BrokerClientException('Workspace Permissionが有効になっていません');
         }
-        await _client.grantOwnerApproval(_request);
-        final updated = await _client.inspect(_request);
-        if (mounted) setState(() => _preflight = updated);
+        await client.grantOwnerApproval(request);
+        if (!isCurrent()) return;
+        final updated = await client.inspect(request);
+        if (isCurrent()) setState(() => _preflight = updated);
       });
 
-  Future<void> _cancel() => _perform(() async {
+  Future<void> _cancel() => _perform((client, draft, isCurrent) async {
         final task = _task;
         if (task == null ||
+            task.taskId != draft.taskId ||
             !const {'pending', 'running'}.contains(task.status)) {
           return;
         }
-        final updated = await _client.cancel(task.taskId);
-        if (mounted) setState(() => _task = updated);
+        final updated = await client.cancel(task.taskId);
+        if (isCurrent()) setState(() => _task = updated);
       });
 
-  Future<void> _showResult() => _perform(() async {
+  Future<void> _showResult() => _perform((client, draft, isCurrent) async {
         final task = _task;
-        if (task == null) throw const BrokerClientException('Task状態を更新してください');
-        final approval = await _client.grantResultExposure(task, 'full');
-        final projection = await _client.readResult(approval);
-        if (!mounted) return;
+        if (task == null || task.taskId != draft.taskId) {
+          throw const BrokerClientException('Task状態を更新してください');
+        }
+        final approval = await client.grantResultExposure(task, 'full');
+        if (!isCurrent()) return;
+        final projection = await client.readResult(approval);
+        if (!isCurrent()) return;
         setState(() => _result = projection);
         await _showProjection(projection.declaredResult, task);
       });
@@ -201,7 +296,7 @@ class _MobileAgentTaskInboxEntryState
     AgentTaskDeclaredResult? result,
     AgentTaskRecord task,
   ) async {
-    await showDialog<void>(
+    final route = DialogRoute<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Agent Task結果（未検証のAgent申告）'),
@@ -240,6 +335,12 @@ class _MobileAgentTaskInboxEntryState
         ],
       ),
     );
+    _resultDialogRoute = route;
+    try {
+      await Navigator.of(context, rootNavigator: true).push<void>(route);
+    } finally {
+      if (identical(_resultDialogRoute, route)) _resultDialogRoute = null;
+    }
   }
 
   @override
@@ -249,6 +350,7 @@ class _MobileAgentTaskInboxEntryState
     final preflight = _preflight;
     return Card(
       child: ExpansionTile(
+        key: ValueKey('mobile-task-entry-$_generation'),
         initiallyExpanded: _expanded,
         onExpansionChanged: (value) => setState(() {
           _expanded = value;

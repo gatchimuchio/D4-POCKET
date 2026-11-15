@@ -281,7 +281,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mobile_agent_task_inbox.dart",
-      "sha256": "11011ad126cdeaba2c702212ac4e07ccb0f86aeaccfb97b9decc753f04c21968"
+      "sha256": "510f7170bf55abeaf91aafd644acbee2a43534717bf2fd700df4768153de1461"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/notifications.dart",
@@ -717,7 +717,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/mobile_agent_task_inbox_test.dart",
-      "sha256": "d27c908c4054ef79f9e3713bed5f96eadce1f81ea11f0cf160bc1c468a1cb94f"
+      "sha256": "8a13f9f156b71320309f07ba2eb01b57bc23e5b6f12a3c3cf359622ecf87d5ab"
     },
     {
       "path": "apps/desktop_flutter/test/module_pruning_test.dart",
@@ -1549,7 +1549,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "e6652116ef76821eac76457c511e9330b7b88d40fee4b3ec6fa06ba7dfe7caf8"
+      "sha256": "e1c742903b88772c5d30f9f554641d186acd8b42ee891a2c6cda21c159883e24"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
