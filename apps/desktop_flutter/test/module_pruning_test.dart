@@ -200,7 +200,12 @@ void main() {
 
       await _openNavigation(tester, '観測');
       await tester.pumpAndSettle();
-      expect(find.textContaining('観測一覧を取得できません:'), findsOneWidget);
+      expect(
+        find.text('観測一覧を取得できません。Broker接続と観測状態を確認してください。'),
+        findsOneWidget,
+      );
+      expect(
+          find.textContaining('secret-marker observation path'), findsNothing);
       expect(find.text('再試行'), findsOneWidget);
       expect(
         fixture.operations.where((operation) => operation == '観測一覧'),
@@ -226,7 +231,12 @@ void main() {
 
       await _openNavigation(tester, '追跡');
       await tester.pumpAndSettle();
-      expect(find.textContaining('Trace一覧を取得できません:'), findsOneWidget);
+      expect(
+        find.text('Trace一覧を取得できません。Broker接続と観測状態を確認してください。'),
+        findsOneWidget,
+      );
+      expect(
+          find.textContaining('secret-marker observation path'), findsNothing);
       expect(find.text('再試行'), findsOneWidget);
       expect(
         fixture.operations.where((operation) => operation == '観測一覧'),
@@ -320,7 +330,7 @@ class _ObservationFixtureTransport implements BrokerTransport {
     payloads.add(Map<String, Object?>.from(payload ?? const {}));
     if (operation == '観測一覧' && failFirstObservation) {
       failFirstObservation = false;
-      throw StateError('fixture observation failure');
+      throw StateError('secret-marker observation path');
     }
     return {
       'status': 'accepted',

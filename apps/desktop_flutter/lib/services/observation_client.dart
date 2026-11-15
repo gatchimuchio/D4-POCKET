@@ -44,9 +44,17 @@ class ObservationClient {
       '上限': limit,
       if (traceId != null) 'TraceID': traceId,
     };
-    final response = await _transport.request('観測一覧', payload: payload);
+    late final Map<String, Object?> response;
+    try {
+      response = await _transport.request('観測一覧', payload: payload);
+    } on Object {
+      throw const BrokerClientException('観測一覧のBroker通信を確認できません');
+    }
     if (response['status'] != 'accepted') {
       throw const BrokerClientException('観測一覧がBrokerに拒否されました');
+    }
+    if (response['error'] != null) {
+      throw const BrokerClientException('観測一覧accepted応答にerrorが含まれています');
     }
     final rawBody = response['body'];
     if (rawBody is! Map || rawBody.keys.any((key) => key is! String)) {

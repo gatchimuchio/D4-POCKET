@@ -289,7 +289,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/observability_center.dart",
-      "sha256": "5039c4bd97548c647bca8ef80ca2c338271e881a93ff89845ad861e23b78a3ef"
+      "sha256": "00e1c716a8114d9250c420d65313d98cf87b763192542ffb6a09067bb9540c48"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/permission_center.dart",
@@ -325,7 +325,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trace_inspector.dart",
-      "sha256": "0a76c8dcfd7d939336a36e3612ce31f62d9bf560b3a17423c0a0dbc277925a2f"
+      "sha256": "655b20426d31ccdfda07c8d5254a12cbfdb75bd348c1e33fe9348e8085b64f3d"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trust_center.dart",
@@ -405,7 +405,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/observation_client.dart",
-      "sha256": "9c8346f22fb60a7fa1fac728a8568a8c877c37385df7ddf099356091e16129b7"
+      "sha256": "0f25696b7ddb401c0105fb0b0f6cea3085a595d8f01e780207d1a920f6498e95"
     },
     {
       "path": "apps/desktop_flutter/lib/services/profile_client.dart",
@@ -713,7 +713,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/module_pruning_test.dart",
-      "sha256": "228c0e47f9a6241030fa11fc8845c4e6c59caee51f60c2f2643a38409a7d7712"
+      "sha256": "a671e61d070dd65eb99917535b641ddb5add91dbf7cc33038212172de621feea"
     },
     {
       "path": "apps/desktop_flutter/test/notification_client_test.dart",
@@ -721,7 +721,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/observation_client_test.dart",
-      "sha256": "d9b69afcd667bbe871182a2bf9b28ec8ca5e4486f0ed6cb62e380f98e604f120"
+      "sha256": "8a9d86f97baafd72abf3f8b79c13cda3d05331dbdb127f825c6c008b86fcadea"
     },
     {
       "path": "apps/desktop_flutter/test/profile_client_test.dart",
@@ -1525,7 +1525,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "5102fda246cdc54ea7c5b848b3ed4bc1548f6cd22f2522e5e120fd9e7c89eb99"
+      "sha256": "421b7baef9ff183ae076ef8d700f01e5896491a3cdb85b85cc699ba817696397"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",

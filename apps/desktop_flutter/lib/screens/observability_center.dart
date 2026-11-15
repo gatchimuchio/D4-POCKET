@@ -64,7 +64,9 @@ class _ObservabilityCenterState extends State<ObservabilityCenter> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('観測一覧を取得できません: ${snapshot.error}'),
+                      const Text(
+                        '観測一覧を取得できません。Broker接続と観測状態を確認してください。',
+                      ),
                       const SizedBox(height: 8),
                       OutlinedButton(
                         onPressed: () => setState(_refresh),

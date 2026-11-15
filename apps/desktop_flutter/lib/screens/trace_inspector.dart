@@ -77,7 +77,9 @@ class _TraceInspectorState extends State<TraceInspector> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Trace一覧を取得できません: ${snapshot.error}'),
+                      const Text(
+                        'Trace一覧を取得できません。Broker接続と観測状態を確認してください。',
+                      ),
                       const SizedBox(height: 8),
                       OutlinedButton(
                         onPressed: () => setState(_refresh),
@@ -191,9 +193,8 @@ class _TraceInspectorState extends State<TraceInspector> {
     final ended = _integer(span['終了EpochMillis']) ?? started;
     final left = ((started - minimum) / range).clamp(0.0, 1.0).toDouble();
     final availableWidth = math.max(0.015, 1.0 - left).toDouble();
-    final width = ((ended - started) / range)
-        .clamp(0.015, availableWidth)
-        .toDouble();
+    final width =
+        ((ended - started) / range).clamp(0.015, availableWidth).toDouble();
     final status = span['状態']?.toString() ?? '不明';
     final error = span['エラー分類']?.toString();
     return Padding(

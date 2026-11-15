@@ -4,8 +4,11 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerTransport, BrokerClientException;
 
 class _FakeObservationTransport implements BrokerTransport {
+  _FakeObservationTransport({this.transportError});
+
   final operations = <String>[];
   Map<String, Object?>? lastPayload;
+  final Object? transportError;
   Map<String, Object?> response = {
     'status': 'accepted',
     'body': _validBody(),
@@ -18,6 +21,7 @@ class _FakeObservationTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     lastPayload = payload == null ? null : Map<String, Object?>.from(payload);
+    if (transportError != null) throw transportError!;
     return response;
   }
 }
@@ -155,6 +159,41 @@ void main() {
           (error) => error.toString(),
           'sanitized error',
           isNot(contains('secret/path/command detail')),
+        ),
+      ),
+    );
+  });
+
+  test('transport例外とaccepted errorを観測Client例外へ露出しない', () async {
+    const marker = 'secret-marker C:/private/observation trace';
+    final transportFailure = _FakeObservationTransport(
+      transportError: StateError(marker),
+    );
+
+    await expectLater(
+      () => ObservationClient(transportFailure).list(),
+      throwsA(
+        isA<BrokerClientException>().having(
+          (error) => error.toString(),
+          'sanitized error',
+          isNot(contains(marker)),
+        ),
+      ),
+    );
+
+    final acceptedError = _FakeObservationTransport()
+      ..response = {
+        'status': 'accepted',
+        'error': {'message': marker},
+        'body': _validBody(),
+      };
+    await expectLater(
+      () => ObservationClient(acceptedError).list(),
+      throwsA(
+        isA<BrokerClientException>().having(
+          (error) => error.toString(),
+          'sanitized error',
+          isNot(contains(marker)),
         ),
       ),
     );
