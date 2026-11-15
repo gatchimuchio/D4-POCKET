@@ -137,6 +137,33 @@ class GlobalSearchIndex {
         pageIndex: 19,
       );
     }
+    for (final host in snapshot.hostCapabilities) {
+      final hostId = _safeUntrustedLabel(host.hostId, 128);
+      if (hostId.isEmpty) continue;
+      final displayName = _safeUntrustedLabel(host.displayName, 128);
+      final platform = _safeUntrustedLabel(host.platform, 48);
+      final hostStatus = _safeUntrustedLabel(host.status, 48);
+      for (final capability in host.capabilities.take(16)) {
+        if (results.length >= maxEntries) break;
+        final capabilityId = _safeUntrustedLabel(capability.capabilityId, 96);
+        if (capabilityId.isEmpty) continue;
+        final capabilityStatus = _safeUntrustedLabel(capability.status, 48);
+        add(
+          category: 'Host能力',
+          title: capabilityId,
+          detail: [
+            if (displayName.isNotEmpty) displayName,
+            if (platform.isNotEmpty) platform,
+            if (hostStatus.isNotEmpty) 'Host status=$hostStatus',
+            if (capabilityStatus.isNotEmpty)
+              'capability status=$capabilityStatus',
+            '能力metadataはPermission／Authorityではありません',
+          ].join(' / '),
+          recordId: hostId,
+          pageIndex: 19,
+        );
+      }
+    }
     for (final adapter in snapshot.adapterCatalog) {
       add(
         category: 'アダプター',

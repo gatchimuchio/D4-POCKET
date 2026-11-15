@@ -78,6 +78,72 @@ void main() {
     );
   });
 
+  test('全体検索はBrokerのHost能力を表示専用で検索し理由本文を除外する', () {
+    final snapshot = ShellCoreClient.mock().getSnapshot().copyWith(
+      snapshotSource: 'broker',
+      hostCapabilities: const [
+        HostCapabilityRecord(
+          hostId: 'host-lab',
+          displayName: 'Linux lab',
+          platform: 'linux',
+          status: 'connected',
+          capabilities: [
+            HostCapabilityItemRecord(
+              capabilityId: 'workspace.read',
+              status: 'available',
+              evidenceSource: 'LIVE_RUNTIME',
+              reason: 'host capability reason-secret-marker',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final results = GlobalSearchIndex.search(snapshot, 'workspace.read');
+
+    expect(results, hasLength(1));
+    expect(results.single.category, 'Host能力');
+    expect(results.single.title, 'workspace.read');
+    expect(results.single.recordId, 'host-lab');
+    expect(results.single.pageIndex, 19);
+    expect(results.single.evidenceSource, 'INTERNAL_STATE');
+    expect(results.single.detail,
+        contains('能力metadataはPermission／Authorityではありません'));
+    expect(results.single.detail, isNot(contains('reason-secret-marker')));
+    expect(
+      GlobalSearchIndex.search(snapshot, 'reason-secret-marker'),
+      isEmpty,
+    );
+  });
+
+  test('Host能力の検索metadataから不可視・双方向制御文字を除去する', () {
+    final snapshot = ShellCoreClient.mock().getSnapshot().copyWith(
+      hostCapabilities: const [
+        HostCapabilityRecord(
+          hostId: 'host-safe',
+          displayName: 'Linux',
+          platform: 'linux',
+          status: 'connected',
+          capabilities: [
+            HostCapabilityItemRecord(
+              capabilityId: 'workspace.\u200Bread',
+              status: 'available\u202E',
+              evidenceSource: 'FIXTURE',
+              reason: '',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final results = GlobalSearchIndex.search(snapshot, 'workspace.read');
+
+    expect(results, hasLength(1));
+    expect(results.single.title, 'workspace.read');
+    expect(results.single.detail, isNot(contains('\u202E')));
+    expect(results.single.detail, isNot(contains('\u200B')));
+  });
+
   test('Agent Adapterの表示metadataから不可視・双方向制御文字を除去する', () {
     final snapshot = ShellCoreClient.mock().getSnapshot().copyWith(
       agentAdapters: const [
