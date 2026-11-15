@@ -147,9 +147,27 @@ def _safe_app_bundle(
         text=True,
         encoding="utf-8",
     )
-    platforms = re.findall(r"(?m)^\s*platform\s+([A-Z]+)\s*$", platform_result.stdout)
-    if platforms != [expected_platform]:
-        raise ValueError(f"iOS app executable platformが不一致: expected {expected_platform}")
+    platform_lines = [
+        line.strip()
+        for line in platform_result.stdout.splitlines()
+        if re.search(r"\bplatform\b", line, flags=re.IGNORECASE)
+    ]
+    platforms = [
+        value.upper()
+        for value in re.findall(r"(?mi)^\s*platform\s+([A-Za-z0-9_]+)", platform_result.stdout)
+    ]
+    observed_platforms = sorted(set(platforms))
+    if not observed_platforms or observed_platforms != [expected_platform]:
+        observed = ",".join(observed_platforms) if observed_platforms else "unrecognized"
+        safe_lines = [
+            re.sub(r"[^A-Za-z0-9_ .()=:-]", "?", line)[:160]
+            for line in platform_lines[:8]
+        ]
+        detail = "|".join(safe_lines) if safe_lines else "no platform lines"
+        raise ValueError(
+            f"iOS app executable platformが不一致: expected {expected_platform}; "
+            f"observed={observed}; output={detail}"
+        )
 
     digest = hashlib.sha256()
     entry_count = 0

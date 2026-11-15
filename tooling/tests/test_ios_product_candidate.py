@@ -26,6 +26,7 @@ class IosProductCandidateTests(unittest.TestCase):
             stdout="",
             stderr="code object is not signed at all",
         )
+        self._repeat_platform = False
         self._platform = patch.object(candidate.platform, "system", return_value="Darwin")
         self._which = patch.object(candidate.shutil, "which", side_effect=self._which_tool)
         self._run = patch.object(candidate.subprocess, "run", side_effect=self._run_tool)
@@ -65,7 +66,9 @@ class IosProductCandidateTests(unittest.TestCase):
             return subprocess.CompletedProcess(arguments, 0, stdout="arm64\n", stderr="")
         if arguments[1:3] == ["vtool", "-show-build"]:
             platform = "IOSSIMULATOR" if "simulator" in str(arguments[-1]).lower() else "IOS"
-            return subprocess.CompletedProcess(arguments, 0, stdout=f"platform {platform}\n", stderr="")
+            count = 2 if self._repeat_platform else 1
+            output = "".join(f"platform {platform}\n" for _ in range(count))
+            return subprocess.CompletedProcess(arguments, 0, stdout=output, stderr="")
         if arguments[0] == "/usr/bin/ditto":
             source = Path(arguments[-2])
             destination = Path(arguments[-1])
@@ -165,6 +168,12 @@ class IosProductCandidateTests(unittest.TestCase):
         self.assertEqual(evidence["bundle_identity"]["distribution_identity"], False)
         self.assertEqual(evidence["distribution_ready"], False)
 
+    def test_accepts_repeated_platform_commands_when_all_match_target(self) -> None:
+        self._repeat_platform = True
+        evidence = self._build()
+        self.assertEqual(evidence["simulator_artifact"]["platform"], "IOSSIMULATOR")
+        self.assertEqual(evidence["device_artifact"]["platform"], "IOS")
+
     def test_accepts_code_resources_directory_when_codesign_reports_unsigned(self) -> None:
         signature_metadata = self.device / "_CodeSignature"
         signature_metadata.mkdir()
@@ -215,6 +224,26 @@ class IosProductCandidateTests(unittest.TestCase):
 
         with patch.object(candidate.subprocess, "run", side_effect=wrong_platform):
             with self.assertRaisesRegex(ValueError, "platformが不一致"):
+                self._build()
+        self.assertFalse(self.output.exists())
+
+    def test_rejects_mixed_platform_commands(self) -> None:
+        def mixed_platform(arguments: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+            if arguments[0] == "/usr/bin/codesign":
+                return self._codesign_result
+            if arguments[1:3] == ["lipo", "-archs"]:
+                return subprocess.CompletedProcess(arguments, 0, stdout="arm64\n", stderr="")
+            if arguments[1:3] == ["vtool", "-show-build"]:
+                return subprocess.CompletedProcess(
+                    arguments,
+                    0,
+                    stdout="platform IOSSIMULATOR\nplatform IOS\n",
+                    stderr="",
+                )
+            raise AssertionError(f"unexpected command: {arguments}")
+
+        with patch.object(candidate.subprocess, "run", side_effect=mixed_platform):
+            with self.assertRaisesRegex(ValueError, r"observed=IOS,IOSSIMULATOR"):
                 self._build()
         self.assertFalse(self.output.exists())
 

@@ -1517,7 +1517,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "81ba0a131e97dab214114ec1b517f56e673a7c5e2c414d923c0f88653a1d516d"
+      "sha256": "5722ca80f08a73930f745ae44d2827a81d101aebd7d23cedd3a995ab415affcb"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5681,7 +5681,7 @@
     },
     {
       "path": "tooling/package_ios_product_candidate.py",
-      "sha256": "2fe3652f417b955d2592052032fbe6a61d5ea35f6d59ef78f390ec2614a39bdb"
+      "sha256": "6c382aab3786d1629bfa031578e7292ec3f6e73e740f4e4a28c75220b42b0a84"
     },
     {
       "path": "tooling/package_linux_deb_setup.py",
@@ -5801,7 +5801,7 @@
     },
     {
       "path": "tooling/tests/test_ios_product_candidate.py",
-      "sha256": "fe4b0d02176f1a28b784016acb492c62711329fc9bd1827c2741874b54e33256"
+      "sha256": "c582e42c9e989adb1f9912c16c18fbc65d1f7c67a14c099fac046e9f17d41f34"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",
