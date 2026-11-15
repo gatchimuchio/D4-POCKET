@@ -1754,12 +1754,8 @@ void main() {
         'audit-workspace-bound');
     expect(snapshot.agentSessions.single.task, isEmpty);
     expect(snapshot.agentSessions.single.auditEventId, 'audit-session-created');
-    expect(
-      snapshot.auditEvents.any(
-        (event) => event.eventId == 'audit-session-list-read',
-      ),
-      isTrue,
-    );
+    expect(snapshot.auditEvents, isEmpty);
+    expect(snapshot.auditChainStatus, 'unknown');
     expect(
       snapshot.evidence.any(
         (record) =>
@@ -1822,6 +1818,15 @@ void main() {
       )['payload'],
       const <String, Object?>{},
     );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AuditViewer(client: client)),
+    ));
+    expect(find.text('Broker監査一覧は未接続'), findsOneWidget);
+    expect(find.textContaining('監査鎖状態: 未検証'), findsOneWidget);
+    expect(find.textContaining('audit-session-list-read'), findsNothing);
+    expect(find.textContaining('1111111111111111111111111111111111111111'),
+        findsNothing);
 
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(body: HostOperationCenter(client: client)),
@@ -5981,7 +5986,7 @@ void main() {
       ),
     );
 
-    expect(find.text('実行状態'), findsOneWidget);
+    expect(find.text('Snapshotの実行状態'), findsOneWidget);
     expect(find.textContaining('通信範囲:'), findsOneWidget);
     expect(find.textContaining('Broker監査鎖:'), findsOneWidget);
     expect(find.textContaining('取得元:'), findsOneWidget);

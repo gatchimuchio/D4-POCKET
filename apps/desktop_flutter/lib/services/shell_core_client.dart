@@ -156,23 +156,14 @@ class ShellCoreClient {
 
       return ShellCoreClient._(
         _brokerSnapshot(
-          healthResponse: healthResponse,
           health: health,
           setupDoctorReport: setupDoctorReport,
-          hostCapabilityResponse: hostCapabilityResponse,
           hostCapability: hostCapability,
-          hostListResponse: hostListResponse,
           hostList: hostList,
-          adapterListResponse: adapterListResponse,
           adapterList: adapterList,
-          agentAdapterListResponse: agentAdapterListResponse,
           agentAdapterList: agentAdapterList,
-          agentSessionListResponse: agentSessionListResponse,
           agentSessionList: agentSessionList,
-          normalizeResponse: normalizeResponse,
-          projectionResponse: projectionResponse,
           projection: projection,
-          protectedEditResponse: protectedEditResponse,
           protectedEdit: protectedEdit,
           commandResponse: commandResponse,
         ),
@@ -1064,23 +1055,14 @@ Map<String, Object?> _validatedSetupDoctorReport(Map<String, Object?> report) {
 }
 
 ShellSnapshot _brokerSnapshot({
-  required Map<String, Object?> healthResponse,
   required Map<String, Object?> health,
   required Map<String, Object?> setupDoctorReport,
-  required Map<String, Object?> hostCapabilityResponse,
   required Map<String, Object?> hostCapability,
-  required Map<String, Object?> hostListResponse,
   required Map<String, Object?> hostList,
-  required Map<String, Object?> adapterListResponse,
   required Map<String, Object?> adapterList,
-  required Map<String, Object?> agentAdapterListResponse,
   required Map<String, Object?> agentAdapterList,
-  required Map<String, Object?> agentSessionListResponse,
   required Map<String, Object?> agentSessionList,
-  required Map<String, Object?> normalizeResponse,
-  required Map<String, Object?> projectionResponse,
   required Map<String, Object?> projection,
-  required Map<String, Object?> protectedEditResponse,
   required Map<String, Object?> protectedEdit,
   required Map<String, Object?> commandResponse,
 }) {
@@ -1174,27 +1156,6 @@ ShellSnapshot _brokerSnapshot({
       ),
     );
   }
-  final auditEvents = [
-    _auditJson(healthResponse, 'broker.health', 'accepted'),
-    _auditJson(hostCapabilityResponse, 'broker.host_capability', 'accepted'),
-    _auditJson(hostListResponse, 'broker.host_list', 'accepted'),
-    _auditJson(adapterListResponse, 'broker.adapter_list', 'accepted'),
-    _auditJson(
-        agentAdapterListResponse, 'broker.agent_adapter_list', 'accepted'),
-    _auditJson(
-      agentSessionListResponse,
-      'broker.dialogue_session_list',
-      'accepted',
-    ),
-    _auditJson(normalizeResponse, 'broker.normalize_payload', 'accepted'),
-    _auditJson(projectionResponse, 'broker.content_projection', 'accepted'),
-    _auditJson(
-      protectedEditResponse,
-      'broker.approval_protected_edit',
-      protectedEditRejected ? 'rejected' : 'accepted',
-    ),
-    _auditJson(commandResponse, 'broker.command_envelope', 'suspended'),
-  ];
   final recoveryPlaybook =
       problems.map(_problemToRecoveryPlaybookJson).toList(growable: false);
 
@@ -1213,8 +1174,7 @@ ShellSnapshot _brokerSnapshot({
       'invariant_status': protectedEditRejected ? 'ok' : 'blocked',
       'trust_status': brokerReady ? 'restricted' : 'blocked',
       'pending_approvals_count': 0,
-      'audit_chain_status':
-          persistenceReady ? 'durable_file_store' : 'not_ready',
+      'audit_chain_status': 'unknown',
       'problems_count': problems.length,
       'release_state': 'not claimed',
     },
@@ -1234,7 +1194,7 @@ ShellSnapshot _brokerSnapshot({
     'agent_adapters': _agentAdapterSnapshotJson(agentAdapterList),
     'permissions': [],
     'pending_approvals': [],
-    'audit_events': auditEvents,
+    'audit_events': <Object?>[],
     'recovery_actions': [
       for (final problem in problems)
         {
@@ -1340,7 +1300,7 @@ ShellSnapshot _brokerSnapshot({
         'authority_related': true,
       },
     ],
-    'audit_chain_status': persistenceReady ? 'durable_file_store' : 'not_ready',
+    'audit_chain_status': 'unknown',
     'network_exposure': '127.0.0.1 restricted broker IPC',
     'release_blocker_count':
         problems.where((problem) => problem['blocks_release'] == true).length,
@@ -1542,20 +1502,6 @@ bool _boolInBody(Map<String, Object?> response, String key) {
     return false;
   }
   return body[key] == true;
-}
-
-Map<String, Object?> _auditJson(
-  Map<String, Object?> response,
-  String action,
-  String result,
-) {
-  return {
-    'event_id': response['audit_event_id']?.toString() ?? action,
-    'action': action,
-    'result': result,
-    'payload_hash':
-        'sha256:1111111111111111111111111111111111111111111111111111111111111111',
-  };
 }
 
 Map<String, Object?> _releaseProblemJson({

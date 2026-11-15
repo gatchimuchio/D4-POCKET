@@ -30,6 +30,8 @@ class _AuditViewerState extends State<AuditViewer> {
   @override
   Widget build(BuildContext context) {
     final snapshot = widget.client.getSnapshot();
+    final brokerMode = widget.client.mode == 'broker';
+    final brokerUnavailableMode = widget.client.mode == 'broker_unavailable';
     final auditEvents = snapshot.auditEvents.where(_matchesFilters).toList();
     return ShellPage(
       title: '監査ビューアー',
@@ -82,24 +84,35 @@ class _AuditViewerState extends State<AuditViewer> {
         SectionList(
           title: '監査鎖状態',
           rows: [
-            '監査鎖状態: ${snapshot.auditChainStatus}',
-            'ハッシュ鎖状態: ${snapshot.auditChainStatus}',
-            '操作: 事象をコピー／JSONLを書き出し／鎖を検証／関連する承認・実行系・アダプターを確認',
+            '監査一覧取得: ${brokerMode ? 'Broker経路未接続' : brokerUnavailableMode ? 'Broker接続不可' : '診断fixtureのみ'}',
+            '監査鎖状態: 未検証',
+            'ハッシュ鎖状態: 未検証',
+            '操作: 表示中の診断fixtureをコピーできます。永続監査記録と鎖の検証結果は未取得です。',
           ],
         ),
         if (auditEvents.isEmpty)
-          const EmptyStatePanel(
-            title: '一致する監査事象なし',
-            meaning: '現在の絞込み条件では全監査事象が非表示です。',
+          EmptyStatePanel(
+            title: brokerMode
+                ? 'Broker監査一覧は未接続'
+                : brokerUnavailableMode
+                    ? 'Broker監査一覧を取得できません'
+                    : '一致する診断fixtureなし',
+            meaning: brokerMode || brokerUnavailableMode
+                ? '永続監査記録はBrokerから取得していません。起動時応答の監査参照IDだけから一覧を作りません。'
+                : '現在の絞込み条件では診断用fixtureが非表示です。',
             phaseBBlocked: false,
-            nextAction: '絞込みを解除するか診断を更新してください。',
+            nextAction: brokerMode
+                ? 'Brokerの監査一覧読取経路が接続されるまで、実監査記録は表示できません。'
+                : brokerUnavailableMode
+                    ? 'Brokerへの接続を復旧してから、監査一覧の読取状態を確認してください。'
+                    : '絞込みを解除して診断fixtureを再表示してください。',
           )
         else
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columns: const [
-                DataColumn(label: Text('事象')),
+                DataColumn(label: Text('診断fixture事象')),
                 DataColumn(label: Text('作用')),
                 DataColumn(label: Text('結果')),
                 DataColumn(label: Text('内容ハッシュ')),
@@ -119,7 +132,7 @@ class _AuditViewerState extends State<AuditViewer> {
                       DataCell(Text(_relatedText(snapshot, event))),
                       DataCell(
                         IconButton(
-                          tooltip: '監査事象JSONをコピー',
+                          tooltip: '診断fixture JSONをコピー',
                           icon: const Icon(Icons.copy, size: 18),
                           onPressed: () => Clipboard.setData(
                             ClipboardData(text: _eventJson(event)),
