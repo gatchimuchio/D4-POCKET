@@ -46,6 +46,40 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   @override
+  void didUpdateWidget(covariant HistoryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.client?.transport, widget.client?.transport)) {
+      return;
+    }
+
+    _generation++;
+    _expiryTimer?.cancel();
+    _refreshTimer?.cancel();
+    _client = widget.client;
+    _page = null;
+    _taskPage = null;
+    _grant = null;
+    _busy = false;
+    _showTaskHistory = false;
+    _requestId = null;
+    _sessionId = null;
+    _state = null;
+    _requestFilter.clear();
+    _sessionFilter.clear();
+    _clearSelection();
+    _message = '履歴接続先が変わりました。現在の接続先を確認中です。';
+
+    final transport = widget.client?.transport;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          _active &&
+          identical(widget.client?.transport, transport)) {
+        _load();
+      }
+    });
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _active = state == AppLifecycleState.resumed;
     _generation++;
@@ -88,13 +122,21 @@ class _HistoryScreenState extends State<HistoryScreen>
       _message = '現在承認と履歴を確認中';
     });
     try {
-      _client ??= widget.client ?? HistoryClient(await BrokerClient.connect());
-      final grant = await _client!.status();
+      HistoryClient? client = _client ?? widget.client;
+      if (client == null) {
+        final transport = await BrokerClient.connect();
+        if (!mounted || !_active || generation != _generation) return;
+        client = HistoryClient(transport);
+      }
+      if (!mounted || !_active || generation != _generation) return;
+      _client = client;
+      final activeClient = client;
+      final grant = await activeClient.status();
       if (grant == null) {
         throw const BrokerClientException('ownerの履歴閲覧承認がありません。');
       }
       if (_showTaskHistory) {
-        final taskPage = await _client!.taskPage(grant, after: after);
+        final taskPage = await activeClient.taskPage(grant, after: after);
         if (!mounted || !_active || generation != _generation) return;
         setState(() {
           if (previousGrant != null && !previousGrant.same(taskPage.grant)) {
@@ -106,7 +148,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         });
         _scheduleExpiry(taskPage.grant);
       } else {
-        final page = await _client!.page(grant,
+        final page = await activeClient.page(grant,
             after: after,
             state: _state,
             requestId: _requestId,

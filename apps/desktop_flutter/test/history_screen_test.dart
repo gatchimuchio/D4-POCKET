@@ -23,7 +23,7 @@ class Fixture implements BrokerTransport {
   final operations = <String>[];
   int expiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 290;
   Map<String, Object?> get grant =>
-      {'approval_id': 'a' * 32, 'runtime_id': 'local', 'expires_at': expiry};
+      {'approval_id': 'a' * 32, 'runtime_id': runtime, 'expires_at': expiry};
 
   Map<String, Object?> historyRecord() {
     final record = <String, Object?>{
@@ -515,6 +515,36 @@ void main() {
     expect(find.textContaining('completed ／ ${'a' * 32}'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('Broker切替で旧履歴と遅延応答を破棄して新接続先から読み直す', (tester) async {
+    final first = Fixture()..runtime = 'broker-a';
+    final second = Fixture()..runtime = 'broker-b';
+    Widget screen(Fixture fixture) => MaterialApp(
+          home: Scaffold(
+            body: HistoryScreen(client: HistoryClient(fixture)),
+          ),
+        );
+
+    await tester.pumpWidget(screen(first));
+    await tester.pumpAndSettle();
+    expect(find.text('Runtime: broker-a ／ 1件の要求'), findsOneWidget);
+
+    first.gate = Completer<void>();
+    await tester.tap(find.text('先頭から更新'));
+    await tester.pump();
+
+    await tester.pumpWidget(screen(second));
+    await tester.pumpAndSettle();
+    expect(find.text('Runtime: broker-b ／ 1件の要求'), findsOneWidget);
+    expect(find.text('Runtime: broker-a ／ 1件の要求'), findsNothing);
+
+    first.gate!.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Runtime: broker-b ／ 1件の要求'), findsOneWidget);
+    expect(find.text('Runtime: broker-a ／ 1件の要求'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('実履歴表示と失効時の破棄', (tester) async {
     final f = Fixture();
     await tester.pumpWidget(MaterialApp(
