@@ -11,6 +11,7 @@ name: Apple platform 手動補助build
           - ios_mobile
           - ios_product_ui
           - macos_product
+          - macos_export
           - macos_owner
           - macos_adapter_lifecycle
           - macos_agent_registration
@@ -687,6 +688,185 @@ jobs:
         with:
           name: macos-product-${{ github.sha }}
           path: evidence/
+          retention-days: 3
+          if-no-files-found: error
+
+  macos-export:
+    if: ${{ inputs.target == 'macos_export' }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: 対象commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
+      - name: 固定toolchainを準備
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/macos-export-evidence"
+          mkdir -p "$evidence"
+          { git rev-parse HEAD; sw_vers; uname -m; xcodebuild -version; } | tee "$evidence/environment.txt"
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          export RUSTUP_HOME="$RUNNER_TEMP/rustup"
+          mkdir -p "$RUSTUP_HOME"
+          rustup toolchain install 1.95.0 --profile minimal
+          printf 'RUSTUP_HOME=%s\n' "$RUSTUP_HOME" >> "$GITHUB_ENV"
+          { rustc +1.95.0 --version; cargo +1.95.0 --version; } | tee "$evidence/rust-toolchain.txt"
+      - name: macOS Broker identity境界試験
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/macos-export-evidence"
+          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib \
+            macos_desktop_worker::tests::exported_bundle_manifest_is_compile_time_bound_and_storage_isolated \
+            -- --exact 2>&1 | tee "$evidence/macos-export-identity-test.txt"
+      - name: 合成ReceiptからmacOS Productをbuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/macos-export-evidence"
+          fixture="$RUNNER_TEMP/macos-export-fixture"
+          output="$RUNNER_TEMP/macos-export-output"
+          test ! -e "$fixture"; test ! -L "$fixture"
+          test ! -e "$output"; test ! -L "$output"
+          python3 -B -X utf8 tooling/tests/create_macos_export_fixture.py --output-dir "$fixture" | tee "$evidence/fixture.json"
+          receipt="$fixture/d4_pocket_export_receipt.json"
+          manifest="$fixture/d4-pocket-app-33333333333333333333333333333333.json"
+          python3 -B -X utf8 tooling/export_macos_product.py \
+            --receipt "$receipt" --manifest-file "$manifest" --output-dir "$output" \
+            --allow-verification-branch 2>&1 | tee "$evidence/export-build.txt"
+          cp "$output/d4_pocket_macos_export_build.json" "$evidence/macos-export-build.json"
+          mkdir -p "$evidence/analysis"
+          cp "$output/analysis/macos-code-size-analysis.json" \
+            "$evidence/analysis/macos-code-size-analysis.json"
+          python3 -B -X utf8 - "$output/d4_pocket_macos_export_build.json" \
+            "$evidence/analysis/macos-code-size-analysis.json" <<'PY'
+          import hashlib, json, pathlib, plistlib, re, sys
+          path = pathlib.Path(sys.argv[1])
+          record = json.loads(path.read_text(encoding='utf-8'))
+          assert record['version'] == 8
+          assert record['target_platform'] == 'macos'
+          assert record['app_id'] == 'd4-pocket-app-33333333333333333333333333333333'
+          assert record['audit_store_id'] == 'audit-store-44444444444444444444444444444444'
+          assert record['bundle_identifier'].endswith('33333333333333333333333333333333')
+          assert record['package_signed'] is False and record['app_publisher_identity_signed'] is False
+          uninstaller = record['uninstaller_package']
+          assert uninstaller['file_name'] == 'D4Pocket-333333333333-Uninstaller.pkg'
+          assert uninstaller['identifier'] == record['bundle_identifier'] + '.uninstaller'
+          assert uninstaller['removed_scope'] == 'matching_app_bundle_only'
+          assert uninstaller['user_data_preserved'] is True and uninstaller['keychain_preserved'] is True
+          assert uninstaller['signed'] is False
+          scan = record['app_code_signature_scan']
+          framework = scan['flutter_toolchain_framework']
+          assert scan['status'] == 'passed_no_d4_publisher_identity'
+          assert scan['code_objects_checked'] >= 2
+          assert scan['sandboxed_adhoc_app_bundle_signatures'] == 1
+          assert scan['generated_adhoc_aot_framework_signatures'] == 1
+          assert scan['verified_toolchain_framework_signatures'] == 1
+          assert scan['d4_publisher_identity_signatures'] == 0
+          assert scan['d4_resource_sealed_bundle_signatures'] == 2
+          sandbox = scan['sandbox_entitlements']
+          assert sandbox['status'] == 'passed_exact_expected_entitlements'
+          assert sandbox['app_sandbox_entitlements_verified'] is True
+          assert sandbox['helper_inherited_sandbox_entitlements_verified'] is True
+          expected_app = {
+              'com.apple.security.app-sandbox': True,
+              'com.apple.security.files.user-selected.read-write': True,
+              'com.apple.security.network.client': True,
+              'com.apple.security.network.server': True,
+          }
+          expected_helper = {
+              'com.apple.security.app-sandbox': True,
+              'com.apple.security.inherit': True,
+          }
+          assert sandbox['app_entitlements_sha256'] == hashlib.sha256(
+              plistlib.dumps(expected_app, fmt=plistlib.FMT_XML, sort_keys=True)).hexdigest()
+          assert sandbox['helper_entitlements_sha256'] == hashlib.sha256(
+              plistlib.dumps(expected_helper, fmt=plistlib.FMT_XML, sort_keys=True)).hexdigest()
+          assert framework['source'] == 'pinned_flutter_release_engine_cache'
+          assert framework['sdk_revision'] == record['toolchain']['flutter_sdk_revision']
+          assert framework['engine_revision'] == record['toolchain']['flutter_engine_revision']
+          for field in ('source_tree_sha256', 'embedded_tree_sha256', 'source_binary_sha256',
+                        'embedded_binary_sha256', 'architecture_slice_sha256'):
+              assert re.fullmatch(r'[0-9a-f]{64}', framework[field])
+          assert framework['binary_architecture'] == record['target_architecture']
+          assert framework['binary_architecture_slice_verified'] is True
+          assert framework['embedded_binary_sha256'] == framework['architecture_slice_sha256']
+          assert framework['non_binary_content_verified'] is True
+          assert framework['framework_copy_transform_verified'] is True
+          assert framework['strict_signature_verified'] is True
+          assert record['target_architecture'] in ('arm64', 'x86_64')
+          assert record['target_architecture'] == record['toolchain']['architecture']
+          assert record['macos_binary_architecture_scan'] == {
+              'status': 'passed_host_architecture',
+              'architecture': record['target_architecture'],
+              'binary_files_checked': 2,
+          }
+          assert record['formal_distribution_claimed'] is False
+          assert record['installed_product_verified'] is False
+          assert record['credential_artifact_scan']['findings'] == 0
+          analysis = record['aot_surface_analysis']
+          assert analysis['scope'] == 'flutter_macos_release_aot_catalog_surfaces'
+          assert analysis['profile_matches_presign_export'] is True
+          assert analysis['profiled_aot_image_size_bytes'] == analysis['presign_export_aot_image_size_bytes']
+          assert analysis['profiled_aot_image_sha256'] == analysis['presign_export_aot_image_sha256']
+          assert analysis['aot_surface_libraries'] == analysis['included_source_surfaces']
+          assert {item['name'] for item in analysis['inputs']} == {
+              f"snapshot.{record['target_architecture']}.json",
+              f"trace.{record['target_architecture']}.json",
+          }
+          report_path = pathlib.Path(analysis['report']['path'])
+          report = path.parent / report_path
+          report_bytes = report.read_bytes()
+          assert len(report_bytes) == analysis['report']['size_bytes']
+          assert hashlib.sha256(report_bytes).hexdigest() == analysis['report']['sha256']
+          assert pathlib.Path(sys.argv[2]).read_bytes() == report_bytes
+          report_artifact = next(item for item in record['artifact_files']
+                                 if item['path'] == report_path.as_posix())
+          assert report_artifact['size_bytes'] == analysis['report']['size_bytes']
+          assert report_artifact['sha256'] == analysis['report']['sha256']
+          aot_image_path = (pathlib.Path(record['bundle_name']) / 'Contents/Frameworks'
+                            / 'App.framework/Versions/A/App').as_posix()
+          aot_image = next(item for item in record['artifact_files']
+                           if item['path'] == aot_image_path)
+          assert aot_image['size_bytes'] == analysis['exported_aot_image_size_bytes']
+          assert aot_image['sha256'] == analysis['exported_aot_image_sha256']
+          print(json.dumps({'app': record['bundle_name'], 'bundle_identifier': record['bundle_identifier'],
+                            'pkg_sha256': record['package']['sha256'],
+                            'uninstaller_pkg_sha256': uninstaller['sha256'],
+                            'artifact_tree_sha256': record['artifact_tree_sha256'],
+                            'aot_surface_analysis': analysis,
+                            'app_code_signature_scan': record['app_code_signature_scan'],
+                            'target_architecture': record['target_architecture'],
+                            'macos_binary_architecture_scan': record['macos_binary_architecture_scan'],
+                            'signed': False, 'installed_product_verified': False}, separators=(',', ':')))
+          PY
+      - name: macOS Installer導入・修復・撤去smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -X utf8 tooling/tests/macos_export_installer_smoke.py \
+            "$RUNNER_TEMP/macos-export-output" "$RUNNER_TEMP/macos-export-evidence" \
+            "$(sw_vers -productVersion)" "$(uname -m)"
+      - name: build候補とfixtureを回収
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in "$RUNNER_TEMP/macos-export-output" "$RUNNER_TEMP/macos-export-fixture"; do
+            if [ -e "$path" ]; then test ! -L "$path"; rm -rf -- "$path"; fi
+            test ! -e "$path"
+          done
+      - name: 限定証拠を保存
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: macos-export-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/macos-export-evidence/
           retention-days: 3
           if-no-files-found: error
 

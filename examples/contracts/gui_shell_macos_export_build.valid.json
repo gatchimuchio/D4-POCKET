@@ -1,0 +1,306 @@
+{
+  "version": 8,
+  "evidence_type": "d4_pocket_macos_export_build",
+  "evidence_source": "INTERNAL_STATE",
+  "product": "D4 Pocket",
+  "target_platform": "macos",
+  "build_mode": "release_candidate_no_d4_publisher_identity",
+  "source_ref": "refs/heads/main",
+  "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_archive_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "source_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "export_id": "export-macos-fixture",
+  "app_id": "d4-pocket-app-33333333333333333333333333333333",
+  "audit_store_id": "audit-store-44444444444444444444444444444444",
+  "bundle_identifier": "com.d4p.export.33333333333333333333333333333333",
+  "installer_identifier": "com.d4p.export.33333333333333333333333333333333.installer",
+  "authority_boundary": {
+    "source_authority_verified": false,
+    "owner_authorization_verified": false,
+    "authority_strip": true,
+    "credential_values_explicitly_supplied": false,
+    "credential_inherited": false,
+    "permission_inherited": false,
+    "approval_inherited": false,
+    "audit_chain_inherited": false
+  },
+  "module_plan": {
+    "catalog_version": 1,
+    "selection_mode": "explicit_optional",
+    "requested_optional_module_ids": [
+      "shell.trace_inspector"
+    ],
+    "unprunable_core_ids": [
+      "core.security_broker",
+      "core.cryptography",
+      "core.audit_finality",
+      "core.credentials",
+      "core.os_controls",
+      "core.permission_enforcement",
+      "core.approval_enforcement",
+      "core.content_exposure"
+    ],
+    "included_module_ids": [
+      "core.security_broker",
+      "core.cryptography",
+      "core.audit_finality",
+      "core.credentials",
+      "core.os_controls",
+      "core.permission_enforcement",
+      "core.approval_enforcement",
+      "core.content_exposure",
+      "shell.dashboard",
+      "shell.runtime_operation",
+      "shell.agent_operation",
+      "shell.authority",
+      "shell.approval",
+      "shell.audit",
+      "shell.recovery",
+      "shell.problems",
+      "shell.evidence",
+      "shell.settings",
+      "shell.observability",
+      "shell.trace_inspector"
+    ],
+    "excluded_optional_module_ids": [
+      "shell.setup_doctor",
+      "shell.history",
+      "shell.evaluation_lab",
+      "shell.host_capabilities",
+      "shell.notifications",
+      "shell.host_operations"
+    ]
+  },
+  "toolchain": {
+    "architecture": "arm64",
+    "flutter": "Flutter 3.44.0",
+    "flutter_sdk_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+    "flutter_engine_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "cargo": "cargo 1.95.0",
+    "rustc": "rustc 1.95.0",
+    "xcodebuild": "Xcode 27.0",
+    "macos_version": "15.0"
+  },
+  "flutter_pub_get_arguments": [
+    "pub",
+    "get",
+    "--enforce-lockfile"
+  ],
+  "flutter_build_arguments": [
+    "build",
+    "macos",
+    "--release",
+    "--no-pub",
+    "--analyze-size",
+    "--code-size-directory=<isolated-size-analysis>",
+    "--dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=false",
+    "--dart-define=GUI_SHELL_MODULE_HISTORY=false",
+    "--dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=false",
+    "--dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=false",
+    "--dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=false",
+    "--dart-define=GUI_SHELL_MODULE_OBSERVABILITY=true",
+    "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true",
+    "--dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=false",
+    "--dart-define=GUI_SHELL_PRODUCT_VERSION=0.1.0"
+  ],
+  "compile_time_identity": {
+    "source": "schema_validated_manifest",
+    "app_id": "d4-pocket-app-33333333333333333333333333333333",
+    "audit_store_id": "audit-store-44444444444444444444444444444444",
+    "manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "compile_time_update_trust": {
+    "source": "not_configured",
+    "configured": false,
+    "public_key_fingerprint": null,
+    "package_source_count": 0
+  },
+  "build_duration_ms": 1234,
+  "runtime_storage_root_template": "$HOME/Library/Application Support/D4Pocket/apps/<App ID>/stores/<Audit Store ID>",
+  "bundle_name": "D4Pocket-333333333333.app",
+  "bundle_identifier_verified": true,
+  "product_manifest_copied_byte_for_byte": true,
+  "target_architecture": "arm64",
+  "macos_binary_architecture_scan": {
+    "status": "passed_host_architecture",
+    "architecture": "arm64",
+    "binary_files_checked": 2
+  },
+  "runtime_manifest_consumed": false,
+  "module_pruning_verified": false,
+  "package_signed": false,
+  "app_publisher_identity_signed": false,
+  "app_code_signature_scan": {
+    "status": "passed_no_d4_publisher_identity",
+    "code_objects_checked": 5,
+    "unsigned_code_objects": 1,
+    "adhoc_executable_signatures": 1,
+    "verified_toolchain_framework_signatures": 1,
+    "d4_publisher_identity_signatures": 0,
+    "d4_resource_sealed_bundle_signatures": 2,
+    "flutter_toolchain_framework": {
+      "source": "pinned_flutter_release_engine_cache",
+      "sdk_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+      "engine_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_relative_path": "bin/cache/artifacts/engine/darwin-x64-release/FlutterMacOS.xcframework/macos-arm64_x86_64/FlutterMacOS.framework",
+      "embedded_relative_path": "Contents/Frameworks/FlutterMacOS.framework",
+      "source_tree_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "embedded_tree_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "source_binary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "embedded_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "architecture_slice_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "binary_architecture": "arm64",
+      "binary_architecture_slice_verified": true,
+      "non_binary_content_verified": true,
+      "framework_copy_transform_verified": true,
+      "strict_signature_verified": true,
+      "authority_present": true,
+      "team_identifier_set": true,
+      "timestamp_present": true,
+      "cms_digest_present": true,
+      "sealed_resources_present": true
+    },
+    "sandboxed_adhoc_app_bundle_signatures": 1,
+    "generated_adhoc_aot_framework_signatures": 1,
+    "sandbox_entitlements": {
+      "status": "passed_exact_expected_entitlements",
+      "app_sandbox_entitlements_verified": true,
+      "helper_inherited_sandbox_entitlements_verified": true,
+      "app_entitlements_sha256": "0f3ccfec7aecad9750541c029444fc22043e28d6ad96ee278acdc0721a5f3592",
+      "helper_entitlements_sha256": "def90a0f9a48b78e8aaa6812ed5ad35662b83645bd249d056db00aeeb14c0f30"
+    }
+  },
+  "launch_status": "not_verified",
+  "installed_product_verified": false,
+  "formal_distribution_claimed": false,
+  "artifact_root": ".",
+  "artifact_files": [
+    {
+      "path": "D4Pocket-333333333333-Uninstaller.pkg",
+      "kind": "file",
+      "size_bytes": 30,
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "path": "D4Pocket-333333333333.app.zip",
+      "kind": "file",
+      "size_bytes": 30,
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "path": "D4Pocket-333333333333.app/Contents/Frameworks/App.framework/Versions/A/App",
+      "kind": "file",
+      "size_bytes": 27,
+      "sha256": "dc9566d02b844625ecb1f40b4902e3f470a654d4259527e13b479b6acef25e31"
+    },
+    {
+      "path": "D4Pocket-333333333333.app/Contents/Frameworks/FlutterMacOS.framework/Versions/A/FlutterMacOS",
+      "kind": "file",
+      "size_bytes": 50,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "path": "D4Pocket-333333333333.app/Contents/Frameworks/FlutterMacOS.framework/Versions/Current",
+      "kind": "symlink",
+      "target": "A"
+    },
+    {
+      "path": "D4Pocket-333333333333.app/Contents/Resources/product_manifest.json",
+      "kind": "file",
+      "size_bytes": 10,
+      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "path": "D4Pocket-333333333333.pkg",
+      "kind": "file",
+      "size_bytes": 20,
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "path": "analysis/macos-code-size-analysis.json",
+      "kind": "file",
+      "size_bytes": 244,
+      "sha256": "6ea9589c864b9b70e721ac67ababd9ae034e72c94c982ed1d6cec409070d8a92"
+    }
+  ],
+  "artifact_total_bytes": 411,
+  "artifact_tree_sha256": "60591f1ba138de4819101b818af7df5dbe50128f2195ce45b9e20aa83f292407",
+  "package": {
+    "file_name": "D4Pocket-333333333333.pkg",
+    "format": "macOS flat pkg",
+    "byte_length": 20,
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "signed": false,
+    "installed_product_verified": false
+  },
+  "uninstaller_package": {
+    "file_name": "D4Pocket-333333333333-Uninstaller.pkg",
+    "identifier": "com.d4p.export.33333333333333333333333333333333.uninstaller",
+    "format": "macOS flat pkg",
+    "byte_length": 30,
+    "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "signed": false,
+    "removed_scope": "matching_app_bundle_only",
+    "user_data_preserved": true,
+    "keychain_preserved": true
+  },
+  "app_archive": {
+    "file_name": "D4Pocket-333333333333.app.zip",
+    "byte_length": 30,
+    "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "credential_artifact_scan": {
+    "version": 1,
+    "status": "passed_known_patterns",
+    "scope": "macos_app_regular_files_and_package_archives",
+    "coverage": "known_patterns_only",
+    "files_scanned": 7,
+    "bytes_scanned": 411,
+    "findings": 0,
+    "artifact_tree_sha256": "60591f1ba138de4819101b818af7df5dbe50128f2195ce45b9e20aa83f292407"
+  },
+  "aot_surface_analysis": {
+    "scope": "flutter_macos_release_aot_catalog_surfaces",
+    "report": {
+      "path": "analysis/macos-code-size-analysis.json",
+      "size_bytes": 244,
+      "sha256": "6ea9589c864b9b70e721ac67ababd9ae034e72c94c982ed1d6cec409070d8a92"
+    },
+    "inputs": [
+      {
+        "name": "snapshot.arm64.json",
+        "size_bytes": 23,
+        "sha256": "a1068dab2cffb5c9132572b884e0f53aa89f244e7a4379ef287af8426bfeb554"
+      },
+      {
+        "name": "trace.arm64.json",
+        "size_bytes": 20,
+        "sha256": "00f2eb958700133cfe9d3966b7e4421af1ad0aaed0f1faef6c70f769d4bd1e9c"
+      }
+    ],
+    "aot_surface_libraries": [
+      "apps/desktop_flutter/lib/screens/observability_center.dart",
+      "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+    ],
+    "included_source_surfaces": [
+      "apps/desktop_flutter/lib/screens/observability_center.dart",
+      "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+    ],
+    "excluded_source_surfaces": [
+      "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
+      "apps/desktop_flutter/lib/screens/history_screen.dart",
+      "apps/desktop_flutter/lib/screens/host_capability_center.dart",
+      "apps/desktop_flutter/lib/screens/host_operation_center.dart",
+      "apps/desktop_flutter/lib/screens/notifications.dart",
+      "apps/desktop_flutter/lib/screens/setup_doctor.dart"
+    ],
+    "profiled_aot_image_size_bytes": 27,
+    "presign_export_aot_image_size_bytes": 27,
+    "exported_aot_image_size_bytes": 27,
+    "profiled_aot_image_sha256": "dc9566d02b844625ecb1f40b4902e3f470a654d4259527e13b479b6acef25e31",
+    "presign_export_aot_image_sha256": "dc9566d02b844625ecb1f40b4902e3f470a654d4259527e13b479b6acef25e31",
+    "exported_aot_image_sha256": "dc9566d02b844625ecb1f40b4902e3f470a654d4259527e13b479b6acef25e31",
+    "profile_matches_presign_export": true
+  }
+}

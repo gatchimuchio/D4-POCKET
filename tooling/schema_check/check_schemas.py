@@ -140,6 +140,7 @@ REQUIRED = {
     "update_trust.schema.json",
     "d4_pocket_product_package_manifest.schema.json",
     "d4_pocket_linux_product_package_manifest.schema.json",
+    "gui_shell_macos_export_build.schema.json",
     "d4_pocket_active_version.schema.json",
     "notification.schema.json",
     "notification_list.schema.json",

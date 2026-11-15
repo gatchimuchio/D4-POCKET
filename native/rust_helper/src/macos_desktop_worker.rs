@@ -15,6 +15,7 @@ use zeroize::{Zeroize, Zeroizing};
 
 const REQUEST_LIMIT: usize = 64 * 1024;
 const RESPONSE_LIMIT: usize = 4 * 1024 * 1024;
+const PRODUCT_MANIFEST_LIMIT: u64 = 64 * 1024;
 const IO_TIMEOUT: Duration = Duration::from_secs(4);
 
 fn failure() -> io::Error {
@@ -26,16 +27,33 @@ pub fn run() -> io::Result<()> {
     if std::env::args_os().len() != 1 {
         return Err(failure());
     }
-    let bundle = verify_bundle(&std::env::current_exe()?)?;
+    let product_identity =
+        crate::broker::update_center::embedded_product_identity().map_err(|_| failure())?;
+    let manifest_sha256 =
+        crate::broker::update_center::embedded_product_manifest_sha256().map_err(|_| failure())?;
+    if product_identity.is_some() != manifest_sha256.is_some() {
+        return Err(failure());
+    }
+    let expected_identity = product_identity
+        .as_ref()
+        .map(|(app_id, audit_id)| (app_id.as_str(), audit_id.as_str()));
+    let bundle = verify_bundle_with_product(
+        &std::env::current_exe()?,
+        expected_identity,
+        manifest_sha256,
+    )?;
     let home = PathBuf::from(std::env::var_os("HOME").ok_or_else(failure)?);
     if !home.is_absolute() || !home.is_dir() {
         return Err(failure());
     }
     let home = home.canonicalize()?;
-    let root = private_directory(
-        &home,
-        &["Library", "Application Support", "D4Pocket", "macos-broker"],
+    let storage_components = broker_storage_components(
+        bundle
+            .product_identity
+            .as_ref()
+            .map(|(app_id, audit_id)| (app_id.as_str(), audit_id.as_str())),
     )?;
+    let root = private_directory(&home, &storage_components)?;
     serve(
         &root,
         &bundle,
@@ -45,10 +63,25 @@ pub fn run() -> io::Result<()> {
     )
 }
 
-/// 固定bundle配置の検査結果。署名・配布identity・Owner承認を表さない。
-struct VerifiedBundle;
+/// 固定bundle配置とcompile-time identityの検査結果。
+/// 署名・配布identity・Owner承認・Permissionを表さない。
+#[derive(Default)]
+struct VerifiedBundle {
+    product_identity: Option<(String, String)>,
+}
 
 fn verify_bundle(helper: &Path) -> io::Result<VerifiedBundle> {
+    verify_bundle_with_product(helper, None, None)
+}
+
+fn verify_bundle_with_product(
+    helper: &Path,
+    expected_identity: Option<(&str, &str)>,
+    expected_manifest_sha256: Option<&str>,
+) -> io::Result<VerifiedBundle> {
+    if expected_identity.is_some() != expected_manifest_sha256.is_some() {
+        return Err(failure());
+    }
     if !helper.is_absolute()
         || helper.file_name().and_then(|v| v.to_str()) != Some("gui_shell_macos_broker")
     {
@@ -78,11 +111,99 @@ fn verify_bundle(helper: &Path) -> io::Result<VerifiedBundle> {
             return Err(failure());
         }
     }
-    Ok(VerifiedBundle)
+    let manifest_path = contents.join("Resources/product_manifest.json");
+    let product_identity = match (expected_identity, expected_manifest_sha256) {
+        (None, None) => {
+            if manifest_path.exists() || manifest_path.is_symlink() {
+                return Err(failure());
+            }
+            None
+        }
+        (Some((app_id, audit_store_id)), Some(expected_hash)) => {
+            if !valid_product_id(app_id, "d4-pocket-app-")
+                || !valid_product_id(audit_store_id, "audit-store-")
+                || expected_hash.len() != 64
+                || !expected_hash
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            {
+                return Err(failure());
+            }
+            let resources = manifest_path.parent().ok_or_else(failure)?;
+            let resource_metadata = fs::symlink_metadata(resources)?;
+            let manifest_metadata = fs::symlink_metadata(&manifest_path)?;
+            if !resource_metadata.is_dir()
+                || resource_metadata.file_type().is_symlink()
+                || !manifest_metadata.is_file()
+                || manifest_metadata.file_type().is_symlink()
+                || manifest_metadata.len() > PRODUCT_MANIFEST_LIMIT
+                || !manifest_path.canonicalize()?.starts_with(&canonical_bundle)
+            {
+                return Err(failure());
+            }
+            let raw = fs::read(&manifest_path)?;
+            use sha2::Digest as _;
+            let actual_hash = hex::encode(sha2::Sha256::digest(&raw));
+            if actual_hash != expected_hash {
+                return Err(failure());
+            }
+            let manifest: serde_json::Value =
+                serde_json::from_slice(&raw).map_err(|_| failure())?;
+            if manifest.get("product").and_then(serde_json::Value::as_str) != Some("D4 Pocket")
+                || manifest
+                    .pointer("/manifest/app_identity/app_id")
+                    .and_then(serde_json::Value::as_str)
+                    != Some(app_id)
+                || manifest
+                    .pointer("/manifest/audit_store/store_id")
+                    .and_then(serde_json::Value::as_str)
+                    != Some(audit_store_id)
+            {
+                return Err(failure());
+            }
+            Some((app_id.to_owned(), audit_store_id.to_owned()))
+        }
+        _ => return Err(failure()),
+    };
+    Ok(VerifiedBundle { product_identity })
+}
+
+fn valid_product_id(value: &str, prefix: &str) -> bool {
+    value.strip_prefix(prefix).is_some_and(|suffix| {
+        suffix.len() == 32
+            && suffix
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
+fn broker_storage_components(identity: Option<(&str, &str)>) -> io::Result<Vec<String>> {
+    let mut components = vec![
+        "Library".to_owned(),
+        "Application Support".to_owned(),
+        "D4Pocket".to_owned(),
+    ];
+    match identity {
+        None => components.push("macos-broker".to_owned()),
+        Some((app_id, audit_store_id)) => {
+            if !valid_product_id(app_id, "d4-pocket-app-")
+                || !valid_product_id(audit_store_id, "audit-store-")
+            {
+                return Err(failure());
+            }
+            components.extend([
+                "apps".to_owned(),
+                app_id.to_owned(),
+                "stores".to_owned(),
+                audit_store_id.to_owned(),
+            ]);
+        }
+    }
+    Ok(components)
 }
 
 #[cfg(target_os = "macos")]
-fn private_directory(base: &Path, names: &[&str]) -> io::Result<PathBuf> {
+fn private_directory(base: &Path, names: &[String]) -> io::Result<PathBuf> {
     use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
     let mut path = base.to_path_buf();
     for (index, name) in names.iter().enumerate() {
@@ -353,7 +474,7 @@ mod tests {
         let mut confirmations = 0;
         serve(
             &broker,
-            &VerifiedBundle,
+            &VerifiedBundle::default(),
             &mut io::Cursor::new(input),
             &mut output,
             &mut |summary| {
@@ -428,7 +549,7 @@ mod tests {
         let mut output = Vec::new();
         serve(
             &root,
-            &VerifiedBundle,
+            &VerifiedBundle::default(),
             &mut io::Cursor::new(bytes),
             &mut output,
             &mut |_| false,
@@ -492,6 +613,74 @@ mod tests {
     }
 
     #[test]
+    fn exported_bundle_manifest_is_compile_time_bound_and_storage_isolated() {
+        let mut random = [0u8; 16];
+        getrandom::getrandom(&mut random).unwrap();
+        let root = std::env::temp_dir().join(format!("d4p-macos-identity-{}", hex::encode(random)));
+        let contents = root.join("D4Pocket.app/Contents");
+        fs::create_dir_all(contents.join("MacOS")).unwrap();
+        fs::create_dir_all(contents.join("Resources")).unwrap();
+        fs::write(
+            contents.join("MacOS/gui_shell_macos_broker"),
+            b"synthetic helper",
+        )
+        .unwrap();
+        fs::write(contents.join("MacOS/gui_shell_desktop"), b"synthetic app").unwrap();
+        fs::write(contents.join("Info.plist"), b"synthetic plist").unwrap();
+
+        let app_id = format!("d4-pocket-app-{}", "1".repeat(32));
+        let audit_id = format!("audit-store-{}", "2".repeat(32));
+        let manifest = serde_json::json!({
+            "version": 1,
+            "product": "D4 Pocket",
+            "export_id": "fixture-export",
+            "manifest": {
+                "app_identity": {"app_id": app_id},
+                "audit_store": {"store_id": audit_id}
+            }
+        });
+        let manifest_raw = serde_json::to_vec(&manifest).unwrap();
+        use sha2::Digest as _;
+        let manifest_hash = hex::encode(sha2::Sha256::digest(&manifest_raw));
+        fs::write(
+            contents.join("Resources/product_manifest.json"),
+            &manifest_raw,
+        )
+        .unwrap();
+
+        let helper = contents.join("MacOS/gui_shell_macos_broker");
+        let bundle =
+            verify_bundle_with_product(&helper, Some((&app_id, &audit_id)), Some(&manifest_hash))
+                .unwrap();
+        assert_eq!(
+            bundle.product_identity,
+            Some((app_id.clone(), audit_id.clone()))
+        );
+        assert!(verify_bundle_with_product(
+            &helper,
+            Some((&app_id, &audit_id)),
+            Some(&"0".repeat(64)),
+        )
+        .is_err());
+        let other_app_id = format!("d4-pocket-app-{}", "3".repeat(32));
+        assert!(verify_bundle_with_product(
+            &helper,
+            Some((&other_app_id, &audit_id)),
+            Some(&manifest_hash),
+        )
+        .is_err());
+
+        let first = broker_storage_components(Some((&app_id, &audit_id))).unwrap();
+        let second_audit = format!("audit-store-{}", "4".repeat(32));
+        let second = broker_storage_components(Some((&app_id, &second_audit))).unwrap();
+        let second_app = broker_storage_components(Some((&other_app_id, &audit_id))).unwrap();
+        assert_ne!(first, second);
+        assert_ne!(first, second_app);
+        assert!(broker_storage_components(Some(("../outside", &audit_id))).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn owner_adapter_lifecycle_拒否と現在条件を保持して状態管理する() {
         let mut random = [0u8; 16];
         getrandom::getrandom(&mut random).unwrap();
@@ -540,7 +729,7 @@ mod tests {
         let mut confirmations = 0;
         serve(
             &root,
-            &VerifiedBundle,
+            &VerifiedBundle::default(),
             &mut io::Cursor::new(bytes),
             &mut output,
             &mut |summary| {
@@ -637,7 +826,7 @@ mod tests {
         let mut confirmations = 0;
         serve(
             &root,
-            &VerifiedBundle,
+            &VerifiedBundle::default(),
             &mut io::Cursor::new(bytes),
             &mut output,
             &mut |summary| {

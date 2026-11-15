@@ -1,0 +1,329 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_macos_export_build.schema.json",
+  "title": "D4 Pocket macOS Export build記録 v8",
+  "type": "object",
+  "required": [
+    "version", "evidence_type", "evidence_source", "product", "target_platform", "build_mode",
+    "source_ref", "source_commit", "source_archive_sha256", "source_receipt_sha256",
+    "source_manifest_sha256", "export_id", "app_id", "audit_store_id", "bundle_identifier",
+    "installer_identifier", "authority_boundary", "module_plan", "toolchain",
+    "flutter_pub_get_arguments", "flutter_build_arguments", "aot_surface_analysis", "compile_time_identity",
+    "compile_time_update_trust", "build_duration_ms", "runtime_storage_root_template",
+    "bundle_name", "bundle_identifier_verified", "product_manifest_copied_byte_for_byte",
+    "target_architecture", "macos_binary_architecture_scan", "app_code_signature_scan",
+    "runtime_manifest_consumed", "module_pruning_verified", "package_signed", "app_publisher_identity_signed",
+    "launch_status", "installed_product_verified", "formal_distribution_claimed", "artifact_root",
+    "artifact_files", "artifact_total_bytes", "artifact_tree_sha256", "package", "uninstaller_package", "app_archive",
+    "credential_artifact_scan"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 8 },
+    "evidence_type": { "const": "d4_pocket_macos_export_build" },
+    "evidence_source": { "const": "INTERNAL_STATE" },
+    "product": { "const": "D4 Pocket" },
+    "target_platform": { "const": "macos" },
+    "build_mode": { "const": "release_candidate_no_d4_publisher_identity" },
+    "source_ref": { "type": "string", "pattern": "^refs/heads/(main|codex/[A-Za-z0-9._/-]+)$" },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "source_archive_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "export_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+    "app_id": { "type": "string", "pattern": "^d4-pocket-app-[0-9a-f]{32}$" },
+    "audit_store_id": { "type": "string", "pattern": "^audit-store-[0-9a-f]{32}$" },
+    "bundle_identifier": { "type": "string", "pattern": "^com\\.d4p\\.export\\.[0-9a-f]{32}$" },
+    "installer_identifier": { "type": "string", "pattern": "^com\\.d4p\\.export\\.[0-9a-f]{32}\\.installer$" },
+    "authority_boundary": {
+      "type": "object",
+      "required": ["source_authority_verified", "owner_authorization_verified", "authority_strip", "credential_values_explicitly_supplied", "credential_inherited", "permission_inherited", "approval_inherited", "audit_chain_inherited"],
+      "additionalProperties": false,
+      "properties": {
+        "source_authority_verified": { "const": false },
+        "owner_authorization_verified": { "const": false },
+        "authority_strip": { "const": true },
+        "credential_values_explicitly_supplied": { "const": false },
+        "credential_inherited": { "const": false },
+        "permission_inherited": { "const": false },
+        "approval_inherited": { "const": false },
+        "audit_chain_inherited": { "const": false }
+      }
+    },
+    "module_plan": {
+      "type": "object",
+      "required": ["catalog_version", "selection_mode", "requested_optional_module_ids", "unprunable_core_ids", "included_module_ids", "excluded_optional_module_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "catalog_version": { "const": 1 },
+        "selection_mode": { "enum": ["all", "explicit_optional"] },
+        "requested_optional_module_ids": { "type": "array", "items": { "type": "string" } },
+        "unprunable_core_ids": { "type": "array", "items": { "type": "string" } },
+        "included_module_ids": { "type": "array", "items": { "type": "string" } },
+        "excluded_optional_module_ids": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "required": ["architecture", "flutter", "flutter_sdk_revision", "flutter_engine_revision", "cargo", "rustc", "xcodebuild", "macos_version"],
+      "additionalProperties": false,
+      "properties": {
+        "architecture": { "enum": ["arm64", "aarch64", "x86_64", "amd64"] },
+        "flutter": { "type": "string", "minLength": 1 },
+        "flutter_sdk_revision": { "const": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42" },
+        "flutter_engine_revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "cargo": { "type": "string", "minLength": 1 },
+        "rustc": { "type": "string", "minLength": 1 },
+        "xcodebuild": { "type": "string", "minLength": 1 },
+        "macos_version": { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+){1,2}$" }
+      }
+    },
+    "flutter_pub_get_arguments": { "type": "array", "items": { "type": "string" } },
+    "flutter_build_arguments": { "type": "array", "items": { "type": "string" } },
+    "aot_surface_analysis": {
+      "type": "object",
+      "required": [
+        "scope", "report", "inputs", "aot_surface_libraries", "included_source_surfaces",
+        "excluded_source_surfaces", "profiled_aot_image_size_bytes", "presign_export_aot_image_size_bytes",
+        "exported_aot_image_size_bytes", "profiled_aot_image_sha256", "presign_export_aot_image_sha256",
+        "exported_aot_image_sha256", "profile_matches_presign_export"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "scope": { "const": "flutter_macos_release_aot_catalog_surfaces" },
+        "report": {
+          "type": "object",
+          "required": ["path", "size_bytes", "sha256"],
+          "additionalProperties": false,
+          "properties": {
+            "path": { "const": "analysis/macos-code-size-analysis.json" },
+            "size_bytes": { "type": "integer", "minimum": 1, "maximum": 50000000 },
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["name", "size_bytes", "sha256"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "pattern": "^(snapshot|trace)\\.(arm64|x86_64)\\.json$" },
+              "size_bytes": { "type": "integer", "minimum": 1, "maximum": 50000000 },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        },
+        "aot_surface_libraries": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "included_source_surfaces": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "excluded_source_surfaces": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "profiled_aot_image_size_bytes": { "type": "integer", "minimum": 1 },
+        "presign_export_aot_image_size_bytes": {
+          "type": "integer", "minimum": 1,
+          "description": "署名前のprofileからExport bundleへのAOT image copy。署名操作の前にbyte identityを照合する。"
+        },
+        "exported_aot_image_size_bytes": {
+          "type": "integer", "minimum": 1,
+          "description": "ad-hoc署名後にartifact inventoryへ含まれるExport bundleのAOT image。"
+        },
+        "profiled_aot_image_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "presign_export_aot_image_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "exported_aot_image_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "profile_matches_presign_export": {
+          "const": true,
+          "description": "Flutter profile imageと署名前のExport bundle copyが同一byte列である。署名後imageとの同一hashを主張しない。"
+        }
+      }
+    },
+    "compile_time_identity": {
+      "type": "object",
+      "required": ["source", "app_id", "audit_store_id", "manifest_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "const": "schema_validated_manifest" },
+        "app_id": { "type": "string", "pattern": "^d4-pocket-app-[0-9a-f]{32}$" },
+        "audit_store_id": { "type": "string", "pattern": "^audit-store-[0-9a-f]{32}$" },
+        "manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "compile_time_update_trust": {
+      "type": "object",
+      "required": ["source", "configured", "public_key_fingerprint", "package_source_count"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "enum": ["not_configured", "schema_validated_manifest"] },
+        "configured": { "type": "boolean" },
+        "public_key_fingerprint": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+        "package_source_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "build_duration_ms": { "type": "integer", "minimum": 0 },
+    "runtime_storage_root_template": { "const": "$HOME/Library/Application Support/D4Pocket/apps/<App ID>/stores/<Audit Store ID>" },
+    "bundle_name": { "type": "string", "pattern": "^D4Pocket-[0-9a-f]{12}\\.app$" },
+    "bundle_identifier_verified": { "const": true },
+    "product_manifest_copied_byte_for_byte": { "const": true },
+    "target_architecture": { "enum": ["arm64", "x86_64"] },
+    "macos_binary_architecture_scan": {
+      "type": "object",
+      "required": ["status", "architecture", "binary_files_checked"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "passed_host_architecture" },
+        "architecture": { "enum": ["arm64", "x86_64"] },
+        "binary_files_checked": { "const": 2 }
+      }
+    },
+    "runtime_manifest_consumed": { "const": false },
+    "module_pruning_verified": { "const": false },
+    "package_signed": { "const": false },
+    "app_publisher_identity_signed": {
+      "const": false,
+      "description": "D4 Pocket自身のPublisher identity署名。別計上するpinned Flutter frameworkの上流署名は含まない。"
+    },
+    "app_code_signature_scan": {
+      "type": "object",
+      "required": [
+        "status", "code_objects_checked", "unsigned_code_objects", "adhoc_executable_signatures",
+        "sandboxed_adhoc_app_bundle_signatures", "generated_adhoc_aot_framework_signatures",
+        "verified_toolchain_framework_signatures",
+        "d4_publisher_identity_signatures", "d4_resource_sealed_bundle_signatures",
+        "sandbox_entitlements", "flutter_toolchain_framework"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "passed_no_d4_publisher_identity" },
+        "code_objects_checked": { "type": "integer", "minimum": 2 },
+        "unsigned_code_objects": { "type": "integer", "minimum": 0 },
+        "adhoc_executable_signatures": { "type": "integer", "minimum": 0 },
+        "sandboxed_adhoc_app_bundle_signatures": { "const": 1 },
+        "generated_adhoc_aot_framework_signatures": {
+          "const": 1,
+          "description": "D4が生成したApp.frameworkをentitlementなしで署名したad-hoc resource seal。Publisher identity署名ではない。"
+        },
+        "verified_toolchain_framework_signatures": { "const": 1 },
+        "d4_publisher_identity_signatures": { "const": 0 },
+        "d4_resource_sealed_bundle_signatures": {
+          "const": 2,
+          "description": "D4 Export App root bundleと生成AOT App.frameworkのad-hoc resource seal。rootには固定App Sandbox entitlementを適用し、どちらもD4 Publisher identity署名ではない。"
+        },
+        "sandbox_entitlements": {
+          "type": "object",
+          "required": ["status", "app_sandbox_entitlements_verified", "helper_inherited_sandbox_entitlements_verified", "app_entitlements_sha256", "helper_entitlements_sha256"],
+          "additionalProperties": false,
+          "properties": {
+            "status": { "const": "passed_exact_expected_entitlements" },
+            "app_sandbox_entitlements_verified": { "const": true },
+            "helper_inherited_sandbox_entitlements_verified": { "const": true },
+            "app_entitlements_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "helper_entitlements_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          }
+        },
+        "flutter_toolchain_framework": {
+          "type": "object",
+          "required": ["source", "sdk_revision", "engine_revision", "source_relative_path", "embedded_relative_path", "source_tree_sha256", "embedded_tree_sha256", "source_binary_sha256", "embedded_binary_sha256", "architecture_slice_sha256", "binary_architecture", "binary_architecture_slice_verified", "non_binary_content_verified", "framework_copy_transform_verified", "strict_signature_verified", "authority_present", "team_identifier_set", "timestamp_present", "cms_digest_present", "sealed_resources_present"],
+          "additionalProperties": false,
+          "properties": {
+            "source": { "const": "pinned_flutter_release_engine_cache" },
+            "sdk_revision": { "const": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42" },
+            "engine_revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "source_relative_path": { "const": "bin/cache/artifacts/engine/darwin-x64-release/FlutterMacOS.xcframework/macos-arm64_x86_64/FlutterMacOS.framework" },
+            "embedded_relative_path": { "const": "Contents/Frameworks/FlutterMacOS.framework" },
+            "source_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "embedded_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "source_binary_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "embedded_binary_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "architecture_slice_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "binary_architecture": { "enum": ["arm64", "x86_64"] },
+            "binary_architecture_slice_verified": { "const": true },
+            "non_binary_content_verified": { "const": true },
+            "framework_copy_transform_verified": { "const": true },
+            "strict_signature_verified": { "const": true },
+            "authority_present": { "const": true },
+            "team_identifier_set": { "const": true },
+            "timestamp_present": { "const": true },
+            "cms_digest_present": { "const": true },
+            "sealed_resources_present": { "const": true }
+          }
+        }
+      }
+    },
+    "launch_status": { "const": "not_verified" },
+    "installed_product_verified": { "const": false },
+    "formal_distribution_claimed": { "const": false },
+    "artifact_root": { "const": "." },
+    "artifact_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "kind"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "maxLength": 2048 },
+          "kind": { "enum": ["file", "symlink"] },
+          "size_bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "target": { "type": "string", "minLength": 1, "maxLength": 2048 }
+        }
+      }
+    },
+    "artifact_total_bytes": { "type": "integer", "minimum": 1 },
+    "artifact_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "package": {
+      "type": "object",
+      "required": ["file_name", "format", "byte_length", "sha256", "signed", "installed_product_verified"],
+      "additionalProperties": false,
+      "properties": {
+        "file_name": { "type": "string", "pattern": "^D4Pocket-[0-9a-f]{12}\\.pkg$" },
+        "format": { "const": "macOS flat pkg" },
+        "byte_length": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "signed": { "const": false },
+        "installed_product_verified": { "const": false }
+      }
+    },
+    "uninstaller_package": {
+      "type": "object",
+      "required": ["file_name", "identifier", "format", "byte_length", "sha256", "signed", "removed_scope", "user_data_preserved", "keychain_preserved"],
+      "additionalProperties": false,
+      "properties": {
+        "file_name": { "type": "string", "pattern": "^D4Pocket-[0-9a-f]{12}-Uninstaller\\.pkg$" },
+        "identifier": { "type": "string", "pattern": "^com\\.d4p\\.export\\.[0-9a-f]{32}\\.uninstaller$" },
+        "format": { "const": "macOS flat pkg" },
+        "byte_length": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "signed": { "const": false },
+        "removed_scope": { "const": "matching_app_bundle_only" },
+        "user_data_preserved": { "const": true },
+        "keychain_preserved": { "const": true }
+      }
+    },
+    "app_archive": {
+      "type": "object",
+      "required": ["file_name", "byte_length", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "file_name": { "type": "string", "pattern": "^D4Pocket-[0-9a-f]{12}\\.app\\.zip$" },
+        "byte_length": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "credential_artifact_scan": {
+      "type": "object",
+      "required": ["version", "status", "scope", "coverage", "files_scanned", "bytes_scanned", "findings", "artifact_tree_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "const": 1 },
+        "status": { "const": "passed_known_patterns" },
+        "scope": { "const": "macos_app_regular_files_and_package_archives" },
+        "coverage": { "const": "known_patterns_only" },
+        "files_scanned": { "type": "integer", "minimum": 1 },
+        "bytes_scanned": { "type": "integer", "minimum": 1 },
+        "findings": { "const": 0 },
+        "artifact_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  }
+}
