@@ -257,7 +257,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/evidence_center.dart",
-      "sha256": "1c3b237a0a1ae6893c5806c086628fecacfb9e6073657bae01c20f5c99a7b328"
+      "sha256": "51606e8e7fe151dc4abe51461365dd263b2cbeff1652e7ded511c64db569039b"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/history_content_dialog.dart",
@@ -674,6 +674,10 @@
     {
       "path": "apps/desktop_flutter/test/evaluation_lab_test.dart",
       "sha256": "132a2585a5f4ccc7722197ff09f5c8f36be92b53411881676318a1dd4cb7f85b"
+    },
+    {
+      "path": "apps/desktop_flutter/test/evidence_center_test.dart",
+      "sha256": "42106c1acbc1c4309d9d653325f38f63c00596b97ea6dc12a29d54151e757f57"
     },
     {
       "path": "apps/desktop_flutter/test/export_client_test.dart",
@@ -1525,7 +1529,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "8750b079b117ef033a5265bcb8329755152bd5aa4784bac1e3cc4d068d2d65e4"
+      "sha256": "f32e9110f5ae44a41e526461f157d4f40a3801172638d6802f32025ccbbf357a"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",

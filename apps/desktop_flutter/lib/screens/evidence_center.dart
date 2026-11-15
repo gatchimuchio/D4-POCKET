@@ -285,9 +285,9 @@ class _SnapshotImportPreviewDialogState
           '読込み前確認で段階Bを遮断: ${imported.problems.any((problem) => problem.blocksOwnerUse) ? 'はい' : 'いいえ'}',
         ].join('\n');
       });
-    } on Object catch (error) {
+    } on Object {
       setState(() {
-        _preview = 'スナップショットJSONが不正です: $error';
+        _preview = 'スナップショットの形式を確認できません。JSONの構造と項目の型を確認してください。';
       });
     }
   }
