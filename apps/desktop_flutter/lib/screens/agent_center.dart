@@ -1665,13 +1665,10 @@ class _AgentCenterState extends State<_AgentCenterScreen>
         _handoffStatus =
             '受信Taskを準備しました。受信先のWorkspace PermissionとTask Approvalを新規に取得してください。';
       });
-    } on Object catch (error) {
+    } on Object {
       if (!mounted) return;
-      setState(
-        () => _handoffStatus = error is BrokerClientException
-            ? error.message
-            : '受信AgentのHandoff事前検査に失敗しました。',
-      );
+      setState(() => _handoffStatus =
+          '受信AgentのHandoff事前検査を確認できません。Broker状態とAuditを確認してください。');
     } finally {
       if (mounted) setState(() => _handoffPending = false);
     }
@@ -1728,13 +1725,10 @@ class _AgentCenterState extends State<_AgentCenterScreen>
         _a2aArtifactTaskContextController.clear();
       });
       widget.onA2aArtifactHandoffConsumed?.call(source);
-    } on Object catch (error) {
+    } on Object {
       if (!mounted) return;
-      setState(
-        () => _a2aArtifactHandoffStatus = error is BrokerClientException
-            ? error.message
-            : '外部A2A Artifactの新規Task事前検査に失敗しました。',
-      );
+      setState(() => _a2aArtifactHandoffStatus =
+          'A2A Artifactから作る受信Taskの事前検査を確認できません。Broker状態とAuditを確認してください。');
     } finally {
       if (mounted) setState(() => _a2aArtifactHandoffPending = false);
     }
