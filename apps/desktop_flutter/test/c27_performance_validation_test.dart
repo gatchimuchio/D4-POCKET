@@ -169,15 +169,20 @@ class _C27Transport implements BrokerTransport {
       final items = List.generate(
         200,
         (index) => <String, Object?>{
-          '通知ID': 'notification-$index',
-          '通知hash': 'sha256:${'a' * 64}',
+          '版': 1,
+          '通知ID': 'notification-broker-audit-$index',
+          'source': 'Audit',
+          'severity': 'info',
           'タイトル': '通知 $index',
           '概要': 'bounded summary',
-          'severity': 'info',
+          '作成順': index,
+          '関連監査ID': 'broker-audit-$index',
+          '関連監査hash': 'sha256:${'a' * 64}',
+          '遷移先': 'audit',
           '状態': index.isEven ? 'unread' : 'read',
-          'source': 'audit',
-          '関連監査ID': 'audit-$index',
-          '遷移先': 'dashboard',
+          '通知hash': 'sha256:${'a' * 64}',
+          '表示範囲': 'summary',
+          '権限生成': 'なし',
         },
       );
       return {

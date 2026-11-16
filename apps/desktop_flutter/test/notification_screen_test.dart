@@ -12,6 +12,7 @@ class _NotificationTransport implements BrokerTransport {
   final String label;
   final operations = <String>[];
   final gates = <String, Completer<void>>{};
+  Map<String, Object?>? notificationBody;
 
   @override
   Future<Map<String, Object?>> request(
@@ -29,29 +30,35 @@ class _NotificationTransport implements BrokerTransport {
     }
     return {
       'status': 'accepted',
-      'body': {
-        '版': 1,
-        '通知一覧': [
+      'body': notificationBody ??
           {
-            'severity': 'info',
-            '遷移先': 'dashboard',
-            '通知ID': 'notification-$label',
-            '通知hash': 'sha256:${'a' * 64}',
-            '状態': 'unread',
-            'タイトル': '通知 $label',
-            '概要': '概要 $label',
-            'source': 'broker',
-            '関連監査ID': 'audit-$label',
+            '版': 1,
+            '通知一覧': [
+              {
+                '版': 1,
+                'severity': 'info',
+                '遷移先': 'agent',
+                '通知ID': 'notification-broker-audit-$label',
+                '通知hash': 'sha256:${'a' * 64}',
+                '状態': 'unread',
+                'タイトル': '通知 $label',
+                '概要': '概要 $label',
+                'source': 'Task',
+                '作成順': 0,
+                '関連監査ID': 'broker-audit-$label',
+                '関連監査hash': 'sha256:${'b' * 64}',
+                '表示範囲': 'summary',
+                '権限生成': 'なし',
+              },
+            ],
+            '件数': 1,
+            '未読件数': 1,
+            '重大件数': 0,
+            '証拠種別': 'INTERNAL_STATE',
+            '表示範囲': 'summary',
+            '権限生成': 'なし',
+            '操作': 'navigation_only',
           },
-        ],
-        '件数': 1,
-        '未読件数': 1,
-        '重大件数': 0,
-        '証拠種別': 'INTERNAL_STATE',
-        '表示範囲': 'summary',
-        '権限生成': 'なし',
-        '操作': 'navigation_only',
-      },
     };
   }
 }
@@ -91,6 +98,28 @@ void main() {
     expect(find.text('通知 A'), findsNothing);
     expect(find.text('通知の表示状態を更新しました。'), findsNothing);
     expect(second.operations, ['通知一覧']);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('不正なBroker通知一覧を通知なしと表示しない', (tester) async {
+    final transport = _NotificationTransport('malformed')
+      ..notificationBody = {
+        '版': 1,
+        '通知一覧': 'C:\\Users\\owner\\secret.json',
+        '件数': 0,
+        '未読件数': 0,
+        '重大件数': 0,
+        '証拠種別': 'INTERNAL_STATE',
+        '表示範囲': 'summary',
+        '権限生成': 'なし',
+        '操作': 'navigation_only',
+      };
+    await tester.pumpWidget(_screen(transport));
+    await tester.pumpAndSettle();
+
+    expect(find.text('通知一覧を取得できません。Broker接続と通知状態を確認してください。'), findsOneWidget);
+    expect(find.text('通知なし'), findsNothing);
+    expect(find.textContaining('secret'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
 }

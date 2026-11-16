@@ -65,13 +65,32 @@ class _TrayTransport implements BrokerTransport {
       }
       return _acceptedStopRequest();
     }
+    final notifications = List<Map<String, Object?>>.generate(
+      criticalCount,
+      (index) => {
+        '版': 1,
+        '通知ID': 'notification-broker-audit-tray-$index',
+        'source': 'Audit',
+        'severity': 'critical',
+        'タイトル': '監査の状態更新',
+        '概要': '監査eventを確認してください。',
+        '作成順': index,
+        '関連監査ID': 'broker-audit-tray-$index',
+        '関連監査hash': 'sha256:${'a' * 64}',
+        '遷移先': 'audit',
+        '状態': 'unread',
+        '通知hash': 'sha256:${'b' * 64}',
+        '表示範囲': 'summary',
+        '権限生成': 'なし',
+      },
+    );
     return {
       'status': 'accepted',
       'body': {
         '版': 1,
-        '通知一覧': <Object?>[],
-        '件数': 3,
-        '未読件数': 3,
+        '通知一覧': notifications,
+        '件数': notifications.length,
+        '未読件数': notifications.length,
         '重大件数': criticalCount,
         '証拠種別': 'INTERNAL_STATE',
         '表示範囲': 'summary',

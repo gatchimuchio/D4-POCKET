@@ -156,4 +156,90 @@ void main() {
       ),
     );
   });
+
+  test('不整合な通知件数を空一覧扱いせず固定形式エラーにする', () async {
+    final transport = _NotificationTransport()
+      ..response = {
+        'status': 'accepted',
+        'body': {
+          '版': 1,
+          '通知一覧': <Object?>[],
+          '件数': 1,
+          '未読件数': 0,
+          '重大件数': 0,
+          '証拠種別': 'INTERNAL_STATE',
+          '表示範囲': 'summary',
+          '権限生成': 'なし',
+          '操作': 'navigation_only',
+        },
+      };
+    final client = NotificationClient(transport);
+
+    await expectLater(
+      client.list(),
+      throwsA(
+        isA<BrokerClientException>().having(
+          (error) => error.message,
+          'safe message',
+          allOf(
+            contains('通知一覧応答の形式が不正'),
+            isNot(contains('private')),
+            isNot(contains('secret')),
+          ),
+        ),
+      ),
+    );
+  });
+
+  test('未知fieldを含む通知recordは表示projectionへ通さない', () async {
+    final transport = _NotificationTransport()
+      ..response = {
+        'status': 'accepted',
+        'body': {
+          '版': 1,
+          '通知一覧': [
+            {
+              '版': 1,
+              '通知ID': 'notification-broker-audit-1',
+              'source': 'Permission',
+              'severity': 'info',
+              'タイトル': 'Permission更新',
+              '概要': 'Permission状態を確認してください。',
+              '作成順': 1,
+              '関連監査ID': 'broker-audit-1',
+              '関連監査hash': 'sha256:${'a' * 64}',
+              '遷移先': 'permission',
+              '状態': 'unread',
+              '通知hash': 'sha256:${'b' * 64}',
+              '表示範囲': 'summary',
+              '権限生成': 'なし',
+              '診断自由文': r'C:\Users\owner\private\secret.txt',
+            },
+          ],
+          '件数': 1,
+          '未読件数': 1,
+          '重大件数': 0,
+          '証拠種別': 'INTERNAL_STATE',
+          '表示範囲': 'summary',
+          '権限生成': 'なし',
+          '操作': 'navigation_only',
+        },
+      };
+    final client = NotificationClient(transport);
+
+    await expectLater(
+      client.list(),
+      throwsA(
+        isA<BrokerClientException>().having(
+          (error) => error.message,
+          'safe message',
+          allOf(
+            contains('通知一覧応答の形式が不正'),
+            isNot(contains('private')),
+            isNot(contains('secret')),
+          ),
+        ),
+      ),
+    );
+  });
 }
