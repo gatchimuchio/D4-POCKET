@@ -12,11 +12,9 @@ class McpConnectionCenterPanel extends StatefulWidget {
   const McpConnectionCenterPanel({
     super.key,
     required this.transport,
-    this.focusRequest = 0,
   });
 
   final BrokerTransport? transport;
-  final int focusRequest;
 
   @override
   State<McpConnectionCenterPanel> createState() =>
@@ -24,7 +22,6 @@ class McpConnectionCenterPanel extends StatefulWidget {
 }
 
 class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
-  final GlobalKey _titleKey = GlobalKey();
   final _serverIdController = TextEditingController();
   final _executableController = TextEditingController();
   final _workspaceController = TextEditingController();
@@ -47,28 +44,6 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     super.initState();
     final transport = widget.transport;
     _client = transport == null ? null : McpConnectionClient(transport);
-    if (widget.focusRequest > 0) _focusPanel();
-  }
-
-  @override
-  void didUpdateWidget(covariant McpConnectionCenterPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusRequest != widget.focusRequest) {
-      _focusPanel();
-    }
-  }
-
-  void _focusPanel() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final targetContext = _titleKey.currentContext;
-      if (!mounted || targetContext == null) return;
-      Scrollable.ensureVisible(
-        targetContext,
-        alignment: 0.12,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-      );
-    });
   }
 
   @override
@@ -94,7 +69,6 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
           children: [
             Text(
               'MCP接続センター',
-              key: _titleKey,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
@@ -110,7 +84,6 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
           children: [
             Text(
               'MCP接続センター',
-              key: _titleKey,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),

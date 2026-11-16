@@ -15,7 +15,6 @@ const _watchdog = Duration(seconds: 5);
 void main() {
   test('C27のsnapshot・一覧projection・検索・通知・資源観測をboundedに測定する', () async {
     final timings = <String, int>{};
-    final base = ShellCoreClient.mock().getSnapshot();
 
     _measure(timings, 'startup_model_initialization', () {
       ShellCoreClient.mock().getSnapshot();
@@ -30,13 +29,34 @@ void main() {
       expect(parsed.runtimes, hasLength(512));
     });
 
-    final scaled = _scaledSnapshot(base, 512);
+    late final List<GlobalSearchResult> searchEntries;
     _measure(timings, 'runtime_audit_history_projection', () {
-      final entries = GlobalSearchIndex.build(scaled);
-      expect(entries.length, lessThanOrEqualTo(GlobalSearchIndex.maxEntries));
+      searchEntries = GlobalSearchIndex.build(
+        hosts: List<HostRegistryRecord>.generate(
+          512,
+          (index) => HostRegistryRecord(
+            hostId: 'host-$index',
+            displayName: 'Host $index',
+            platform: 'linux',
+            connectionState: 'pending_review',
+            trustState: 'pending_review',
+            runtimeCount: 0,
+            agentCount: 0,
+            evidenceSource: 'INTERNAL_STATE',
+            visibility: 'metadata_only',
+            authorityStrip: true,
+          ),
+        ),
+        workspaces: const [],
+        now: DateTime.now(),
+      );
+      expect(
+        searchEntries.length,
+        lessThanOrEqualTo(GlobalSearchIndex.maxEntries),
+      );
     });
     _measure(timings, 'global_search', () {
-      final results = GlobalSearchIndex.search(base, 'MCP');
+      final results = GlobalSearchIndex.search(searchEntries, 'Host');
       expect(results, isNotEmpty);
       expect(results.length, lessThanOrEqualTo(GlobalSearchIndex.maxResults));
     });
@@ -104,52 +124,6 @@ Future<void> _measureAsync(
   await action();
   stopwatch.stop();
   timings[name] = stopwatch.elapsedMilliseconds;
-}
-
-ShellSnapshot _scaledSnapshot(ShellSnapshot base, int count) {
-  return ShellSnapshot(
-    phaseStatus: base.phaseStatus,
-    operationStatus: base.operationStatus,
-    runtimes: List<RuntimeRecord>.generate(
-      count,
-      (index) => RuntimeRecord(
-        runtimeId: 'runtime-$index',
-        name: 'Runtime $index',
-        status: 'ready',
-        adapterId: 'adapter-reference',
-        diagnosticSummary: '上限付き性能検証用データ',
-      ),
-    ),
-    agentSessions: base.agentSessions,
-    permissions: base.permissions,
-    pendingApprovals: base.pendingApprovals,
-    auditEvents: base.auditEvents,
-    recoveryActions: base.recoveryActions,
-    invariantFlags: base.invariantFlags,
-    setupDoctorChecks: base.setupDoctorChecks,
-    setupDoctorStatus: base.setupDoctorStatus,
-    installerGrantsAuthority: base.installerGrantsAuthority,
-    installerSilentlyApprovesPermissions:
-        base.installerSilentlyApprovesPermissions,
-    trustRecords: base.trustRecords,
-    authorityMap: base.authorityMap,
-    adapterCatalog: base.adapterCatalog,
-    permissionDiffs: base.permissionDiffs,
-    problems: base.problems,
-    evidence: base.evidence,
-    settings: base.settings,
-    auditChainStatus: base.auditChainStatus,
-    networkExposure: base.networkExposure,
-    releaseBlockerCount: base.releaseBlockerCount,
-    evidenceSummary: base.evidenceSummary,
-    recoveryPlaybook: base.recoveryPlaybook,
-    hosts: base.hosts,
-    hostCapabilities: base.hostCapabilities,
-    snapshotSource: base.snapshotSource,
-    snapshotPath: base.snapshotPath,
-    snapshotGeneratedAt: base.snapshotGeneratedAt,
-    snapshotFreshness: base.snapshotFreshness,
-  );
 }
 
 Map<String, Object?> _snapshotJson(int runtimeCount) => {

@@ -6,7 +6,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:gui_shell_ui/gui_shell_ui.dart' show HistoryClient;
 
-import 'models/generated_contracts.dart';
 import 'screens/approval_center.dart';
 import 'screens/audit_viewer.dart';
 import 'screens/dashboard.dart';
@@ -254,9 +253,6 @@ class _ShellHomePageState extends State<ShellHomePage> {
   final Set<int> _visitedPageIndexes = {0};
   bool _dialogueVisited = false;
   int _updateCenterFocusRequest = 0;
-  int _mcpCenterFocusRequest = 0;
-  int _composeCenterFocusRequest = 0;
-  int _exportCenterFocusRequest = 0;
   AiEditProposalReview? _pendingAiEditProposal;
   A2aTaskQueryResult? _pendingA2aArtifactHandoff;
   _ShellViewMode viewMode = _ShellViewMode.ownerUse;
@@ -454,9 +450,6 @@ class _ShellHomePageState extends State<ShellHomePage> {
         client: widget.client,
         active: selectedIndex == 11,
         focusUpdateCenterRequest: _updateCenterFocusRequest,
-        focusMcpCenterRequest: _mcpCenterFocusRequest,
-        focusComposeCenterRequest: _composeCenterFocusRequest,
-        focusExportCenterRequest: _exportCenterFocusRequest,
         onPrepareAiEditTask: _openAiEditProposal,
       ),
       if (_dialogueVisited)
@@ -538,13 +531,13 @@ class _ShellHomePageState extends State<ShellHomePage> {
         actions: {
           _OpenCommandPaletteIntent: CallbackAction<_OpenCommandPaletteIntent>(
             onInvoke: (_) {
-              _openCommandPalette(context, snapshot, pageEntries);
+              _openCommandPalette(context);
               return null;
             },
           ),
           _OpenGlobalSearchIntent: CallbackAction<_OpenGlobalSearchIntent>(
             onInvoke: (_) {
-              _openGlobalSearch(context, snapshot);
+              _openGlobalSearch(context);
               return null;
             },
           ),
@@ -562,10 +555,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
                   navigationGroup: navigationGroup,
                   onViewModeChanged: (mode) => setState(() => viewMode = mode),
                   onNavigationGroupChanged: _setNavigationGroup,
-                  onOpenCommandPalette: () =>
-                      _openCommandPalette(context, snapshot, pageEntries),
-                  onOpenGlobalSearch: () =>
-                      _openGlobalSearch(context, snapshot),
+                  onOpenCommandPalette: () => _openCommandPalette(context),
+                  onOpenGlobalSearch: () => _openGlobalSearch(context),
                 ),
                 PhaseBanner(snapshot: snapshot),
                 Expanded(
@@ -852,33 +843,6 @@ class _ShellHomePageState extends State<ShellHomePage> {
     });
   }
 
-  void _openMcpCenter() {
-    setState(() {
-      selectedIndex = 11;
-      _visitedPageIndexes.add(selectedIndex);
-      navigationGroup = _ShellNavigationGroup.settings;
-      _mcpCenterFocusRequest++;
-    });
-  }
-
-  void _openComposeCenter() {
-    setState(() {
-      selectedIndex = 11;
-      _visitedPageIndexes.add(selectedIndex);
-      navigationGroup = _ShellNavigationGroup.settings;
-      _composeCenterFocusRequest++;
-    });
-  }
-
-  void _openExportCenter() {
-    setState(() {
-      selectedIndex = 11;
-      _visitedPageIndexes.add(selectedIndex);
-      navigationGroup = _ShellNavigationGroup.settings;
-      _exportCenterFocusRequest++;
-    });
-  }
-
   void _openAgentSetup() => _selectPage(5);
 
   void _openAiEditProposal(AiEditProposalReview proposal) {
@@ -974,264 +938,56 @@ class _ShellHomePageState extends State<ShellHomePage> {
     });
   }
 
-  Future<void> _openCommandPalette(
-    BuildContext context,
-    ShellSnapshot snapshot,
-    List<_ShellPageEntry> pageEntries,
-  ) async {
-    final selected = await showDialog<_CommandEntry>(
-      context: context,
-      builder: (context) => _CommandPaletteDialog(
-        entries: _commandEntries(snapshot, pageEntries),
-      ),
-    );
-    if (selected == null || !mounted) {
+  Future<void> _openCommandPalette(BuildContext context) =>
+      _openCurrentBrokerSearch(context, commandPalette: true);
+
+  Future<void> _openGlobalSearch(BuildContext context) =>
+      _openCurrentBrokerSearch(context, commandPalette: false);
+
+  Future<void> _openCurrentBrokerSearch(
+    BuildContext context, {
+    required bool commandPalette,
+  }) async {
+    final broker = widget.client.brokerTransport;
+    if (broker == null) {
+      _showCurrentSearchUnavailable(context);
       return;
     }
-    if (selected.copyText != null) {
-      await Clipboard.setData(ClipboardData(text: selected.copyText!));
-      if (!mounted) {
-        return;
-      }
-    }
-    if (selected.title == 'MCP接続') {
-      _openMcpCenter();
-    } else {
-      switch (selected.focusTarget) {
-        case _SettingsFocusTarget.compose:
-          _openComposeCenter();
-          break;
-        case _SettingsFocusTarget.export:
-          _openExportCenter();
-          break;
-        case null:
-          _selectPage(selected.pageIndex);
-          break;
-      }
-    }
-    setState(() {
-      if (selected.viewMode != null) {
-        viewMode = selected.viewMode!;
-      }
-    });
-  }
 
-  Future<void> _openGlobalSearch(
-    BuildContext context,
-    ShellSnapshot snapshot,
-  ) async {
+    late final List<GlobalSearchResult> entries;
+    try {
+      entries = await GlobalSearchIndex.loadCurrent(broker);
+    } on Object {
+      if (context.mounted) _showCurrentSearchUnavailable(context);
+      return;
+    }
+    if (!mounted || !context.mounted) return;
+
     final availablePageIndices =
         _pageEntries().map((page) => page.index).toSet();
+    final visibleEntries = entries
+        .where((entry) => availablePageIndices.contains(entry.pageIndex))
+        .toList(growable: false);
     final selected = await showDialog<GlobalSearchResult>(
       context: context,
-      builder: (context) => _GlobalSearchDialog(
-        snapshot: snapshot,
-        availablePageIndices: availablePageIndices,
+      builder: (context) => _CurrentBrokerSearchDialog(
+        entries: visibleEntries,
+        label: commandPalette ? 'コマンドパレット' : '全体検索',
       ),
     );
     if (selected == null || !mounted) return;
-    if (selected.recordId == 'mcp-surface') {
-      _openMcpCenter();
-    } else {
-      switch (selected.recordId) {
-        case 'compose-surface':
-          _openComposeCenter();
-          break;
-        case 'export-surface':
-          _openExportCenter();
-          break;
-        default:
-          _selectPage(selected.pageIndex);
-          break;
-      }
-    }
+
+    // Search and palette selections navigate only. They do not pass the
+    // indexed record or any authority to the destination.
+    _selectPage(selected.pageIndex);
   }
 
-  List<_CommandEntry> _commandEntries(
-    ShellSnapshot snapshot,
-    List<_ShellPageEntry> pageEntries,
-  ) {
-    return [
-      for (final page in pageEntries)
-        _CommandEntry(
-          title: '${page.label}を開く',
-          subtitle: '${page.label}へ移動',
-          pageIndex: page.index,
-          icon: page.icon,
-          keywords: page.label,
-        ),
-      ..._featureCommandEntries(),
-      for (final mode in _ShellViewMode.values)
-        _CommandEntry(
-          title: '表示モードを切り替え: ${mode.label}',
-          subtitle: mode.description,
-          pageIndex: selectedIndex,
-          icon: mode.icon,
-          keywords: '表示 モード mode profile ${mode.label} ${mode.description}',
-          viewMode: mode,
-        ),
-      for (final problem in snapshot.problems)
-        _CommandEntry(
-          title: problem.item.isEmpty ? problem.message : problem.item,
-          subtitle: '問題 → ${problem.recoveryId}',
-          pageIndex: 9,
-          icon: Icons.report_problem_outlined,
-          keywords:
-              '${problem.problemId} ${problem.category} ${problem.classification} ${problem.target}',
-          copyText: problem.target.isEmpty ? null : problem.target,
-        ),
-      for (final recovery in snapshot.recoveryPlaybook)
-        _CommandEntry(
-          title:
-              recovery.recoveryId.isEmpty ? recovery.item : recovery.recoveryId,
-          subtitle: recovery.requiredAction,
-          pageIndex: 8,
-          icon: Icons.health_and_safety_outlined,
-          keywords:
-              '${recovery.item} ${recovery.classification} ${recovery.command} ${recovery.path}',
-          copyText: recovery.command.isNotEmpty
-              ? recovery.command
-              : recovery.path.isNotEmpty
-                  ? recovery.path
-                  : null,
-        ),
-      for (final runtime in snapshot.runtimes)
-        _CommandEntry(
-          title: runtime.runtimeId,
-          subtitle: '${runtime.status}（${runtime.adapterId}経由）',
-          pageIndex: 3,
-          icon: Icons.hub_outlined,
-          keywords: '${runtime.name} ${runtime.diagnosticSummary}',
-        ),
-      for (final authority in snapshot.authorityMap)
-        _CommandEntry(
-          title: '${authority.runtimeId} -> ${authority.capabilityId}',
-          subtitle:
-              '${authority.permissionId} -> ${authority.approvalId} -> ${authority.auditEventId} -> ${authority.recoveryId}',
-          pageIndex: 4,
-          icon: Icons.account_tree_outlined,
-          keywords:
-              '${authority.warning} ${authority.permissionId} ${authority.recoveryId}',
-        ),
-      for (final setting in snapshot.settings)
-        _CommandEntry(
-          title: setting.key,
-          subtitle: '${setting.currentValue}（出所: ${setting.source}）',
-          pageIndex: 11,
-          icon: Icons.settings_outlined,
-          keywords:
-              '${setting.group} ${setting.effectiveValue} ${setting.authorityRelated ? 'authority' : ''} ${setting.dangerous ? 'dangerous' : ''}',
-        ),
-    ];
-  }
-
-  List<_CommandEntry> _featureCommandEntries() {
-    return [
-      const _CommandEntry(
-        title: 'Runtimeを開く',
-        subtitle: '実行系センターへ移動',
-        pageIndex: 3,
-        icon: Icons.hub_outlined,
-        keywords: 'Runtime 実行系',
+  void _showCurrentSearchUnavailable(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Brokerの現在Host／Workspace状態を取得できません。検索結果を表示していません。'),
       ),
-      const _CommandEntry(
-        title: 'Agentを開く',
-        subtitle: 'エージェントセンターへ移動',
-        pageIndex: 5,
-        icon: Icons.smart_toy_outlined,
-        keywords: 'Agent エージェント',
-      ),
-      if (kGuiShellModuleHistory)
-        const _CommandEntry(
-          title: '履歴検索',
-          subtitle: '実行履歴の検索画面を開く',
-          pageIndex: 13,
-          icon: Icons.history,
-          keywords: '履歴 実行履歴 検索',
-        ),
-      if (kGuiShellModuleEvaluationLab)
-        const _CommandEntry(
-          title: '評価実行',
-          subtitle: '評価ラボを開く。実行はBrokerとowner承認の統治経路を使う',
-          pageIndex: 14,
-          icon: Icons.science_outlined,
-          keywords: '評価 評価ラボ Experiment Dataset',
-        ),
-      const _CommandEntry(
-        title: 'MCP接続',
-        subtitle: 'MCP接続一覧とOwner確認付き切断を開く',
-        pageIndex: 11,
-        icon: Icons.extension_outlined,
-        keywords: 'MCP 接続 道具 資源 提示',
-      ),
-      const _CommandEntry(
-        title: '構成Manifest作成',
-        subtitle: 'GUI Shell構成Manifest作成・Previewを開く',
-        pageIndex: 11,
-        icon: Icons.account_tree_outlined,
-        keywords: 'GUI Shell 構成 Compose Manifest Preview',
-        focusTarget: _SettingsFocusTarget.compose,
-      ),
-      const _CommandEntry(
-        title: '独立Appを書き出す',
-        subtitle: 'GUI Shell独立App書出し面を開く',
-        pageIndex: 11,
-        icon: Icons.file_download_outlined,
-        keywords: 'GUI Shell Windows Linux macOS Export 独立 App 書出し',
-        focusTarget: _SettingsFocusTarget.export,
-      ),
-      if (kGuiShellModuleNotifications)
-        const _CommandEntry(
-          title: '通知表示',
-          subtitle: '通知センターを開く',
-          pageIndex: 16,
-          icon: Icons.notifications_none,
-          keywords: '通知 通知センター',
-        ),
-      const _CommandEntry(
-        title: '資源監視',
-        subtitle: '実行系センターの資源観測面を開く',
-        pageIndex: 3,
-        icon: Icons.memory_outlined,
-        keywords: '資源 CPU RAM 観測 実行系',
-      ),
-      const _CommandEntry(
-        title: '資格情報',
-        subtitle: '資格情報の設定面を開く',
-        pageIndex: 11,
-        icon: Icons.key_outlined,
-        keywords: '資格情報 Credential 秘密',
-      ),
-      const _CommandEntry(
-        title: '更新確認',
-        subtitle: '更新センターを開く',
-        pageIndex: 11,
-        icon: Icons.system_update_outlined,
-        keywords: '更新 Update 署名',
-      ),
-      if (kGuiShellModuleHostOperations)
-        const _CommandEntry(
-          title: 'Host切替',
-          subtitle: 'Host操作面を開く。切替はBrokerの表示コンテキスト操作で行う',
-          pageIndex: 19,
-          icon: Icons.swap_horiz_outlined,
-          keywords: 'Host 切替 接続状態 Trust',
-        ),
-      const _CommandEntry(
-        title: 'A2A接続',
-        subtitle: 'A2A Agent Cardのloopback metadata接続面を開く',
-        pageIndex: 20,
-        icon: Icons.hub_outlined,
-        keywords: 'A2A Agent Card 接続 metadata Trust',
-      ),
-      const _CommandEntry(
-        title: '全Runtime停止要求を確認',
-        subtitle: '実行系センターを開き、Brokerの承認境界を確認する',
-        pageIndex: 3,
-        icon: Icons.stop_circle_outlined,
-        keywords: '全Runtime停止要求 停止 承認 Broker',
-      ),
-    ];
+    );
   }
 }
 
@@ -1265,8 +1021,6 @@ enum _ShellNavigationGroup {
   }
 }
 
-enum _SettingsFocusTarget { compose, export }
-
 class _ShellPageEntry {
   const _ShellPageEntry(this.index, this.label, this.icon, this.group);
 
@@ -1274,36 +1028,6 @@ class _ShellPageEntry {
   final String label;
   final IconData icon;
   final _ShellNavigationGroup group;
-}
-
-class _CommandEntry {
-  const _CommandEntry({
-    required this.title,
-    required this.subtitle,
-    required this.pageIndex,
-    required this.icon,
-    required this.keywords,
-    this.copyText,
-    this.viewMode,
-    this.focusTarget,
-  });
-
-  final String title;
-  final String subtitle;
-  final int pageIndex;
-  final IconData icon;
-  final String keywords;
-  final String? copyText;
-  final _ShellViewMode? viewMode;
-  final _SettingsFocusTarget? focusTarget;
-
-  bool matches(String query) {
-    final normalized = query.trim().toLowerCase();
-    if (normalized.isEmpty) {
-      return true;
-    }
-    return '$title $subtitle $keywords'.toLowerCase().contains(normalized);
-  }
 }
 
 class _TopCommandBar extends StatelessWidget {
@@ -1474,96 +1198,22 @@ enum _ShellViewMode {
   }
 }
 
-class _CommandPaletteDialog extends StatefulWidget {
-  const _CommandPaletteDialog({required this.entries});
-
-  final List<_CommandEntry> entries;
-
-  @override
-  State<_CommandPaletteDialog> createState() => _CommandPaletteDialogState();
-}
-
-class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
-  final TextEditingController _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final entries = widget.entries
-        .where((entry) => entry.matches(_controller.text))
-        .take(30)
-        .toList();
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 640),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _controller,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.search),
-                  labelText: 'コマンドパレット',
-                  helperText: '画面、問題、復旧、実行系、権限、設定を検索します',
-                ),
-                onChanged: (_) => setState(() {}),
-                onSubmitted: (_) {
-                  if (entries.isNotEmpty) {
-                    Navigator.of(context).pop(entries.first);
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: entries.isEmpty
-                    ? const Center(child: Text('一致するコマンドはありません'))
-                    : ListView.builder(
-                        itemCount: entries.length,
-                        itemBuilder: (context, index) {
-                          final entry = entries[index];
-                          return ListTile(
-                            leading: Icon(entry.icon),
-                            title: Text(entry.title),
-                            subtitle: Text(entry.subtitle),
-                            trailing: entry.copyText == null
-                                ? null
-                                : const Icon(Icons.copy, size: 18),
-                            onTap: () => Navigator.of(context).pop(entry),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GlobalSearchDialog extends StatefulWidget {
-  const _GlobalSearchDialog({
-    required this.snapshot,
-    required this.availablePageIndices,
+class _CurrentBrokerSearchDialog extends StatefulWidget {
+  const _CurrentBrokerSearchDialog({
+    required this.entries,
+    required this.label,
   });
 
-  final ShellSnapshot snapshot;
-  final Set<int> availablePageIndices;
+  final List<GlobalSearchResult> entries;
+  final String label;
 
   @override
-  State<_GlobalSearchDialog> createState() => _GlobalSearchDialogState();
+  State<_CurrentBrokerSearchDialog> createState() =>
+      _CurrentBrokerSearchDialogState();
 }
 
-class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
+class _CurrentBrokerSearchDialogState
+    extends State<_CurrentBrokerSearchDialog> {
   final TextEditingController _controller = TextEditingController();
 
   @override
@@ -1574,10 +1224,7 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final results = GlobalSearchIndex.search(widget.snapshot, _controller.text)
-        .where(
-            (result) => widget.availablePageIndices.contains(result.pageIndex))
-        .toList(growable: false);
+    final results = GlobalSearchIndex.search(widget.entries, _controller.text);
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 820, maxHeight: 680),
@@ -1590,12 +1237,12 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
                 controller: _controller,
                 autofocus: true,
                 maxLength: GlobalSearchIndex.maxQueryLength,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.manage_search),
-                  labelText: '全体検索',
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.manage_search),
+                  labelText: widget.label,
                   helperText:
-                      'Runtime、Agent、信頼、許可差分、監査、復旧、診断などを横断検索します。検索結果は表示専用です。',
+                      'Brokerの現在Host・Workspaceと有効なWorkspace読取だけを検索します。選択時は画面移動のみです。',
                 ),
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) {
@@ -1607,7 +1254,7 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
               const SizedBox(height: 12),
               Expanded(
                 child: results.isEmpty
-                    ? const Center(child: Text('一致する検索結果はありません'))
+                    ? const Center(child: Text('一致する現在の項目はありません'))
                     : ListView.builder(
                         itemCount: results.length,
                         itemBuilder: (context, index) {
@@ -1616,7 +1263,8 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
                             leading: const Icon(Icons.label_outline),
                             title: Text(result.title),
                             subtitle: Text(
-                              '${result.category} / ${result.detail} / 証拠: ${result.evidenceSource}',
+                              '${result.category} / ${result.detail} / '
+                              '証拠: ${result.evidenceSource}',
                             ),
                             onTap: () => Navigator.of(context).pop(result),
                           );

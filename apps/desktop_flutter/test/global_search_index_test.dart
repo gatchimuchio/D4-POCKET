@@ -1,267 +1,283 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/models/generated_contracts.dart';
 import 'package:gui_shell_desktop/services/global_search_index.dart';
-import 'package:gui_shell_desktop/services/shell_core_client.dart';
+import 'package:gui_shell_desktop/services/workspace_client.dart';
+import 'package:gui_shell_ui/runtime_resource_client.dart' show BrokerTransport;
 
 void main() {
-  test('全体検索はMCPとA2Aを表示専用のsurface結果として見つける', () {
-    final snapshot = ShellCoreClient.mock().getSnapshot();
+  final now = DateTime.utc(2026, 11, 16, 12);
 
-    final mcp = GlobalSearchIndex.search(snapshot, 'MCP');
-    final a2a = GlobalSearchIndex.search(snapshot, 'A2A');
-
-    expect(mcp, isNotEmpty);
-    expect(mcp.first.title, 'MCP接続');
-    expect(mcp.first.pageIndex, 11);
-    expect(a2a.first.title, 'A2A接続');
-    expect(a2a.first.pageIndex, 20);
-    expect(a2a.first.evidenceSource, '不明');
-  });
-
-  test('全体検索はBrokerの信頼・診断・許可差分・復旧を専用画面へ表示する', () {
-    final snapshot = ShellSnapshot.fromJson({
-      'trust_records': [
-        {
-          'scope': 'agent:claude\u200B',
-          'state': 'untrusted\u202E',
-          'source': 'private-secret-marker',
-          'expires_at': 'private-secret-marker',
-          'blocked_operations': ['workspace.write'],
-        },
-      ],
-      'setup_doctor_checks': [
-        {
-          'check_id': 'diagnostic-check-41',
-          'status': 'fail',
-          'message': 'private-secret-marker',
-          'recovery_instruction': 'C:\\private-secret-marker',
-          'grants_authority': false,
-        },
-      ],
-      'permission_diffs': [
-        {
-          'subject': 'workspace-policy-17',
-          'added': ['workspace.write\u202E'],
-          'removed': ['workspace.read'],
-          'changed': ['terminal.spawn'],
-          'dangerous': ['filesystem.delete'],
-        },
-      ],
-      'recovery_playbook': [
-        {
-          'recovery_id': 'recovery-case-7',
-          'item': 'private-secret-marker',
-          'severity': 'critical\u202E',
-          'classification': 'required_for_v1',
-          'safe_to_ignore_for_phase_b': false,
-          'required_action': 'private-secret-marker',
-          'blocks_completed_product_release': true,
-          'blocks_owner_use': true,
-          'command': 'private-secret-marker',
-          'path': 'C:\\private-secret-marker',
-        },
-      ],
-    }).copyWith(snapshotSource: 'broker');
-
-    final trust = GlobalSearchIndex.search(snapshot, 'agent:claude').single;
-    final doctor =
-        GlobalSearchIndex.search(snapshot, 'diagnostic-check-41').single;
-    final permission =
-        GlobalSearchIndex.search(snapshot, 'workspace-policy-17').single;
-    final recovery =
-        GlobalSearchIndex.search(snapshot, 'recovery-case-7').single;
-
-    expect((trust.category, trust.pageIndex), ('信頼状態', 2));
-    expect(trust.title, 'agent:claude');
-    expect(trust.detail, contains('Authorityではありません'));
-    expect((doctor.category, doctor.pageIndex), ('環境診断', 1));
-    expect(doctor.detail, contains('診断結果はPermission／Approvalを発行しません'));
-    expect((permission.category, permission.pageIndex), ('許可差分', 3));
-    expect(permission.detail, contains('workspace.write'));
-    expect(permission.detail, contains('許可差分は承認ではありません'));
-    expect(permission.detail, isNot(contains('\u202E')));
-    expect((recovery.category, recovery.pageIndex), ('復旧Playbook', 8));
-    expect(recovery.detail, contains('製品Releaseを阻害'));
-    expect(recovery.detail, isNot(contains('\u202E')));
-    expect(
-      GlobalSearchIndex.search(snapshot, 'private-secret-marker'),
-      isEmpty,
-    );
-    for (final result in [trust, doctor, permission, recovery]) {
-      expect(result.evidenceSource, 'INTERNAL_STATE');
-      expect(result.title, isNot(contains('\u202E')));
-      expect(result.detail, isNot(contains('private-secret-marker')));
-    }
-  });
-
-  test('全体検索はqueryと結果件数をboundedにしraw contentを射影しない', () {
-    final snapshot = ShellCoreClient.mock().getSnapshot();
-
-    expect(
-      GlobalSearchIndex.search(snapshot, 'a' * 129),
-      isEmpty,
-    );
-    final results = GlobalSearchIndex.search(snapshot, '');
-    expect(results.length, lessThanOrEqualTo(GlobalSearchIndex.maxResults));
-    for (final result in results) {
-      expect(result.detail, isNot(contains('projected_content')));
-    }
-  });
-
-  test('全体検索はBrokerのAgent Adapter一覧を権限なしの表示metadataとして検索する', () {
-    final snapshot = ShellCoreClient.mock().getSnapshot().copyWith(
-      snapshotSource: 'broker',
-      agentAdapters: const [
-        AgentAdapterRecord(
-          adapterId: 'anthropic-adapter',
-          agentId: 'claude-agent',
-          provider: 'Anthropic',
-          version: '1.2',
-          model: 'claude-sonnet',
-          status: 'ready',
-          capabilities: [
-            AgentCapabilitySupportRecord(
-              capabilityId: 'task_execution',
-              status: 'supported',
-              reason: 'free-form capability reason must not enter search',
-            ),
-          ],
-          evidenceSource: 'LIVE_RUNTIME',
-          evidenceReason: 'credential-secret-marker',
-          authenticationMethod: 'credential-reference-secret-marker',
-          authenticationStatus: 'configured',
-        ),
-      ],
-    );
-
-    final results = GlobalSearchIndex.search(snapshot, 'claude-sonnet');
-
-    expect(results, hasLength(1));
-    expect(results.single.category, 'Agent Adapter');
-    expect(results.single.title, 'claude-agent');
-    expect(results.single.recordId, 'anthropic-adapter');
-    expect(results.single.pageIndex, 5);
-    expect(results.single.evidenceSource, 'INTERNAL_STATE');
-    expect(results.single.detail, contains('能力metadataは権限ではありません'));
-    expect(results.single.detail, isNot(contains('credential-secret-marker')));
-    expect(
-      GlobalSearchIndex.search(snapshot, 'credential-secret-marker'),
-      isEmpty,
-    );
-    expect(
-      GlobalSearchIndex.search(snapshot, 'free-form capability reason'),
-      isEmpty,
-    );
-  });
-
-  test('全体検索はBrokerのHost能力を表示専用で検索し理由本文を除外する', () {
-    final snapshot = ShellCoreClient.mock().getSnapshot().copyWith(
-      snapshotSource: 'broker',
-      hostCapabilities: const [
-        HostCapabilityRecord(
-          hostId: 'host-lab',
+  test('検索対象は現在Host・Workspace・期限内Workspace読取許可だけ', () {
+    final entries = GlobalSearchIndex.build(
+      hosts: const [
+        HostRegistryRecord(
+          hostId: 'host-linux-lab',
           displayName: 'Linux lab',
           platform: 'linux',
-          status: 'connected',
-          capabilities: [
-            HostCapabilityItemRecord(
-              capabilityId: 'workspace.read',
-              status: 'available',
-              evidenceSource: 'LIVE_RUNTIME',
-              reason: 'host capability reason-secret-marker',
-            ),
-          ],
+          connectionState: 'pending_review',
+          trustState: 'pending_review',
+          runtimeCount: 0,
+          agentCount: 0,
+          evidenceSource: 'INTERNAL_STATE',
+          visibility: 'metadata_only',
+          authorityStrip: true,
         ),
       ],
+      workspaces: [
+        _workspace('workspace-live',
+            approved: true, expiresAt: now.add(const Duration(minutes: 5))),
+        _workspace('workspace-expired',
+            approved: true,
+            expiresAt: now.subtract(const Duration(minutes: 1))),
+        _workspace('workspace-denied', approved: false),
+      ],
+      now: now,
     );
 
-    final results = GlobalSearchIndex.search(snapshot, 'workspace.read');
-
-    expect(results, hasLength(1));
-    expect(results.single.category, 'Host能力');
-    expect(results.single.title, 'workspace.read');
-    expect(results.single.recordId, 'host-lab');
-    expect(results.single.pageIndex, 19);
-    expect(results.single.evidenceSource, 'INTERNAL_STATE');
-    expect(results.single.detail,
-        contains('能力metadataはPermission／Authorityではありません'));
-    expect(results.single.detail, isNot(contains('reason-secret-marker')));
+    expect(entries.map((entry) => entry.category).toSet(),
+        {'Host', 'Workspace', '許可済み操作'});
+    expect(GlobalSearchIndex.search(entries, 'Linux lab').single.target,
+        GlobalSearchTarget.host);
+    expect(GlobalSearchIndex.search(entries, 'workspace-live'), hasLength(2));
     expect(
-      GlobalSearchIndex.search(snapshot, 'reason-secret-marker'),
-      isEmpty,
+        GlobalSearchIndex.search(entries, 'workspace-expired'), hasLength(1));
+    expect(GlobalSearchIndex.search(entries, 'workspace-denied'), hasLength(1));
+    expect(GlobalSearchIndex.search(entries, 'Workspace読取').single.target,
+        GlobalSearchTarget.grantedAction);
+    for (final oldCategory in [
+      'MCP',
+      'A2A',
+      'Agent',
+      'Audit',
+      'Approval',
+      'Permission',
+      '問題',
+      '復旧',
+      '診断',
+      'Profile',
+    ]) {
+      expect(GlobalSearchIndex.search(entries, oldCategory), isEmpty,
+          reason: '$oldCategoryは検索対象に含めない');
+    }
+  });
+
+  test('検索用Broker取得はHost一覧と作業領域一覧だけを現在再取得する', () async {
+    final transport = _SearchTransport();
+    final entries = await GlobalSearchIndex.loadCurrent(transport, now: now);
+
+    expect(transport.operations.toSet(), {'Host一覧', '作業領域一覧'});
+    expect(transport.requests, hasLength(2));
+    expect(
+      transport.requests.singleWhere(
+        (request) => request['operation'] == 'Host一覧',
+      )['payload'],
+      {'版': 1},
+    );
+    expect(
+      transport.requests.singleWhere(
+        (request) => request['operation'] == '作業領域一覧',
+      )['payload'],
+      <String, Object?>{},
+    );
+    expect(entries.map((entry) => entry.evidenceSource).toSet(),
+        {'INTERNAL_STATE'});
+    expect(GlobalSearchIndex.search(entries, 'fixture-secret-marker'), isEmpty);
+    expect(
+      transport.operations.any((operation) =>
+          operation.contains('Permission') ||
+          operation.contains('Approval') ||
+          operation.contains('実行')),
+      isFalse,
     );
   });
 
-  test('Host能力の検索metadataから不可視・双方向制御文字を除去する', () {
-    final snapshot = ShellCoreClient.mock().getSnapshot().copyWith(
-      hostCapabilities: const [
-        HostCapabilityRecord(
-          hostId: 'host-safe',
-          displayName: 'Linux',
+  test('検索取得が失敗したら古い値へfallbackしない', () async {
+    final transport = _SearchTransport(failWorkspaceList: true);
+
+    await expectLater(
+      GlobalSearchIndex.loadCurrent(transport, now: now),
+      throwsA(isA<StateError>()),
+    );
+    expect(transport.operations.toSet(), {'Host一覧', '作業領域一覧'});
+  });
+
+  test('検索を再生成すると更新されたBroker Hostを読み直す', () async {
+    final transport = _SearchTransport();
+    final first = await GlobalSearchIndex.loadCurrent(transport, now: now);
+    transport.hostDisplayName = 'Updated Linux';
+    final second = await GlobalSearchIndex.loadCurrent(transport, now: now);
+
+    expect(GlobalSearchIndex.search(first, 'Current Linux'), hasLength(1));
+    expect(GlobalSearchIndex.search(first, 'Updated Linux'), isEmpty);
+    expect(GlobalSearchIndex.search(second, 'Current Linux'), isEmpty);
+    expect(GlobalSearchIndex.search(second, 'Updated Linux'), hasLength(1));
+    expect(transport.operations, hasLength(4));
+  });
+
+  test('検索結果とqueryをboundedにし、未許可のSnapshot分類を混ぜない', () {
+    final entries = GlobalSearchIndex.build(
+      hosts: List<HostRegistryRecord>.generate(
+        80,
+        (index) => HostRegistryRecord(
+          hostId: 'host-$index',
+          displayName: 'Host $index',
           platform: 'linux',
-          status: 'connected',
-          capabilities: [
-            HostCapabilityItemRecord(
-              capabilityId: 'workspace.\u200Bread',
-              status: 'available\u202E',
-              evidenceSource: 'FIXTURE',
-              reason: '',
-            ),
-          ],
+          connectionState: 'pending_review',
+          trustState: 'pending_review',
+          runtimeCount: 0,
+          agentCount: 0,
+          evidenceSource: 'INTERNAL_STATE',
+          visibility: 'metadata_only',
+          authorityStrip: true,
         ),
-      ],
+      ),
+      workspaces: List<WorkspaceRegistration>.generate(
+        16,
+        (index) => _workspace(
+          'workspace-$index',
+          approved: true,
+          expiresAt: now.add(const Duration(hours: 1)),
+        ),
+      ),
+      now: now,
     );
 
-    final results = GlobalSearchIndex.search(snapshot, 'workspace.read');
-
-    expect(results, hasLength(1));
-    expect(results.single.title, 'workspace.read');
-    expect(results.single.detail, isNot(contains('\u202E')));
-    expect(results.single.detail, isNot(contains('\u200B')));
+    expect(entries.length, lessThanOrEqualTo(GlobalSearchIndex.maxEntries));
+    expect(GlobalSearchIndex.search(entries, 'a' * 129), isEmpty);
+    expect(
+      GlobalSearchIndex.search(entries, '').length,
+      lessThanOrEqualTo(GlobalSearchIndex.maxResults),
+    );
+    expect(GlobalSearchIndex.search(entries, 'private-secret-marker'), isEmpty);
   });
 
-  test('Agent Adapterの表示metadataから不可視・双方向制御文字を除去する', () {
-    final snapshot = ShellCoreClient.mock().getSnapshot().copyWith(
-      agentAdapters: const [
-        AgentAdapterRecord(
-          adapterId: 'adapter-safe',
-          agentId: 'agent-safe',
-          provider: 'Anthro\u202Epic',
-          version: '1',
-          model: 'claude\u200Bsonnet',
-          status: 'ready',
-          capabilities: [],
-          evidenceSource: 'FIXTURE',
-          evidenceReason: '',
+  test('Host表示metadataから不可視・双方向制御文字を除去する', () {
+    final entries = GlobalSearchIndex.build(
+      hosts: const [
+        HostRegistryRecord(
+          hostId: 'host-safe',
+          displayName: 'Li\u200Bnx\u202Elab',
+          platform: 'linux',
+          connectionState: 'pending_review',
+          trustState: 'pending_review',
+          runtimeCount: 0,
+          agentCount: 0,
+          evidenceSource: 'INTERNAL_STATE',
+          visibility: 'metadata_only',
+          authorityStrip: true,
         ),
       ],
+      workspaces: const [],
+      now: now,
     );
 
-    final results = GlobalSearchIndex.search(snapshot, 'claudesonnet');
-
-    expect(results, hasLength(1));
-    expect(results.single.detail, contains('Anthropic'));
-    expect(results.single.detail, isNot(contains('\u202E')));
-    expect(results.single.detail, isNot(contains('\u200B')));
-  });
-
-  test('取込JSONのsnapshot_source自己申告はBroker証拠へ昇格しない', () {
-    final snapshot = ShellSnapshot.fromJson({
-      'snapshot_source': 'broker',
-      'runtimes': [
-        {
-          'runtime_id': 'forged-runtime',
-          'name': '未検証Runtime',
-          'status': 'ready',
-          'adapter_id': 'unverified-adapter',
-        },
-      ],
-    });
-
-    expect(snapshot.snapshotSource, 'unverified');
-    final evidenceSources = GlobalSearchIndex.build(snapshot)
-        .map((result) => result.evidenceSource)
-        .toSet();
-    expect(evidenceSources, {'不明'});
+    expect(entries.single.title, 'Linxlab');
+    expect(entries.single.title, isNot(contains('\u200B')));
+    expect(entries.single.title, isNot(contains('\u202E')));
   });
 }
+
+WorkspaceRegistration _workspace(
+  String id, {
+  required bool approved,
+  DateTime? expiresAt,
+}) {
+  final expiredAt =
+      expiresAt == null ? null : expiresAt.millisecondsSinceEpoch ~/ 1000;
+  return WorkspaceRegistration.parse({
+    '作業領域ID': id,
+    '実行系ID': 'runtime-codex',
+    '登録hash': 'sha256:${'a' * 64}',
+    '承認状態': approved ? 'approved' : 'denied',
+    '有効期限': approved ? expiredAt : null,
+    '表示範囲': approved ? 'summary' : 'none',
+    'approval_id': approved ? 'approval-$id' : null,
+  });
+}
+
+class _SearchTransport implements BrokerTransport {
+  _SearchTransport({this.failWorkspaceList = false});
+
+  final bool failWorkspaceList;
+  String hostDisplayName = 'Current Linux';
+  final List<String> operations = [];
+  final List<Map<String, Object?>> requests = [];
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) async {
+    operations.add(operation);
+    requests.add({'operation': operation, 'payload': payload ?? {}});
+    if (operation == 'Host一覧') {
+      return _accepted(operation, {
+        '版': 1,
+        'Host一覧': [_host('host-current', hostDisplayName)],
+        '件数': 1,
+        '公開範囲': 'metadata_only',
+        '証拠種別': 'INTERNAL_STATE',
+      });
+    }
+    if (operation == '作業領域一覧') {
+      if (failWorkspaceList) {
+        throw StateError('fixture transport failure');
+      }
+      return _accepted(operation, {
+        '作業領域': [
+          {
+            '作業領域ID': 'workspace-current',
+            '実行系ID': 'runtime-codex',
+            '登録hash': 'sha256:${'b' * 64}',
+            '承認状態': 'approved',
+            '有効期限': 1900000000,
+            '表示範囲': 'summary',
+            'approval_id': 'approval-current',
+          },
+        ],
+      });
+    }
+    throw StateError('unexpected search operation: $operation');
+  }
+
+  Map<String, Object?> _accepted(String operation, Object body) => {
+        'operation': operation,
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'audit-search-${operations.length}',
+        'error': null,
+        'body': body,
+      };
+}
+
+Map<String, Object?> _host(String id, String displayName) => {
+      '版': 1,
+      'Host ID': id,
+      '表示名': displayName,
+      'Platform': 'linux',
+      '接続状態': 'pending_review',
+      'Trust': {
+        'state': 'pending_review',
+        'evidence_source': 'INTERNAL_STATE',
+        'requires_operator_review': true,
+      },
+      '証明書/identity': {
+        '種別': 'identity_hash',
+        'hash': 'sha256:${'c' * 64}',
+      },
+      'Runtime summary': {
+        'runtime_count': 0,
+        'agent_count': 0,
+        'evidence_source': 'INTERNAL_STATE',
+      },
+      '最終接続': null,
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+      '権限生成': 'なし',
+      'authority_strip': true,
+      '能力ID': 'host.registry.register',
+      '権限ID': 'permission.host.registry.register',
+      '承認状態': 'owner_control_approved',
+      '復旧ID': 'recover-host-registration',
+      '登録監査ID': 'audit-host-register-$id',
+    };

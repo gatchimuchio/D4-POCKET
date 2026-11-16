@@ -1209,49 +1209,11 @@ void main() {
     expect(find.textContaining('リリース: not claimed'), findsOneWidget);
   });
 
-  testWidgets('コマンドパレットが検索して移動する', (WidgetTester tester) async {
-    await tester.pumpWidget(const GuiShellDesktopApp());
-
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
-    await tester.pumpAndSettle();
-
-    await tester.enterText(find.byType(TextField), '問題');
-    await tester.pumpAndSettle();
-    expect(find.text('問題一覧を開く'), findsOneWidget);
-    await tester.tap(find.text('問題一覧を開く'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('問題一覧'), findsWidgets);
-  });
-
-  testWidgets('コマンドパレットがC21の新機能別コマンドを表示する', (WidgetTester tester) async {
-    await tester.pumpWidget(const GuiShellDesktopApp());
-
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
-    await tester.pumpAndSettle();
-
-    await tester.enterText(find.byType(TextField), 'MCP接続');
-    await tester.pumpAndSettle();
-    expect(
-      find.byWidgetPredicate(
-        (widget) => widget is Text && widget.data == 'MCP接続',
-      ),
-      findsOneWidget,
+  testWidgets('コマンドパレットはBrokerの現在Hostへ画面移動だけを行う', (WidgetTester tester) async {
+    final transport = _CurrentSearchNavigationTransport();
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
     );
-    expect(
-      find.byWidgetPredicate(
-        (widget) => widget is Text && widget.data == 'MCP接続一覧とOwner確認付き切断を開く',
-      ),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('コマンドパレットはMCP検索結果をEnterで実行する', (WidgetTester tester) async {
-    await tester.pumpWidget(const GuiShellDesktopApp());
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
@@ -1263,45 +1225,81 @@ void main() {
         (widget) =>
             widget is TextField && widget.decoration?.labelText == 'コマンドパレット',
       ),
-      'MCP',
+      'Current Linux',
     );
     await tester.pumpAndSettle();
-    expect(
-      find.byWidgetPredicate(
-        (widget) => widget is Text && widget.data == 'MCP接続一覧とOwner確認付き切断を開く',
-      ),
-      findsOneWidget,
+    final hostResult = find.descendant(
+      of: find.byType(ListTile),
+      matching: find.text('Current Linux'),
     );
-    await tester.testTextInput.receiveAction(TextInputAction.done);
+    expect(hostResult, findsOneWidget);
+    await tester.tap(hostResult);
     await tester.pumpAndSettle();
 
-    expect(find.text('MCP接続センター'), findsWidgets);
+    expect(find.text('D4 Pocket Host操作面'), findsOneWidget);
+    expect(transport.operations.toSet(), {'Host一覧', '作業領域一覧'});
+  });
+
+  testWidgets('コマンドパレットに固定MCPや問題・復旧コマンドを出さない', (WidgetTester tester) async {
+    final transport = _CurrentSearchNavigationTransport();
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == 'コマンドパレット',
+      ),
+      'MCP接続',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('一致する現在の項目はありません'), findsOneWidget);
+    expect(find.text('MCP接続一覧とOwner確認付き切断を開く'), findsNothing);
+    expect(find.text('問題一覧を開く'), findsNothing);
+    expect(find.text('復旧手順を開く'), findsNothing);
+  });
+
+  testWidgets('コマンドパレットは選択時にBroker操作を実行しない', (WidgetTester tester) async {
+    final transport = _CurrentSearchNavigationTransport();
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == 'コマンドパレット',
+      ),
+      'Current Linux',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(ListTile),
+        matching: find.text('Current Linux'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('D4 Pocket Host操作面'), findsOneWidget);
+    expect(transport.operations, hasLength(2));
+    expect(transport.operations.toSet(), {'Host一覧', '作業領域一覧'});
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('全体検索がCtrl+Shift+Fで開き画面遷移だけを行う', (WidgetTester tester) async {
-    await tester.pumpWidget(const GuiShellDesktopApp());
-
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.shift);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.shift);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
-    await tester.pumpAndSettle();
-
-    expect(find.text('全体検索'), findsWidgets);
-    expect(find.textContaining('検索結果は表示専用'), findsOneWidget);
-    await tester.enterText(find.byType(TextField), 'MCP');
-    await tester.pumpAndSettle();
-    expect(find.text('MCP接続'), findsOneWidget);
-    await tester.tap(find.text('MCP接続'));
-    await tester.pumpAndSettle();
-    expect(find.text('設定'), findsWidgets);
-  });
-
-  testWidgets('MCP検索とコマンドからMCP欄へ移動し同じBroker transportで一覧を読む',
-      (WidgetTester tester) async {
-    final transport = _McpNavigationTransport();
+    final transport = _CurrentSearchNavigationTransport();
     await tester.pumpWidget(
       GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
     );
@@ -1312,38 +1310,46 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shift);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'MCP');
+
+    expect(find.text('全体検索'), findsWidgets);
+    expect(find.textContaining('選択時は画面移動のみ'), findsOneWidget);
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == '全体検索',
+      ),
+      'Current Linux',
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('MCP接続'));
+    final hostResult = find.descendant(
+      of: find.byType(ListTile),
+      matching: find.text('Current Linux'),
+    );
+    expect(hostResult, findsOneWidget);
+    await tester.tap(hostResult);
+    await tester.pumpAndSettle();
+    expect(find.text('D4 Pocket Host操作面'), findsOneWidget);
+    expect(transport.operations, hasLength(2));
+  });
+
+  testWidgets('設定画面からMCP欄へ移動し同じBroker transportで一覧を読む',
+      (WidgetTester tester) async {
+    final transport = _McpNavigationTransport();
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('open-product-setup')));
     await tester.pumpAndSettle();
 
     final listButton = find.byKey(const ValueKey('mcp-load-connections'));
-    expect(find.text('MCP接続センター').hitTestable(), findsOneWidget);
+    expect(find.text('MCP接続センター'), findsOneWidget);
     await tester.ensureVisible(listButton);
     await tester.tap(listButton);
     await tester.pumpAndSettle();
     expect(find.text('Brokerが保持するMCP接続はありません。'), findsOneWidget);
 
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is TextField && widget.decoration?.labelText == 'コマンドパレット',
-      ),
-      'MCP接続',
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('MCP接続一覧とOwner確認付き切断を開く'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('MCP接続センター').hitTestable(), findsOneWidget);
-    expect(
-      transport.operations.where((operation) => operation.startsWith('MCP')),
-      ['MCP接続一覧'],
-    );
+    expect(find.text('設定').hitTestable(), findsWidgets);
     expect(
       transport.requests.singleWhere(
         (request) => (request['operation']! as String).startsWith('MCP'),
@@ -1368,18 +1374,10 @@ void main() {
       isEmpty,
     );
 
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.shift);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.shift);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'MCP');
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('MCP接続'));
+    await tester.tap(find.byKey(const ValueKey('open-product-setup')));
     await tester.pumpAndSettle();
 
-    expect(find.text('MCP接続センター').hitTestable(), findsOneWidget);
+    expect(find.text('MCP接続センター'), findsOneWidget);
     final listButton = find.byKey(const ValueKey('mcp-load-connections'));
     await tester.ensureVisible(listButton);
     await tester.tap(listButton);
@@ -1427,31 +1425,17 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('全体検索からCompose、コマンドからExportへ進み同一ManifestをBrokerへ渡す',
+  testWidgets('設定画面のComposeとExportが同一ManifestをBrokerへ渡す',
       (WidgetTester tester) async {
     final transport = _ComposeExportNavigationTransport();
     await tester.pumpWidget(
       GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
     );
 
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.shift);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.shift);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is TextField && widget.decoration?.labelText == '全体検索',
-      ),
-      'GUI Shell構成',
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('GUI Shell構成').last);
+    await tester.tap(find.byKey(const ValueKey('open-product-setup')));
     await tester.pumpAndSettle();
 
-    expect(find.text('GUI Shell構成').hitTestable(), findsOneWidget);
+    expect(find.text('GUI Shell構成'), findsOneWidget);
     final catalogRefresh =
         find.byKey(const ValueKey('compose-runtime-agent-catalog-refresh'));
     await tester.ensureVisible(catalogRefresh);
@@ -1466,28 +1450,9 @@ void main() {
     await tester.tap(composeButton);
     await tester.pumpAndSettle();
 
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is TextField && widget.decoration?.labelText == 'コマンドパレット',
-      ),
-      '独立Appを書き出す',
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byWidgetPredicate(
-        (widget) => widget is Text && widget.data == '独立Appを書き出す',
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('GUI Shell独立App書出し').hitTestable(), findsOneWidget);
     final exportButton = find.byKey(const ValueKey('compose-export-button'));
     await tester.ensureVisible(exportButton);
+    expect(find.text('GUI Shell独立App書出し'), findsOneWidget);
     await tester.tap(exportButton);
     await tester.pumpAndSettle();
 
@@ -6613,6 +6578,69 @@ class _FailingBrokerTransport implements BrokerTransport {
   }) {
     throw BrokerClientException(message);
   }
+}
+
+class _CurrentSearchNavigationTransport implements BrokerTransport {
+  final operations = <String>[];
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) async {
+    operations.add(operation);
+    final body = switch (operation) {
+      'Host一覧' => {
+          '版': 1,
+          'Host一覧': [_currentSearchHost()],
+          '件数': 1,
+          '公開範囲': 'metadata_only',
+          '証拠種別': 'INTERNAL_STATE',
+        },
+      '作業領域一覧' => {'作業領域': <Object?>[]},
+      _ => throw const BrokerClientException('検索fixtureで未対応の要求です'),
+    };
+    return {
+      'operation': operation,
+      'status': 'accepted',
+      'evidence_source': 'INTERNAL_STATE',
+      'audit_event_id': 'audit-current-search-${operations.length}',
+      'error': null,
+      'body': body,
+    };
+  }
+
+  Map<String, Object?> _currentSearchHost() => {
+        '版': 1,
+        'Host ID': 'host-current-linux',
+        '表示名': 'Current Linux',
+        'Platform': 'linux',
+        '接続状態': 'pending_review',
+        'Trust': {
+          'state': 'pending_review',
+          'evidence_source': 'INTERNAL_STATE',
+          'requires_operator_review': true,
+        },
+        '証明書/identity': {
+          '種別': 'identity_hash',
+          'hash': 'sha256:${'a' * 64}',
+        },
+        'Runtime summary': {
+          'runtime_count': 0,
+          'agent_count': 0,
+          'evidence_source': 'INTERNAL_STATE',
+        },
+        '最終接続': null,
+        '公開範囲': 'metadata_only',
+        '証拠種別': 'INTERNAL_STATE',
+        '権限生成': 'なし',
+        'authority_strip': true,
+        '能力ID': 'host.registry.register',
+        '権限ID': 'permission.host.registry.register',
+        '承認状態': 'owner_control_approved',
+        '復旧ID': 'recover-host-registration',
+        '登録監査ID': 'audit-host-register-current-linux',
+      };
 }
 
 class _McpNavigationTransport implements BrokerTransport {

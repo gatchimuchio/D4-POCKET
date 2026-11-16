@@ -51,9 +51,6 @@ class SettingsScreen extends StatelessWidget {
     this.active = true,
     this.requestApplicationExit,
     this.focusUpdateCenterRequest = 0,
-    this.focusMcpCenterRequest = 0,
-    this.focusComposeCenterRequest = 0,
-    this.focusExportCenterRequest = 0,
     this.onPrepareAiEditTask,
   });
 
@@ -62,9 +59,6 @@ class SettingsScreen extends StatelessWidget {
   final Future<ui.AppExitResponse> Function(ui.AppExitType)?
       requestApplicationExit;
   final int focusUpdateCenterRequest;
-  final int focusMcpCenterRequest;
-  final int focusComposeCenterRequest;
-  final int focusExportCenterRequest;
   final ValueChanged<AiEditProposalReview>? onPrepareAiEditTask;
 
   @override
@@ -74,9 +68,6 @@ class SettingsScreen extends StatelessWidget {
         active: active,
         requestApplicationExit: requestApplicationExit,
         focusUpdateCenterRequest: focusUpdateCenterRequest,
-        focusMcpCenterRequest: focusMcpCenterRequest,
-        focusComposeCenterRequest: focusComposeCenterRequest,
-        focusExportCenterRequest: focusExportCenterRequest,
         onPrepareAiEditTask: onPrepareAiEditTask,
       );
 }
@@ -88,9 +79,6 @@ class _SettingsScreenStateful extends StatefulWidget {
     this.active = true,
     this.requestApplicationExit,
     this.focusUpdateCenterRequest = 0,
-    this.focusMcpCenterRequest = 0,
-    this.focusComposeCenterRequest = 0,
-    this.focusExportCenterRequest = 0,
     this.onPrepareAiEditTask,
   });
 
@@ -99,9 +87,6 @@ class _SettingsScreenStateful extends StatefulWidget {
   final Future<ui.AppExitResponse> Function(ui.AppExitType)?
       requestApplicationExit;
   final int focusUpdateCenterRequest;
-  final int focusMcpCenterRequest;
-  final int focusComposeCenterRequest;
-  final int focusExportCenterRequest;
   final ValueChanged<AiEditProposalReview>? onPrepareAiEditTask;
 
   @override
@@ -110,8 +95,6 @@ class _SettingsScreenStateful extends StatefulWidget {
 
 class _SettingsScreenState extends State<_SettingsScreenStateful> {
   final GlobalKey _updateCenterKey = GlobalKey();
-  final GlobalKey _composeCenterKey = GlobalKey();
-  final GlobalKey _exportCenterKey = GlobalKey();
   final Set<String> _selectedExportModules =
       Set<String>.of(guiShellOptionalExportModules.keys);
   String _exportTargetPlatform = defaultTargetPlatform == TargetPlatform.linux
@@ -212,13 +195,6 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     if (oldWidget.focusUpdateCenterRequest != widget.focusUpdateCenterRequest) {
       _focusSettingsSection(_updateCenterKey);
     }
-    if (oldWidget.focusComposeCenterRequest !=
-        widget.focusComposeCenterRequest) {
-      _focusSettingsSection(_composeCenterKey);
-    }
-    if (oldWidget.focusExportCenterRequest != widget.focusExportCenterRequest) {
-      _focusSettingsSection(_exportCenterKey);
-    }
   }
 
   void _focusSettingsSection(GlobalKey key) {
@@ -259,12 +235,6 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     _updatesFuture = widget.active ? _updateClient?.list() : null;
     if (widget.focusUpdateCenterRequest > 0) {
       _focusSettingsSection(_updateCenterKey);
-    }
-    if (widget.focusComposeCenterRequest > 0) {
-      _focusSettingsSection(_composeCenterKey);
-    }
-    if (widget.focusExportCenterRequest > 0) {
-      _focusSettingsSection(_exportCenterKey);
     }
   }
 
@@ -337,7 +307,6 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         ),
         McpConnectionCenterPanel(
           transport: widget.client.brokerTransport,
-          focusRequest: widget.focusMcpCenterRequest,
         ),
         _profilePanel(),
         _composePanel(),
@@ -376,9 +345,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('GUI Shell構成',
-                key: _composeCenterKey,
-                style: Theme.of(context).textTheme.titleMedium),
+            Text('GUI Shell構成', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             const Text(
                 'Broker接続がないためManifestを生成できません。local snapshotは構成権限の根拠ではありません。'),
@@ -390,9 +357,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('GUI Shell構成',
-              key: _composeCenterKey,
-              style: Theme.of(context).textTheme.titleMedium),
+          Text('GUI Shell構成', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text(
             'Runtime、Agent、Tool、MCP、Theme、Capability、SettingsをManifestへまとめます。build、独立App identity、Credential、Permission、Approval、Audit chainは生成・継承しません。',
@@ -1076,7 +1041,6 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('GUI Shell独立App書出し',
-                key: _exportCenterKey,
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             const Text('Broker接続がないため操作できません。'),
@@ -1089,7 +1053,6 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('GUI Shell独立App書出し',
-              key: _exportCenterKey,
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text(

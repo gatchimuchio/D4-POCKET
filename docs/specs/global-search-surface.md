@@ -1,49 +1,33 @@
-# D4 Pocket 全体検索操作面の責任正本
+# D4 Pocket Search／Command Paletteの責任正本
 
 ## 目的
 
-C22は、D4 Pocketの既存操作面を横断して、現在取得できている表示用metadataを読み取り専用で検索する。全体検索は操作面であり、Authority、Permission、Approval、Credential、Runtime実行、外部接続を所有しない。
+SearchとCommand Paletteは、Rust Brokerから開くたびに取得した現在のHost／Workspaceと、現在有効なWorkspace読取許可だけを検索する。検索結果は画面遷移専用であり、Authority、Permission、Approval、Credential、Runtime実行、外部接続を所有しない。
 
-## 検索対象
+## 現在検索する内容
 
-検索対象は次の表示用projectionである。
+- Host：`HostRegistrationClient.refresh()`が`Host一覧`から受け取るmetadata-only projection。表示名、Host ID、Platform、接続状態、Trust状態だけを使う。identity hash、証明書、Runtime／Agent summary、登録Audit IDは検索indexへ入れない。
+- Workspace：`WorkspaceClient.list()`が`作業領域一覧`から受け取るWorkspace ID、Runtime ID、表示範囲、承認状態。
+- 許可済み操作：Workspace一覧で`approved`かつ取得時点で期限内、表示範囲が`none`以外のWorkspace読取だけを「Workspace読取」として表示する。承認ID、登録hash、root pathは検索indexへ入れない。Task用の一回Permission／ApprovalやCapabilityは一覧化・許可判定に使用しない。
 
-- 実行系（Runtime）
-- エージェント（Agent）
-- 対話セッション（Session）
-- 権限（Permission）
-- 承認（Approval）
-- 監査（Audit）
-- 復旧（Recovery）
-- 問題（Problem）
-- 証拠（Evidence）
-- MCP接続
-- A2A接続
-- 接続先（Host）
-- アダプター（Adapter）
-- プロファイル（Profile）
-- 評価（Evaluation）
-- 通知（Notification）
-
-Runtime、Agent、Session、Permission、Approval、Audit、Recovery、Problem、Evidence、Host、Adapter、Profileは現在の`ShellSnapshot`から取得できたbounded metadataを対象とする。MCP、A2A、Evaluation、Notificationは対象操作面を見つけるための固定surface entryも持つ。固定entryの存在は外部接続、実行、取得成功を意味しない。
+BrokerのHostまたはWorkspace取得が失敗した場合は、Search／Paletteを表示せず、古いSnapshotやlocal fixtureへfallbackしない。Broker取得後に許可が失効しても、結果選択は画面遷移だけで作用を起こさない。結果recordやAuthorityを移動先へ渡さず、移動後に操作者が開始する作用は移動先の既存Broker要求で再評価する。
 
 ## 操作とbounded境界
 
-- `Ctrl+Shift+F`または画面上の`全体検索`から開く。
-- 検索語は128文字までとする。
-- indexは512件まで、結果は30件までとする。
-- 実装上の検索語・結果上限は`GlobalSearchIndex.maxQueryLength`と`GlobalSearchIndex.maxResults`で固定する。
-- 選択時は対象画面へ移動するだけで、検索結果から操作要求を発行しない。
-- 現在のsnapshotがBroker由来と確認できるときだけ証拠範囲を`INTERNAL_STATE`と表示する。それ以外は`不明`と表示し、成功を推測しない。
-- JSON内の`snapshot_source`は自己申告値として扱い、証拠源の判定に使わない。`ShellSnapshot.fromJson`で読み込んだ値は`unverified`とし、製品Broker取得経路が必要な応答を受理した後にだけ`broker`を設定する。この出所表示もAuthorityではない。
+- Searchは`Ctrl+Shift+F`または画面上の`全体検索`、Command Paletteは`Ctrl+K`／`Ctrl+P`または画面上の`コマンドパレット`から開く。
+- それぞれを開くたびに、認証済Brokerの`Host一覧`と`作業領域一覧`を読み取る。
+- 検索語は128文字まで、indexは最大96件（Host 64、Workspace 16、Workspace読取許可16）、結果は30件まで。
+- 結果選択はHost操作面またはAgent Centerへの画面遷移だけを行う。検索語、結果、Palette項目からClipboard、Broker操作、権限要求を実行しない。
+- 応答は各Clientが既存のoperation、status、`INTERNAL_STATE`、Audit ID、bounded schemaで検証する。出所未検証の`ShellSnapshot`、固定surface entry、設定・Problem・Recovery・MCP・A2A・Agent・Capability一覧を検索へ混在させない。
 
 ## 内容露出と権限境界
 
-検索indexへ登録するのは識別子、状態、分類、画面遷移先、boundedな表示用summaryだけである。対話本文、Approvalのpayload、Auditのraw payload、Credential実値、秘密値、外部fileの内容、未許可のfull content、任意のpathは登録しない。
+登録識別子と状態だけをbounded projectionする。Workspace path、registration hash、approval ID、identity hash、証明書、Credential、Task本文、Approval payload、Audit raw payload、自由記述error、外部file内容を登録しない。
 
-Flutterの全体検索はBroker IPC、filesystem、process、network、credential、Clipboardへ直接到達しない。検索結果、snapshot、MCP metadata、A2A Agent Card、Profile、History、TelemetryはAuthority、Permission、Approvalを生成または再利用しない。
+Flutterは表示と画面遷移だけを担い、Broker以外のfilesystem、process、network、credential、Clipboardへ到達しない。Host／Workspace metadata、検索結果、期限内Workspace読取の表示はPermission／Approvalを生成・再利用しない。検索結果はWorkspace readの実行ではない。
 
-## 未成立範囲
+## 既知の未成立範囲
 
-- `release_blocker`: 実Runtime・Agent・MCP・A2A・Hostの全surfaceから取得したinstalled productでの横断検索実機evidence、clean installed artifactとの結合、owner GO。
-- `known_limitation`: 現行C22は現在のShellSnapshotと固定surface entryを対象にする読み取り専用indexであり、外部surfaceのlive再取得、全文検索、本文検索、検索結果からの操作実行を提供しない。
+- Search／Paletteの全Host・Workspace・Task Grant経路を対象にしたinstalled product横断検索証拠は未成立。
+- 現Brokerに汎用のPermission／Grant一覧operationはないため、一覧表示できるGranted Actionは既存Workspace読取許可に限定される。Task実行の一回Permission／ApprovalはSearch／Paletteから検索・実行しない。
+- Command Paletteの直接作用、本文検索、検索結果からの操作実行は提供しない。

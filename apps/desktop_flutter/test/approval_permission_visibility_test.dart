@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gui_shell_desktop/models/generated_contracts.dart';
 import 'package:gui_shell_desktop/screens/approval_center.dart';
 import 'package:gui_shell_desktop/screens/dashboard.dart';
 import 'package:gui_shell_desktop/screens/permission_center.dart';
 import 'package:gui_shell_desktop/screens/shared.dart';
-import 'package:gui_shell_desktop/services/global_search_index.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 
 void main() {
@@ -108,62 +106,4 @@ void main() {
     expect(find.text('保留中の承認なし'), findsNothing);
     expect(find.textContaining('local-approval-redacted'), findsNothing);
   });
-
-  test('横断検索は未取得のPermission／Approval fixtureを検索対象にしない', () {
-    final snapshot = _snapshot(inventoryKnown: false);
-
-    expect(
-      GlobalSearchIndex.search(snapshot, 'fixture-permission-marker'),
-      isEmpty,
-    );
-    expect(
-      GlobalSearchIndex.search(snapshot, 'fixture-approval-marker'),
-      isEmpty,
-    );
-  });
-
-  test('横断検索はBrokerが取得済みと示したPermission／Approvalを検索する', () {
-    final snapshot = _snapshot(inventoryKnown: true);
-
-    final permission =
-        GlobalSearchIndex.search(snapshot, 'fixture-permission-marker');
-    final approval =
-        GlobalSearchIndex.search(snapshot, 'fixture-approval-marker');
-
-    expect(permission, hasLength(1));
-    expect(permission.single.category, '権限');
-    expect(approval, hasLength(1));
-    expect(approval.single.category, '承認');
-  });
-}
-
-ShellSnapshot _snapshot({
-  required bool inventoryKnown,
-  bool countKnown = true,
-}) {
-  return ShellSnapshot.fromJson({
-    'snapshot_source': 'broker',
-    'permission_inventory_known': inventoryKnown,
-    'operation_status': {
-      'pending_approvals_count': 1,
-      'pending_approvals_count_known': countKnown,
-    },
-    'permissions': [
-      {
-        'permission_id': 'fixture-permission-marker',
-        'capability_id': 'filesystem.read',
-        'decision': 'allow',
-        'source': 'broker',
-      },
-    ],
-    'pending_approvals': [
-      {
-        'approval_id': 'fixture-approval-marker',
-        'operation': 'workspace.read',
-        'status': 'pending',
-        'content_visibility': 'redacted',
-      },
-    ],
-    'pending_approvals_inventory_known': inventoryKnown,
-  }).copyWith(snapshotSource: 'broker');
 }
