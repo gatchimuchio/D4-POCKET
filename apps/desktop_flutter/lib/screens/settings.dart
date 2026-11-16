@@ -17,6 +17,7 @@ import '../services/profile_client.dart';
 import '../services/shell_core_client.dart';
 import '../services/update_client.dart';
 import 'mcp_connection_center.dart';
+import 'provider_credential_metadata_panel.dart';
 import 'shared.dart';
 
 bool _jsonContractEquals(Object? left, Object? right) {
@@ -355,6 +356,10 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         SectionList(
           title: 'Permission / Approval 状態',
           rows: _permissionApprovalRows(shellSnapshot),
+        ),
+        ProviderCredentialMetadataPanel(
+          transport: widget.client.brokerTransport,
+          active: widget.active,
         ),
         McpConnectionCenterPanel(
           transport: widget.client.brokerTransport,
