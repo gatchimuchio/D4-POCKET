@@ -160,6 +160,14 @@ class _SetupDoctorState extends State<SetupDoctor> {
         ),
         for (final check in checks) _SetupDoctorCheckCard(check: check),
         SectionList(
+          title: 'AI実行の要因分類',
+          rows: _executionReadinessRows(
+            snapshot,
+            reportStatus: status,
+            checks: checks,
+          ),
+        ),
+        SectionList(
           title: 'インストール先の証拠',
           rows: installedEvidence.isEmpty
               ? const ['導入先を検証した証拠はありません。']
@@ -189,6 +197,90 @@ class _SetupDoctorState extends State<SetupDoctor> {
       ],
     );
   }
+}
+
+List<String> _executionReadinessRows(
+  ShellSnapshot snapshot, {
+  required String reportStatus,
+  required List<SetupDoctorCheckRecord> checks,
+}) {
+  final agents = snapshot.agentAdapters;
+  final source =
+      '${_snapshotSourceLabel(snapshot.snapshotSource)} / ${_snapshotFreshnessLabel(snapshot.snapshotFreshness)}';
+  final runtimeUnavailable = agents
+      .where((agent) =>
+          agent.status == 'unavailable' ||
+          agent.status == 'unsupported' ||
+          agent.processSpawnStatus == 'unsupported')
+      .length;
+  final runtimeRow = agents.isEmpty
+      ? 'Runtime/Agent: このSnapshotにBroker登録Agentなし。Runtime製品の導入有無は不明です。'
+      : runtimeUnavailable > 0
+          ? 'Runtime/Agent: $runtimeUnavailable件の登録metadataがunavailable／unsupportedです。実行fileの導入状態は別途未確認です。'
+          : 'Runtime/Agent: ${agents.length}件の登録metadataがあります。実行fileの導入と現在の起動可否は未確認です。';
+
+  final unsupportedAuthentication = agents
+      .where((agent) => agent.authenticationStatus == 'unsupported')
+      .length;
+  final unknownAuthentication =
+      agents.where((agent) => agent.authenticationStatus == 'unknown').length;
+  final supportedAuthentication =
+      agents.where((agent) => agent.authenticationStatus == 'supported').length;
+  final authenticationDetails = <String>[
+    if (unsupportedAuthentication > 0)
+      '認証方式unsupported=$unsupportedAuthentication件',
+    if (unknownAuthentication > 0) '認証状態unknown=$unknownAuthentication件',
+    if (supportedAuthentication > 0)
+      '認証方式supported宣言=$supportedAuthentication件（資格値の有効性は未検証）',
+  ];
+  final authenticationRow = agents.isEmpty
+      ? '認証: Agent metadataがないためunknownです。資格情報の不足・失効も判定できません。'
+      : '認証: ${authenticationDetails.join(' / ')}。秘密値は表示しません。';
+
+  final deniedPermissions = snapshot.permissions.where((permission) {
+    final decision = permission.decision.toLowerCase();
+    return decision == 'deny' ||
+        decision == 'denied' ||
+        decision == 'rejected' ||
+        decision == '拒否';
+  }).length;
+  final permissionRow = !snapshot.permissionInventoryKnown
+      ? 'Permission: 現在の一覧が未観測のためunknownです。Task別の拒否状態もこのSnapshotからは分かりません。'
+      : deniedPermissions > 0
+          ? 'Permission: 現在の一覧に拒否記録が$deniedPermissions件あります。別Taskの許可へ転用しません。'
+          : 'Permission: 現在の既知一覧に拒否記録はありません。TaskごとのApproval状態は別途確認が必要です。';
+
+  final unsupportedTools =
+      agents.where((agent) => agent.toolSupportStatus == 'unsupported').length;
+  final unknownTools =
+      agents.where((agent) => agent.toolSupportStatus == 'unknown').length;
+  final supportedTools =
+      agents.where((agent) => agent.toolSupportStatus == 'supported').length;
+  final toolDetails = <String>[
+    if (unsupportedTools > 0) 'unsupported宣言=$unsupportedTools件',
+    if (unknownTools > 0) 'unknown=$unknownTools件',
+    if (supportedTools > 0) 'supported宣言=$supportedTools件',
+  ];
+  final toolRow = agents.isEmpty
+      ? 'Tool: Agent metadataがないため互換性はunknownです。'
+      : 'Tool: ${toolDetails.join(' / ')}。現在のTool catalog比較は未実施です。';
+
+  final failedChecks = checks.where((check) => check.status == 'fail').length;
+  final productRow = reportStatus == 'fail' || failedChecks > 0
+      ? '製品: Setup Doctorが故障候補を$failedChecks件報告しています。復旧案内を確認してください。'
+      : reportStatus == 'pass'
+          ? '製品: このSetup Doctorの固定診断項目はpassです。製品全体のQA判定ではありません。'
+          : '製品: Setup Doctorにwarning／unknownがあります。passや故障なしとは判定しません。';
+
+  return <String>[
+    '参照元: $source。snapshotの範囲内で分類し、未観測値はunknownのまま表示します。',
+    runtimeRow,
+    authenticationRow,
+    permissionRow,
+    toolRow,
+    productRow,
+    'この表示はPermission／Approvalを発行せず、Agent metadataからAuthorityを生成しません。',
+  ];
 }
 
 class _ReportSummary extends StatelessWidget {

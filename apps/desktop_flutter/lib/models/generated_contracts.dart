@@ -365,6 +365,7 @@ class AgentAdapterRecord {
     this.processSpawnStatus = 'unknown',
     this.authenticationMethod = 'unknown',
     this.authenticationStatus = 'unknown',
+    this.toolSupportStatus = 'unknown',
     this.providerHealthStatus = 'unknown',
     this.automaticFallback,
   });
@@ -382,6 +383,7 @@ class AgentAdapterRecord {
   final String processSpawnStatus;
   final String authenticationMethod;
   final String authenticationStatus;
+  final String toolSupportStatus;
   final String providerHealthStatus;
   final bool? automaticFallback;
 
@@ -394,6 +396,8 @@ class AgentAdapterRecord {
         Map<String, Object?>.from(host['process_spawn'] as Map? ?? {});
     final authentication =
         Map<String, Object?>.from(json['authentication'] as Map? ?? {});
+    final toolSupport =
+        Map<String, Object?>.from(json['tool_support'] as Map? ?? {});
     final providerHealth =
         Map<String, Object?>.from(json['provider_health'] as Map? ?? {});
     final automaticFallback = json['automatic_fallback'];
@@ -411,7 +415,8 @@ class AgentAdapterRecord {
       workspaceBoundary: workspace['boundary_policy'] as String? ?? 'unknown',
       processSpawnStatus: processSpawn['status'] as String? ?? 'unknown',
       authenticationMethod: authentication['method'] as String? ?? 'unknown',
-      authenticationStatus: authentication['status'] as String? ?? 'unknown',
+      authenticationStatus: _supportStatus(authentication['status']),
+      toolSupportStatus: _supportStatus(toolSupport['status']),
       providerHealthStatus: providerHealth['status'] as String? ?? 'unknown',
       automaticFallback: automaticFallback is bool ? automaticFallback : null,
     );
@@ -1124,6 +1129,9 @@ class ShellSnapshot {
   ShellSnapshot copyWith({
     PhaseStatusRecord? phaseStatus,
     OperationStatusRecord? operationStatus,
+    List<PermissionRecord>? permissions,
+    List<SetupDoctorCheckRecord>? setupDoctorChecks,
+    String? setupDoctorStatus,
     List<ProblemRecord>? problems,
     List<EvidenceRecord>? evidence,
     List<HostRegistryRecord>? hosts,
@@ -1141,13 +1149,13 @@ class ShellSnapshot {
       operationStatus: operationStatus ?? this.operationStatus,
       runtimes: runtimes,
       agentSessions: agentSessions,
-      permissions: permissions,
+      permissions: permissions ?? this.permissions,
       pendingApprovals: pendingApprovals,
       auditEvents: auditEvents,
       recoveryActions: recoveryActions,
       invariantFlags: invariantFlags,
-      setupDoctorChecks: setupDoctorChecks,
-      setupDoctorStatus: setupDoctorStatus,
+      setupDoctorChecks: setupDoctorChecks ?? this.setupDoctorChecks,
+      setupDoctorStatus: setupDoctorStatus ?? this.setupDoctorStatus,
       installerGrantsAuthority: installerGrantsAuthority,
       installerSilentlyApprovesPermissions:
           installerSilentlyApprovesPermissions,
@@ -1187,6 +1195,11 @@ bool _boolFromJson(Object? value) {
   }
   return false;
 }
+
+String _supportStatus(Object? value) =>
+    const {'supported', 'unsupported', 'unknown'}.contains(value)
+        ? value! as String
+        : 'unknown';
 
 List<String> _stringList(Object? value) {
   return (value as List? ?? []).map((item) => item.toString()).toList();

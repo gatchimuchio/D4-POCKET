@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gui_shell_desktop/models/generated_contracts.dart';
 import 'package:gui_shell_desktop/screens/audit_viewer.dart';
 import 'package:gui_shell_desktop/screens/problems_panel.dart';
 import 'package:gui_shell_desktop/screens/recovery_center.dart';
@@ -10,6 +11,99 @@ import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 
 void main() {
+  test('不正な認証・Tool metadata statusはunknownへ閉じる', () {
+    final record = AgentAdapterRecord.fromJson({
+      'authentication': {'status': 'credential-present'},
+      'tool_support': {'status': 'probably-supported'},
+    });
+
+    expect(record.authenticationStatus, 'unknown');
+    expect(record.toolSupportStatus, 'unknown');
+  });
+
+  testWidgets('Setup Doctorは実行要因を区分し、未確認状態を成功扱いしない', (tester) async {
+    final snapshot = ShellCoreClient.mock().getSnapshot().copyWith(
+          snapshotSource: 'broker',
+          snapshotFreshness: 'verified',
+          agentAdapters: const [
+            AgentAdapterRecord(
+              adapterId: 'codex-cli-adapter',
+              agentId: 'codex-cli',
+              provider: 'OpenAI',
+              version: 'unknown',
+              model: 'unknown',
+              status: 'ready',
+              capabilities: [],
+              evidenceSource: 'INTERNAL_STATE',
+              evidenceReason: 'SENSITIVE_DIAGNOSTIC_MARKER',
+              processSpawnStatus: 'supported',
+              authenticationMethod: 'api_key_reference',
+              authenticationStatus: 'unsupported',
+              toolSupportStatus: 'unsupported',
+            ),
+            AgentAdapterRecord(
+              adapterId: 'second-agent-adapter',
+              agentId: 'second-agent',
+              provider: 'unknown',
+              version: 'unknown',
+              model: 'unknown',
+              status: 'degraded',
+              capabilities: [],
+              evidenceSource: 'INTERNAL_STATE',
+              evidenceReason: 'not shown',
+              processSpawnStatus: 'unknown',
+              authenticationMethod: 'unknown',
+              authenticationStatus: 'unknown',
+              toolSupportStatus: 'unknown',
+            ),
+          ],
+          permissions: const [
+            PermissionRecord(
+              permissionId: 'permission.workspace.write',
+              capabilityId: 'workspace.write',
+              decision: 'denied',
+              source: 'owner',
+            ),
+          ],
+          permissionInventoryKnown: true,
+          setupDoctorStatus: 'fail',
+          setupDoctorChecks: const [
+            SetupDoctorCheckRecord(
+              checkId: 'setup_doctor.runtime_connection',
+              scope: 'runtime',
+              status: 'fail',
+              severity: 'critical',
+              message: '診断用の失敗状態',
+              recoveryInstruction: 'Brokerを確認してください。',
+              grantsAuthority: false,
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+          body: SetupDoctor(client: ShellCoreClient.mock(snapshot: snapshot))),
+    ));
+
+    expect(
+      find.textContaining('Runtime/Agent: 2件の登録metadataがあります'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('実行fileの導入と現在の起動可否は未確認'), findsOneWidget);
+    expect(
+      find.textContaining('認証方式unsupported=1件 / 認証状態unknown=1件'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('拒否記録が1件'), findsOneWidget);
+    expect(
+      find.textContaining('Tool: unsupported宣言=1件 / unknown=1件'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('故障候補を1件'), findsOneWidget);
+    expect(find.textContaining('SENSITIVE_DIAGNOSTIC_MARKER'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Setup DoctorはBrokerから最新報告と証拠種別・監査IDを再取得する', (tester) async {
     final transport = _SetupDoctorTransport();
     final client = await ShellCoreClient.product(transport: transport);
