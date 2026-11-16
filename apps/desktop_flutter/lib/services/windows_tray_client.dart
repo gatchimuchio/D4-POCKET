@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-import '../models/generated_contracts.dart';
 import '../module_features.dart';
 import 'broker_client.dart';
 import 'notification_client.dart';
@@ -34,15 +33,32 @@ class WindowsTrayProjection {
         'stop_request_supported': stopRequestSupported,
       };
 
-  static Future<WindowsTrayProjection> fromSnapshot(
-    ShellSnapshot snapshot,
+  static Future<WindowsTrayProjection> fromBroker(
     BrokerTransport? transport, {
     bool windowVisible = true,
   }) async {
     if (!windowVisible) {
       return unavailable(stopRequestSupported: transport != null);
     }
-    final brokerSnapshot = snapshot.snapshotSource == 'broker';
+    var runtimeStatus = '不明';
+    var evidenceSource = '不明';
+    if (transport != null) {
+      try {
+        final health = await _currentBrokerHealth(transport);
+        final persistenceReady = health['persistence_ready'] as bool;
+        runtimeStatus = health['status'] == 'ready' &&
+                persistenceReady &&
+                health['authority_cutover_status'] == 'active'
+            ? 'ready'
+            : 'suspend';
+        // windows_tray_projection classifies its bounded Broker projection
+        // as INTERNAL_STATE; the health envelope's source was validated above.
+        evidenceSource = 'INTERNAL_STATE';
+      } on Object {
+        runtimeStatus = '不明';
+        evidenceSource = '不明';
+      }
+    }
     Object criticalCount = '不明';
     if (transport != null && kGuiShellModuleNotifications) {
       try {
@@ -53,20 +69,17 @@ class WindowsTrayProjection {
         final value = body['重大件数'];
         if (value is int && value >= 0 && value <= 256) {
           criticalCount = value;
+          evidenceSource = 'INTERNAL_STATE';
         }
       } on Object {
         criticalCount = '不明';
       }
     }
     return WindowsTrayProjection(
-      runtimeStatus:
-          brokerSnapshot ? snapshot.operationStatus.runtimeStatus : '不明',
-      pendingApprovalCount:
-          brokerSnapshot && snapshot.operationStatus.pendingApprovalsCountKnown
-              ? snapshot.operationStatus.pendingApprovalsCount
-              : '不明',
+      runtimeStatus: runtimeStatus,
+      pendingApprovalCount: '不明',
       criticalNotificationCount: criticalCount,
-      evidenceSource: brokerSnapshot ? 'INTERNAL_STATE' : '不明',
+      evidenceSource: evidenceSource,
       stopRequestSupported: transport != null,
     );
   }
@@ -82,6 +95,95 @@ class WindowsTrayProjection {
         stopRequestSupported: stopRequestSupported,
       );
 }
+
+Future<Map<String, Object?>> _currentBrokerHealth(
+  BrokerTransport transport,
+) async {
+  final response = await transport.request('health');
+  const responseFields = <String>{
+    'request_id',
+    'operation',
+    'status',
+    'evidence_source',
+    'audit_event_id',
+    'error',
+    'health',
+    'body',
+    'shutdown_requested',
+  };
+  final requestId = response['request_id'];
+  final auditEventId = response['audit_event_id'];
+  final responseStatus = response['status'];
+  final responseEvidence = response['evidence_source'];
+  final accepted = responseStatus == 'accepted';
+  final suspended = responseStatus == 'suspended';
+  if (response.length != responseFields.length ||
+      response.keys.any((key) => !responseFields.contains(key)) ||
+      requestId is! String ||
+      !_isSafeTrayIdentifier(requestId) ||
+      response['operation'] != 'health' ||
+      (!accepted && !suspended) ||
+      auditEventId is! String ||
+      !_isSafeTrayIdentifier(auditEventId) ||
+      response['body'] != null ||
+      response['shutdown_requested'] != false ||
+      (accepted &&
+          (responseEvidence != 'LIVE_RUNTIME' || response['error'] != null)) ||
+      (suspended &&
+          (responseEvidence != 'INTERNAL_STATE' ||
+              response['error'] is! Map))) {
+    throw const BrokerClientException('Broker Health応答を確認できません');
+  }
+
+  final rawHealth = response['health'];
+  if (rawHealth is! Map) {
+    throw const BrokerClientException('Broker Health内容を確認できません');
+  }
+  final health = Map<String, Object?>.from(rawHealth);
+  const healthFields = <String>{
+    'broker_id',
+    'status',
+    'boundary_role',
+    'authority_cutover_status',
+    'command_dispatch_enabled',
+    'audit_append_enabled',
+    'audit_persistence',
+    'replay_persistence',
+    'session_persistence',
+    'persistence_required',
+    'persistence_ready',
+    'evidence_source',
+  };
+  final brokerId = health['broker_id'];
+  final healthEvidence = health['evidence_source'];
+  if (health.length != healthFields.length ||
+      health.keys.any((key) => !healthFields.contains(key)) ||
+      brokerId is! String ||
+      brokerId.trim().isEmpty ||
+      brokerId.length > 128 ||
+      !const {'ready', 'degraded', 'suspend'}.contains(health['status']) ||
+      health['boundary_role'] != 'rust_security_broker_candidate' ||
+      health['authority_cutover_status'] != 'not_active' ||
+      health['command_dispatch_enabled'] != false ||
+      health['audit_append_enabled'] != true ||
+      !const {'in_memory_skeleton', 'durable_file_store'}
+          .contains(health['audit_persistence']) ||
+      !const {'in_memory_session_only', 'durable_file_store'}
+          .contains(health['replay_persistence']) ||
+      !const {'in_memory_session_only', 'durable_file_store'}
+          .contains(health['session_persistence']) ||
+      health['persistence_required'] is! bool ||
+      health['persistence_ready'] is! bool ||
+      healthEvidence != responseEvidence) {
+    throw const BrokerClientException('Broker Health内容の契約が不正です');
+  }
+  return health;
+}
+
+bool _isSafeTrayIdentifier(String value) =>
+    value.trim().isNotEmpty &&
+    value.length <= 256 &&
+    !value.codeUnits.any((unit) => unit < 0x20 || unit == 0x7f);
 
 class WindowsTrayClient {
   WindowsTrayClient({MethodChannel? channel})

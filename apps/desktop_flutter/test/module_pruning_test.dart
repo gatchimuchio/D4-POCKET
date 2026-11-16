@@ -8,14 +8,11 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
 void main() {
   if (!kGuiShellModuleNotifications) {
-    test('通知Module除外時はtrayがBrokerへ通知照会を送らない', () async {
+    test('通知Module除外時もHealthだけを取得し通知一覧を照会しない', () async {
       final transport = _ObservationFixtureTransport();
-      final projection = await WindowsTrayProjection.fromSnapshot(
-        ShellCoreClient.mock().getSnapshot(),
-        transport,
-      );
+      final projection = await WindowsTrayProjection.fromBroker(transport);
 
-      expect(transport.operations, isEmpty);
+      expect(transport.operations, ['health']);
       expect(projection.criticalNotificationCount, '不明');
     });
   }
@@ -343,6 +340,32 @@ class _ObservationFixtureTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     payloads.add(Map<String, Object?>.from(payload ?? const {}));
+    if (operation == 'health') {
+      return {
+        'request_id': 'tray-health',
+        'operation': 'health',
+        'status': 'accepted',
+        'evidence_source': 'LIVE_RUNTIME',
+        'audit_event_id': 'broker-audit-tray-health',
+        'error': null,
+        'health': {
+          'broker_id': 'gui-shell-rust-broker',
+          'status': 'ready',
+          'boundary_role': 'rust_security_broker_candidate',
+          'authority_cutover_status': 'not_active',
+          'command_dispatch_enabled': false,
+          'audit_append_enabled': true,
+          'audit_persistence': 'durable_file_store',
+          'replay_persistence': 'durable_file_store',
+          'session_persistence': 'durable_file_store',
+          'persistence_required': true,
+          'persistence_ready': true,
+          'evidence_source': 'LIVE_RUNTIME',
+        },
+        'body': null,
+        'shutdown_requested': false,
+      };
+    }
     if (operation == '観測一覧' && failFirstObservation) {
       failFirstObservation = false;
       throw StateError('secret-marker observation path');

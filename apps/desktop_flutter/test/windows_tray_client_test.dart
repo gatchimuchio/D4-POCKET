@@ -9,9 +9,15 @@ import 'package:gui_shell_desktop/services/windows_tray_client.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
 class _TrayTransport implements BrokerTransport {
-  _TrayTransport({this.criticalCount = 3});
+  _TrayTransport({
+    this.criticalCount = 3,
+    this.healthResponse,
+    this.failHealth = false,
+  });
 
   final int criticalCount;
+  final Map<String, Object?>? healthResponse;
+  final bool failHealth;
   final operations = <String>[];
   bool _holdNextNotification = false;
   Completer<void>? _notificationStarted;
@@ -48,6 +54,10 @@ class _TrayTransport implements BrokerTransport {
     Map<String, Object?>? payload,
   }) async {
     operations.add(operation);
+    if (operation == 'health') {
+      if (failHealth) throw StateError('SECRET_HEALTH_ERROR');
+      return healthResponse ?? _trayHealthResponse();
+    }
     if (operation == '通知一覧' && _holdNextNotification) {
       _holdNextNotification = false;
       _notificationStarted!.complete();
@@ -116,59 +126,143 @@ class _TrayTransport implements BrokerTransport {
       };
 }
 
+Map<String, Object?> _trayHealthResponse({
+  String responseStatus = 'accepted',
+  String responseEvidence = 'LIVE_RUNTIME',
+  String healthStatus = 'ready',
+  String? healthEvidence,
+  bool persistenceReady = true,
+}) {
+  final evidence = healthEvidence ?? responseEvidence;
+  return {
+    'request_id': 'tray-health',
+    'operation': 'health',
+    'status': responseStatus,
+    'evidence_source': responseEvidence,
+    'audit_event_id': 'broker-audit-tray-health',
+    'error': responseStatus == 'suspended'
+        ? {
+            'code': 'broker_persistence_unavailable',
+            'message': 'SECRET_HEALTH_ERROR',
+            'recoverable': true,
+            'audit_event_required': true,
+            'fail_closed': true,
+          }
+        : null,
+    'health': {
+      'broker_id': 'gui-shell-rust-broker',
+      'status': healthStatus,
+      'boundary_role': 'rust_security_broker_candidate',
+      'authority_cutover_status': 'not_active',
+      'command_dispatch_enabled': false,
+      'audit_append_enabled': true,
+      'audit_persistence': 'durable_file_store',
+      'replay_persistence': 'durable_file_store',
+      'session_persistence': 'durable_file_store',
+      'persistence_required': true,
+      'persistence_ready': persistenceReady,
+      'evidence_source': evidence,
+    },
+    'body': null,
+    'shutdown_requested': false,
+  };
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('常駐トレイ射影は未Broker snapshotを不明にし通知件数だけ取得する', () async {
+  test('常駐トレイは毎回Broker Healthを取得し通知件数だけを併記する', () async {
     final transport = _TrayTransport();
-    final projection = await WindowsTrayProjection.fromSnapshot(
-      ShellCoreClient.mock().getSnapshot(),
-      transport,
-    );
+    final projection = await WindowsTrayProjection.fromBroker(transport);
 
-    expect(projection.runtimeStatus, '不明');
+    expect(projection.runtimeStatus, 'suspend');
     expect(projection.pendingApprovalCount, '不明');
     expect(
       projection.criticalNotificationCount,
       kGuiShellModuleNotifications ? 3 : '不明',
     );
-    expect(projection.evidenceSource, '不明');
+    expect(projection.evidenceSource, 'INTERNAL_STATE');
     expect(projection.stopRequestSupported, isTrue);
     if (kGuiShellModuleNotifications) {
-      expect(transport.operations, ['通知一覧']);
+      expect(transport.operations, ['health', '通知一覧']);
       expect(projection.toJson()['critical_notification_count'], 3);
     } else {
-      expect(transport.operations, isEmpty);
+      expect(transport.operations, ['health']);
       expect(projection.toJson()['critical_notification_count'], '不明');
     }
   });
 
-  test('常駐トレイ射影はBroker transportなしで件数を0へ変換しない', () async {
-    final projection = await WindowsTrayProjection.fromSnapshot(
-      ShellCoreClient.mock().getSnapshot(),
-      null,
+  test('Broker Health取得失敗は状態unknownにし有効な通知射影を保つ', () async {
+    final transport = _TrayTransport(failHealth: true);
+    final projection = await WindowsTrayProjection.fromBroker(transport);
+
+    expect(projection.runtimeStatus, '不明');
+    expect(
+      projection.evidenceSource,
+      kGuiShellModuleNotifications ? 'INTERNAL_STATE' : '不明',
     );
+    expect(projection.pendingApprovalCount, '不明');
+    expect(
+      projection.criticalNotificationCount,
+      kGuiShellModuleNotifications ? 3 : '不明',
+    );
+    expect(
+      projection.toJson().toString(),
+      isNot(contains('SECRET_HEALTH_ERROR')),
+    );
+  });
+
+  test('Broker Healthに不明fieldがあれば現在状態を採用しない', () async {
+    final response = _trayHealthResponse()..['unexpected'] = 'ready';
+    final projection = await WindowsTrayProjection.fromBroker(
+      _TrayTransport(healthResponse: response),
+    );
+
+    expect(projection.runtimeStatus, '不明');
+    expect(
+      projection.evidenceSource,
+      kGuiShellModuleNotifications ? 'INTERNAL_STATE' : '不明',
+    );
+  });
+
+  test('suspended HealthはInternal Stateとして安全に投影する', () async {
+    final projection = await WindowsTrayProjection.fromBroker(
+      _TrayTransport(
+        healthResponse: _trayHealthResponse(
+          responseStatus: 'suspended',
+          responseEvidence: 'INTERNAL_STATE',
+          healthStatus: 'suspend',
+          healthEvidence: 'INTERNAL_STATE',
+          persistenceReady: false,
+        ),
+      ),
+    );
+
+    expect(projection.runtimeStatus, 'suspend');
+    expect(projection.evidenceSource, 'INTERNAL_STATE');
+    expect(
+      projection.toJson().toString(),
+      isNot(contains('SECRET_HEALTH_ERROR')),
+    );
+  });
+
+  test('常駐トレイ射影はBroker transportなしで件数を0へ変換しない', () async {
+    final projection = await WindowsTrayProjection.fromBroker(null);
 
     expect(projection.pendingApprovalCount, '不明');
     expect(projection.criticalNotificationCount, '不明');
     expect(projection.stopRequestSupported, isFalse);
   });
 
-  test('Broker snapshotでもApproval一覧未取得を0件と表示しない', () async {
-    final source = ShellCoreClient.local().getSnapshot();
-    final brokerSnapshot = source.copyWith(snapshotSource: 'broker');
-    final projection = await WindowsTrayProjection.fromSnapshot(
-      brokerSnapshot,
-      null,
-    );
+  test('現在Broker Healthが読めてもApproval一覧未取得は0件と表示しない', () async {
+    final projection = await WindowsTrayProjection.fromBroker(_TrayTransport());
 
     expect(projection.pendingApprovalCount, '不明');
   });
 
   test('隠れた常駐トレイはBrokerをpollせず全ての測定値を不明にする', () async {
     final transport = _TrayTransport();
-    final projection = await WindowsTrayProjection.fromSnapshot(
-      ShellCoreClient.mock().getSnapshot(),
+    final projection = await WindowsTrayProjection.fromBroker(
       transport,
       windowVisible: false,
     );

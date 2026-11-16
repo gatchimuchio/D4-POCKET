@@ -221,7 +221,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "48d06dc4107685a2df05f11095a6ba4bfb7ead1d059a072281a4aa21ad3115f6"
+      "sha256": "3227dc60ecdfc7c3c29ab5aa3a8fc65725633ce90f4ad831087df5fc534c6771"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -445,7 +445,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
-      "sha256": "2218ba4d62ea8fda9a0b074e698663a0e3e92200358e039d9553e85ce8eb9d49"
+      "sha256": "4f29e61f3aefbbf63bcc8bf1d8ae240aef25b892cb6c50ab9f61086e22dbbaf0"
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
@@ -749,7 +749,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/module_pruning_test.dart",
-      "sha256": "79065191e4a17f61b7e33f54cd2797fa62f0345fd764125949db06fa4c6f019a"
+      "sha256": "646b50f598d10a07007f5be7affdc48d7a82d1f3ce9b80c0063a50364b282dbb"
     },
     {
       "path": "apps/desktop_flutter/test/notification_client_test.dart",
@@ -845,7 +845,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
-      "sha256": "995aa54227a4db15533c0b644bdef58f0c8404809861b29062f40288a2e94a8c"
+      "sha256": "d331d484c79e687592f1970720486b83272bb2f1f75f9b3d92181e89623eba33"
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
@@ -1617,7 +1617,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "39720dddfef9c060f6fb85e988e3cbcb1eb00e9661082b266bed8d73fdbc3c38"
+      "sha256": "8f24a0f40e19e02d89c85377e73a8aab7ab2a79236655f2b0a9c34fca352f856"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",

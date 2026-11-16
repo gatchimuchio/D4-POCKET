@@ -339,8 +339,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       if (!_trayWindowVisible) _setWindowsTrayVisibility(true);
       final generation = _trayProjectionGeneration;
       final brokerTransport = widget.client.brokerTransport;
-      final projection = await WindowsTrayProjection.fromSnapshot(
-        widget.client.getSnapshot(),
+      final projection = await WindowsTrayProjection.fromBroker(
         brokerTransport,
         windowVisible: true,
       );
