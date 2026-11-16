@@ -80,6 +80,7 @@
     },
     "flutter_pub_get_arguments": { "type": "array", "items": { "type": "string" } },
     "flutter_build_arguments": { "type": "array", "items": { "type": "string" } },
+    "rust_build_arguments": { "type": "array", "minItems": 8, "items": { "type": "string", "minLength": 1 } },
     "aot_surface_analysis": {
       "type": "object",
       "required": [

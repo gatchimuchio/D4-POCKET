@@ -221,7 +221,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "0165cd2d68362186112777f91fd5b3a8ecd8c8edba78bb24339bd8290fe632ea"
+      "sha256": "b1c4bfe993a773a471bae2a7d151ad078e0fa6dbbf73719beefd2683ff445eea"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -309,7 +309,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_dialogue.dart",
-      "sha256": "85e0a864c3aa1102746cc455b7c0f7c85a2e326bad547239d5e43d1e5c107d32"
+      "sha256": "4bcf20c272554f341b449552c0733ed6df5ac86cd8222fbcb90549e0bb41717e"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
@@ -429,7 +429,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "91aede2343ff2e1c17638f38bf699d29d2aadf4837808d2116d82e8b30c61072"
+      "sha256": "d9d3bfa1a9a03ee5fdf3547f94488e0a083c7508b809edcbb5264c688414e540"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
@@ -437,7 +437,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
-      "sha256": "e15c2ce077778614395c2200e493b41bc07e610067657c539c82a6fff41dd8d0"
+      "sha256": "2218ba4d62ea8fda9a0b074e698663a0e3e92200358e039d9553e85ce8eb9d49"
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
@@ -741,7 +741,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/module_pruning_test.dart",
-      "sha256": "a671e61d070dd65eb99917535b641ddb5add91dbf7cc33038212172de621feea"
+      "sha256": "42bb879e41e9b4862a7937d67193d287edbc9208d3c9498bb690b5efb1f6ed50"
     },
     {
       "path": "apps/desktop_flutter/test/notification_client_test.dart",
@@ -817,7 +817,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
-      "sha256": "82b98b524b68410aa65797ba0ebca23d2d265480892b9105dec2e8677bbfef6d"
+      "sha256": "3c5e6ff57cdd30457ffb08f85ca0a4e5477787164c25be8e250846da29e66d28"
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
@@ -1589,7 +1589,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "3dc27c410caa6772ded592794ea8452521127fed6e5731c90c593327fa897dee"
+      "sha256": "576f536651ab98af4ab97681b8013e8bdcc965d933a261107df224180cb10551"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -2421,7 +2421,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_module_comparison_evidence.valid.json",
-      "sha256": "bedefe6edbeeaa99f0d681ad6e560ae2444236c6e369a4b3f1651492ab15ac26"
+      "sha256": "9e680c3444bf7df7dd6c5a28ddb2cd75f2a27a3c3fa3ed305caf5ea46d0c9477"
     },
     {
       "path": "examples/contracts/gui_shell_preview.valid.json",
@@ -3917,7 +3917,7 @@
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "a254e971efe99b0490c00512e7d9c32602e9cef40a3ba17f3b89b0bc382ea2c5"
+      "sha256": "b48df4706e41452e4274c3461bdf221991db4acdb6374a4e89cca203b4d07e0a"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -4109,7 +4109,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "3cc1f2b5992b2922534478e2e8a771c275adcfd13a0240e42f015f22d09e74e7"
+      "sha256": "719186bdd5e82b13bf5d02d47ac4b97de718b34fa31185b3261273301946c4ad"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -4121,7 +4121,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "d32cda31096a1257b7fb59181767abbeec6787b97042377025aa709b43d1b829"
+      "sha256": "b5ac90a26fb838640fdbb746aa422da96aafbb79c1de893359dfbd25c536df1a"
     },
     {
       "path": "native/rust_helper/src/broker/notification_center.rs",
@@ -5241,11 +5241,11 @@
     },
     {
       "path": "specs/gui_shell_linux_export_build.schema.json",
-      "sha256": "a530d507987f963836a6a16b6b2db12b3f635cd917a188976393198b85f9a171"
+      "sha256": "eb2f571c3bd899c21ab98a045607d266be842184c8b55c89668e771b396602fb"
     },
     {
       "path": "specs/gui_shell_macos_export_build.schema.json",
-      "sha256": "532a2b8feda847cc9c581770f1908c51c1a11609fede0e29f92b8df57df706f8"
+      "sha256": "9dbe1a2974505cb2a110e6bbc917c23cc0f6037c782263725c3b5b1f90b2f375"
     },
     {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
@@ -5261,7 +5261,7 @@
     },
     {
       "path": "specs/gui_shell_module_comparison_evidence.schema.json",
-      "sha256": "465810d3024738b557f95b49df1982625d04e5ea602390cb838ecca0dbf5bf16"
+      "sha256": "6b52e61945361f6ee2d4b89e234b66c1e8aecfc4135032a2c0edd12c36ec778d"
     },
     {
       "path": "specs/gui_shell_preview.schema.json",
@@ -5661,7 +5661,7 @@
     },
     {
       "path": "tooling/build_module_pruned_windows.py",
-      "sha256": "565a885ed741093ee8fde4f175f4c799ee07a71afc0e55d803809b30356c4661"
+      "sha256": "513acfc49ef868c141aa4d2cdca9dcaeb1a8f45b15ca11def8b3582a0da0bd25"
     },
     {
       "path": "tooling/build_windows_installer.py",
@@ -5689,7 +5689,7 @@
     },
     {
       "path": "tooling/compare_module_builds_windows.py",
-      "sha256": "8c1d870cc387e4b78ea2ca2ec792fb4c8d2a0c2e49f604fda72b2944da71a1c4"
+      "sha256": "5f8083b5e20dc26aac8bb0a0249e341cc1ab90f9d47462bd53bbf0485a9d44f8"
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
@@ -5737,15 +5737,15 @@
     },
     {
       "path": "tooling/export_linux_product.py",
-      "sha256": "381cb7271f88cbdd825e5177bb9c3dbe1ff3ed09f27cbf335eb6d460c608e94d"
+      "sha256": "e8dcd31a50aa665ded3aaacf684b31420e352ad87b6e54ae332fc1a693c94102"
     },
     {
       "path": "tooling/export_macos_product.py",
-      "sha256": "782a94cff982cfe1db7bb5f2ac184c69f5ad0a2762ef87b333365e9aa3165083"
+      "sha256": "ccb51d9e7a87f6712e97ddeffea27bb37a21b5a4c035af139bc4f822f8a03735"
     },
     {
       "path": "tooling/export_windows_product.py",
-      "sha256": "8a8970c19defb9019dad533606f14ea3b5f1513042309dcf5b0cec3caeba6c8a"
+      "sha256": "2d148129da8e9430fb497a867f921ddb8242281906fb46f3d56bd89dd6351ed4"
     },
     {
       "path": "tooling/failure_injection_validation.py",
@@ -5928,8 +5928,12 @@
       "sha256": "d78d76c9ef91991e5cf27f7932cd05492395b843f8aa2954928c74444f7adfba"
     },
     {
+      "path": "tooling/tests/test_compare_module_builds_windows.py",
+      "sha256": "adebe759ad22281ba2a7f9e45ffe3df18b0de5eccf9214c91d3548a12cebb7b7"
+    },
+    {
       "path": "tooling/tests/test_export_linux_product.py",
-      "sha256": "5fc789ea4bf803b4f715f2fa2f2fdd78e8cecb1cdde8e595a60b5a376e9c0833"
+      "sha256": "db24e43b5b2bf98742a99ea134d85bea09245867031cb1fa8a3a2d0e9479c3c4"
     },
     {
       "path": "tooling/tests/test_export_macos_product.py",

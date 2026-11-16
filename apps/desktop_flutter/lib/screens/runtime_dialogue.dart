@@ -1,4 +1,5 @@
 import 'package:gui_shell_ui/gui_shell_ui.dart' as shared;
+import '../module_features.dart';
 import '../services/regression_case_client.dart';
 import '../services/runtime_dialogue_client.dart';
 
@@ -9,9 +10,10 @@ class RuntimeDialogueScreen extends shared.RuntimeDialogueScreen {
     super.client,
     super.readOnly,
     super.active,
-  })
-      : super(
+  }) : super(
           connect: connectRuntimeDialogue,
-          connectOwnerRegistration: connectRegressionCaseOwnerClient,
+          connectOwnerRegistration: kGuiShellModuleEvaluationLab
+              ? connectRegressionCaseOwnerClient
+              : null,
         );
 }

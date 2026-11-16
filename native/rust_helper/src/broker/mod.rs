@@ -23,6 +23,7 @@ pub(crate) mod host_center;
 pub mod ipc_server;
 pub(crate) mod json_input;
 pub(crate) mod mcp_center;
+pub(crate) mod module_pruning;
 pub(crate) mod notification_center;
 pub(crate) mod observation_center;
 pub(crate) mod product_install;

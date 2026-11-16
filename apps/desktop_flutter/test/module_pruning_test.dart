@@ -2,9 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/main.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
+import 'package:gui_shell_desktop/services/windows_tray_client.dart'
+    show WindowsTrayProjection;
 import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
 void main() {
+  if (!kGuiShellModuleNotifications) {
+    test('通知Module除外時はtrayがBrokerへ通知照会を送らない', () async {
+      final transport = _ObservationFixtureTransport();
+      final projection = await WindowsTrayProjection.fromSnapshot(
+        ShellCoreClient.mock().getSnapshot(),
+        transport,
+      );
+
+      expect(transport.operations, isEmpty);
+      expect(projection.criticalNotificationCount, '不明');
+    });
+  }
+
   const allOptionalModulesEnabled = kGuiShellModuleSetupDoctor &&
       kGuiShellModuleHistory &&
       kGuiShellModuleEvaluationLab &&

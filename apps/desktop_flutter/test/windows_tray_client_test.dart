@@ -64,11 +64,19 @@ void main() {
 
     expect(projection.runtimeStatus, '不明');
     expect(projection.pendingApprovalCount, '不明');
-    expect(projection.criticalNotificationCount, 3);
+    expect(
+      projection.criticalNotificationCount,
+      kGuiShellModuleNotifications ? 3 : '不明',
+    );
     expect(projection.evidenceSource, '不明');
     expect(projection.stopRequestSupported, isTrue);
-    expect(transport.operations, ['通知一覧']);
-    expect(projection.toJson()['critical_notification_count'], 3);
+    if (kGuiShellModuleNotifications) {
+      expect(transport.operations, ['通知一覧']);
+      expect(projection.toJson()['critical_notification_count'], 3);
+    } else {
+      expect(transport.operations, isEmpty);
+      expect(projection.toJson()['critical_notification_count'], '不明');
+    }
   });
 
   test('常駐トレイ射影はBroker transportなしで件数を0へ変換しない', () async {

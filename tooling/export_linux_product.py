@@ -24,7 +24,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tooling.build_module_pruned_windows import _load_catalog, dart_defines
+from tooling.build_module_pruned_windows import (
+    _load_catalog,
+    cargo_feature_arguments,
+    dart_defines,
+)
 from tooling.export_windows_product import (
     CREDENTIAL_SCAN_STATUS,
     MAX_INPUT_BYTES,
@@ -430,6 +434,50 @@ def _write_source_archive(commit: str, archive_path: Path) -> str:
             env=_linux_build_environment({}),
         )
     return _sha256_file(archive_path)
+
+
+def _patch_linux_broker_module_features(
+    source_root: Path,
+    cargo_arguments: list[str],
+) -> None:
+    """Bind Linux's temporary export source to its explicit Rust ModulePlan."""
+    cmake_path = source_root / "apps/desktop_flutter/linux/runner/CMakeLists.txt"
+    metadata = cmake_path.lstat()
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise ValueError("Linux Runner CMake input must be a regular source file")
+    source = cmake_path.read_text(encoding="utf-8")
+    feature_flag = "--features"
+    try:
+        feature_index = cargo_arguments.index(feature_flag)
+        feature_list = cargo_arguments[feature_index + 1].split(",")
+    except (ValueError, IndexError) as error:
+        raise ValueError("Linux Cargo ModulePlanにfeatures指定がない") from error
+    if "r2-e2e" in feature_list:
+        feature_list.remove("r2-e2e")
+        r2_e2e_entry = 'list(APPEND LINUX_BROKER_FEATURES "r2-e2e")'
+        if source.count(r2_e2e_entry) != 1:
+            raise ValueError("LinuxのR2 E2E feature binding sourceが一意でない")
+    if not feature_list or any(
+        re.fullmatch(r"[a-z0-9_-]+", feature) is None for feature in feature_list
+    ):
+        raise ValueError("Linux Cargo feature名が固定形式ではない")
+
+    old_features = 'set(LINUX_BROKER_FEATURES "linux-desktop-broker")'
+    new_features = (
+        'set(LINUX_BROKER_FEATURES "' + ";".join(feature_list) + '")'
+    )
+    if source.count(old_features) != 1:
+        raise ValueError("Linux Runner Cargo feature binding sourceが一意でない")
+    old_build = "build --locked --release"
+    if source.count(old_build) != 1:
+        raise ValueError("Linux Runner Cargo build command sourceが一意でない")
+    source = source.replace(old_features, new_features, 1)
+    source = source.replace(
+        old_build,
+        "build --locked --release --no-default-features",
+        1,
+    )
+    cmake_path.write_text(source, encoding="utf-8", newline="\n")
 
 
 def _portable_archive_plan(
@@ -839,6 +887,11 @@ def build_linux_product(
     paths = _tool_paths()
     rustup_home = _rustup_home()
     defines = dart_defines(plan)
+    rust_feature_arguments = cargo_feature_arguments(
+        plan,
+        target_platform="linux",
+        r2_e2e_test_build=r2_e2e_test_build,
+    )
 
     build_started = time.perf_counter()
     with tempfile.TemporaryDirectory(prefix=OUTPUT_TEMP_PREFIX, dir=output.parent) as output_temp:
@@ -857,6 +910,9 @@ def build_linux_product(
             archive_path = temporary_root / "source.tar"
             archive_hash = _write_source_archive(commit, archive_path)
             _safe_extract_source(archive_path, source_root)
+            _patch_linux_broker_module_features(
+                source_root, rust_feature_arguments
+            )
 
             flutter_project = source_root / "apps" / "desktop_flutter"
             build_dir = flutter_project / "build" / "linux" / "x64" / "release"
@@ -1088,6 +1144,20 @@ def build_linux_product(
                 "flutter_size_analysis_arguments": flutter_size_analysis_arguments,
                 "cmake_configure_arguments": cmake_configure_arguments,
                 "cmake_build_arguments": cmake_build_arguments,
+                "rust_build_arguments": [
+                    "build",
+                    "--locked",
+                    "--release",
+                    "--no-default-features",
+                    "--manifest-path",
+                    "native/rust_helper/Cargo.toml",
+                    "--bin",
+                    "gui_shell_linux_broker",
+                    "--bin",
+                    "gui_shell_desktop_launcher",
+                    "--features",
+                    rust_feature_arguments[rust_feature_arguments.index("--features") + 1],
+                ],
                 "compile_time_identity": {
                     "source": "schema_validated_manifest",
                     "app_id": app_id,

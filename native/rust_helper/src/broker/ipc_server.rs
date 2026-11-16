@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::broker::{Broker, BrokerResponse};
+use crate::broker::{module_pruning, Broker, BrokerResponse};
 
 const DEFAULT_MAX_REQUEST_BYTES: usize = 64 * 1024;
 const AUTH_LINE_MAX_BYTES: usize = 256;
@@ -439,14 +439,20 @@ fn run_loopback_server_inner(
         broker.端末期限処理();
         if let Some(owner_operations) = &owner_operations {
             if let Ok(mut request) = owner_operations.try_recv() {
-                let response = broker.desktop_owner_operation_json_with_all_confirmations(
-                    &request.request_json,
-                    request.download_confirmation,
-                    request.apply_confirmation,
-                    request.activation_confirmation,
-                    request.product_uninstall_confirmation,
-                    request.product_repair_confirmation,
-                );
+                let response = if let Some(response) =
+                    module_pruning::reject_if_pruned(&mut broker, &request.request_json)
+                {
+                    response
+                } else {
+                    broker.desktop_owner_operation_json_with_all_confirmations(
+                        &request.request_json,
+                        request.download_confirmation,
+                        request.apply_confirmation,
+                        request.activation_confirmation,
+                        request.product_uninstall_confirmation,
+                        request.product_repair_confirmation,
+                    )
+                };
                 // native資格情報登録を含むprivate要求本文を応答後に消去する。
                 zeroize::Zeroize::zeroize(&mut request.request_json);
                 let _ = request.reply.send(response);
@@ -595,8 +601,11 @@ fn handle_stream(
         Err(IpcLineError::Io(message)) => return Err(BrokerServerError::new(message)),
     };
 
+    let pruned_response = module_pruning::reject_if_pruned(broker, &request_json);
     #[cfg(feature = "r2-e2e")]
-    let response = if owner && config.r2_e2e_synthetic_owner_confirmation {
+    let response = if let Some(response) = pruned_response {
+        response
+    } else if owner && config.r2_e2e_synthetic_owner_confirmation {
         broker.r2_e2e_synthetic_owner_operation_json(&request_json)
     } else if owner {
         broker.owner要求処理(&request_json)
@@ -604,7 +613,9 @@ fn handle_stream(
         broker.handle_json(&request_json)
     };
     #[cfg(not(feature = "r2-e2e"))]
-    let response = if owner {
+    let response = if let Some(response) = pruned_response {
+        response
+    } else if owner {
         broker.owner要求処理(&request_json)
     } else {
         broker.handle_json(&request_json)
@@ -754,6 +765,108 @@ enum IpcLineError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn authenticated_ipc_respects_optional_module_selection_without_exposing_request_content() {
+        const CONTENT_MARKER: &str = "private-content-marker-must-not-leak";
+        use zeroize::Zeroize;
+
+        let root = TestDirectory::new();
+        let store_dir = root.0.join("store");
+        let session_file = root.0.join("normal.json");
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let thread_shutdown = Arc::clone(&shutdown);
+        let thread_store = store_dir.clone();
+        let thread_session = session_file.clone();
+        let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
+        let thread = std::thread::spawn(move || {
+            run_loopback_server_cancellable(
+                BrokerServerConfig::new(thread_store, thread_session),
+                thread_shutdown,
+                ready_tx,
+            )
+        });
+        let mut broker = TestBrokerServer {
+            shutdown,
+            thread: Some(thread),
+        };
+        ready_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("実Rust Brokerがloopbackをlistenする");
+        let mut endpoint: BrokerEndpoint =
+            serde_json::from_slice(&std::fs::read(&session_file).expect("normal endpointを読む"))
+                .expect("normal endpointの形式");
+        let mut request = crate::broker::BrokerRequestEnvelope::health(
+            "module-pruning-ipc-request",
+            "module-pruning-ipc-nonce",
+        );
+        request.session_id = Some(endpoint.session_id.clone());
+        request.operation = Some(crate::broker::BrokerOperation::SetupDoctor報告取得);
+        request.issued_at = Some(crate::broker::BrokerRequestEnvelope::current_issued_at());
+        request.payload = Some(serde_json::json!({
+            "version": 1,
+            "privateMarker": CONTENT_MARKER,
+        }));
+        request.refresh_payload_hash();
+        let request_json = serde_json::json!({
+            "request_id": request.request_id,
+            "session_id": request.session_id,
+            "operation": request.operation.as_ref().expect("operation").as_str(),
+            "payload_hash": request.payload_hash,
+            "nonce": request.nonce,
+            "issued_at": request.issued_at,
+            "metadata": {},
+            "payload": request.payload,
+        })
+        .to_string();
+        let mut client =
+            TcpStream::connect((endpoint.host.as_str(), endpoint.port)).expect("認証IPCへ接続する");
+        write!(client, "{}\n{request_json}\n", endpoint.session_secret)
+            .expect("認証済み要求を送る");
+        client.flush().expect("認証済み要求をflushする");
+        let mut response_line = String::new();
+        let mut response_reader = BufReader::new(client);
+        response_reader
+            .read_line(&mut response_line)
+            .expect("Broker応答を読む");
+        response_reader
+            .get_mut()
+            .shutdown(std::net::Shutdown::Write)
+            .expect("応答後に要求送信側をhalf-closeする");
+        let mut trailing_response = String::new();
+        response_reader
+            .read_to_string(&mut trailing_response)
+            .expect("Broker response EOFを読む");
+
+        broker.stop().expect("実Rust Brokerを正常停止する");
+        assert!(!response_line.is_empty(), "Broker responseが空");
+        let response: serde_json::Value =
+            serde_json::from_str(response_line.trim()).expect("Broker応答JSON");
+        assert!(!response_line.contains(CONTENT_MARKER));
+        assert!(!response_line.contains(&endpoint.session_secret));
+        assert!(trailing_response.is_empty(), "余分なBroker応答を返さない");
+
+        if cfg!(feature = "module_setup_doctor") {
+            assert_ne!(
+                response["error"]["code"], "optional_module_not_included",
+                "含まれるModuleをIPC gateで拒否しない"
+            );
+        } else {
+            assert_eq!(response["status"], "rejected");
+            assert_eq!(response["operation"], "Setup Doctor報告取得");
+            assert_eq!(response["error"]["code"], "optional_module_not_included");
+            assert!(response["audit_event_id"]
+                .as_str()
+                .is_some_and(|id| !id.is_empty()));
+        }
+        let audit_text = read_audit(&store_dir.join("audit.jsonl"));
+        assert!(!audit_text.contains(CONTENT_MARKER));
+        assert!(!audit_text.contains(&endpoint.session_secret));
+        if !cfg!(feature = "module_setup_doctor") {
+            assert!(audit_text.contains("optional_module_not_included"));
+        }
+        endpoint.session_secret.zeroize();
+    }
 
     #[test]
     fn 監査済みshutdownは応答後の切断errorにかかわらず終了する() {

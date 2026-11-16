@@ -15,10 +15,12 @@ from unittest.mock import patch
 from tooling.build_module_pruned_windows import (
     MODULE_DEFINE_NAMES,
     _load_catalog,
+    cargo_feature_arguments,
     dart_defines,
 )
 from tooling.export_linux_product import (
     _linux_build_environment,
+    _patch_linux_broker_module_features,
     _require_clean_source,
     _toolchain,
     build_linux_product,
@@ -45,6 +47,71 @@ PAYLOADS = {
 
 
 class LinuxExportInputTests(unittest.TestCase):
+    def test_linux_cargo_features_follow_the_selected_module_plan(self) -> None:
+        receipt_raw, manifest_raw = linux_export_pair()
+        _, _, plan, _, _ = validate_export_inputs(
+            receipt_raw, manifest_raw, target_platform="linux"
+        )
+
+        arguments = cargo_feature_arguments(plan, target_platform="linux")
+
+        self.assertEqual(arguments[0], "--no-default-features")
+        self.assertEqual(arguments[1], "--features")
+        features = set(arguments[2].split(","))
+        self.assertEqual(
+            features,
+            {
+                "module_observability",
+                "module_trace_inspector",
+                "linux-desktop-broker",
+            },
+        )
+
+    def test_linux_runner_build_is_patched_with_one_explicit_feature_selection(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-linux-cmake-features-") as temporary:
+            source_root = Path(temporary)
+            cmake_path = (
+                source_root
+                / "apps/desktop_flutter/linux/runner/CMakeLists.txt"
+            )
+            cmake_path.parent.mkdir(parents=True)
+            cmake_path.write_text(
+                'set(LINUX_BROKER_FEATURES "linux-desktop-broker")\n'
+                '"${CARGO_EXECUTABLE}" build --locked --release\n'
+                '--features "${LINUX_BROKER_FEATURE_ARGUMENT}"\n',
+                encoding="utf-8",
+            )
+
+            _patch_linux_broker_module_features(
+                source_root,
+                [
+                    "--no-default-features",
+                    "--features",
+                    "linux-desktop-broker,module_observability",
+                ],
+            )
+
+            source = cmake_path.read_text(encoding="utf-8")
+            self.assertIn(
+                'set(LINUX_BROKER_FEATURES '
+                '"linux-desktop-broker;module_observability")',
+                source,
+            )
+            self.assertIn(
+                '"${CARGO_EXECUTABLE}" build --locked --release '
+                '--no-default-features',
+                source,
+            )
+            with self.assertRaisesRegex(ValueError, "sourceが一意でない"):
+                _patch_linux_broker_module_features(
+                    source_root,
+                    [
+                        "--no-default-features",
+                        "--features",
+                        "linux-desktop-broker,module_observability",
+                    ],
+                )
+
     def test_host_registration_fixture_includes_host_operations_module(self) -> None:
         receipt_raw, manifest_raw = linux_export_pair(include_host_operations=True)
         _, _, plan, _, _ = validate_export_inputs(
@@ -401,6 +468,17 @@ class LinuxExportBuildTests(unittest.TestCase):
                 portable_readme.write_bytes(
                     (ROOT / "installer/linux/PORTABLE_README_ja.txt").read_bytes()
                 )
+                runner_cmake = (
+                    destination
+                    / "apps/desktop_flutter/linux/runner/CMakeLists.txt"
+                )
+                runner_cmake.parent.mkdir(parents=True)
+                runner_cmake.write_text(
+                    'set(LINUX_BROKER_FEATURES "linux-desktop-broker")\n'
+                    '"${CARGO_EXECUTABLE}" build --locked --release\n'
+                    '--features "${LINUX_BROKER_FEATURE_ARGUMENT}"\n',
+                    encoding="utf-8",
+                )
 
             configure_args: list[str] = []
             commands: list[list[str]] = []
@@ -518,6 +596,12 @@ class LinuxExportBuildTests(unittest.TestCase):
             self.assertFalse(evidence["authority_boundary"]["owner_authorization_verified"])
             self.assertFalse(evidence["signed"])
             self.assertFalse(evidence["formal_distribution_claimed"])
+            self.assertIn("--no-default-features", evidence["rust_build_arguments"])
+            self.assertIn("--features", evidence["rust_build_arguments"])
+            self.assertIn(
+                "linux-desktop-broker,module_observability,module_trace_inspector",
+                evidence["rust_build_arguments"],
+            )
             self.assertEqual(
                 evidence["portable_archive"]["sha256"],
                 hashlib.sha256(portable_archive.read_bytes()).hexdigest(),
@@ -629,6 +713,22 @@ class LinuxExportBuildTests(unittest.TestCase):
             root = Path(temporary)
             receipt, manifest = self._input_files(root)
             output = root / "failed-result"
+
+            def extract_source(_archive: Path, target: Path) -> None:
+                project = target / "apps/desktop_flutter"
+                project.mkdir(parents=True)
+                (project / "pubspec.yaml").write_text(
+                    "name: x\nversion: 1.0.0\n", encoding="utf-8"
+                )
+                runner = target / "apps/desktop_flutter/linux/runner"
+                runner.mkdir(parents=True)
+                (runner / "CMakeLists.txt").write_text(
+                    'set(LINUX_BROKER_FEATURES "linux-desktop-broker")\n'
+                    '"${CARGO_EXECUTABLE}" build --locked --release\n'
+                    '--features "${LINUX_BROKER_FEATURE_ARGUMENT}"\n',
+                    encoding="utf-8",
+                )
+
             with (
                 patch("tooling.export_linux_product._require_clean_source", return_value=("main", "a" * 40)),
                 patch("tooling.export_linux_product._tool_paths", return_value={
@@ -645,10 +745,7 @@ class LinuxExportBuildTests(unittest.TestCase):
                 }),
                 patch("tooling.export_linux_product._rustup_home", return_value=str(root)),
                 patch("tooling.export_linux_product._write_source_archive", side_effect=lambda _commit, path: (path.write_bytes(b"archive"), "f" * 64)[1]),
-                patch("tooling.export_linux_product._safe_extract_source", side_effect=lambda _archive, target: (
-                    (target / "apps/desktop_flutter").mkdir(parents=True),
-                    (target / "apps/desktop_flutter/pubspec.yaml").write_text("name: x\nversion: 1.0.0\n", encoding="utf-8"),
-                )),
+                patch("tooling.export_linux_product._safe_extract_source", side_effect=extract_source),
                 patch("tooling.export_linux_product.subprocess.run", side_effect=RuntimeError("合成ビルド失敗")),
             ):
                 with self.assertRaisesRegex(RuntimeError, "合成ビルド失敗"):

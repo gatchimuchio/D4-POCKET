@@ -26,6 +26,7 @@ from tooling.build_module_pruned_windows import (
     _flutter_versions,
     _parse_json_bytes,
     _validate_catalog,
+    cargo_feature_arguments,
     dart_defines,
     resolve_module_plan,
 )
@@ -915,10 +916,14 @@ def build_portable_bundle(
                 temporary_root, app_id, audit_store_id, manifest_hash
             )
             _validate_cargo_target_path(target_dir)
+            rust_feature_arguments = cargo_feature_arguments(
+                plan, target_platform="windows"
+            )
             rust_arguments = [
                 "build",
                 "--release",
                 "--locked",
+                *rust_feature_arguments,
                 "--target-dir",
                 str(target_dir),
                 "--manifest-path",
@@ -1019,6 +1024,7 @@ def build_portable_bundle(
                 "build",
                 "--release",
                 "--locked",
+                *rust_feature_arguments,
                 "--target-dir",
                 "<isolated-target-dir>",
                 "--manifest-path",

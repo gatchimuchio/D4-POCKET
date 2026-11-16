@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 import '../models/generated_contracts.dart';
+import '../module_features.dart';
 import 'broker_client.dart';
 import 'notification_client.dart';
 
@@ -43,7 +44,7 @@ class WindowsTrayProjection {
     }
     final brokerSnapshot = snapshot.snapshotSource == 'broker';
     Object criticalCount = '不明';
-    if (transport != null) {
+    if (transport != null && kGuiShellModuleNotifications) {
       try {
         final body = await NotificationClient(transport).list(
           unreadOnly: true,

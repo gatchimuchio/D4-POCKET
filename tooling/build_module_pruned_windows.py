@@ -73,6 +73,10 @@ MODULE_DEFINE_NAMES = {
     "shell.trace_inspector": "TRACE_INSPECTOR",
     "shell.host_operations": "HOST_OPERATIONS",
 }
+MODULE_CARGO_FEATURE_NAMES = {
+    module_id: "module_" + module_id.removeprefix("shell.").replace(".", "_")
+    for module_id in MODULE_DEFINE_NAMES
+}
 
 
 @dataclass(frozen=True)
@@ -321,8 +325,45 @@ def dart_defines(plan: ResolvedModulePlan, catalog: dict[str, Any] | None = None
     }
 
 
+def cargo_feature_arguments(
+    plan: ResolvedModulePlan,
+    *,
+    target_platform: str,
+    r2_e2e_test_build: bool = False,
+) -> list[str]:
+    """Return explicit Cargo features matching the validated Export ModulePlan."""
+    if target_platform not in {"windows", "linux", "macos"}:
+        raise ValueError("Cargo feature targetが未対応である")
+    catalog = _load_catalog()
+    included = set(plan.included_optional_ids)
+    unknown = included - set(MODULE_CARGO_FEATURE_NAMES)
+    if unknown:
+        raise ValueError("Cargo feature一覧に未知の任意Moduleがある")
+    for module in catalog["optional_modules"]:
+        if module["module_id"] in included and not set(module["depends_on"]).issubset(included):
+            raise ValueError("Cargo feature選択がModule依存を満たさない")
+
+    features = ["linux-desktop-broker"] if target_platform == "linux" else []
+    features.extend(
+        MODULE_CARGO_FEATURE_NAMES[module["module_id"]]
+        for module in catalog["optional_modules"]
+        if module["module_id"] in included
+    )
+    if target_platform == "linux":
+        if r2_e2e_test_build:
+            features.append("r2-e2e")
+    elif r2_e2e_test_build:
+        raise ValueError("R2 E2E test featureはLinux検証buildだけで使用できる")
+
+    arguments = ["--no-default-features"]
+    if features:
+        arguments.extend(("--features", ",".join(features)))
+    return arguments
+
+
 def _validate_dart_define_bindings(catalog: dict[str, Any]) -> None:
-    source = (FLUTTER_PROJECT / "lib" / "main.dart").read_text(encoding="utf-8")
+    source = (FLUTTER_PROJECT / "lib" / "module_features.dart").read_text(encoding="utf-8")
+    main_source = (FLUTTER_PROJECT / "lib" / "main.dart").read_text(encoding="utf-8")
     for module in catalog["optional_modules"]:
         module_id = module["module_id"]
         flag = MODULE_DEFINE_NAMES[module_id]
@@ -333,7 +374,7 @@ def _validate_dart_define_bindings(catalog: dict[str, Any]) -> None:
             source,
             re.DOTALL,
         )
-        if match is None or source.count(dart_name) < 2:
+        if match is None or main_source.count(dart_name) < 2:
             raise ValueError("Module一覧に対応するcompile-time UI surfaceがない")
         if module_id == "shell.trace_inspector":
             declaration_end = source.find(";", match.start())

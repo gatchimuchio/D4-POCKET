@@ -86,6 +86,7 @@
     "flutter_size_analysis_arguments": { "$ref": "#/$defs/argumentList" },
     "cmake_configure_arguments": { "$ref": "#/$defs/argumentList" },
     "cmake_build_arguments": { "$ref": "#/$defs/argumentList" },
+    "rust_build_arguments": { "$ref": "#/$defs/argumentList" },
     "compile_time_identity": {
       "type": "object",
       "required": ["source", "app_id", "audit_store_id", "manifest_sha256"],

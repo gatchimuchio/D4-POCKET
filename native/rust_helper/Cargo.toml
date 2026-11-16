@@ -5,11 +5,28 @@ edition = "2021"
 license = "Apache-2.0"
 
 [features]
-default = []
+default = [
+    "module_setup_doctor",
+    "module_history",
+    "module_evaluation_lab",
+    "module_host_capabilities",
+    "module_notifications",
+    "module_observability",
+    "module_trace_inspector",
+    "module_host_operations",
+]
 # Local-only integrated R2 test build. Never use for product distribution.
 r2-e2e = []
 # Linux Desktop-only bundled Broker bridge. Product runners opt in explicitly.
 linux-desktop-broker = []
+module_setup_doctor = []
+module_history = []
+module_evaluation_lab = []
+module_host_capabilities = []
+module_notifications = []
+module_observability = []
+module_trace_inspector = ["module_observability"]
+module_host_operations = []
 
 [lib]
 name = "gui_shell_rust_helper"

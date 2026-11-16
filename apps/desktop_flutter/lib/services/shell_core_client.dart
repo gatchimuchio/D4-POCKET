@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../models/generated_contracts.dart';
+import '../module_features.dart';
 import 'broker_client.dart';
 import 'workspace_client.dart';
 
@@ -57,23 +58,38 @@ class ShellCoreClient {
         ),
       );
       Map<String, Object?> setupDoctorReport;
-      try {
-        final setupDoctorResponse = await broker.request(
-          'Setup Doctor報告取得',
-          payload: const <String, Object?>{'version': 1},
-        );
-        setupDoctorReport =
-            _setupDoctorReportProjectionFromResponse(setupDoctorResponse);
-      } on Object {
+      if (!kGuiShellModuleSetupDoctor) {
         setupDoctorReport = _unknownSetupDoctorReport(
-          'Rust Brokerから有効なSetup Doctor報告を取得できません。',
+          'このAppにはSetup Doctor Moduleが含まれていません。',
         );
+      } else {
+        try {
+          final setupDoctorResponse = await broker.request(
+            'Setup Doctor報告取得',
+            payload: const <String, Object?>{'version': 1},
+          );
+          setupDoctorReport =
+              _setupDoctorReportProjectionFromResponse(setupDoctorResponse);
+        } on Object {
+          setupDoctorReport = _unknownSetupDoctorReport(
+            'Rust Brokerから有効なSetup Doctor報告を取得できません。',
+          );
+        }
       }
-      final hostCapabilityResponse = await broker.request('ホスト能力');
-      final hostCapability = _acceptedResponseBodyMap(
-        hostCapabilityResponse,
-        'ホスト能力',
-      );
+      final Map<String, Object?> hostCapability;
+      if (kGuiShellModuleHostCapabilities) {
+        final hostCapabilityResponse = await broker.request('ホスト能力');
+        hostCapability = _acceptedResponseBodyMap(
+          hostCapabilityResponse,
+          'ホスト能力',
+        );
+      } else {
+        hostCapability = const <String, Object?>{
+          '能力': <Object?>[],
+          '状態': 'unknown',
+          'プラットフォーム': 'unknown',
+        };
+      }
       final hostListResponse = await broker.request(
         'Host一覧',
         payload: {'版': 1},
@@ -216,6 +232,11 @@ class ShellCoreClient {
   ShellSnapshot getSnapshot() => snapshot;
 
   Future<SetupDoctorReportRecord> refreshSetupDoctorReport() async {
+    if (!kGuiShellModuleSetupDoctor) {
+      throw const BrokerClientException(
+        'このAppにはSetup Doctor Moduleが含まれていません',
+      );
+    }
     final broker = brokerTransport;
     if (mode != 'broker' || broker == null) {
       throw const BrokerClientException(
@@ -317,6 +338,11 @@ class ShellCoreClient {
 
   Future<HostSelectionRecord> selectHost(String hostId,
       {HostRegistryRecord? selectedHost}) async {
+    if (!kGuiShellModuleHostOperations) {
+      throw const BrokerClientException(
+        'このAppにはHost Operations Moduleが含まれていません',
+      );
+    }
     // 起動後に通常Broker一覧から取得したmetadataを選択できる。Authorityではない。
     HostRegistryRecord? host =
         selectedHost?.hostId == hostId ? selectedHost : null;

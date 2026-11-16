@@ -28,6 +28,7 @@ if str(ROOT) not in sys.path:
 from tooling.build_module_pruned_windows import (
     MODULE_DEFINE_NAMES,
     _load_catalog,
+    cargo_feature_arguments,
     dart_defines,
 )
 from tooling.export_windows_product import (
@@ -1968,6 +1969,9 @@ def build_macos_product(
         }
         app_owner_manifest = source_root / "native/macos_owner/Cargo.toml"
         broker_manifest = source_root / "native/rust_helper/Cargo.toml"
+        rust_feature_arguments = cargo_feature_arguments(
+            plan, target_platform="macos"
+        )
         _run(
             [tools["cargo"], "+" + RUST_TOOLCHAIN, "build", "--release", "--locked", "--manifest-path", str(app_owner_manifest), "--lib"],
             cwd=source_root,
@@ -1987,7 +1991,18 @@ def build_macos_product(
                 update_trust, ensure_ascii=False, sort_keys=True, separators=(",", ":")
             )
         _run(
-            [tools["cargo"], "+" + RUST_TOOLCHAIN, "build", "--release", "--locked", "--manifest-path", str(broker_manifest), "--bin", "gui_shell_macos_broker"],
+            [
+                tools["cargo"],
+                "+" + RUST_TOOLCHAIN,
+                "build",
+                "--release",
+                "--locked",
+                *rust_feature_arguments,
+                "--manifest-path",
+                str(broker_manifest),
+                "--bin",
+                "gui_shell_macos_broker",
+            ],
             cwd=source_root,
             environment=rust_environment,
         )
@@ -2203,6 +2218,16 @@ def build_macos_product(
                 "--code-size-directory=<isolated-size-analysis>",
                 *[f"--dart-define={name}={str(enabled).lower()}" for name, enabled in defines.items()],
                 f"--dart-define=GUI_SHELL_PRODUCT_VERSION={version}",
+            ],
+            "rust_build_arguments": [
+                "build",
+                "--release",
+                "--locked",
+                *rust_feature_arguments,
+                "--manifest-path",
+                "native/rust_helper/Cargo.toml",
+                "--bin",
+                "gui_shell_macos_broker",
             ],
             "aot_surface_analysis": aot_surface_analysis,
             "compile_time_identity": {
