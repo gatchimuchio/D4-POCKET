@@ -251,6 +251,12 @@ pub(super) fn enrich_agent_task_payload(
             )
         })?
         .to_owned();
+    #[cfg(feature = "module_observability")]
+    broker
+        .observations
+        .clear_pending_followup_instruction(&crate::audit_hash::sha256_tagged(
+            instruction.as_bytes(),
+        ));
     let snapshot_hash = object
         .get("mcp_capability_snapshot_hash")
         .map(|value| value.as_str().unwrap_or_default());
@@ -290,6 +296,8 @@ pub(super) fn enrich_agent_task_payload(
     }
 
     let mut consume_result_id = None;
+    #[cfg(feature = "module_observability")]
+    let mut followup_source_task_id = None;
     if let (Some(result_id), Some(result_hash)) = (result_id, result_hash) {
         let runtime_id = object
             .get("agent_runtime_id")
@@ -323,6 +331,10 @@ pub(super) fn enrich_agent_task_payload(
                 "MCP Tool結果のhashまたはAgent／Session／Workspace束縛が一致しない",
             ));
         }
+        #[cfg(feature = "module_observability")]
+        {
+            followup_source_task_id = Some(result.source_task_id.clone());
+        }
         let result_text = serde_json::to_string(result.text.as_str()).map_err(|_| {
             McpError::new(
                 "mcp_agent_result_invalid",
@@ -348,6 +360,19 @@ pub(super) fn enrich_agent_task_payload(
             "MCP capability／resultを含む有効Task指示が上限を超過した",
         ));
     }
+    #[cfg(feature = "module_observability")]
+    if operation == "AgentTask実行" {
+        if let (Some(result_id), Some(source_task_id)) = (
+            consume_result_id.as_deref(),
+            followup_source_task_id.as_deref(),
+        ) {
+            broker.observations.register_followup(
+                result_id,
+                &crate::audit_hash::sha256_tagged(effective_instruction.as_bytes()),
+                source_task_id,
+            );
+        }
+    }
     object.insert(
         "instruction".to_string(),
         Value::String(effective_instruction),
@@ -360,8 +385,10 @@ pub(super) fn consume_agent_result_context_after_task(
     result_id: Option<&str>,
     task_succeeded: bool,
 ) {
-    if task_succeeded {
-        if let Some(result_id) = result_id {
+    if let Some(result_id) = result_id {
+        #[cfg(feature = "module_observability")]
+        broker.observations.clear_pending_followup_result(result_id);
+        if task_succeeded {
             broker.mcp_agent_results.remove(result_id);
         }
     }
@@ -1112,8 +1139,7 @@ pub(super) fn call_tool(
         }
         _ => String::new(),
     };
-    if broker
-        .append_audit(
+    let _started_event = match broker.append_audit(
             request_id,
             OP_TOOL_CALL,
             "started",
@@ -1123,15 +1149,25 @@ pub(super) fn call_tool(
             ),
             EVIDENCE_SOURCE_INTERNAL_STATE,
             payload_hash,
-        )
-        .is_err()
-    {
-        return broker.audit_store_failed_response(
-            request_id,
-            OP_TOOL_CALL,
-            "mcp_audit_append_failed",
-            "MCP Tool実行開始Auditを確定できないため送信しない",
-        );
+        ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_TOOL_CALL,
+                "mcp_audit_append_failed",
+                "MCP Tool実行開始Auditを確定できないため送信しない",
+            )
+        }
+    };
+    #[cfg(feature = "module_observability")]
+    if let (Some(_), Some(task_id)) = (
+        agent_provenance.as_ref(),
+        request.source_agent_task_id.as_deref(),
+    ) {
+        broker
+            .observations
+            .associate_audit_event_with_task(&_started_event.event_id, task_id);
     }
 
     let call_result = broker
@@ -1318,6 +1354,15 @@ pub(super) fn call_tool(
             );
         }
     };
+    #[cfg(feature = "module_observability")]
+    if let (Some(_), Some(task_id)) = (
+        agent_provenance.as_ref(),
+        request.source_agent_task_id.as_deref(),
+    ) {
+        broker
+            .observations
+            .associate_audit_event_with_task(&accepted.event_id, task_id);
+    }
     if let Some((result_id, context)) = pending_agent_result {
         retain_agent_result_context(broker, result_id, context);
     }

@@ -12,11 +12,15 @@ use super::protocol::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+use std::time::{Duration, Instant};
 
 const VERSION: u64 = 1;
 const MAX_SPANS: usize = 1024;
 const MAX_RESPONSE_SPANS: usize = 256;
+const MAX_TASK_TRACE_BINDINGS: usize = 128;
+const MAX_PENDING_FOLLOWUPS: usize = 8;
+const PENDING_FOLLOWUP_TTL: Duration = Duration::from_secs(300);
 #[cfg(feature = "module_trace_inspector")]
 const MAX_TRACE_ID_LENGTH: usize = 128;
 const OP_LIST: &str = "観測一覧";
@@ -24,7 +28,20 @@ const OP_LIST: &str = "観測一覧";
 #[derive(Debug, Default)]
 pub(crate) struct ObservationCenter {
     next_sequence: u64,
+    next_trace_sequence: u64,
     spans: VecDeque<ObservationSpan>,
+    task_trace_ids: HashMap<String, String>,
+    task_trace_order: VecDeque<String>,
+    trace_parent_ids: HashMap<String, String>,
+    pending_followups: HashMap<String, PendingFollowup>,
+    pending_followup_order: VecDeque<String>,
+}
+
+#[derive(Debug)]
+struct PendingFollowup {
+    instruction_hash: String,
+    source_task_id: String,
+    expires_at: Instant,
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +82,18 @@ impl ObservationCenter {
         self.next_sequence = self.next_sequence.saturating_add(1);
         let sequence = self.next_sequence;
         let span_id = format!("observation-span-{sequence}");
-        let trace_id = format!("observation-trace-{sequence}");
+        let task_record = super::execution_history::agent_task_audit_record(event)
+            .ok()
+            .flatten();
+        let trace_id = match task_record.as_ref() {
+            Some(record) => {
+                let parent_task_id = (record.stage == "start")
+                    .then(|| self.take_followup_parent(&record.instruction_hash))
+                    .flatten();
+                self.trace_for_task(&record.task_id, parent_task_id.as_deref())
+            }
+            None => self.next_trace_id(),
+        };
         let ended_at_epoch_millis = started_at_epoch_millis
             .saturating_add(i64::try_from(duration_millis).unwrap_or(i64::MAX));
         let error_kind = match event.decision.as_str() {
@@ -103,7 +131,7 @@ impl ObservationCenter {
         });
         spans.truncate(limit);
         let span_values: Vec<Value> = spans.iter().map(ObservationSpan::to_value).collect();
-        let trace_values = traces_for(&spans);
+        let trace_values = traces_for(&spans, &self.trace_parent_ids);
         let metric_values = metrics_for(&spans);
         json!({
             "版": VERSION,
@@ -117,6 +145,135 @@ impl ObservationCenter {
             "OpenTelemetry export": "unsupported",
             "権限生成": "なし"
         })
+    }
+
+    pub(super) fn associate_audit_event_with_task(&mut self, audit_event_id: &str, task_id: &str) {
+        if !valid_correlation_id(task_id) {
+            return;
+        }
+        let Some(index) = self.spans.iter().rposition(|span| {
+            span.related_audit_id == audit_event_id
+                && span.operation == "MCP Tool実行"
+                && matches!(span.status.as_str(), "started" | "accepted")
+        }) else {
+            return;
+        };
+        let trace_id = self.trace_for_task(task_id, None);
+        if let Some(span) = self.spans.get_mut(index) {
+            span.trace_id = trace_id;
+        }
+    }
+
+    pub(super) fn register_followup(
+        &mut self,
+        result_id: &str,
+        instruction_hash: &str,
+        source_task_id: &str,
+    ) {
+        if !valid_result_id(result_id)
+            || !valid_tagged_hash(instruction_hash)
+            || !valid_correlation_id(source_task_id)
+        {
+            return;
+        }
+        self.clear_pending_followup_instruction(instruction_hash);
+        self.clear_pending_followup_result(result_id);
+        while self.pending_followups.len() >= MAX_PENDING_FOLLOWUPS {
+            let Some(oldest) = self.pending_followup_order.pop_front() else {
+                break;
+            };
+            self.pending_followups.remove(&oldest);
+        }
+        self.pending_followup_order.push_back(result_id.to_owned());
+        self.pending_followups.insert(
+            result_id.to_owned(),
+            PendingFollowup {
+                instruction_hash: instruction_hash.to_owned(),
+                source_task_id: source_task_id.to_owned(),
+                expires_at: Instant::now() + PENDING_FOLLOWUP_TTL,
+            },
+        );
+    }
+
+    pub(super) fn clear_pending_followup_result(&mut self, result_id: &str) {
+        self.pending_followups.remove(result_id);
+        self.pending_followup_order
+            .retain(|pending_id| pending_id != result_id);
+    }
+
+    pub(super) fn clear_pending_followup_instruction(&mut self, instruction_hash: &str) {
+        let matching = self
+            .pending_followups
+            .iter()
+            .filter(|(_, pending)| pending.instruction_hash == instruction_hash)
+            .map(|(result_id, _)| result_id.clone())
+            .collect::<Vec<_>>();
+        for result_id in matching {
+            self.clear_pending_followup_result(&result_id);
+        }
+    }
+
+    fn take_followup_parent(&mut self, instruction_hash: &str) -> Option<String> {
+        let now = Instant::now();
+        let expired = self
+            .pending_followups
+            .iter()
+            .filter(|(_, pending)| now >= pending.expires_at)
+            .map(|(result_id, _)| result_id.clone())
+            .collect::<Vec<_>>();
+        for result_id in expired {
+            self.clear_pending_followup_result(&result_id);
+        }
+        let matching = self
+            .pending_followups
+            .iter()
+            .filter(|(_, pending)| pending.instruction_hash == instruction_hash)
+            .map(|(result_id, pending)| (result_id.clone(), pending.source_task_id.clone()))
+            .collect::<Vec<_>>();
+        let mut unique_parents = matching
+            .iter()
+            .map(|(_, task_id)| task_id.clone())
+            .collect::<Vec<_>>();
+        unique_parents.sort_unstable();
+        unique_parents.dedup();
+        for (result_id, _) in matching {
+            self.clear_pending_followup_result(&result_id);
+        }
+        (unique_parents.len() == 1).then(|| unique_parents.remove(0))
+    }
+
+    fn trace_for_task(&mut self, task_id: &str, parent_task_id: Option<&str>) -> String {
+        if let Some(trace_id) = self.task_trace_ids.get(task_id).cloned() {
+            self.task_trace_order.retain(|known| known != task_id);
+            self.task_trace_order.push_back(task_id.to_owned());
+            return trace_id;
+        }
+        let trace_id = self.next_trace_id();
+        if let Some(parent_trace_id) = parent_task_id
+            .filter(|parent| *parent != task_id)
+            .and_then(|parent| self.task_trace_ids.get(parent))
+            .filter(|parent_trace_id| **parent_trace_id != trace_id)
+        {
+            self.trace_parent_ids
+                .insert(trace_id.clone(), parent_trace_id.clone());
+        }
+        while self.task_trace_ids.len() >= MAX_TASK_TRACE_BINDINGS {
+            let Some(oldest) = self.task_trace_order.pop_front() else {
+                break;
+            };
+            if let Some(evicted_trace_id) = self.task_trace_ids.remove(&oldest) {
+                self.trace_parent_ids.remove(&evicted_trace_id);
+            }
+        }
+        self.task_trace_order.push_back(task_id.to_owned());
+        self.task_trace_ids
+            .insert(task_id.to_owned(), trace_id.clone());
+        trace_id
+    }
+
+    fn next_trace_id(&mut self) -> String {
+        self.next_trace_sequence = self.next_trace_sequence.saturating_add(1);
+        format!("observation-trace-{}", self.next_trace_sequence)
     }
 }
 
@@ -140,21 +297,61 @@ impl ObservationSpan {
     }
 }
 
-fn traces_for(spans: &[ObservationSpan]) -> Vec<Value> {
-    spans
-        .iter()
-        .map(|span| {
+fn traces_for(spans: &[ObservationSpan], parent_trace_ids: &HashMap<String, String>) -> Vec<Value> {
+    let mut indexes = HashMap::<String, usize>::new();
+    let mut grouped = Vec::<(String, Vec<String>)>::new();
+    for span in spans {
+        let index = match indexes.get(&span.trace_id) {
+            Some(index) => *index,
+            None => {
+                let index = grouped.len();
+                indexes.insert(span.trace_id.clone(), index);
+                grouped.push((span.trace_id.clone(), Vec::new()));
+                index
+            }
+        };
+        grouped[index].1.push(span.span_id.clone());
+    }
+    grouped
+        .into_iter()
+        .map(|(trace_id, span_ids)| {
+            let count = span_ids.len();
             json!({
                 "版": VERSION,
-                "TraceID": span.trace_id,
-                "SpanID一覧": [span.span_id],
-                "件数": 1,
+                "TraceID": trace_id,
+                "SpanID一覧": span_ids,
+                "件数": count,
                 "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
                 "生成源": "broker_audit_finalization",
-                "親TraceID": Value::Null
+                "親TraceID": parent_trace_ids.get(&trace_id)
             })
         })
         .collect()
+}
+
+fn valid_correlation_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.as_bytes()[0].is_ascii_alphanumeric()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"_.:-".contains(&byte))
+}
+
+fn valid_tagged_hash(value: &str) -> bool {
+    value.len() == 71
+        && value.starts_with("sha256:")
+        && value[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn valid_result_id(value: &str) -> bool {
+    value.len() == "mcp-agent-result-".len() + 32
+        && value.starts_with("mcp-agent-result-")
+        && value["mcp-agent-result-".len()..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn metrics_for(spans: &[ObservationSpan]) -> Vec<Value> {
@@ -346,11 +543,16 @@ mod tests {
     use super::super::protocol::BrokerRequestEnvelope;
     use super::*;
 
-    fn event(decision: &str, index: usize) -> BrokerAuditEvent {
+    fn event_for(
+        operation: &str,
+        decision: &str,
+        index: usize,
+        request_id: &str,
+    ) -> BrokerAuditEvent {
         BrokerAuditEvent {
             event_id: format!("broker-audit-{index}"),
-            request_id: format!("request-{index}"),
-            operation: "通知一覧".to_string(),
+            request_id: request_id.to_string(),
+            operation: operation.to_string(),
             decision: decision.to_string(),
             reason: "秘密の理由を観測へ露出しない".to_string(),
             evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
@@ -360,6 +562,59 @@ mod tests {
             event_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
                 .to_string(),
         }
+    }
+
+    fn event(decision: &str, index: usize) -> BrokerAuditEvent {
+        event_for("通知一覧", decision, index, &format!("request-{index}"))
+    }
+
+    fn task_event(
+        task_id: &str,
+        stage: &str,
+        instruction_hash: &str,
+        index: usize,
+    ) -> BrokerAuditEvent {
+        let request_hash = crate::audit_hash::sha256_tagged(format!("request-{index}").as_bytes());
+        let record = super::super::execution_history::AgentTaskHistoryAuditRecord {
+            version: 1,
+            stage: stage.to_string(),
+            task_id: task_id.to_string(),
+            runtime_id: "runtime-a".to_string(),
+            session_id: "session-a".to_string(),
+            workspace_id: "workspace-a".to_string(),
+            instruction_hash: instruction_hash.to_string(),
+            request_hash,
+            created_at: 100,
+            status: if stage == "start" {
+                "running".to_string()
+            } else {
+                "completed".to_string()
+            },
+            updated_at: if stage == "start" { 100 } else { 200 },
+            result_hash: (stage == "terminal")
+                .then(|| crate::audit_hash::sha256_tagged(b"task result")),
+            failure_class: None,
+            start_audit_event_id: (stage == "terminal").then(|| "broker-audit-1".to_string()),
+            buffer_intervention_record_hash: None,
+            buffer_intervention_status: None,
+            buffer_intervention_audit_event_id: None,
+        };
+        let (reason, payload_hash) =
+            super::super::execution_history::encode_agent_task_audit(&record)
+                .expect("valid Task audit marker");
+        let mut event = event_for(
+            if stage == "start" {
+                "AgentTask実行"
+            } else {
+                "AgentTask状態"
+            },
+            "recorded",
+            index,
+            task_id,
+        );
+        event.reason = reason;
+        event.payload_hash = payload_hash;
+        event
     }
 
     #[test]
@@ -388,6 +643,191 @@ mod tests {
             center.spans.front().unwrap().related_audit_id,
             "broker-audit-2"
         );
+    }
+
+    #[test]
+    fn AgentTaskと検証済みMCPTool結果を同じTraceへ結ぶ() {
+        let instruction_hash = crate::audit_hash::sha256_tagged(b"task instruction");
+        let mut center = ObservationCenter::default();
+        center.record_completed_span(
+            &task_event("task-source", "start", &instruction_hash, 1),
+            1_000,
+            3,
+        );
+        let task_trace_id = center.spans.back().unwrap().trace_id.clone();
+
+        let tool_started = event_for("MCP Tool実行", "started", 2, "mcp-request");
+        center.record_completed_span(&tool_started, 1_010, 5);
+        center.associate_audit_event_with_task(&tool_started.event_id, "task-source");
+
+        let tool_result = event_for("MCP Tool実行", "accepted", 3, "mcp-request");
+        center.record_completed_span(&tool_result, 1_020, 7);
+        center.associate_audit_event_with_task(&tool_result.event_id, "task-source");
+
+        center.record_completed_span(
+            &task_event("task-source", "terminal", &instruction_hash, 4),
+            1_030,
+            2,
+        );
+
+        assert!(center
+            .spans
+            .iter()
+            .all(|span| span.trace_id == task_trace_id));
+        let body = center.response_body(&ListRequest {
+            version: VERSION,
+            limit: None,
+            trace_id: None,
+        });
+        assert_eq!(body["Trace一覧"].as_array().unwrap().len(), 1);
+        assert_eq!(body["Trace一覧"][0]["件数"], 4);
+        assert_eq!(body["Trace一覧"][0]["親TraceID"], Value::Null);
+    }
+
+    #[test]
+    fn 検証済み一回MCP結果だけをFollowupTraceの親へ結び期限後は結ばない() {
+        let source_instruction_hash = crate::audit_hash::sha256_tagged(b"source task");
+        let followup_instruction_hash = crate::audit_hash::sha256_tagged(b"effective followup");
+        let result_id = "mcp-agent-result-0123456789abcdef0123456789abcdef";
+        let mut center = ObservationCenter::default();
+        center.record_completed_span(
+            &task_event("task-source", "start", &source_instruction_hash, 1),
+            1_000,
+            3,
+        );
+        let parent_trace_id = center.spans.back().unwrap().trace_id.clone();
+        center.register_followup(result_id, &followup_instruction_hash, "task-source");
+        center.record_completed_span(
+            &task_event("task-followup", "start", &followup_instruction_hash, 2),
+            1_010,
+            4,
+        );
+        let child_trace_id = center.spans.back().unwrap().trace_id.clone();
+        let body = center.response_body(&ListRequest {
+            version: VERSION,
+            limit: None,
+            trace_id: None,
+        });
+        let child_trace = body["Trace一覧"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|trace| trace["TraceID"] == child_trace_id)
+            .unwrap();
+        assert_eq!(child_trace["親TraceID"], parent_trace_id);
+        assert!(center.pending_followups.is_empty());
+
+        let mut unlinked = ObservationCenter::default();
+        unlinked.record_completed_span(
+            &task_event("task-source", "start", &source_instruction_hash, 1),
+            1_000,
+            3,
+        );
+        unlinked.register_followup(result_id, &followup_instruction_hash, "task-source");
+        unlinked
+            .pending_followups
+            .get_mut(result_id)
+            .expect("pending followup")
+            .expires_at = Instant::now() - Duration::from_secs(1);
+        unlinked.record_completed_span(
+            &task_event("task-followup", "start", &followup_instruction_hash, 2),
+            1_010,
+            4,
+        );
+        assert!(unlinked.trace_parent_ids.is_empty());
+        assert!(unlinked.pending_followups.is_empty());
+
+        unlinked.register_followup(
+            "untrusted-result-id",
+            &followup_instruction_hash,
+            "task-source",
+        );
+        assert!(unlinked.pending_followups.is_empty());
+    }
+
+    #[test]
+    fn Brokerに束縛されたMCP結果だけが実FollowupTaskの親Traceになる() {
+        let mut broker = Broker::new("observation-followup-binding-test");
+        let result_id = "mcp-agent-result-0123456789abcdef0123456789abcdef";
+        let result_hash = crate::audit_hash::sha256_tagged(b"bound MCP result");
+        let source_instruction_hash = crate::audit_hash::sha256_tagged(b"source task");
+        broker.mcp_agent_results.insert(
+            result_id.to_string(),
+            super::super::mcp_center::McpAgentResultContext {
+                server_id: "mcp-server-a".to_string(),
+                tool_id: "tool-a".to_string(),
+                source_task_id: "task-source".to_string(),
+                source_task_result_hash: source_instruction_hash.clone(),
+                agent_runtime_id: "runtime-a".to_string(),
+                session_id: "session-a".to_string(),
+                workspace_id: "workspace-a".to_string(),
+                result_hash: result_hash.clone(),
+                tool_result_hash: crate::audit_hash::sha256_tagged(b"tool result"),
+                text: zeroize::Zeroizing::new("private fixture result".to_string()),
+                expires_at: Instant::now() + Duration::from_secs(60),
+            },
+        );
+        broker.observations.record_completed_span(
+            &task_event("task-source", "start", &source_instruction_hash, 1),
+            1_000,
+            3,
+        );
+        let source_trace_id = broker.observations.spans.back().unwrap().trace_id.clone();
+        let payload = json!({
+            "agent_runtime_id": "runtime-a",
+            "session_id": "session-a",
+            "workspace_id": "workspace-a",
+            "instruction": "Use the verified Tool result as data",
+            "mcp_result_id": result_id,
+            "mcp_result_hash": result_hash,
+        });
+
+        let (enriched, consume_id) = super::super::mcp_center::enrich_agent_task_payload(
+            &mut broker,
+            "AgentTask実行",
+            &payload,
+        )
+        .expect("Broker内で束縛されたTool結果をFollowup Taskへ渡す");
+        assert_eq!(consume_id.as_deref(), Some(result_id));
+        let effective_instruction = enriched["instruction"].as_str().unwrap();
+        let effective_instruction_hash =
+            crate::audit_hash::sha256_tagged(effective_instruction.as_bytes());
+        let pending = broker
+            .observations
+            .pending_followups
+            .get(result_id)
+            .expect("bounded correlation binding");
+        assert_eq!(pending.instruction_hash, effective_instruction_hash);
+        assert_eq!(pending.source_task_id, "task-source");
+        assert!(!format!("{:?}", broker.observations).contains("private fixture result"));
+
+        broker.observations.record_completed_span(
+            &task_event("task-followup", "start", &effective_instruction_hash, 2),
+            1_010,
+            4,
+        );
+        let followup_trace_id = broker.observations.spans.back().unwrap().trace_id.clone();
+        let response = broker.observations.response_body(&ListRequest {
+            version: VERSION,
+            limit: None,
+            trace_id: None,
+        });
+        let followup_trace = response["Trace一覧"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|trace| trace["TraceID"] == followup_trace_id)
+            .unwrap();
+        assert_eq!(followup_trace["親TraceID"], source_trace_id);
+        assert!(!response.to_string().contains("private fixture result"));
+
+        super::super::mcp_center::consume_agent_result_context_after_task(
+            &mut broker,
+            consume_id.as_deref(),
+            true,
+        );
+        assert!(broker.mcp_agent_results.is_empty());
+        assert!(broker.observations.pending_followups.is_empty());
     }
 
     #[test]
