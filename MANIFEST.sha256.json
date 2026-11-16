@@ -221,7 +221,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "a6ca209db4a931784be1b08aa215882e4e25cd8c9f6b68cceaf352d311822603"
+      "sha256": "500881ea8ef321e000af5ecbf7b86bbe16f41aad5082c51c59b02b0260b5ac13"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -830,6 +830,10 @@
     {
       "path": "apps/desktop_flutter/test/shell_core_unavailable_test.dart",
       "sha256": "075af2e34bbb10d301b113da3f7c145e4ef9b967acd17fdb06fbba5dc2af85be"
+    },
+    {
+      "path": "apps/desktop_flutter/test/shell_home_broker_handoff_generation_test.dart",
+      "sha256": "8d88f69d4eb6c3cf52a1b5f3dfd2b459e8c26d1a4ac549cb2275ef355cab8a46"
     },
     {
       "path": "apps/desktop_flutter/test/support/d4p_receipt_fixtures.dart",
@@ -1625,7 +1629,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "4a005a071a6c8ac44cfdbe91a6bdfadd12270454d216aa98aa7c31b496d5eadc"
+      "sha256": "1ce51b0fa2a7db5e56c48152f2de8c5700996bc0b10e05b4e413912afd5bc238"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",

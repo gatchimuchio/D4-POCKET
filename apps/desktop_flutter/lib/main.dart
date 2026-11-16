@@ -268,6 +268,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
     )) {
       _brokerTransportGeneration++;
       _trayProjectionGeneration++;
+      _pendingAiEditProposal = null;
+      _pendingA2aArtifactHandoff = null;
       _agentTaskExecutionCoordinator?.dispose();
       final transport = widget.client.brokerTransport;
       _agentTaskExecutionCoordinator =
