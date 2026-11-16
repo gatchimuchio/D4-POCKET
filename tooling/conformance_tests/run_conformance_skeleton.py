@@ -11378,6 +11378,48 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
         errors.append("all-enabled baselineのFlutter AOT surface libraryが揃っていない")
     if len(evidence["selected"]["aot_surface_libraries"]) != 2:
         errors.append("選択buildのFlutter AOT surface libraryがReceiptの選択数と一致しない")
+
+    none_receipt = copy.deepcopy(receipt)
+    none_plan = none_receipt["export_manifest"]["module_plan"]
+    none_plan["requested_optional_module_ids"] = []
+    none_plan["included_module_ids"] = [
+        *none_plan["unprunable_core_ids"],
+        *none_plan["mandatory_module_ids"],
+    ]
+    none_plan["excluded_optional_module_ids"] = [
+        module["module_id"] for module in catalog["optional_modules"]
+    ]
+    none_evidence = copy.deepcopy(evidence)
+    none_evidence["requested_optional_module_ids"] = []
+    none_evidence["included_module_ids"] = list(none_plan["included_module_ids"])
+    none_evidence["excluded_optional_module_ids"] = list(
+        none_plan["excluded_optional_module_ids"]
+    )
+    none_defines = {name: False for name in all_optional_defines()}
+    none_evidence["selected"]["effective_dart_defines"] = none_defines
+    none_evidence["selected"]["dart_define_arguments"] = dict(none_defines)
+    none_evidence["selected"]["build_command"] = [
+        argument
+        for argument in none_evidence["selected"]["build_command"]
+        if not argument.startswith("--dart-define=")
+    ] + [
+        f"--dart-define={name}=false" for name in none_defines
+    ]
+    none_evidence["selected"]["aot_surface_libraries"] = []
+    if validate_comparison_evidence(
+        none_evidence, schema, receipt=none_receipt, catalog=catalog
+    ):
+        errors.append("任意ModuleなしのRelease build構成を比較証拠として受け入れない")
+
+    leaked_receipt = copy.deepcopy(none_receipt)
+    leaked_receipt["export_manifest"]["module_plan"]["included_module_ids"].append(
+        EXPECTED_OPTIONAL_IDS[0]
+    )
+    if not validate_comparison_evidence(
+        none_evidence, schema, receipt=leaked_receipt, catalog=catalog
+    ):
+        errors.append("任意Moduleなし構成で任意Moduleの包含漏れを拒否しない")
+
     try:
         _safe_console_text("░", "cp932").encode("cp932")
     except (LookupError, UnicodeEncodeError):
