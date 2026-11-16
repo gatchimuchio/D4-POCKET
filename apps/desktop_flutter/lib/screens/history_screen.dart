@@ -149,7 +149,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           _taskPage = taskPage;
           _grant = taskPage.grant;
           _message =
-              'Agent Taskの取得時点の過去状態です。「先頭から更新」で再取得します。本文・現在の権限・実行状態を示しません。';
+              'Agent Taskの過去状態です。これは取得時点の情報です。「先頭から更新」で再取得します。本文・現在の権限・実行状態を示しません。';
         });
         _scheduleExpiry(taskPage.grant);
       } else {
