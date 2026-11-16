@@ -421,7 +421,9 @@ class AgentAdapterRecord {
 class SetupDoctorCheckRecord {
   const SetupDoctorCheckRecord({
     required this.checkId,
+    required this.scope,
     required this.status,
+    required this.severity,
     required this.message,
     required this.recoveryInstruction,
     required this.grantsAuthority,
@@ -429,7 +431,9 @@ class SetupDoctorCheckRecord {
   });
 
   final String checkId;
+  final String scope;
   final String status;
+  final String severity;
   final String message;
   final String? recoveryInstruction;
   final bool grantsAuthority;
@@ -438,7 +442,9 @@ class SetupDoctorCheckRecord {
   factory SetupDoctorCheckRecord.fromJson(Map<String, Object?> json) {
     return SetupDoctorCheckRecord(
       checkId: json['check_id'] as String? ?? '',
+      scope: json['scope'] as String? ?? 'unknown',
       status: json['status'] as String? ?? '',
+      severity: json['severity'] as String? ?? 'unknown',
       message: json['message'] as String? ?? '',
       recoveryInstruction: json['recovery_instruction'] as String?,
       grantsAuthority: json['grants_authority'] as bool? ?? false,

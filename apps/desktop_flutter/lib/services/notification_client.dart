@@ -49,7 +49,7 @@ class NotificationClient {
     } on Object {
       throw BrokerClientException(_failureMessage(operation));
     }
-    if (response['status'] != 'accepted') {
+    if (response['status'] != 'accepted' || response['error'] != null) {
       throw BrokerClientException(_failureMessage(operation));
     }
     return _body(response, operation);

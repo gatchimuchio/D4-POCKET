@@ -6650,7 +6650,9 @@ Map<String, Object?> _brokerSetupDoctorResponse() {
   const checks = <Map<String, Object?>>[
     {
       'check_id': 'setup_doctor.ran_from_installed_app_path',
+      'scope': 'installation',
       'status': 'unknown',
+      'severity': 'unknown',
       'message': 'installed package配置は未検証です。',
       'recovery_instruction': '正式配置からD4 Pocketを起動してください。',
       'evidence_class': 'INTERNAL_STATE',
@@ -6658,7 +6660,9 @@ Map<String, Object?> _brokerSetupDoctorResponse() {
     },
     {
       'check_id': 'setup_doctor.runtime_connection',
+      'scope': 'runtime',
       'status': 'pass',
+      'severity': 'info',
       'message': 'Broker要求を処理しました。',
       'recovery_instruction': '接続が切れた場合は再起動してください。',
       'evidence_class': 'LIVE_RUNTIME',
@@ -6666,7 +6670,9 @@ Map<String, Object?> _brokerSetupDoctorResponse() {
     },
     {
       'check_id': 'setup_doctor.authority_boundary',
+      'scope': 'authority',
       'status': 'pass',
+      'severity': 'info',
       'message': '診断報告は権限を生成しません。',
       'recovery_instruction': '問題時は権限依存操作を停止してください。',
       'evidence_class': 'CONFIG',
@@ -6674,7 +6680,9 @@ Map<String, Object?> _brokerSetupDoctorResponse() {
     },
     {
       'check_id': 'setup_doctor.network_public_bind',
+      'scope': 'network',
       'status': 'unknown',
+      'severity': 'unknown',
       'message': 'loopback bindを確認できません。',
       'recovery_instruction': '固定loopback設定を確認してください。',
       'evidence_class': 'INTERNAL_STATE',
@@ -6682,7 +6690,9 @@ Map<String, Object?> _brokerSetupDoctorResponse() {
     },
     {
       'check_id': 'setup_doctor.recovery_instruction',
+      'scope': 'recovery',
       'status': 'pass',
+      'severity': 'info',
       'message': '復旧案内を含みます。',
       'recovery_instruction': '最新の報告を再取得してください。',
       'evidence_class': 'CONFIG',
@@ -6690,7 +6700,9 @@ Map<String, Object?> _brokerSetupDoctorResponse() {
     },
     {
       'check_id': 'setup_doctor.audit_storage',
+      'scope': 'audit',
       'status': 'pass',
+      'severity': 'info',
       'message': 'Broker永続storeが利用可能です。',
       'recovery_instruction': 'Broker storeを復旧してください。',
       'evidence_class': 'LIVE_RUNTIME',
@@ -6698,7 +6710,9 @@ Map<String, Object?> _brokerSetupDoctorResponse() {
     },
     {
       'check_id': 'setup_doctor.config_created',
+      'scope': 'configuration',
       'status': 'unknown',
+      'severity': 'unknown',
       'message': '初回config生成は未接続です。',
       'recovery_instruction': '初回config契約の成立前は完了扱いしないでください。',
       'evidence_class': 'CONFIG',

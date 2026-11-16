@@ -80,7 +80,7 @@ Windowsのinstalled smoke collectorは、Setup Doctor product exportが実在し
 
 reportは機密・path・資格を含まない最大64 KiBのJSONとし、Broker durable store内の固定`setup_doctor_report.json`一件だけをatomic replaceする。任意path書込みや履歴蓄積はしない。報告生成は`Setup Doctor報告取得`の`received`／`accepted`／`rejected` Auditへ対応づける。`accepted` eventのpayload hashは、保存したreportの正確なUTF-8 byte列のSHA-256と一致しなければならない。保存失敗、監査失敗、永続store不在では成功reportを返さず、固定recovery案内を返す。保存reportはAuthority、Permission、Approvalを生成せず、監査記録そのものの代替にもならない。
 
-各checkは日本語のmessage、recovery instruction、evidence class、`grants_authority=false`を持つ。現行report対象はinstalled path、Broker応答、authority境界、loopback bind、recovery instruction、Audit永続性、および8.2の初回設定状態である。初回設定が`unknown`の間、strict release validatorはSetup Doctorをrelease証拠として受理しない。Flutterは返却reportを表示するだけで、保存、check生成、status昇格をしない。
+各checkは固定check IDに対応する診断分類`scope`、現在statusから決まる`severity`、日本語message、recovery instruction、evidence class、`grants_authority=false`を持つ。scopeは`installation`／`runtime`／`authority`／`network`／`recovery`／`audit`／`configuration`に限定し、Permission scopeや実行権限を表さない。severityは`pass=info`、`warning=warning`、`fail=critical`、`unknown=unknown`に固定する。現行report対象はinstalled path、Broker応答、authority境界、loopback bind、recovery instruction、Audit永続性、および8.2の初回設定状態である。初回設定が`unknown`の間、strict release validatorはSetup Doctorをrelease証拠として受理しない。Flutterは返却reportを表示するだけで、保存、check生成、scope/severity/statusの推測・昇格をしない。旧v1 reportにscopeとseverityの両方がない場合はUIで両方を`unknown`として表示し、片方だけの欠落や既知ID/statusとの不一致はreport全体を不明へ閉じる。
 
 ### 8.2 Broker統治の初回UI設定
 

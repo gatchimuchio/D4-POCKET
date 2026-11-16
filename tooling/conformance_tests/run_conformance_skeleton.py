@@ -581,8 +581,40 @@ def test_setup_doctor_report_schema_preserves_unknown_and_denies_authority() -> 
         return [f"Setup Doctorの正常報告例が契約に適合しない: {errors}"]
     if valid.get("status") != "warning" or valid["checks"][-1].get("status") != "unknown":
         return ["初回設定が未実装なら状態を不明のまま保持しなければならない"]
+    expected_scopes = {
+        "setup_doctor.ran_from_installed_app_path": "installation",
+        "setup_doctor.runtime_connection": "runtime",
+        "setup_doctor.authority_boundary": "authority",
+        "setup_doctor.network_public_bind": "network",
+        "setup_doctor.recovery_instruction": "recovery",
+        "setup_doctor.audit_storage": "audit",
+        "setup_doctor.config_created": "configuration",
+    }
+    expected_severities = {
+        "pass": "info",
+        "warning": "warning",
+        "fail": "critical",
+        "unknown": "unknown",
+    }
+    for check in valid["checks"]:
+        if check.get("scope") != expected_scopes.get(check.get("check_id")):
+            return ["Setup DoctorのScopeは固定check IDに対応しなければならない"]
+        if check.get("severity") != expected_severities.get(check.get("status")):
+            return ["Setup DoctorのSeverityは現在statusに対応しなければならない"]
     if validate_instance(invalid, schema) == []:
         return ["環境診断報告のSchemaが権限昇格を拒否しない"]
+    bad_scope = {**valid, "checks": [dict(check) for check in valid["checks"]]}
+    bad_scope["checks"][0]["scope"] = "credential"
+    if validate_instance(bad_scope, schema) == []:
+        return ["環境診断報告のSchemaが未知Scopeを拒否しない"]
+    mismatched_scope = {**valid, "checks": [dict(check) for check in valid["checks"]]}
+    mismatched_scope["checks"][0]["scope"] = "authority"
+    if validate_instance(mismatched_scope, schema) == []:
+        return ["環境診断報告のSchemaがcheck IDと不一致の既知Scopeを拒否しない"]
+    bad_severity = {**valid, "checks": [dict(check) for check in valid["checks"]]}
+    bad_severity["checks"][0]["severity"] = "critical"
+    if validate_instance(bad_severity, schema) == []:
+        return ["環境診断報告のSchemaがstatusと不一致のSeverityを拒否しない"]
     return []
 
 
@@ -1989,6 +2021,15 @@ def test_evidence_bundle_is_development_classified_and_non_authoritative() -> li
 
 def _valid_windows_installed_evidence() -> dict:
     setup_checks = []
+    setup_scopes = {
+        "setup_doctor.ran_from_installed_app_path": "installation",
+        "setup_doctor.runtime_connection": "runtime",
+        "setup_doctor.authority_boundary": "authority",
+        "setup_doctor.network_public_bind": "network",
+        "setup_doctor.recovery_instruction": "recovery",
+        "setup_doctor.audit_storage": "audit",
+        "setup_doctor.config_created": "configuration",
+    }
     for check_id, evidence_class in [
         ("setup_doctor.ran_from_installed_app_path", "LIVE_RUNTIME"),
         ("setup_doctor.runtime_connection", "LIVE_RUNTIME"),
@@ -2001,7 +2042,9 @@ def _valid_windows_installed_evidence() -> dict:
         setup_checks.append(
             {
                 "check_id": check_id,
+                "scope": setup_scopes[check_id],
                 "status": "pass",
+                "severity": "info",
                 "message": f"{check_id} passed",
                 "recovery_instruction": "Rerun installed-path smoke after remediation.",
                 "evidence_class": evidence_class,
@@ -2668,6 +2711,7 @@ def test_windows_setup_doctor_does_not_promote_unknown_to_release_pass() -> list
     setup["status"] = "warning"
     setup["product_report"]["status"] = "warning"
     setup["product_report"]["checks"][-1]["status"] = "unknown"
+    setup["product_report"]["checks"][-1]["severity"] = "unknown"
     report_bytes = json.dumps(
         setup["product_report"], ensure_ascii=False, separators=(",", ":")
     ).encode("utf-8")

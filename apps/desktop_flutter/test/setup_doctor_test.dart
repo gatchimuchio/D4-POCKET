@@ -103,6 +103,97 @@ void main() {
     );
   });
 
+  test('Scope/Severity不一致・片側欠落はunknownへ閉じ旧形式はunknownのまま保つ', () async {
+    final transport = _SetupDoctorTransport();
+    final client = await ShellCoreClient.product(transport: transport);
+    final inconsistent = _setupDoctorResponse(
+      status: 'pass',
+      message: '不一致の分類を含む応答です。',
+      auditId: 'audit-setup-doctor-inconsistent-classification',
+    );
+    final inconsistentBody =
+        Map<String, Object?>.from(inconsistent['body']! as Map);
+    final inconsistentChecks = List<Map<String, Object?>>.from(
+      (inconsistentBody['checks']! as List).map(
+        (check) => Map<String, Object?>.from(check as Map),
+      ),
+    );
+    inconsistentChecks.first['scope'] = 'audit';
+    inconsistentBody['checks'] = inconsistentChecks;
+    inconsistent['body'] = inconsistentBody;
+    transport.nextReportResponse = inconsistent;
+
+    final rejected = await client.refreshSetupDoctorReport();
+    expect(rejected.status, 'unknown');
+    expect(rejected.checks.first.scope, 'unknown');
+    expect(rejected.checks.first.severity, 'unknown');
+
+    final wrongSeverity = _setupDoctorResponse(
+      status: 'pass',
+      message: 'statusと異なる重大度を含む応答です。',
+      auditId: 'audit-setup-doctor-wrong-severity',
+    );
+    final wrongSeverityBody =
+        Map<String, Object?>.from(wrongSeverity['body']! as Map);
+    final wrongSeverityChecks = List<Map<String, Object?>>.from(
+      (wrongSeverityBody['checks']! as List).map(
+        (check) => Map<String, Object?>.from(check as Map),
+      ),
+    );
+    wrongSeverityChecks.first['severity'] = 'critical';
+    wrongSeverityBody['checks'] = wrongSeverityChecks;
+    wrongSeverity['body'] = wrongSeverityBody;
+    transport.nextReportResponse = wrongSeverity;
+
+    final rejectedSeverity = await client.refreshSetupDoctorReport();
+    expect(rejectedSeverity.status, 'unknown');
+    expect(rejectedSeverity.checks.first.severity, 'unknown');
+
+    final partial = _setupDoctorResponse(
+      status: 'pass',
+      message: '分類片側が欠落した応答です。',
+      auditId: 'audit-setup-doctor-partial-classification',
+    );
+    final partialBody = Map<String, Object?>.from(partial['body']! as Map);
+    final partialChecks = List<Map<String, Object?>>.from(
+      (partialBody['checks']! as List).map(
+        (check) => Map<String, Object?>.from(check as Map),
+      ),
+    );
+    partialChecks.first.remove('scope');
+    partialBody['checks'] = partialChecks;
+    partial['body'] = partialBody;
+    transport.nextReportResponse = partial;
+
+    final rejectedPartial = await client.refreshSetupDoctorReport();
+    expect(rejectedPartial.status, 'unknown');
+
+    final legacy = _setupDoctorResponse(
+      status: 'warning',
+      message: '分類を持たない旧形式の報告です。',
+      unknownFirstCheck: true,
+      auditId: 'audit-setup-doctor-legacy',
+    );
+    final legacyBody = Map<String, Object?>.from(legacy['body']! as Map);
+    final legacyChecks = List<Map<String, Object?>>.from(
+      (legacyBody['checks']! as List).map(
+        (check) => Map<String, Object?>.from(check as Map),
+      ),
+    );
+    for (final check in legacyChecks) {
+      check.remove('scope');
+      check.remove('severity');
+    }
+    legacyBody['checks'] = legacyChecks;
+    legacy['body'] = legacyBody;
+    transport.nextReportResponse = legacy;
+
+    final compatible = await client.refreshSetupDoctorReport();
+    expect(compatible.status, 'warning');
+    expect(compatible.checks.first.scope, 'unknown');
+    expect(compatible.checks.first.severity, 'unknown');
+  });
+
   testWidgets('Broker client切替後に旧報告の遅延応答を表示しない', (tester) async {
     final firstTransport = _SetupDoctorTransport();
     final firstClient =
@@ -199,6 +290,32 @@ void main() {
           .where((request) => request['operation'] == 'Setup Doctor報告取得'),
       hasLength(2),
     );
+  });
+
+  testWidgets('問題一覧はBroker由来の範囲・重大度・復旧案内を表示専用で示す', (tester) async {
+    final transport = _SetupDoctorTransport();
+    final client = await ShellCoreClient.product(transport: transport);
+    transport.nextReportResponse = _setupDoctorResponse(
+      status: 'warning',
+      message: 'Brokerの実行環境診断です。',
+      warningCheckId: 'setup_doctor.runtime_connection',
+      recoveryInstruction: 'Broker接続を確認してください。',
+      auditId: 'audit-problems-classification',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: ProblemsPanel(client: client))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('診断範囲'), findsOneWidget);
+    expect(find.text('重大度'), findsOneWidget);
+    expect(find.text('実行環境'), findsOneWidget);
+    expect(find.text('注意'), findsOneWidget);
+    expect(find.text('Brokerの実行環境診断です。'), findsOneWidget);
+    expect(find.text('Broker接続を確認してください。'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('problems-panel-refresh')), findsOneWidget);
   });
 
   testWidgets('復旧画面はBrokerの最新案内を表示し再試行安全性を捏造しない', (tester) async {
@@ -630,6 +747,8 @@ Map<String, Object?> _setupDoctorResponse({
   required String message,
   required String auditId,
   bool unknownFirstCheck = false,
+  String? warningCheckId,
+  String recoveryInstruction = 'Broker接続後に再取得してください。',
 }) {
   const checkIds = <String>[
     'setup_doctor.ran_from_installed_app_path',
@@ -640,20 +759,44 @@ Map<String, Object?> _setupDoctorResponse({
     'setup_doctor.audit_storage',
     'setup_doctor.config_created',
   ];
-  final checks = [
-    for (var index = 0; index < checkIds.length; index++)
-      {
-        'check_id': checkIds[index],
-        'status': unknownFirstCheck && index == 0 ? 'unknown' : 'pass',
-        'message': message,
-        'recovery_instruction': 'Broker接続後に再取得してください。',
-        'evidence_class': switch (index) {
-          1 || 5 => 'LIVE_RUNTIME',
-          2 || 4 || 6 => 'CONFIG',
-          _ => 'INTERNAL_STATE',
-        },
-        'grants_authority': false,
+  const scopes = <String>[
+    'installation',
+    'runtime',
+    'authority',
+    'network',
+    'recovery',
+    'audit',
+    'configuration',
+  ];
+  Map<String, Object?> buildCheck(int index) {
+    final checkStatus = unknownFirstCheck && index == 0
+        ? 'unknown'
+        : warningCheckId == checkIds[index]
+            ? 'warning'
+            : 'pass';
+    return {
+      'check_id': checkIds[index],
+      'scope': scopes[index],
+      'status': checkStatus,
+      'severity': switch (checkStatus) {
+        'pass' => 'info',
+        'warning' => 'warning',
+        'fail' => 'critical',
+        _ => 'unknown',
       },
+      'message': message,
+      'recovery_instruction': recoveryInstruction,
+      'evidence_class': switch (index) {
+        1 || 5 => 'LIVE_RUNTIME',
+        2 || 4 || 6 => 'CONFIG',
+        _ => 'INTERNAL_STATE',
+      },
+      'grants_authority': false,
+    };
+  }
+
+  final checks = [
+    for (var index = 0; index < checkIds.length; index++) buildCheck(index),
   ];
   return {
     'request_id': 'test-Setup Doctor報告取得',

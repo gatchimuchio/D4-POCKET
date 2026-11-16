@@ -198,7 +198,9 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
               child: DataTable(
                 columns: const [
                   DataColumn(label: Text('診断ID')),
+                  DataColumn(label: Text('診断範囲')),
                   DataColumn(label: Text('状態')),
+                  DataColumn(label: Text('重大度')),
                   DataColumn(label: Text('証拠種別')),
                   DataColumn(label: Text('Brokerの観測')),
                   DataColumn(label: Text('必要な対応')),
@@ -208,7 +210,9 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
                     DataRow(
                       cells: [
                         DataCell(Text(check.checkId)),
+                        DataCell(Text(_scopeLabel(check.scope))),
                         DataCell(Text(_statusLabel(check.status))),
+                        DataCell(Text(_severityLabel(check.severity))),
                         DataCell(Text(check.evidenceClass ?? 'unknown')),
                         DataCell(Text(check.message)),
                         DataCell(Text(
@@ -259,6 +263,24 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
         'warning' => '警告',
         'unknown' => '不明',
         _ => status,
+      };
+
+  String _scopeLabel(String scope) => switch (scope) {
+        'installation' => '導入',
+        'runtime' => '実行環境',
+        'authority' => '権限境界',
+        'network' => '通信',
+        'recovery' => '復旧',
+        'audit' => '監査',
+        'configuration' => '設定',
+        _ => '不明',
+      };
+
+  String _severityLabel(String severity) => switch (severity) {
+        'info' => '情報',
+        'warning' => '注意',
+        'critical' => '重大',
+        _ => '不明',
       };
 
   DataRow _problemRow(

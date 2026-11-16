@@ -79,6 +79,39 @@ void main() {
     );
   });
 
+  test('acceptedとerrorが混在した応答は成功扱いせず自由文を露出しない', () async {
+    final transport = _NotificationTransport()
+      ..response = {
+        'status': 'accepted',
+        'error': {
+          'message': r'C:\Users\owner\private\notifications.json token=secret',
+        },
+        'body': {
+          '版': 1,
+          '通知一覧': <Object?>[],
+          '件数': 0,
+          '未読件数': 0,
+          '重大件数': 0,
+        },
+      };
+    final client = NotificationClient(transport);
+
+    await expectLater(
+      client.markAllRead(),
+      throwsA(
+        isA<BrokerClientException>().having(
+          (error) => error.message,
+          'safe message',
+          allOf(
+            contains('通知の状態を更新できません'),
+            isNot(contains('private')),
+            isNot(contains('secret')),
+          ),
+        ),
+      ),
+    );
+  });
+
   test('transport例外のpathやsecretを通知clientの例外へ露出しない', () async {
     final transport = _NotificationTransport()
       ..failure = StateError(r'C:\Users\owner\secret=private');

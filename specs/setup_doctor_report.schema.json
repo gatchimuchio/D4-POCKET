@@ -28,7 +28,9 @@
         "type": "object",
         "required": [
           "check_id",
+          "scope",
           "status",
+          "severity",
           "message",
           "recovery_instruction",
           "evidence_class",
@@ -47,14 +49,72 @@
               "setup_doctor.config_created"
             ]
           },
+          "scope": {
+            "enum": [
+              "installation",
+              "runtime",
+              "authority",
+              "network",
+              "recovery",
+              "audit",
+              "configuration"
+            ]
+          },
           "status": { "enum": ["pass", "warning", "fail", "unknown"] },
+          "severity": { "enum": ["info", "warning", "critical", "unknown"] },
           "message": { "type": "string", "minLength": 1 },
           "recovery_instruction": { "type": "string", "minLength": 1 },
           "evidence_class": {
             "enum": ["CONFIG", "INTERNAL_STATE", "LIVE_RUNTIME"]
           },
           "grants_authority": { "type": "boolean", "const": false }
-        }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "status": { "const": "pass" } }, "required": ["status"] },
+            "then": { "properties": { "severity": { "const": "info" } } }
+          },
+          {
+            "if": { "properties": { "status": { "const": "warning" } }, "required": ["status"] },
+            "then": { "properties": { "severity": { "const": "warning" } } }
+          },
+          {
+            "if": { "properties": { "status": { "const": "fail" } }, "required": ["status"] },
+            "then": { "properties": { "severity": { "const": "critical" } } }
+          },
+          {
+            "if": { "properties": { "status": { "const": "unknown" } }, "required": ["status"] },
+            "then": { "properties": { "severity": { "const": "unknown" } } }
+          },
+          {
+            "if": { "properties": { "check_id": { "const": "setup_doctor.ran_from_installed_app_path" } }, "required": ["check_id"] },
+            "then": { "properties": { "scope": { "const": "installation" } } }
+          },
+          {
+            "if": { "properties": { "check_id": { "const": "setup_doctor.runtime_connection" } }, "required": ["check_id"] },
+            "then": { "properties": { "scope": { "const": "runtime" } } }
+          },
+          {
+            "if": { "properties": { "check_id": { "const": "setup_doctor.authority_boundary" } }, "required": ["check_id"] },
+            "then": { "properties": { "scope": { "const": "authority" } } }
+          },
+          {
+            "if": { "properties": { "check_id": { "const": "setup_doctor.network_public_bind" } }, "required": ["check_id"] },
+            "then": { "properties": { "scope": { "const": "network" } } }
+          },
+          {
+            "if": { "properties": { "check_id": { "const": "setup_doctor.recovery_instruction" } }, "required": ["check_id"] },
+            "then": { "properties": { "scope": { "const": "recovery" } } }
+          },
+          {
+            "if": { "properties": { "check_id": { "const": "setup_doctor.audit_storage" } }, "required": ["check_id"] },
+            "then": { "properties": { "scope": { "const": "audit" } } }
+          },
+          {
+            "if": { "properties": { "check_id": { "const": "setup_doctor.config_created" } }, "required": ["check_id"] },
+            "then": { "properties": { "scope": { "const": "configuration" } } }
+          }
+        ]
       }
     },
     "installer_grants_authority": { "type": "boolean", "const": false },

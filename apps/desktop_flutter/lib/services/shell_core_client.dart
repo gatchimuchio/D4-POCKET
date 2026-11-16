@@ -1193,7 +1193,9 @@ Map<String, Object?> _unknownSetupDoctorReport(String message) {
       for (final checkId in checkIds)
         <String, Object?>{
           'check_id': checkId,
+          'scope': 'unknown',
           'status': 'unknown',
+          'severity': 'unknown',
           'message': message,
           'recovery_instruction': 'Broker接続を確認してSetup Doctorを再取得してください。',
           'evidence_class': 'INTERNAL_STATE',
@@ -1266,6 +1268,16 @@ Map<String, Object?> _validatedSetupDoctorReport(Map<String, Object?> report) {
     'evidence_class',
     'grants_authority',
   };
+  const classifiedCheckFields = <String>{
+    'check_id',
+    'scope',
+    'status',
+    'severity',
+    'message',
+    'recovery_instruction',
+    'evidence_class',
+    'grants_authority',
+  };
   const checkIds = <String>{
     'setup_doctor.ran_from_installed_app_path',
     'setup_doctor.runtime_connection',
@@ -1274,6 +1286,21 @@ Map<String, Object?> _validatedSetupDoctorReport(Map<String, Object?> report) {
     'setup_doctor.recovery_instruction',
     'setup_doctor.audit_storage',
     'setup_doctor.config_created',
+  };
+  const scopes = <String, String>{
+    'setup_doctor.ran_from_installed_app_path': 'installation',
+    'setup_doctor.runtime_connection': 'runtime',
+    'setup_doctor.authority_boundary': 'authority',
+    'setup_doctor.network_public_bind': 'network',
+    'setup_doctor.recovery_instruction': 'recovery',
+    'setup_doctor.audit_storage': 'audit',
+    'setup_doctor.config_created': 'configuration',
+  };
+  const severities = <String, String>{
+    'pass': 'info',
+    'warning': 'warning',
+    'fail': 'critical',
+    'unknown': 'unknown',
   };
   final actualReportFields = report.keys.toSet();
   final checks = report['checks'];
@@ -1304,11 +1331,15 @@ Map<String, Object?> _validatedSetupDoctorReport(Map<String, Object?> report) {
     }
     final check = Map<String, Object?>.from(item);
     final actualCheckFields = check.keys.toSet();
+    final hasLegacyShape = actualCheckFields.length == checkFields.length &&
+        actualCheckFields.containsAll(checkFields);
+    final hasClassifiedShape =
+        actualCheckFields.length == classifiedCheckFields.length &&
+            actualCheckFields.containsAll(classifiedCheckFields);
     final id = check['check_id'];
     final status = check['status'];
     final evidenceClass = check['evidence_class'];
-    if (actualCheckFields.length != checkFields.length ||
-        !actualCheckFields.containsAll(checkFields) ||
+    if ((!hasLegacyShape && !hasClassifiedShape) ||
         id is! String ||
         !checkIds.contains(id) ||
         !seen.add(id) ||
@@ -1324,9 +1355,19 @@ Map<String, Object?> _validatedSetupDoctorReport(Map<String, Object?> report) {
       return _unknownSetupDoctorReport(
           'Brokerが返したSetup Doctor checkの内容を検証できません。');
     }
+    if (hasClassifiedShape &&
+        (check['scope'] != scopes[id] ||
+            check['severity'] != severities[status])) {
+      return _unknownSetupDoctorReport(
+          'Brokerが返したSetup DoctorのScopeまたはSeverityが一致しません。');
+    }
     hasFailure |= status == 'fail';
     hasWarningOrUnknown |= status == 'warning' || status == 'unknown';
-    normalized.add(check);
+    normalized.add(<String, Object?>{
+      ...check,
+      'scope': hasClassifiedShape ? check['scope'] : 'unknown',
+      'severity': hasClassifiedShape ? check['severity'] : 'unknown',
+    });
   }
   final expectedStatus =
       hasFailure ? 'fail' : (hasWarningOrUnknown ? 'warning' : 'pass');
@@ -1928,21 +1969,27 @@ const _mockSnapshot = ShellSnapshot(
   setupDoctorChecks: [
     SetupDoctorCheckRecord(
       checkId: 'host.os',
+      scope: 'unknown',
       status: 'pass',
+      severity: 'info',
       message: 'ホストOSを検出しました',
       recoveryInstruction: null,
       grantsAuthority: false,
     ),
     SetupDoctorCheckRecord(
       checkId: 'filesystem.permission',
+      scope: 'unknown',
       status: 'pass',
+      severity: 'info',
       message: '監査保管先へ書込み可能です',
       recoveryInstruction: null,
       grantsAuthority: false,
     ),
     SetupDoctorCheckRecord(
       checkId: 'network.public_bind',
+      scope: 'unknown',
       status: 'warning',
+      severity: 'warning',
       message: '公開bindには操作者の明示確認が必要です',
       recoveryInstruction: '許可と承認が公開bindを明示的に認めない限り、実行系はlocalhostに限定してください。',
       grantsAuthority: false,
@@ -2320,7 +2367,9 @@ const _localFallbackSnapshot = ShellSnapshot(
   setupDoctorChecks: [
     SetupDoctorCheckRecord(
       checkId: 'local.snapshot',
+      scope: 'unknown',
       status: 'warning',
+      severity: 'warning',
       message: 'メモリ内診断スナップショットが注入されていません',
       recoveryInstruction: '診断データを明示的に渡すか、製品操作ではBroker経路を使用してください。',
       grantsAuthority: false,

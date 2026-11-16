@@ -5901,6 +5901,7 @@ impl Broker {
         let checks = vec![
             setup_doctor_check(
                 "setup_doctor.ran_from_installed_app_path",
+                "installation",
                 if self.desktop_install_path_verified { "pass" } else { "unknown" },
                 if self.desktop_install_path_verified {
                     "Rust起動器が固定installed package配置を検証しました。"
@@ -5912,6 +5913,7 @@ impl Broker {
             ),
             setup_doctor_check(
                 "setup_doctor.runtime_connection",
+                "runtime",
                 "pass",
                 "通常資格で認証されたBroker要求をRust Brokerが処理しています。",
                 "Broker接続が切れた場合はD4 Pocketを終了し、Desktop起動器から再起動してください。",
@@ -5919,6 +5921,7 @@ impl Broker {
             ),
             setup_doctor_check(
                 "setup_doctor.authority_boundary",
+                "authority",
                 "pass",
                 "Setup Doctor報告は権限を生成せず、installerも権限を付与・承認しません。",
                 "権限境界の検査に失敗した場合は権限依存操作を停止し、監査可能なBroker buildへ更新してください。",
@@ -5926,6 +5929,7 @@ impl Broker {
             ),
             setup_doctor_check(
                 "setup_doctor.network_public_bind",
+                "network",
                 if self.desktop_loopback_bind_verified { "pass" } else { "unknown" },
                 if self.desktop_loopback_bind_verified {
                     "実際にbindしたBroker IPCはIPv4 loopbackに限定されています。"
@@ -5937,6 +5941,7 @@ impl Broker {
             ),
             setup_doctor_check(
                 "setup_doctor.recovery_instruction",
+                "recovery",
                 "pass",
                 "各診断checkに個別の復旧案内があります。",
                 "復旧案内が欠落するreportを使用せず、製品診断を再実行してください。",
@@ -5944,6 +5949,7 @@ impl Broker {
             ),
             setup_doctor_check(
                 "setup_doctor.audit_storage",
+                "audit",
                 if health.persistence_ready { "pass" } else { "warning" },
                 if health.persistence_ready {
                     "Brokerは永続Audit storeを使用しています。"
@@ -5955,6 +5961,7 @@ impl Broker {
             ),
             setup_doctor_check(
                 "setup_doctor.config_created",
+                "configuration",
                 if self.desktop_first_run_configuration.is_some() { "pass" } else { "unknown" },
                 if self.desktop_first_run_configuration.is_some() {
                     "Rust Brokerが固定storeの初回UI設定をSchema検証し、Audit hashへ結合しました。"
@@ -6891,14 +6898,23 @@ fn epoch_seconds_to_rfc3339(epoch_seconds: i64) -> String {
 #[cfg(feature = "module_setup_doctor")]
 fn setup_doctor_check(
     check_id: &str,
+    scope: &str,
     status: &str,
     message: &str,
     recovery_instruction: &str,
     evidence_class: &str,
 ) -> Value {
+    let severity = match status {
+        "pass" => "info",
+        "warning" => "warning",
+        "fail" => "critical",
+        _ => "unknown",
+    };
     serde_json::json!({
         "check_id": check_id,
+        "scope": scope,
         "status": status,
+        "severity": severity,
         "message": message,
         "recovery_instruction": recovery_instruction,
         "evidence_class": evidence_class,
@@ -8457,6 +8473,37 @@ mod tests {
         assert_eq!(report["checks"][3]["status"], "pass");
         assert_eq!(report["checks"][6]["status"], "unknown");
         assert_eq!(report["checks"][6]["evidence_class"], "CONFIG");
+        let checks = report["checks"].as_array().unwrap();
+        let expected_scopes = [
+            "installation",
+            "runtime",
+            "authority",
+            "network",
+            "recovery",
+            "audit",
+            "configuration",
+        ];
+        for (check, expected_scope) in checks.iter().zip(expected_scopes) {
+            assert_eq!(check["scope"], expected_scope);
+            let expected_severity = match check["status"].as_str().unwrap() {
+                "pass" => "info",
+                "warning" => "warning",
+                "fail" => "critical",
+                _ => "unknown",
+            };
+            assert_eq!(check["severity"], expected_severity);
+        }
+        assert_eq!(checks[5]["status"], "pass");
+        assert_eq!(checks[5]["severity"], "info");
+        let warning = setup_doctor_check(
+            "setup_doctor.audit_storage",
+            "audit",
+            "warning",
+            "Audit storeの準備状態を確認できません。",
+            "Broker固定storeを確認してください。",
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+        );
+        assert_eq!(warning["severity"], "warning");
         assert!(report["checks"]
             .as_array()
             .unwrap()
@@ -8495,6 +8542,22 @@ mod tests {
             bytes
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(feature = "module_setup_doctor")]
+    #[test]
+    fn setup_doctor_failure_status_projects_critical_severity() {
+        let check = setup_doctor_check(
+            "setup_doctor.runtime_connection",
+            "runtime",
+            "fail",
+            "Broker接続が利用できません。",
+            "Broker接続を確認してください。",
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+        );
+        assert_eq!(check["scope"], "runtime");
+        assert_eq!(check["severity"], "critical");
+        assert_eq!(check["grants_authority"], false);
     }
 
     #[test]
