@@ -12,6 +12,6 @@
     "件数": { "type": "integer", "minimum": 1, "maximum": 1024 },
     "証拠種別": { "const": "INTERNAL_STATE" },
     "生成源": { "const": "broker_audit_finalization" },
-    "親TraceID": { "type": ["string", "null"], "maxLength": 128 }
+    "親TraceID": { "type": ["string", "null"], "pattern": "^observation-trace-[1-9][0-9]*$", "maxLength": 128 }
   }
 }

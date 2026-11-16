@@ -12,6 +12,7 @@ C13は、性能・挙動・運用状態を確認するための内部観測面�
 - Desktopの観測センターはMetric、Span、責任分離、証拠種別を表示する。
 - 観測はsession内memoryに限定し、Audit永続storeとは別管理にする。
 - responseの証拠種別は`INTERNAL_STATE`に固定する。
+- `観測一覧`のSpan／Trace／Metric各要素は対応Schemaへ照合し、未知field・型不一致・TraceとSpanの参照不一致を拒否する。
 
 ## 境界
 

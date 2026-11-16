@@ -7,9 +7,9 @@
   "additionalProperties": false,
   "properties": {
     "版": { "const": 1 },
-    "Span一覧": { "type": "array", "maxItems": 256, "items": { "type": "object" } },
-    "Trace一覧": { "type": "array", "maxItems": 256, "items": { "type": "object" } },
-    "Metric一覧": { "type": "array", "maxItems": 16, "items": { "type": "object" } },
+    "Span一覧": { "type": "array", "maxItems": 256, "items": { "$ref": "observation_span.schema.json" } },
+    "Trace一覧": { "type": "array", "maxItems": 256, "items": { "$ref": "observation_trace.schema.json" } },
+    "Metric一覧": { "type": "array", "maxItems": 16, "items": { "$ref": "observation_metric.schema.json" } },
     "件数": { "type": "integer", "minimum": 0, "maximum": 256 },
     "証拠種別": { "const": "INTERNAL_STATE" },
     "観測範囲": { "const": "broker_audit_finalization" },

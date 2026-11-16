@@ -35,12 +35,15 @@ class _ObservationTransport implements BrokerTransport {
         '版': 1,
         'Span一覧': [
           {
-            'TraceID': 'trace-$label',
-            'SpanID': 'span-$label',
-            '対象': 'Broker $label',
-            '操作': 'fixture-observation',
+            '版': 1,
+            'TraceID': 'observation-trace-1',
+            'SpanID': 'observation-span-1',
+            '親SpanID': null,
+            '対象': 'Broker',
+            '操作': 'fixture-observation-$label',
             '状態': 'completed',
             '所要Millis': 12,
+            'エラー分類': null,
             '関連監査ID': 'audit-$label',
             '証拠種別': 'INTERNAL_STATE',
             '開始EpochMillis': 1700000000000,
@@ -48,14 +51,27 @@ class _ObservationTransport implements BrokerTransport {
           },
         ],
         'Trace一覧': [
-          {'TraceID': 'trace-$label'},
+          {
+            '版': 1,
+            'TraceID': 'observation-trace-1',
+            'SpanID一覧': ['observation-span-1'],
+            '件数': 1,
+            '証拠種別': 'INTERNAL_STATE',
+            '生成源': 'broker_audit_finalization',
+            '親TraceID': null,
+          },
         ],
         'Metric一覧': [
           {
+            '版': 1,
+            'MetricID': 'broker.operation.count',
             '名称': 'Fixture Metric $label',
             '値': 3,
             '単位': 'count',
-            '状態': 'measured',
+            '種別': 'counter',
+            '観測件数': 1,
+            '状態': 'observed',
+            '証拠種別': 'INTERNAL_STATE',
           },
         ],
         '件数': 1,
@@ -96,13 +112,13 @@ void main() {
 
     await tester.pumpWidget(_observabilityScreen(second));
     await tester.pumpAndSettle();
-    expect(find.text('Broker B / fixture-observation'), findsOneWidget);
-    expect(find.text('Broker A / fixture-observation'), findsNothing);
+    expect(find.text('Broker / fixture-observation-B'), findsOneWidget);
+    expect(find.text('Broker / fixture-observation-A'), findsNothing);
 
     oldRequest.complete();
     await tester.pumpAndSettle();
-    expect(find.text('Broker B / fixture-observation'), findsOneWidget);
-    expect(find.text('Broker A / fixture-observation'), findsNothing);
+    expect(find.text('Broker / fixture-observation-B'), findsOneWidget);
+    expect(find.text('Broker / fixture-observation-A'), findsNothing);
     expect(second.requests, hasLength(1));
   });
 
@@ -111,17 +127,17 @@ void main() {
     final second = _ObservationTransport('B');
     await tester.pumpWidget(_traceScreen(first));
     await tester.pumpAndSettle();
-    expect(find.text('Broker A / fixture-observation / completed'),
+    expect(find.text('Broker / fixture-observation-A / completed'),
         findsOneWidget);
 
     await tester.tap(find.byType(DropdownButton<String?>));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('trace-A').last);
+    await tester.tap(find.text('observation-trace-1').last);
     await tester.pumpAndSettle();
     expect(first.requests.last['payload'], {
       '版': 1,
       '上限': 256,
-      'TraceID': 'trace-A',
+      'TraceID': 'observation-trace-1',
     });
 
     final oldRequest = Completer<void>();
@@ -131,18 +147,18 @@ void main() {
 
     await tester.pumpWidget(_traceScreen(second));
     await tester.pumpAndSettle();
-    expect(find.text('Broker B / fixture-observation / completed'),
+    expect(find.text('Broker / fixture-observation-B / completed'),
         findsOneWidget);
     expect(
-        find.text('Broker A / fixture-observation / completed'), findsNothing);
+        find.text('Broker / fixture-observation-A / completed'), findsNothing);
     expect(second.requests, hasLength(1));
     expect(second.requests.single['payload'], {'版': 1, '上限': 256});
 
     oldRequest.complete();
     await tester.pumpAndSettle();
-    expect(find.text('Broker B / fixture-observation / completed'),
+    expect(find.text('Broker / fixture-observation-B / completed'),
         findsOneWidget);
     expect(
-        find.text('Broker A / fixture-observation / completed'), findsNothing);
+        find.text('Broker / fixture-observation-A / completed'), findsNothing);
   });
 }

@@ -9,7 +9,7 @@
     "版": { "const": 1 },
     "MetricID": { "type": "string", "pattern": "^broker\\.[a-z0-9_.-]+$" },
     "名称": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "値": { "type": ["number", "null"] },
+    "値": { "type": ["number", "null"], "minimum": 0 },
     "単位": { "enum": ["count", "ms"] },
     "種別": { "enum": ["counter", "gauge"] },
     "観測件数": { "type": "integer", "minimum": 0, "maximum": 1024 },

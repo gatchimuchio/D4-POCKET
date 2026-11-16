@@ -409,7 +409,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/observation_client.dart",
-      "sha256": "0f25696b7ddb401c0105fb0b0f6cea3085a595d8f01e780207d1a920f6498e95"
+      "sha256": "d094896a6c749146124f6f6a46839160d3323086540156df955d0cde09a2e875"
     },
     {
       "path": "apps/desktop_flutter/lib/services/profile_client.dart",
@@ -745,7 +745,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/module_pruning_test.dart",
-      "sha256": "42bb879e41e9b4862a7937d67193d287edbc9208d3c9498bb690b5efb1f6ed50"
+      "sha256": "79065191e4a17f61b7e33f54cd2797fa62f0345fd764125949db06fa4c6f019a"
     },
     {
       "path": "apps/desktop_flutter/test/notification_client_test.dart",
@@ -757,11 +757,11 @@
     },
     {
       "path": "apps/desktop_flutter/test/observation_client_test.dart",
-      "sha256": "8a9d86f97baafd72abf3f8b79c13cda3d05331dbdb127f825c6c008b86fcadea"
+      "sha256": "d9157aeb9717e69ad29d212c918cc96c999c80a5e3ec6773f25ed9f30d1c50b3"
     },
     {
       "path": "apps/desktop_flutter/test/observation_screen_test.dart",
-      "sha256": "11868f0e186fa40b47f79ceafc55dd1e0db8d73a73cb4ea32edc69900de44e98"
+      "sha256": "1bde401fef242dc611485b64fec899162038ab84be3a4b112a0456873f1b427b"
     },
     {
       "path": "apps/desktop_flutter/test/profile_client_test.dart",
@@ -1597,7 +1597,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "8dbf38bbb8148beb75c045201cd52da8b6a6e1c8aecfdc01c3dced1a0cfec820"
+      "sha256": "7098331f2128d78a537eeb6dabca566f485ea18e0558c008c81322dad0c197f8"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "docs/specs/observability-center.md",
-      "sha256": "06e623838bf6f526360d7deaee6d2a6ac05363b3ef61e5babda19cbe01bfd657"
+      "sha256": "af96b80830acdee3549a121762f72af86b16d7c2172a3367ea2036074c7e3682"
     },
     {
       "path": "docs/specs/operation-profile.md",
@@ -5413,19 +5413,19 @@
     },
     {
       "path": "specs/observation_list.schema.json",
-      "sha256": "e078f88ee042e077039b0299048d48d7af6ae6ccac005c2c479791c006aad1cf"
+      "sha256": "25f49b86df251a8b1685a0e980fb083a296016fcbf88fad5faf5a2e8ec0bc289"
     },
     {
       "path": "specs/observation_metric.schema.json",
-      "sha256": "8dd960f846826f70a09280ca99ad50574c26e40098fff08209ef47557340eff1"
+      "sha256": "3d8e80dd9470f05ffab99b98b181f23c3d209f51610b4362225a6c417415f107"
     },
     {
       "path": "specs/observation_span.schema.json",
-      "sha256": "3944cb7008900f3cd19f005da086416fd6598f2f2b7ee5ef3feb0f40ddd19521"
+      "sha256": "5589ed82e5956c55558e89172f756b32ca0b8706da81a6fb437be5a02fdf7d41"
     },
     {
       "path": "specs/observation_trace.schema.json",
-      "sha256": "cf79db8b5b84292f0e7e69b17a65434500031f06b23974f76eb9db73f272ed79"
+      "sha256": "535812c865177fb6dec01fbddaa72a486c24fe7488701cc08df321029c271ee0"
     },
     {
       "path": "specs/permission.schema.json",

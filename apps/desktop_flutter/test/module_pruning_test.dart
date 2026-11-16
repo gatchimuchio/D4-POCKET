@@ -128,7 +128,7 @@ void main() {
       expect(find.text('Span: 1'), findsOneWidget);
       expect(find.text('Trace: 1'), findsOneWidget);
       expect(find.text('Metric: 1'), findsOneWidget);
-      expect(find.text('Fixture Metric: 3 count (measured)'), findsOneWidget);
+      expect(find.text('Fixture Metric: 3 count (observed)'), findsOneWidget);
       expect(
           find.textContaining('Broker / fixture-observation'), findsOneWidget);
       expect(find.textContaining('Audit=責任・安全・証拠'), findsOneWidget);
@@ -168,17 +168,17 @@ void main() {
           tester.widget<DropdownButton<String?>>(traceDropdown);
       expect(
         dropdownWidget.items!.map((item) => item.value),
-        contains('module-trace-fixture'),
+        contains('observation-trace-2'),
       );
       await tester.tap(traceDropdown);
       await tester.pumpAndSettle();
-      expect(find.text('module-trace-fixture'), findsWidgets);
-      await tester.tap(find.text('module-trace-fixture').last);
+      expect(find.text('observation-trace-2'), findsWidgets);
+      await tester.tap(find.text('observation-trace-2').last);
       await tester.pumpAndSettle();
       final filteredPayloads = <Map<String, Object?>>[
         for (var index = 0; index < fixture.operations.length; index++)
           if (fixture.operations[index] == '観測一覧' &&
-              fixture.payloads[index]['TraceID'] == 'module-trace-fixture')
+              fixture.payloads[index]['TraceID'] == 'observation-trace-2')
             fixture.payloads[index],
       ];
       expect(filteredPayloads, hasLength(1));
@@ -353,12 +353,15 @@ class _ObservationFixtureTransport implements BrokerTransport {
         '版': 1,
         'Span一覧': [
           {
-            'TraceID': 'module-trace-fixture',
-            'SpanID': 'module-span-fixture',
+            '版': 1,
+            'TraceID': 'observation-trace-2',
+            'SpanID': 'observation-span-2',
+            '親SpanID': null,
             '対象': 'Broker',
             '操作': 'fixture-observation',
             '状態': 'completed',
             '所要Millis': 12,
+            'エラー分類': null,
             '関連監査ID': 'audit-observation-fixture',
             '証拠種別': 'INTERNAL_STATE',
             '開始EpochMillis': 1700000000000,
@@ -366,15 +369,27 @@ class _ObservationFixtureTransport implements BrokerTransport {
           },
         ],
         'Trace一覧': [
-          {'TraceID': 'module-trace-fixture'},
+          {
+            '版': 1,
+            'TraceID': 'observation-trace-2',
+            'SpanID一覧': ['observation-span-2'],
+            '件数': 1,
+            '証拠種別': 'INTERNAL_STATE',
+            '生成源': 'broker_audit_finalization',
+            '親TraceID': null,
+          },
         ],
         'Metric一覧': [
           {
-            'MetricID': 'fixture-metric-1',
+            '版': 1,
+            'MetricID': 'broker.fixture.metric',
             '名称': 'Fixture Metric',
             '値': 3,
             '単位': 'count',
-            '状態': 'measured',
+            '種別': 'counter',
+            '観測件数': 1,
+            '状態': 'observed',
+            '証拠種別': 'INTERNAL_STATE',
           },
         ],
         '件数': 1,

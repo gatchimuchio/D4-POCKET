@@ -39,6 +39,50 @@ Map<String, Object?> _validBody() => {
       '権限生成': 'なし',
     };
 
+Map<String, Object?> _sampleBody() => _validBody()
+  ..['Span一覧'] = [
+    {
+      '版': 1,
+      'SpanID': 'observation-span-1',
+      'TraceID': 'observation-trace-1',
+      '親SpanID': null,
+      '対象': 'Broker',
+      '操作': 'MCP Tool実行',
+      '開始EpochMillis': 1700000000000,
+      '終了EpochMillis': 1700000000012,
+      '所要Millis': 12,
+      '状態': 'accepted',
+      'エラー分類': null,
+      '関連監査ID': 'broker-audit-1',
+      '証拠種別': 'INTERNAL_STATE',
+    },
+  ]
+  ..['Trace一覧'] = [
+    {
+      '版': 1,
+      'TraceID': 'observation-trace-1',
+      'SpanID一覧': ['observation-span-1'],
+      '件数': 1,
+      '証拠種別': 'INTERNAL_STATE',
+      '生成源': 'broker_audit_finalization',
+      '親TraceID': null,
+    },
+  ]
+  ..['Metric一覧'] = [
+    {
+      '版': 1,
+      'MetricID': 'broker.operation.count',
+      '名称': '操作観測数',
+      '値': 1,
+      '単位': 'count',
+      '種別': 'counter',
+      '観測件数': 1,
+      '状態': 'observed',
+      '証拠種別': 'INTERNAL_STATE',
+    },
+  ]
+  ..['件数'] = 1;
+
 void main() {
   test('観測clientは契約内のbounded一覧をBrokerへ要求する', () async {
     final transport = _FakeObservationTransport();
@@ -86,6 +130,44 @@ void main() {
 
     expect(transport.lastPayload?['上限'], 256);
     expect(transport.lastPayload?['TraceID'], List.filled(128, 'x').join());
+  });
+
+  test('nested schemaに合うSpan/Trace/Metricだけを受け入れる', () async {
+    final transport = _FakeObservationTransport()
+      ..response = {'status': 'accepted', 'body': _sampleBody()};
+    final body = await ObservationClient(transport).list();
+
+    expect(body['件数'], 1);
+  });
+
+  test('nested objectの余分な秘密fieldとSpan/Trace不整合を拒否する', () async {
+    final invalidBodies = <Map<String, Object?>>[];
+
+    final spanSecret = _sampleBody();
+    (spanSecret['Span一覧'] as List).single['秘密本文'] = 'secret marker';
+    invalidBodies.add(spanSecret);
+
+    final metricSecret = _sampleBody();
+    (metricSecret['Metric一覧'] as List).single['raw_input'] = 'private';
+    invalidBodies.add(metricSecret);
+
+    final badTraceLink = _sampleBody();
+    ((badTraceLink['Trace一覧'] as List).single['SpanID一覧'] as List)[0] =
+        'observation-span-2';
+    invalidBodies.add(badTraceLink);
+
+    final badDuration = _sampleBody();
+    (badDuration['Span一覧'] as List).single['所要Millis'] = 13;
+    invalidBodies.add(badDuration);
+
+    for (final body in invalidBodies) {
+      final transport = _FakeObservationTransport()
+        ..response = {'status': 'accepted', 'body': body};
+      await expectLater(
+        () => ObservationClient(transport).list(),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
   });
 
   test('契約外・上限超過・Authority誤表記の応答を拒否する', () async {
