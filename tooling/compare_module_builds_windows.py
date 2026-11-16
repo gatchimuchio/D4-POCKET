@@ -95,6 +95,222 @@ def comparison_summary(
     }
 
 
+def _resource_files(artifact_files: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Windows Flutter bundleに実在するflutter_assets fileを返す。"""
+    return sorted(
+        (
+            item
+            for item in artifact_files
+            if item["path"].startswith("data/flutter_assets/")
+        ),
+        key=lambda item: item["path"],
+    )
+
+
+def resource_inventory_comparison(
+    baseline_files: list[dict[str, Any]], selected_files: list[dict[str, Any]]
+) -> dict[str, Any]:
+    baseline = _resource_files(baseline_files)
+    selected = _resource_files(selected_files)
+    baseline_by_path = {item["path"]: item for item in baseline}
+    selected_by_path = {item["path"]: item for item in selected}
+    changed = sorted(
+        path
+        for path in baseline_by_path.keys() | selected_by_path.keys()
+        if baseline_by_path.get(path) != selected_by_path.get(path)
+    )
+    return {
+        "baseline_resource_bytes": sum(item["size_bytes"] for item in baseline),
+        "selected_resource_bytes": sum(item["size_bytes"] for item in selected),
+        "changed_resource_paths": changed,
+        "resource_inventory_identical": not changed,
+    }
+
+
+def _runtime_dependency_tree_from_json(value: dict[str, Any]) -> dict[str, Any]:
+    """dart pub deps JSONからrootのruntime依存閉包を正規化する。"""
+    packages = value.get("packages")
+    if not isinstance(packages, list):
+        raise ValueError("dart pub deps JSONにpackages一覧がない")
+    if any(
+        not isinstance(item, dict) or not isinstance(item.get("name"), str)
+        for item in packages
+    ):
+        raise ValueError("dart pub deps JSONに不正なpackage entryがある")
+    entries = {item["name"]: item for item in packages}
+    if len(entries) != len(packages):
+        raise ValueError("dart pub deps JSONに重複package nodeがある")
+    root = entries.get(value.get("root"))
+    if (
+        root is None
+        or root.get("kind") != "root"
+        or root.get("name") != value.get("root")
+    ):
+        raise ValueError("dart pub deps JSONのroot packageが特定できない")
+    direct = root.get("directDependencies")
+    if not isinstance(direct, list) or any(not isinstance(item, str) for item in direct):
+        raise ValueError("dart pub deps JSONのdirectDependenciesが不正である")
+    if len(direct) != len(set(direct)):
+        raise ValueError("dart pub deps JSONのdirectDependenciesに重複がある")
+
+    pending = list(direct)
+    visited: set[str] = set()
+    normalized: list[dict[str, Any]] = []
+    while pending:
+        name = pending.pop()
+        if name in visited:
+            continue
+        entry = entries.get(name)
+        if entry is None:
+            raise ValueError(f"runtime依存packageがpub deps graphに存在しない: {name}")
+        dependencies = entry.get("dependencies", [])
+        if not isinstance(dependencies, list) or any(
+            not isinstance(item, str) for item in dependencies
+        ):
+            raise ValueError(f"runtime依存packageのedgeが不正である: {name}")
+        if len(dependencies) != len(set(dependencies)):
+            raise ValueError(f"runtime依存packageのedgeが重複している: {name}")
+        if not isinstance(entry.get("source"), str) or not entry["source"]:
+            raise ValueError(f"runtime依存packageのsourceが不正である: {name}")
+        if not isinstance(entry.get("version"), str):
+            raise ValueError(f"runtime依存packageのversionが不正である: {name}")
+        visited.add(name)
+        pending.extend(dependencies)
+        normalized.append(
+            {
+                "name": name,
+                "version": str(entry.get("version", "")),
+                "source": str(entry.get("source", "")),
+                "dependencies": sorted(set(dependencies)),
+            }
+        )
+
+    direct_dependencies = sorted(set(direct))
+    normalized.sort(key=lambda item: item["name"])
+    digest_input = {
+        "root_package": root["name"],
+        "direct_runtime_dependencies": direct_dependencies,
+        "runtime_packages": normalized,
+    }
+    digest = hashlib.sha256(
+        json.dumps(
+            digest_input, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
+    return {
+        "source": "dart_pub_deps_json",
+        "command": "dart pub deps --json",
+        **digest_input,
+        "runtime_package_count": len(normalized),
+        "runtime_tree_sha256": digest,
+    }
+
+
+def _runtime_dependency_tree(dart_executable: str) -> dict[str, Any]:
+    completed = subprocess.run(
+        [dart_executable, "pub", "deps", "--json"],
+        cwd=ROOT / "apps" / "desktop_flutter",
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if completed.returncode != 0:
+        raise ValueError(
+            "dart pub deps --jsonに失敗した: "
+            + completed.stderr.strip()[-1000:]
+        )
+    value = _parse_json_bytes(completed.stdout.encode("utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("dart pub deps --jsonがobjectを返さなかった")
+    return _runtime_dependency_tree_from_json(value)
+
+
+def _dart_executable(flutter_executable: str, expected_version: str) -> str:
+    flutter_bin = Path(flutter_executable).resolve().parent
+    candidates = [
+        flutter_bin / "dart.bat",
+        flutter_bin / "dart.cmd",
+        flutter_bin / "dart.exe",
+        flutter_bin / "cache" / "dart-sdk" / "bin" / "dart.exe",
+    ]
+    path_dart = shutil.which("dart")
+    if path_dart is not None:
+        candidates.append(Path(path_dart))
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = str(candidate.resolve()) if candidate.exists() else str(candidate)
+        if normalized.lower() in seen:
+            continue
+        seen.add(normalized.lower())
+        if not candidate.is_file() and shutil.which(str(candidate)) is None:
+            continue
+        completed = subprocess.run(
+            [str(candidate), "--version"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            errors="replace",
+        )
+        version_output = completed.stdout + completed.stderr
+        if completed.returncode == 0 and expected_version in version_output:
+            return str(candidate)
+    raise ValueError("Flutter toolchainと同じDart SDK executableを特定できない")
+
+
+def _aot_package_libraries(report: dict[str, Any]) -> list[str]:
+    """Flutter AOT treeに含まれるpackage配下のDart library pathを列挙する。"""
+    roots: list[dict[str, Any]] = []
+    pending: list[Any] = [report]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            if value.get("n") == AOT_REPORT_ROOT:
+                roots.append(value)
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+    if len(roots) != 1:
+        raise ValueError("Flutter size-analysis reportにDart AOT treeが一意に存在しない")
+
+    found: set[str] = set()
+    path_stack: list[tuple[Any, str | None]] = [(roots[0], None)]
+    while path_stack:
+        value, package_path = path_stack.pop()
+        if isinstance(value, dict):
+            name = value.get("n")
+            if isinstance(name, str):
+                if name.startswith("package:"):
+                    package_path = name
+                    if name.endswith(".dart"):
+                        found.add(name)
+                elif package_path is not None and name.endswith(".dart"):
+                    found.add(f"{package_path.rstrip('/')}/{name}")
+            children = value.get("children", [])
+            if isinstance(children, list):
+                path_stack.extend((child, package_path) for child in children)
+    return sorted(found)
+
+
+def package_dependency_comparison(
+    baseline: dict[str, Any], selected: dict[str, Any]
+) -> dict[str, Any]:
+    baseline_tree = baseline["runtime_dependency_tree"]
+    selected_tree = selected["runtime_dependency_tree"]
+    baseline_libraries = set(baseline["aot_package_libraries"])
+    selected_libraries = set(selected["aot_package_libraries"])
+    return {
+        "baseline_runtime_tree_sha256": baseline_tree["runtime_tree_sha256"],
+        "selected_runtime_tree_sha256": selected_tree["runtime_tree_sha256"],
+        "runtime_package_tree_identical": baseline_tree == selected_tree,
+        "removed_aot_package_libraries": sorted(baseline_libraries - selected_libraries),
+        "added_aot_package_libraries": sorted(selected_libraries - baseline_libraries),
+    }
+
+
 def _aot_surface_libraries(report: dict[str, Any], catalog: dict[str, Any]) -> list[str]:
     """Flutter AOT size report内に存在するCatalog対象Dart libraryを列挙する。"""
     aot_roots: list[dict[str, Any]] = []
@@ -259,6 +475,50 @@ def validate_comparison_evidence(
             errors.append(f"{run['label']} snapshotとprecompiler traceが揃っていない")
         if any(not item["path"].startswith(expected_prefix + "inputs/") for item in analysis_inputs):
             errors.append(f"{run['label']} size-analysis入力の採取位置が不正である")
+        dependency_tree = run["runtime_dependency_tree"]
+        dependency_names = [
+            item["name"] for item in dependency_tree["runtime_packages"]
+        ]
+        if dependency_tree["runtime_package_count"] != len(
+            dependency_tree["runtime_packages"]
+        ):
+            errors.append(f"{run['label']} runtime package countが一致しない")
+        if dependency_names != sorted(set(dependency_names)):
+            errors.append(f"{run['label']} runtime package nodeが一意・整列されていない")
+        dependency_name_set = set(dependency_names)
+        if not set(dependency_tree["direct_runtime_dependencies"]).issubset(
+            dependency_name_set
+        ):
+            errors.append(f"{run['label']} direct runtime dependency nodeが欠けている")
+        if any(
+            not set(item["dependencies"]).issubset(dependency_name_set)
+            for item in dependency_tree["runtime_packages"]
+        ):
+            errors.append(f"{run['label']} runtime dependency edgeの参照先が欠けている")
+        dependency_digest_input = {
+            "root_package": dependency_tree["root_package"],
+            "direct_runtime_dependencies": dependency_tree[
+                "direct_runtime_dependencies"
+            ],
+            "runtime_packages": dependency_tree["runtime_packages"],
+        }
+        dependency_digest = hashlib.sha256(
+            json.dumps(
+                dependency_digest_input,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        if dependency_digest != dependency_tree["runtime_tree_sha256"]:
+            errors.append(f"{run['label']} runtime dependency tree hashが一致しない")
+        if run["aot_package_libraries"] != sorted(
+            set(run["aot_package_libraries"])
+        ):
+            errors.append(f"{run['label']} AOT package libraryが一意・整列されていない")
+
+    if baseline["runtime_dependency_tree"] != selected["runtime_dependency_tree"]:
+        errors.append("同一sourceのModule選択間でruntime dependency treeが変化した")
 
     try:
         expected_summary = comparison_summary(
@@ -268,6 +528,18 @@ def validate_comparison_evidence(
             errors.append("comparison summaryがartifact file記録から再計算した値と一致しない")
     except (KeyError, TypeError, ValueError) as exc:
         errors.append(f"artifact比較を再計算できない: {exc}")
+
+    try:
+        expected_resources = resource_inventory_comparison(
+            baseline["artifact_files"], selected["artifact_files"]
+        )
+        if evidence["resource_inventory_comparison"] != expected_resources:
+            errors.append("resource inventory比較がartifact file記録と一致しない")
+        expected_dependencies = package_dependency_comparison(baseline, selected)
+        if evidence["package_dependency_comparison"] != expected_dependencies:
+            errors.append("package dependency比較がrun記録から再計算した値と一致しない")
+    except (KeyError, TypeError, ValueError) as exc:
+        errors.append(f"resource／dependency比較を再計算できない: {exc}")
 
     if receipt is not None:
         try:
@@ -433,6 +705,7 @@ def _capture_run(
     executable: str,
     evidence_root: Path,
     catalog: dict[str, Any],
+    dart_executable: str,
 ) -> dict[str, Any]:
     run_root = output_root / label
     run_root.mkdir(parents=True, exist_ok=False)
@@ -443,9 +716,10 @@ def _capture_run(
         profile_input_dir=profile_input_dir,
         cwd=ROOT / "apps" / "desktop_flutter",
     )
-    aot_surface_libraries = _aot_surface_libraries(
-        _parse_json_bytes(report_source.read_bytes()), catalog
-    )
+    report = _parse_json_bytes(report_source.read_bytes())
+    aot_surface_libraries = _aot_surface_libraries(report, catalog)
+    aot_package_libraries = _aot_package_libraries(report)
+    runtime_dependency_tree = _runtime_dependency_tree(dart_executable)
     if not (BUILD_OUTPUT / APP_EXECUTABLE).is_file() or not (BUILD_OUTPUT / APP_CODE_PATH).is_file():
         raise ValueError("Windows release出力にapp executableまたはDart AOT imageがない")
     build_metadata = _reject_link_or_reparse(BUILD_OUTPUT, "Windows build output")
@@ -489,6 +763,8 @@ def _capture_run(
         "artifact_total_bytes": copied_bytes,
         "artifact_tree_sha256": copied_tree_hash,
         "aot_surface_libraries": aot_surface_libraries,
+        "aot_package_libraries": aot_package_libraries,
+        "runtime_dependency_tree": runtime_dependency_tree,
         "size_analysis_report": report_record,
         "size_analysis_inputs": input_records,
     }
@@ -512,6 +788,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
 
     executable = _flutter_executable()
     versions = _flutter_versions(executable)
+    dart_executable = _dart_executable(executable, versions["dart"])
     output_dir.mkdir(parents=True, exist_ok=False)
     baseline = _capture_run(
         label="baseline",
@@ -521,6 +798,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         executable=executable,
         evidence_root=output_dir,
         catalog=catalog,
+        dart_executable=dart_executable,
     )
     _clean_source_commit(source_commit)
     selected = _capture_run(
@@ -531,13 +809,14 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         executable=executable,
         evidence_root=output_dir,
         catalog=catalog,
+        dart_executable=dart_executable,
     )
     _clean_source_commit(source_commit)
     if _flutter_versions(executable) != versions:
         raise ValueError("比較build中にFlutter toolchain versionが変化した")
     summary = comparison_summary(baseline["artifact_files"], selected["artifact_files"])
     evidence = {
-        "version": 1,
+        "version": 2,
         "evidence_type": "development_module_build_comparison",
         "evidence_source": "INTERNAL_STATE",
         "product_artifact_claimed": False,
@@ -562,6 +841,12 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         "baseline": baseline,
         "selected": selected,
         "comparison": summary,
+        "resource_inventory_comparison": resource_inventory_comparison(
+            baseline["artifact_files"], selected["artifact_files"]
+        ),
+        "package_dependency_comparison": package_dependency_comparison(
+            baseline, selected
+        ),
         "binary_pruning_verified": False,
         "semantic_pruning_status": "flutter_aot_report_surface_libraries_match_selection; runtime_unverified",
         "cold_start_status": "not_measured",
@@ -601,6 +886,12 @@ def main() -> int:
         "selected_bytes": evidence["comparison"]["selected_total_bytes"],
         "bytes_reduced": evidence["comparison"]["total_bytes_reduced"],
         "app_code_bytes_reduced": evidence["comparison"]["app_code_bytes_reduced"],
+        "resource_inventory_identical": evidence["resource_inventory_comparison"][
+            "resource_inventory_identical"
+        ],
+        "runtime_package_tree_identical": evidence[
+            "package_dependency_comparison"
+        ]["runtime_package_tree_identical"],
         "binary_pruning_verified": False,
         "cold_start_status": "not_measured",
         "resource_comparison_status": "not_measured",
