@@ -11,6 +11,18 @@ import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 
 void main() {
+  test('Agent Adapter Provider IDを保持し、不正型は結合に使わない', () {
+    final valid = AgentAdapterRecord.fromJson({
+      'provider_id': 'openai_codex_cli',
+    });
+    final invalid = AgentAdapterRecord.fromJson({
+      'provider_id': <String>['openai_codex_cli'],
+    });
+
+    expect(valid.providerId, 'openai_codex_cli');
+    expect(invalid.providerId, isNull);
+  });
+
   test('不正な認証・Tool metadata statusはunknownへ閉じる', () {
     final record = AgentAdapterRecord.fromJson({
       'authentication': {'status': 'credential-present'},
@@ -19,6 +31,66 @@ void main() {
 
     expect(record.authenticationStatus, 'unknown');
     expect(record.toolSupportStatus, 'unknown');
+  });
+
+  testWidgets('Setup DoctorはAgent Provider IDに対応するCredential件数だけを表示する',
+      (tester) async {
+    final transport = _SetupDoctorTransport()
+      ..agentEntries.add(_agentAdapterFixture(method: 'api_key_reference'))
+      ..credentialEntries.add(_providerCredentialFixture());
+    final client = await ShellCoreClient.product(transport: transport);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: SetupDoctor(client: client))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('有効な対象Credential metadata=1件'), findsOneWidget);
+    expect(
+      find.textContaining('authentication_sourceやCredential IDを公開せず'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Provider認証成功は未確認'), findsOneWidget);
+    expect(find.textContaining('a' * 32), findsNothing);
+    expect(find.textContaining('b' * 64), findsNothing);
+    expect(find.textContaining('SENSITIVE_PROVIDER_AUDIT'), findsNothing);
+    expect(
+      transport.requests.where((request) => request['operation'] == '資格情報一覧'),
+      hasLength(1),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Setup Doctorは0件とCLI管理認証をD4資格不足と混同しない', (tester) async {
+    final transport = _SetupDoctorTransport()
+      ..agentEntries.add(_agentAdapterFixture(method: 'api_key_reference'));
+    final client = await ShellCoreClient.product(transport: transport);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: SetupDoctor(client: client))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('有効な対象Credential metadataは0件'), findsOneWidget);
+    expect(find.textContaining('選択Taskが同保管庫を使うか'), findsOneWidget);
+
+    final managedTransport = _SetupDoctorTransport()
+      ..agentEntries.add(_agentAdapterFixture(method: 'codex_cli_managed'));
+    final managedClient =
+        await ShellCoreClient.product(transport: managedTransport);
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: SetupDoctor(client: managedClient))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('CLI管理認証方式が1件'), findsOneWidget);
+    expect(find.textContaining('CLIログイン状態は判定しません'), findsOneWidget);
+    expect(
+      managedTransport.requests
+          .where((request) => request['operation'] == '資格情報一覧'),
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Setup Doctorは実行要因を区分し、未確認状態を成功扱いしない', (tester) async {
@@ -628,6 +700,8 @@ class _SetupDoctorTransport implements BrokerTransport {
 
   final String initialMessage;
   final requests = <Map<String, Object?>>[];
+  final agentEntries = <Map<String, Object?>>[];
+  final credentialEntries = <Map<String, Object?>>[];
   int _reportCount = 0;
   Map<String, Object?>? nextReportResponse;
   Map<String, Object?>? nextAuditResponse;
@@ -711,7 +785,18 @@ class _SetupDoctorTransport implements BrokerTransport {
       return _accepted(operation, {'Adapter一覧': <Object?>[]});
     }
     if (operation == 'Agent一覧') {
-      return _accepted(operation, {'Agent': <Object?>[]});
+      return _accepted(operation, {'Agent': List<Object?>.from(agentEntries)});
+    }
+    if (operation == '資格情報一覧') {
+      final response = _accepted(operation, {
+        '版': 1,
+        '資格情報一覧': List<Object?>.from(credentialEntries),
+        '件数': credentialEntries.length,
+        '公開範囲': 'metadata_only',
+        '証拠種別': 'INTERNAL_STATE',
+      });
+      response['evidence_source'] = 'INTERNAL_STATE';
+      return response;
     }
     if (operation == '対話セッション一覧') {
       return {
@@ -742,6 +827,59 @@ class _SetupDoctorTransport implements BrokerTransport {
     throw BrokerClientException('Unexpected fixture operation: $operation');
   }
 }
+
+Map<String, Object?> _agentAdapterFixture({required String method}) => {
+      'adapter_id': 'fixture-adapter',
+      'agent_id': 'fixture-agent',
+      'provider': 'OpenAI',
+      'provider_id': 'openai_codex_cli',
+      'version': 'unknown',
+      'model': 'unknown',
+      'status': 'ready',
+      'capabilities': <Object?>[],
+      'workspace_requirements': {
+        'mode': 'required',
+        'boundary_policy': 'deny_outside_workspace',
+        'secret_paths': <Object?>[],
+      },
+      'provider_health': {'status': 'unknown', 'reason': 'fixture'},
+      'automatic_fallback': false,
+      'tool_support': {'status': 'unknown', 'reason': 'fixture'},
+      'mcp_support': {'status': 'unknown', 'reason': 'fixture'},
+      'session_support': {'status': 'unknown', 'reason': 'fixture'},
+      'cancellation_support': {'status': 'unknown', 'reason': 'fixture'},
+      'usage_metrics_support': {'status': 'unknown', 'reason': 'fixture'},
+      'cost_metrics_support': {'status': 'unknown', 'reason': 'fixture'},
+      'authentication': {
+        'method': method,
+        'status': 'unknown',
+        'secret_value_present': false,
+      },
+      'host_requirements': {
+        'platforms': ['windows'],
+        'network_scope': 'outbound_allowed',
+        'process_spawn': {'status': 'supported', 'reason': 'fixture'},
+      },
+      'evidence_source': 'FIXTURE',
+      'evidence_reason': 'fixture only',
+    };
+
+Map<String, Object?> _providerCredentialFixture() => {
+      '版': 1,
+      '資格情報ID': 'a' * 32,
+      '用途': 'provider_api_key',
+      '接続対象': 'openai_codex_cli',
+      '種類': 'api_key',
+      '保管方式': 'windows_dpapi',
+      '状態': '有効',
+      '作成時刻UnixMillis': 1,
+      '最終使用時刻UnixMillis': null,
+      '失効時刻UnixMillis': null,
+      '暗号文hash': 'sha256:${'b' * 64}',
+      '作成監査ID': 'SENSITIVE_PROVIDER_AUDIT',
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+    };
 
 Map<String, Object?> _auditInspectionResponse() => {
       'request_id': 'test-audit-inspection',

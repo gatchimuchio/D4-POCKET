@@ -1,6 +1,8 @@
+import 'package:broker_contract/broker_transport.dart' show BrokerTransport;
 import 'package:flutter/material.dart';
 
 import '../models/generated_contracts.dart';
+import '../services/mcp_connection_client.dart';
 import '../services/shell_core_client.dart';
 import 'shared.dart';
 
@@ -167,6 +169,10 @@ class _SetupDoctorState extends State<SetupDoctor> {
             checks: checks,
           ),
         ),
+        _ProviderCredentialReadinessSection(
+          snapshot: snapshot,
+          transport: brokerMode ? widget.client.brokerTransport : null,
+        ),
         SectionList(
           title: 'インストール先の証拠',
           rows: installedEvidence.isEmpty
@@ -233,6 +239,24 @@ List<String> _executionReadinessRows(
     if (supportedAuthentication > 0)
       '認証方式supported宣言=$supportedAuthentication件（資格値の有効性は未検証）',
   ];
+  final apiKeyReferenceAgents = agents
+      .where((agent) =>
+          agent.providerId == 'openai_codex_cli' &&
+          agent.authenticationMethod == 'api_key_reference')
+      .length;
+  final cliManagedAgents = agents
+      .where((agent) =>
+          agent.providerId == 'openai_codex_cli' &&
+          agent.authenticationMethod == 'codex_cli_managed')
+      .length;
+  if (apiKeyReferenceAgents > 0) {
+    authenticationDetails.add(
+      'API-key参照方式のAgent metadata=$apiKeyReferenceAgents件',
+    );
+  }
+  if (cliManagedAgents > 0) {
+    authenticationDetails.add('CLI管理認証方式のAgent metadata=$cliManagedAgents件');
+  }
   final authenticationRow = agents.isEmpty
       ? '認証: Agent metadataがないためunknownです。資格情報の不足・失効も判定できません。'
       : '認証: ${authenticationDetails.join(' / ')}。秘密値は表示しません。';
@@ -281,6 +305,155 @@ List<String> _executionReadinessRows(
     productRow,
     'この表示はPermission／Approvalを発行せず、Agent metadataからAuthorityを生成しません。',
   ];
+}
+
+class _ProviderCredentialReadinessSection extends StatefulWidget {
+  const _ProviderCredentialReadinessSection({
+    required this.snapshot,
+    required this.transport,
+  });
+
+  final ShellSnapshot snapshot;
+  final BrokerTransport? transport;
+
+  @override
+  State<_ProviderCredentialReadinessSection> createState() =>
+      _ProviderCredentialReadinessSectionState();
+}
+
+class _ProviderCredentialReadinessSectionState
+    extends State<_ProviderCredentialReadinessSection> {
+  static const _providerId = 'openai_codex_cli';
+  Future<List<McpCredentialSummary>>? _credentials;
+
+  List<AgentAdapterRecord> get _brokerReferenceAgents =>
+      widget.snapshot.agentAdapters
+          .where((agent) =>
+              agent.providerId == _providerId &&
+              agent.authenticationMethod == 'api_key_reference')
+          .toList(growable: false);
+
+  @override
+  void initState() {
+    super.initState();
+    _credentials = _requestCredentials();
+  }
+
+  @override
+  void didUpdateWidget(
+      covariant _ProviderCredentialReadinessSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.transport != widget.transport ||
+        oldWidget.snapshot.snapshotSource != widget.snapshot.snapshotSource ||
+        oldWidget.snapshot.agentAdapters != widget.snapshot.agentAdapters) {
+      _credentials = _requestCredentials();
+    }
+  }
+
+  Future<List<McpCredentialSummary>>? _requestCredentials() {
+    final transport = widget.transport;
+    if (widget.snapshot.snapshotSource != 'broker' ||
+        transport == null ||
+        _brokerReferenceAgents.isEmpty) {
+      return null;
+    }
+    return McpConnectionClient(transport).listProviderCredentials();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final agents = widget.snapshot.agentAdapters;
+    final targetAgents = agents
+        .where((agent) => agent.providerId == _providerId)
+        .toList(growable: false);
+    final brokerAgents = _brokerReferenceAgents;
+    final cliManagedAgents = targetAgents
+        .where((agent) => agent.authenticationMethod == 'codex_cli_managed')
+        .length;
+
+    if (widget.snapshot.snapshotSource != 'broker' ||
+        widget.transport == null) {
+      return const SectionList(
+        title: 'Provider認証の資格metadata',
+        rows: ['Broker Agent metadataと資格一覧を照合できないためunknownです。'],
+      );
+    }
+    if (targetAgents.isEmpty) {
+      return const SectionList(
+        title: 'Provider認証の資格metadata',
+        rows: [
+          'Agent Snapshotにopenai_codex_cliのprovider_idがありません。対象Agentとの対応を確認できないため、資格不足は判定しません。',
+        ],
+      );
+    }
+    if (brokerAgents.isEmpty) {
+      return SectionList(
+        title: 'Provider認証の資格metadata',
+        rows: [
+          if (cliManagedAgents > 0)
+            'CLI管理認証方式が$cliManagedAgents件あります。D4 Broker保管庫の資格有無からCLIログイン状態は判定しません。',
+          if (cliManagedAgents < targetAgents.length)
+            'API-key参照方式以外のAgent metadataは、資格要件をこの一覧へ結合できないためunknownです。',
+          '外部Providerの認証成功は別途未確認です。',
+        ],
+      );
+    }
+
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Provider認証の資格metadata',
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            '対象Agent metadata=${brokerAgents.length}件 / provider_id=$_providerId / authentication.method=api_key_reference。Agent SnapshotはTaskごとのauthentication_sourceやCredential IDを公開せず、資格一覧とは別々のBroker readです。',
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const ValueKey('setup-doctor-provider-credentials-refresh'),
+            onPressed: () =>
+                setState(() => _credentials = _requestCredentials()),
+            icon: const Icon(Icons.refresh),
+            label: const Text('対象Credential metadataを再取得'),
+          ),
+          FutureBuilder<List<McpCredentialSummary>>(
+            future: _credentials,
+            builder: (context, state) {
+              if (state.connectionState == ConnectionState.waiting) {
+                return const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  title: Text('Brokerの資格metadataを確認中'),
+                );
+              }
+              if (state.hasError || state.data == null) {
+                return const Text(
+                  '資格metadataを取得できずunknownです。秘密値や認証成功を推測しません。',
+                );
+              }
+              final credentials = state.data!;
+              if (credentials.isEmpty) {
+                return const Text(
+                  '有効な対象Credential metadataは0件です。D4 Broker保管庫に有効な対象資格はありませんが、選択Taskが同保管庫を使うかはAgent一覧から判定できません。',
+                );
+              }
+              return Text(
+                '有効な対象Credential metadata=${credentials.length}件です。Agent一覧はCredential ID bindingを公開しないため、選択Agentとの一致とProvider認証成功は未確認です。',
+              );
+            },
+          ),
+          const Text(
+            '秘密値・Credential ID・ciphertext hash・Audit IDは表示しません。資格metadataは認証成功やTask実行許可を意味しません。',
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ReportSummary extends StatelessWidget {

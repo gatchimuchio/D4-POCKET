@@ -355,6 +355,7 @@ class AgentAdapterRecord {
     required this.adapterId,
     required this.agentId,
     required this.provider,
+    this.providerId,
     required this.version,
     required this.model,
     required this.status,
@@ -373,6 +374,7 @@ class AgentAdapterRecord {
   final String adapterId;
   final String agentId;
   final String provider;
+  final String? providerId;
   final String version;
   final String model;
   final String status;
@@ -405,6 +407,8 @@ class AgentAdapterRecord {
       adapterId: json['adapter_id'] as String? ?? '',
       agentId: json['agent_id'] as String? ?? '',
       provider: json['provider'] as String? ?? '',
+      providerId:
+          json['provider_id'] is String ? json['provider_id'] as String : null,
       version: json['version'] as String? ?? 'unknown',
       model: json['model'] as String? ?? 'unknown',
       status: json['status'] as String? ?? 'unknown',
