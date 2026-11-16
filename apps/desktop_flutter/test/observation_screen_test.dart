@@ -114,6 +114,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Broker / fixture-observation-B'), findsOneWidget);
     expect(find.text('Broker / fixture-observation-A'), findsNothing);
+    expect(
+      find.text(
+        'Window (UTC): 2023-11-14T22:13:20.000Z – 2023-11-14T22:13:20.012Z',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Source: INTERNAL_STATE / broker_audit_finalization'),
+        findsOneWidget);
+    expect(find.text('Scope: broker_audit_finalization'), findsOneWidget);
+    expect(
+      find.textContaining('開始 (UTC): 2023-11-14T22:13:20.000Z'),
+      findsOneWidget,
+    );
 
     oldRequest.complete();
     await tester.pumpAndSettle();
@@ -129,6 +142,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Broker / fixture-observation-A / completed'),
         findsOneWidget);
+    expect(
+      find.text(
+        'Window (UTC): 2023-11-14T22:13:20.000Z – 2023-11-14T22:13:20.012Z',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Source: INTERNAL_STATE / broker_audit_finalization'),
+        findsOneWidget);
+    expect(find.text('Scope: broker_audit_finalization'), findsOneWidget);
+    expect(
+      find.textContaining(
+        '開始 (UTC): 2023-11-14T22:13:20.000Z / 終了 (UTC): 2023-11-14T22:13:20.012Z / Source: INTERNAL_STATE',
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byType(DropdownButton<String?>));
     await tester.pumpAndSettle();

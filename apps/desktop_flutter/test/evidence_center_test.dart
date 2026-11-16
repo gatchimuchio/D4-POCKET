@@ -135,6 +135,78 @@ void main() {
     );
     expect(visibleDialogText, isNot(contains(secretMarker)));
   });
+
+  testWidgets('有効snapshotの事前確認は適用や権限変更を行わない', (
+    WidgetTester tester,
+  ) async {
+    final clipboardText = _captureClipboard(tester);
+    final client = ShellCoreClient.local();
+    final originalReleaseState =
+        client.getSnapshot().operationStatus.releaseState;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: EvidenceCenter(client: client)),
+      ),
+    );
+
+    final exportButton = find.text('スナップショットJSONをコピー');
+    await tester.ensureVisible(exportButton);
+    await tester.tap(exportButton);
+    await tester.pump();
+    final imported = jsonDecode(clipboardText()!) as Map<String, Object?>;
+    final operationStatus = Map<String, Object?>.from(
+      imported['operation_status']! as Map,
+    )..['release_state'] = 'imported-release-marker';
+    imported['operation_status'] = operationStatus;
+
+    final compareButton = find.text('読込み前確認／比較');
+    await tester.ensureVisible(compareButton);
+    await tester.tap(compareButton);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(TextField),
+      ),
+      jsonEncode(imported),
+    );
+    await tester.pump();
+
+    final dialogText = tester
+        .widgetList<Text>(
+          find.descendant(
+            of: find.byType(Dialog),
+            matching: find.byType(Text),
+          ),
+        )
+        .map((text) => text.data ?? '')
+        .join('\n');
+    expect(dialogText, contains('事前確認専用です。読み込んだデータは適用しません。'));
+    expect(dialogText, contains('読込み側のリリース状態: imported-release-marker'));
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.textContaining('Approval'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('適用'),
+      ),
+      findsNothing,
+    );
+
+    await tester.tap(find.descendant(
+      of: find.byType(Dialog),
+      matching: find.text('閉じる'),
+    ));
+    await tester.pumpAndSettle();
+    expect(client.getSnapshot().operationStatus.releaseState,
+        originalReleaseState);
+    expect(find.textContaining('imported-release-marker'), findsNothing);
+  });
 }
 
 String? Function() _captureClipboard(WidgetTester tester) {

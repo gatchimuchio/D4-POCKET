@@ -437,6 +437,15 @@ void main() {
 
     expect(find.text('監査鎖状態: 検証済み'), findsOneWidget);
     expect(find.text('ハッシュ鎖状態: 検証済み'), findsOneWidget);
+    expect(
+      find.text('状態: 認証済みBroker Sessionのread-only Grant確認済み'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Owner Approval／Permission／Authorityの発行・変更: なし'),
+      findsOneWidget,
+    );
+    expect(find.text('個別Grant対応: Audit pageには投影されません'), findsOneWidget);
     expect(find.text('broker-audit-1'), findsOneWidget);
     expect(find.textContaining('safe-action'), findsOneWidget);
     expect(find.textContaining('PRIVATE_REQUEST'), findsNothing);

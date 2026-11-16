@@ -183,12 +183,20 @@ class _TraceInspectorState extends State<TraceInspector> {
             nextAction: 'Broker操作後に更新してください。',
           )
         else
-          _waterfallPanel(spans),
+          _waterfallPanel(
+            spans,
+            evidenceSource: _traceSource(body, traces),
+            scope: body['観測範囲']?.toString() ?? 'unknown',
+          ),
       ],
     );
   }
 
-  Widget _waterfallPanel(List<Map<String, Object?>> spans) {
+  Widget _waterfallPanel(
+    List<Map<String, Object?>> spans, {
+    required String evidenceSource,
+    required String scope,
+  }) {
     final starts = spans
         .map((span) => _integer(span['開始EpochMillis']))
         .whereType<int>()
@@ -210,6 +218,9 @@ class _TraceInspectorState extends State<TraceInspector> {
           ),
           const SizedBox(height: 4),
           Text('観測対象: ${_bodyScope(spans)}'),
+          Text('Window (UTC): ${_windowText(minimum, maximum)}'),
+          Text('Source: $evidenceSource'),
+          Text('Scope: $scope'),
           const SizedBox(height: 10),
           for (final span in spans)
             _spanRow(span, minimum: minimum, range: range),
@@ -272,6 +283,10 @@ class _TraceInspectorState extends State<TraceInspector> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           Text(
+            '開始 (UTC): ${_utcTimestamp(span['開始EpochMillis'])} / 終了 (UTC): ${_utcTimestamp(span['終了EpochMillis'])} / Source: ${span['証拠種別'] ?? 'unknown'}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          Text(
             '親Span: ${span['親SpanID'] ?? 'なし'} / 関連Audit: ${span['関連監査ID'] ?? '不明'}',
             style: Theme.of(context).textTheme.bodySmall,
           ),
@@ -295,6 +310,33 @@ class _TraceInspectorState extends State<TraceInspector> {
         .toSet()
         .toList();
     return targets.isEmpty ? '不明' : targets.join('、');
+  }
+
+  String _traceSource(
+    Map<String, Object?> body,
+    List<Map<String, Object?>> traces,
+  ) {
+    final sources = traces
+        .map((trace) => trace['生成源'])
+        .whereType<String>()
+        .toSet()
+        .toList()
+      ..sort();
+    final evidence = '${body['証拠種別'] ?? 'unknown'}';
+    return '$evidence / ${sources.isEmpty ? '生成源unknown' : sources.join(', ')}';
+  }
+
+  String _windowText(int start, int end) =>
+      '${_utcTimestamp(start)} – ${_utcTimestamp(end)}';
+
+  String _utcTimestamp(Object? value) {
+    if (value is! int || value < 0) return 'unknown';
+    try {
+      return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true)
+          .toIso8601String();
+    } on Object {
+      return '$value epoch ms';
+    }
   }
 
   int? _integer(Object? value) => value is num ? value.toInt() : null;

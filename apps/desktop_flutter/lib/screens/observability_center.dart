@@ -141,6 +141,21 @@ class _ObservabilityCenterState extends State<ObservabilityCenter> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
+                '計測範囲',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text('Window (UTC): ${_windowText(spans)}'),
+              Text('Source: ${_sourceText(body, traces)}'),
+              Text('Scope: ${body['観測範囲'] ?? 'unknown'}'),
+            ],
+          ),
+        ),
+        BorderedPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
                 '監査との責任分離',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
@@ -203,6 +218,8 @@ class _ObservabilityCenterState extends State<ObservabilityCenter> {
             Text(
                 'Trace識別子: ${span['TraceID'] ?? '不明'} / Span識別子: ${span['SpanID'] ?? '不明'}'),
             Text(
+                '開始 (UTC): ${_utcTimestamp(span['開始EpochMillis'])} / 終了 (UTC): ${_utcTimestamp(span['終了EpochMillis'])}'),
+            Text(
                 '状態: ${span['状態'] ?? 'unknown'} / 所要: ${span['所要Millis'] ?? 'unknown'} ms'),
             Text(
                 '関連Audit: ${span['関連監査ID'] ?? 'unknown'} / 証拠: ${span['証拠種別'] ?? 'unknown'}'),
@@ -215,4 +232,38 @@ class _ObservabilityCenterState extends State<ObservabilityCenter> {
   List<Map<String, Object?>> _maps(Object? value) => value is List
       ? value.whereType<Map>().map(Map<String, Object?>.from).toList()
       : <Map<String, Object?>>[];
+
+  String _windowText(List<Map<String, Object?>> spans) {
+    final starts =
+        spans.map((span) => span['開始EpochMillis']).whereType<int>().toList();
+    final ends =
+        spans.map((span) => span['終了EpochMillis']).whereType<int>().toList();
+    if (starts.isEmpty || ends.isEmpty) return 'unknown (観測Spanなし)';
+    starts.sort();
+    ends.sort();
+    return '${_utcTimestamp(starts.first)} – ${_utcTimestamp(ends.last)}';
+  }
+
+  String _sourceText(
+    Map<String, Object?> body,
+    List<Map<String, Object?>> traces,
+  ) {
+    final sources = traces
+        .map((trace) => trace['生成源'])
+        .whereType<String>()
+        .toSet()
+        .toList()
+      ..sort();
+    return '${body['証拠種別'] ?? 'unknown'} / ${sources.isEmpty ? '生成源unknown' : sources.join(', ')}';
+  }
+
+  String _utcTimestamp(Object? value) {
+    if (value is! int || value < 0) return 'unknown';
+    try {
+      return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true)
+          .toIso8601String();
+    } on Object {
+      return '$value epoch ms';
+    }
+  }
 }

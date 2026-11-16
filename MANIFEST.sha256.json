@@ -245,7 +245,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/audit_viewer.dart",
-      "sha256": "d7b7423da9c2f7e761f8de34ee9b476a35416e602282f6bbbe99d2127f704139"
+      "sha256": "81c1ca64bbecff480d6b1d647dac6490a1c54175460809a14f6af4c3eb726fa2"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/authority_map.dart",
@@ -293,7 +293,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/observability_center.dart",
-      "sha256": "68b68bd93a6d1317a2dc4b69c89c97d7dcd916af75eaf5e9a14d29a9e897e0ef"
+      "sha256": "8d10b4f8977cb66b0dbcea9438d80c790c46b11d4f7b47429b91d281bb5bdccd"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/permission_center.dart",
@@ -329,7 +329,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trace_inspector.dart",
-      "sha256": "23759aae67d54edbefc0965e17de85d3146cd6a8f112a831b61fb2457245d773"
+      "sha256": "cee33e0027c4b5c24fb7c658212ccc813986fe08d66c49fceba0d127ffe1c81f"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trust_center.dart",
@@ -701,7 +701,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/evidence_center_test.dart",
-      "sha256": "1bfe3aa7186dc3803705f7d80eced754d42924462c8773e722f4844bd5cb703a"
+      "sha256": "6924efbed10a34366efff98b5f408f412346ac43ac5480bbbab23463581f26e5"
     },
     {
       "path": "apps/desktop_flutter/test/export_client_test.dart",
@@ -761,7 +761,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/observation_screen_test.dart",
-      "sha256": "1bde401fef242dc611485b64fec899162038ab84be3a4b112a0456873f1b427b"
+      "sha256": "d09d0c3db8137349eb76bf2ce320ee78cd3fcf2d0625d375c18010aa61df6f6d"
     },
     {
       "path": "apps/desktop_flutter/test/profile_client_test.dart",
@@ -797,7 +797,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/setup_doctor_test.dart",
-      "sha256": "a7459bf1648a77ddf05ee11d48a0d1857b485b3102f80472a81f83ff97d96661"
+      "sha256": "a022461a3d156cac1373e23fe42d560d731b26b202057834131e802bd6dd5268"
     },
     {
       "path": "apps/desktop_flutter/test/shell_core_unavailable_test.dart",
@@ -1597,7 +1597,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "bf0fc6d2988f55bfb21cc0598013254a85a12fbf632037c6b0ca239a70c85d5a"
+      "sha256": "4979cda05f39b6c44fb9b29b95cdf10cf33f6c921f677a3f39688acf3096a19f"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
