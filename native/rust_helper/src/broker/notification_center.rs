@@ -473,6 +473,7 @@ fn build_record(event: &BrokerAuditEvent, source: &str, target: &str) -> Notific
         "accepted" => format!("{source}操作を受け付けました。"),
         "rejected" => format!("{source}操作が拒否されました。監査ビューアーで確認してください。"),
         "suspended" => format!("{source}操作を保留しました。復旧手順を確認してください。"),
+        "failed" => format!("{source}操作に失敗しました。状態と復旧手順を確認してください。"),
         _ => format!("{source}操作の結果を確認してください。"),
     };
     let created_order = event
@@ -561,6 +562,7 @@ fn build_hash_projection(event: &BrokerAuditEvent, source: &str, target: &str) -
         "accepted" => format!("{source}操作を受け付けました。"),
         "rejected" => format!("{source}操作が拒否されました。監査ビューアーで確認してください。"),
         "suspended" => format!("{source}操作を保留しました。復旧手順を確認してください。"),
+        "failed" => format!("{source}操作に失敗しました。状態と復旧手順を確認してください。"),
         _ => format!("{source}操作の結果を確認してください。"),
     };
     json!({
@@ -634,8 +636,8 @@ fn source_for_operation(operation: &str) -> Option<(&'static str, &'static str)>
 
 fn severity_for(source: &str, decision: &str) -> &'static str {
     match (source, decision) {
-        ("Audit", "rejected" | "suspended") => "critical",
-        (_, "suspended") => "error",
+        ("Audit", "rejected" | "suspended" | "failed") => "critical",
+        (_, "suspended" | "failed") => "error",
         (_, "rejected") => "warning",
         _ => "info",
     }
@@ -807,6 +809,33 @@ mod tests {
     fn audit_failure_is_critical() {
         assert_eq!(severity_for("Audit", "rejected"), "critical");
         assert_eq!(severity_for("Runtime", "suspended"), "error");
+        assert_eq!(severity_for("Update", "failed"), "error");
+        assert_eq!(severity_for("Audit", "failed"), "critical");
+    }
+
+    #[test]
+    fn Updateの失敗Auditをerror通知へ射影し詳細を隠す() {
+        let mut broker = Broker::new("session");
+        broker
+            .append_audit(
+                "update-download-failed",
+                "更新download要求",
+                "failed",
+                "secret update failure reason and local path",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
+            .expect("failed update audit");
+
+        let notifications = project_notifications(&broker);
+        assert_eq!(notifications.len(), 1);
+        assert_eq!(notifications[0].source, "Update");
+        assert_eq!(notifications[0].severity, "error");
+        assert_eq!(notifications[0].navigation_target, "settings");
+        assert!(notifications[0].summary.contains("失敗"));
+        let serialized = serde_json::to_string(&notifications).expect("通知JSON");
+        assert!(!serialized.contains("secret update failure"));
+        assert!(!serialized.contains("local path"));
     }
 
     #[test]
