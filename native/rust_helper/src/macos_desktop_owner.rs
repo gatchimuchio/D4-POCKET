@@ -791,8 +791,15 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
             summary.payload_hash
         )
     } else if operation == "Host登録" {
-        let summary = crate::broker::host_center::owner_confirmation_summary(payload)?;
-        format!("{summary}\n要求hash: {hash}")
+        #[cfg(feature = "module_host_operations")]
+        {
+            let summary = crate::broker::host_center::owner_confirmation_summary(payload)?;
+            format!("{summary}\n要求hash: {hash}")
+        }
+        #[cfg(not(feature = "module_host_operations"))]
+        {
+            return None;
+        }
     } else if operation == "A2A接続" {
         let (agent, target) =
             crate::broker::a2a_center::owner_confirmation_summary(payload).ok()?;
@@ -1181,7 +1188,7 @@ mod workspace_inspector_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "module_host_operations"))]
 mod host_tests {
     use super::*;
     use crate::broker::ipc_server::BrokerCredentialRole;

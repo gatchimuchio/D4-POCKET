@@ -17,6 +17,7 @@ const MAX_A2A_STATE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_HOST_STATE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_ADAPTER_STATE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_AGENT_TASK_SCRATCH_STATE_BYTES: usize = 512 * 1024;
+#[cfg(feature = "module_setup_doctor")]
 const MAX_SETUP_DOCTOR_REPORT_BYTES: usize = 64 * 1024;
 const MAX_FIRST_RUN_CONFIGURATION_BYTES: usize = 16 * 1024;
 const MAX_UPDATE_TRUST_BYTES: usize = 8 * 1024;
@@ -31,6 +32,7 @@ pub enum BrokerStoreError {
     MalformedProfileState(String),
     MalformedUpdateState(String),
     MalformedUpdateTrust(String),
+    #[cfg(feature = "module_notifications")]
     MalformedNotificationState(String),
     MalformedA2aState(String),
     MalformedHostState(String),
@@ -52,10 +54,11 @@ impl BrokerStoreError {
             | BrokerStoreError::MalformedProfileState(message)
             | BrokerStoreError::MalformedUpdateState(message)
             | BrokerStoreError::MalformedUpdateTrust(message)
-            | BrokerStoreError::MalformedNotificationState(message)
             | BrokerStoreError::MalformedA2aState(message)
             | BrokerStoreError::MalformedHostState(message)
             | BrokerStoreError::MalformedAdapterState(message) => message.clone(),
+            #[cfg(feature = "module_notifications")]
+            BrokerStoreError::MalformedNotificationState(message) => message.clone(),
             BrokerStoreError::MalformedAgentTaskScratchState(message)
             | BrokerStoreError::TamperedAgentTaskScratchState(message) => message.clone(),
             BrokerStoreError::MalformedFirstRunConfiguration(message) => message.clone(),
@@ -83,11 +86,13 @@ pub struct BrokerPersistentStore {
     profile_path: PathBuf,
     update_path: PathBuf,
     update_trust_path: PathBuf,
+    #[cfg(feature = "module_notifications")]
     notification_path: PathBuf,
     a2a_path: PathBuf,
     host_path: PathBuf,
     adapter_path: PathBuf,
     agent_task_scratch_path: PathBuf,
+    #[cfg(feature = "module_setup_doctor")]
     setup_doctor_report_path: PathBuf,
     first_run_configuration_path: PathBuf,
     audit_anchor_key: Vec<u8>,
@@ -157,11 +162,13 @@ impl BrokerPersistentStore {
             profile_path: root.join("profiles.json"),
             update_path: root.join("updates.json"),
             update_trust_path: root.join("update_trust.json"),
+            #[cfg(feature = "module_notifications")]
             notification_path: root.join("notifications.json"),
             a2a_path: root.join("a2a_connections.json"),
             host_path: root.join("hosts.json"),
             adapter_path: root.join("adapters.json"),
             agent_task_scratch_path: root.join("agent_task_scratch_recovery.json"),
+            #[cfg(feature = "module_setup_doctor")]
             setup_doctor_report_path: root.join("setup_doctor_report.json"),
             first_run_configuration_path: root.join("first_run_configuration.json"),
             audit_anchor_key: load_or_create_anchor_key(&root.join("audit_anchor.key"))?,
@@ -171,6 +178,7 @@ impl BrokerPersistentStore {
         store.ensure_file_exists(&store.replay_path)?;
         store.ensure_profile_file_exists()?;
         store.ensure_update_files_exist()?;
+        #[cfg(feature = "module_notifications")]
         store.ensure_notification_file_exists()?;
         store.ensure_a2a_file_exists()?;
         store.ensure_host_file_exists()?;
@@ -331,6 +339,7 @@ impl BrokerPersistentStore {
         })
     }
 
+    #[cfg(feature = "module_notifications")]
     pub fn load_notification_state(&self) -> Result<Value, BrokerStoreError> {
         let raw = fs::read_to_string(&self.notification_path).map_err(|error| {
             BrokerStoreError::MalformedNotificationState(format!(
@@ -349,6 +358,7 @@ impl BrokerPersistentStore {
         })
     }
 
+    #[cfg(feature = "module_notifications")]
     pub fn write_notification_state(&self, state: &Value) -> Result<(), BrokerStoreError> {
         let serialized = serde_json::to_string_pretty(state).map_err(|error| {
             BrokerStoreError::MalformedNotificationState(format!(
@@ -577,6 +587,7 @@ impl BrokerPersistentStore {
         })
     }
 
+    #[cfg(feature = "module_setup_doctor")]
     pub fn write_setup_doctor_report(&self, bytes: &[u8]) -> Result<(), BrokerStoreError> {
         if bytes.is_empty() || bytes.len() > MAX_SETUP_DOCTOR_REPORT_BYTES {
             return Err(BrokerStoreError::Io(
@@ -879,6 +890,7 @@ impl BrokerPersistentStore {
         Ok(())
     }
 
+    #[cfg(feature = "module_notifications")]
     fn ensure_notification_file_exists(&self) -> Result<(), BrokerStoreError> {
         if self.notification_path.exists() {
             return Ok(());
@@ -1316,7 +1328,7 @@ mod first_run_configuration_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "module_setup_doctor"))]
 mod setup_doctor_report_tests {
     use super::*;
 

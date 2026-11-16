@@ -228,6 +228,10 @@
       "sha256": "160fe9b64a37570dc77b629ad210afc29332605e1ab104aad7bc73f963943661"
     },
     {
+      "path": "apps/desktop_flutter/lib/module_features.dart",
+      "sha256": "2dbb7fdc88b1bb56c8d2012d8d82d233e14c126df09e84fe91f35375e54aacac"
+    },
+    {
       "path": "apps/desktop_flutter/lib/screens/a2a_connection_center.dart",
       "sha256": "062b192bf0f55bc8399c2cfd2fa827d4aa597e493606dd6300a35687b9dd569c"
     },
@@ -1589,7 +1593,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "576f536651ab98af4ab97681b8013e8bdcc965d933a261107df224180cb10551"
+      "sha256": "374bdc9764b5c02019b75f9fbd4d49c065d55ef52db2f349a35b62476ccdcf1a"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4077,7 +4081,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "6432ce3e18f37a8532696c25535476f0ba5682a78fa75ed2f75a8416c24ca969"
+      "sha256": "0a1ffa004a0440410d4bb55974b598f9d5be94cb14baa9d168219efffda5d140"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -4089,7 +4093,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/execution_history.rs",
-      "sha256": "0590ccb9f2053bdb2716cbb7bad5d8bfb635b612c461bbe05e1bf62fc525e31d"
+      "sha256": "303b7277f98aa5da13625be1bf7f509f7cd0b59b4978ea0883882d11d146a8a9"
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
@@ -4105,7 +4109,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/host_center.rs",
-      "sha256": "104c3b0a451fe15c7901b19c5ff030f0556ded39a1c80f40c3009a1e65ba621e"
+      "sha256": "8c87f964c6ee38adc776918d0111eccbdc624899daacc64c97de39c58ec11c75"
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
@@ -4121,7 +4125,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "b5ac90a26fb838640fdbb746aa422da96aafbb79c1de893359dfbd25c536df1a"
+      "sha256": "bae4b9f3c369a207f6e266ceb0caa933c996e408e2b4f196d376ade52566c4bc"
+    },
+    {
+      "path": "native/rust_helper/src/broker/module_pruning.rs",
+      "sha256": "b4aa79fb89d8794ac0934ed0a5f29a938941fc6fc9d227ad4b0d14ef1779eb40"
     },
     {
       "path": "native/rust_helper/src/broker/notification_center.rs",
@@ -4129,7 +4137,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/observation_center.rs",
-      "sha256": "0f1d5c7770d5ad23d2c3fb7997ebd40e16b2ce2f4adf5f1a93b4dd882dbe6921"
+      "sha256": "4570708b77269c570e2dfc31db306b153235d40977feb6a2358e30a34b10ba4d"
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
@@ -4141,7 +4149,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "1444b28baea0d0cd49fd186bc109dfd97f211b7f4bc611bcf04d2ceb1003b850"
+      "sha256": "b176598db48660d7e97f87d9ca0ecc9d6e018901a82fdda5857e3683dff128d1"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -4161,7 +4169,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
-      "sha256": "6b289ce59d9b7a985144eae2ebb90bae1a790ea65836b51752e4b411bf0110ac"
+      "sha256": "8e5c2cbcfccd0a461489f8cf4fc8e4317d7ab455a1aed4b9b889cb6022f66da1"
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
@@ -4193,7 +4201,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "aed6205970e1483d26196e3d061b61472c271aa2b52f72979cd5db31eca7f2d9"
+      "sha256": "1a51649fdd45d4b210dd623cf5cf00c792b08cee92efb16f6aa1979f82a6571e"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4241,7 +4249,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "c1d8c277ddc7b1a5cff20f14fdb24be88bd9a8c2c979c24de41da0226526899f"
+      "sha256": "fb46048d84d0bce9e23430469ba7978b6dc6f303ba22f86500e07c444bee2804"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -5970,6 +5978,10 @@
     {
       "path": "tooling/tests/test_linux_workflow_helpers.py",
       "sha256": "0569578e9a96ecded4ac9eee27cc07d6241569233264e356cbf976ef25d8bb59"
+    },
+    {
+      "path": "tooling/tests/test_module_feature_selection.py",
+      "sha256": "79271b6dbd91c629ec95d51f5e465dc2ff329bc54e13ebac708754a1448a332f"
     },
     {
       "path": "tooling/tests/test_windows_bootstrap_setup.py",

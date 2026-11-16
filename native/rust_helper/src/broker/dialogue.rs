@@ -953,6 +953,7 @@ struct 作業 {
     表示範囲: String,
     /// C5評価が既存の対話経路を使うための内部区別。
     /// 通常の`対話取得`からはownerを含めて結果を返さない。
+    #[cfg(feature = "module_evaluation_lab")]
     評価隔離: bool,
     取消: Arc<AtomicBool>,
     受信: Option<mpsc::Receiver<受信結果>>,
@@ -966,6 +967,7 @@ struct 作業 {
 
 /// 評価ラボが既存の対話統治経路から受け取る内部射影。
 /// 生応答、入力、Adapter接続先は含めない。`結果` は既存の表示範囲射影である。
+#[cfg(feature = "module_evaluation_lab")]
 #[derive(Clone)]
 pub(crate) struct 評価対話進捗 {
     pub 要求ID: String,
@@ -979,6 +981,7 @@ pub(crate) struct 評価対話進捗 {
 
 /// C6が対話制御から受け取る、結果本文を含まない内部射影。
 /// 要求hash、結果証跡、終了監査の相関だけをBroker内の独立登録経路へ渡す。
+#[cfg(feature = "module_evaluation_lab")]
 pub(crate) struct 回帰Case情報 {
     pub 要求ID: String,
     pub 要求hash: String,
@@ -1096,7 +1099,11 @@ impl 対話制御 {
         }
         let p: 指定 = 読取(payload)?;
         let work = self.作業.get(&p.要求ID).ok_or(対話失敗::要求不正)?;
-        if work.評価隔離 || p.要求hash != work.要求hash || work.表示範囲 != "full" {
+        if p.要求hash != work.要求hash || work.表示範囲 != "full" {
+            return Err(対話失敗::権限拒否);
+        }
+        #[cfg(feature = "module_evaluation_lab")]
+        if work.評価隔離 {
             return Err(対話失敗::権限拒否);
         }
         if work.状態 != "完了"
@@ -1114,6 +1121,7 @@ impl 対話制御 {
 
     /// C6のowner登録だけが消費する。元の入力・応答本文を返さず、現在の
     /// request/hashと永続化済み結果証跡の一致だけを証明する。
+    #[cfg(feature = "module_evaluation_lab")]
     pub(crate) fn 回帰Case情報(
         &self,
         request_id: &str,
@@ -1182,6 +1190,7 @@ impl 対話制御 {
 
     /// C5が一括の承認待ち対話を作る前に、既存対話を追い出さずに確認する上限。
     /// この値は権限・Approval・送信許可を生成しない。
+    #[cfg(feature = "module_evaluation_lab")]
     pub(crate) fn 評価要求可能数(&self) -> usize {
         128usize
             .saturating_sub(self.作業.len())
@@ -1190,6 +1199,7 @@ impl 対話制御 {
 
     /// C4のterminal隔離後、評価対話のworker受信側とsessionの双方が実際に
     /// 解放されたことだけをC5が確認する。外部実行の停止やC4の成功は示さない。
+    #[cfg(feature = "module_evaluation_lab")]
     pub(crate) fn 評価対話回収済み(
         &self, 要求ID: &str, 対話セッションID: &str
     ) -> bool {
@@ -1198,6 +1208,7 @@ impl 対話制御 {
 
     /// C5評価だけが、送信済みでまだowner承認されていない対話を隔離する。
     /// 隔離後も既存のowner対話承認は個別に行うが、通常の`対話取得`へは公開しない。
+    #[cfg(feature = "module_evaluation_lab")]
     pub(crate) fn 評価隔離(&mut self, 要求ID: &str) -> Result<(), 対話失敗> {
         let work = self.作業.get_mut(要求ID).ok_or(対話失敗::要求不正)?;
         if work.評価隔離 || work.状態 != "承認待ち" || work.受信.is_some() || work.結果.is_some()
@@ -1211,6 +1222,7 @@ impl 対話制御 {
     /// C5の評価結果収集用。既存の対話状態遷移・監査保存を進めてから、
     /// Content Exposure Boundaryを適用済みの結果だけを返す。
     /// 評価器や呼出し元に生応答・入力・接続先を渡さない。
+    #[cfg(feature = "module_evaluation_lab")]
     pub(crate) fn 評価進捗(
         &mut self,
         要求ID: &str,
@@ -1238,7 +1250,7 @@ impl 対話制御 {
 
     /// C5の非隣接監査回帰だけが、workerから到着済みの結果を進捗反映前の同じ
     /// receiverへ戻すための試験用同期点。production binaryには含めない。
-    #[cfg(test)]
+    #[cfg(all(test, feature = "module_evaluation_lab"))]
     pub(crate) fn 試験用受信済みを進捗前に再投入(
         &mut self,
         要求ID: &str,
@@ -2488,6 +2500,7 @@ impl 対話制御 {
                         終了監査ID: None,
                         状態: "承認待ち",
                         表示範囲: "none".into(),
+                        #[cfg(feature = "module_evaluation_lab")]
                         評価隔離: false,
                         取消: Arc::new(AtomicBool::new(false)),
                         受信: None,
@@ -2504,7 +2517,8 @@ impl 対話制御 {
                 空入力(値)?;
                 Ok(
                     json!({"要求": self.作業.values().filter(|v| v.状態 == "承認待ち").map(|v| {
-                        if v.評価隔離 {
+                        #[cfg(feature = "module_evaluation_lab")]
+                        let projection = if v.評価隔離 {
                             // C5のprivate Case inputは、owner承認待ち一覧にも再投影しない。
                             // 承認に必要なrequest ID/hash、Runtime、期限だけを返す。
                             json!({
@@ -2523,7 +2537,15 @@ impl 対話制御 {
                                 "期限": v.作成時刻 + 300,
                                 "接続先": self.実行系[&v.要求.実行系ID].接続対象(),
                             })
-                        }
+                        };
+                        #[cfg(not(feature = "module_evaluation_lab"))]
+                        let projection = json!({
+                            "要求": v.要求,
+                            "要求hash": v.要求hash,
+                            "期限": v.作成時刻 + 300,
+                            "接続先": self.実行系[&v.要求.実行系ID].接続対象(),
+                        });
+                        projection
                     }).collect::<Vec<_>>()}),
                 )
             }
@@ -2560,6 +2582,7 @@ impl 対話制御 {
                         )
                     })
                     .transpose()?;
+                #[cfg(feature = "module_evaluation_lab")]
                 let 理由 = if work.評価隔離 {
                     format!(
                         "対話送信承認 Capability=対話送信 Permission={} Approval={} 表示範囲={} 評価隔離=true RecoveryAction=接続再確認",
@@ -2574,6 +2597,14 @@ impl 対話制御 {
                         指定.表示範囲,
                     )
                 };
+                #[cfg(not(feature = "module_evaluation_lab"))]
+                let 理由 = format!(
+                    "対話送信承認 Capability=対話送信 Permission={}:{} Approval={} 表示範囲={} RecoveryAction=接続再確認",
+                    work.要求.実行系ID,
+                    adapter.接続対象(),
+                    work.要求hash,
+                    指定.表示範囲,
+                );
                 work.開始監査ID = Some(監査(&理由, &work.要求.要求ID, &work.要求hash)?);
                 work.開始時刻 = Some(現在);
                 work.表示範囲 = 指定.表示範囲;
@@ -2639,8 +2670,11 @@ impl 対話制御 {
                 if work.状態 == "監査失敗" {
                     return Err(対話失敗::監査失敗);
                 }
-                if work.評価隔離 {
-                    return Err(対話失敗::権限拒否);
+                #[cfg(feature = "module_evaluation_lab")]
+                {
+                    if work.評価隔離 {
+                        return Err(対話失敗::権限拒否);
+                    }
                 }
                 Ok(
                     json!({"要求ID": 指定.要求ID, "状態": work.状態, "結果": work.結果.as_ref().map(|r| 表示射影(work, r)), "実行記録": 実行記録(work)}),
@@ -6676,6 +6710,7 @@ mod tests {
     fn 承認(p: &Value, scope: &str) -> Value {
         json!({"要求ID":p["要求ID"],"要求hash":p["要求hash"],"表示範囲":scope})
     }
+    #[cfg(feature = "module_evaluation_lab")]
     fn 評価成功受信(対話セッションID: String, 応答完了: Instant) -> 受信結果 {
         受信結果 {
             結果: Ok(実行結果 {
@@ -6707,6 +6742,7 @@ mod tests {
         panic!("対話完了の待機期限");
     }
 
+    #[cfg(feature = "module_evaluation_lab")]
     #[test]
     fn 対話終了はsession上限を回復する() {
         let (mut c, _) = 準備(false, false, false);
@@ -6762,6 +6798,7 @@ mod tests {
         assert_eq!(stats.失敗要求数, 0);
     }
 
+    #[cfg(feature = "module_evaluation_lab")]
     #[test]
     fn 評価隔離済み対話は通常取得を拒否し内部進捗だけを返す() {
         let (mut c, _) = 準備(false, false, false);
@@ -6849,6 +6886,7 @@ mod tests {
                 && !reason.contains("評価隔離=true")));
     }
 
+    #[cfg(feature = "module_evaluation_lab")]
     #[test]
     fn 評価遅延はworker応答完了時刻から求めpoll待機を含めない() {
         let (mut c, _) = 準備(false, false, false);
@@ -6880,6 +6918,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "module_evaluation_lab")]
     #[test]
     fn 期限前に完了した評価対話は期限後pollでも採用する() {
         let (mut c, _) = 準備(false, false, false);
@@ -6916,6 +6955,7 @@ mod tests {
         assert!(!reasons.iter().any(|reason| reason == "対話期限超過"));
     }
 
+    #[cfg(feature = "module_evaluation_lab")]
     #[test]
     fn 中止後にworker応答を回収しても評価遅延を残さない() {
         let (mut c, calls) = 準備(false, false, true);
@@ -7231,6 +7271,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "module_evaluation_lab")]
     #[test]
     fn 回帰Case情報は完了した全文結果のhashと監査だけを返す() {
         let (mut c, _) = 準備(false, false, false);

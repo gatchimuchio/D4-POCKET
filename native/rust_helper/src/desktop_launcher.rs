@@ -22,11 +22,12 @@ use crate::broker::export_center::{self, OwnerConfirmationSummary as ExportConfi
 #[cfg(test)]
 use crate::broker::ipc_server::run_loopback_server_cancellable;
 use crate::broker::ipc_server::{BrokerServerError, DesktopOwnerOperationRequest};
+use crate::broker::protocol::{canonical_payload_hash, request_issued_at_is_current};
+#[cfg(feature = "module_evaluation_lab")]
 use crate::broker::protocol::{
-    canonical_payload_hash, owner_delete_confirmation_summary, owner_recovery_confirmation_summary,
-    owner_registration_confirmation_summary, request_issued_at_is_current,
-    OwnerDeleteConfirmationSummary, OwnerRecoveryConfirmationSummary,
-    OwnerRegistrationConfirmationSummary,
+    owner_delete_confirmation_summary, owner_recovery_confirmation_summary,
+    owner_registration_confirmation_summary, OwnerDeleteConfirmationSummary,
+    OwnerRecoveryConfirmationSummary, OwnerRegistrationConfirmationSummary,
 };
 use crate::broker::{
     BrokerCredentialRole, BrokerEndpoint, BrokerOperation, BrokerRequestEnvelope,
@@ -122,14 +123,17 @@ enum DesktopOwnerOperationSummary {
         credential_id: Option<String>,
         payload_hash: String,
     },
+    #[cfg(feature = "module_evaluation_lab")]
     RegressionCaseDelete {
         summary: OwnerDeleteConfirmationSummary,
         payload_hash: String,
     },
+    #[cfg(feature = "module_evaluation_lab")]
     RegressionCaseRecovery {
         summary: OwnerRecoveryConfirmationSummary,
         payload_hash: String,
     },
+    #[cfg(feature = "module_evaluation_lab")]
     RegressionCaseRegistration {
         summary: OwnerRegistrationConfirmationSummary,
         payload_hash: String,
@@ -2289,16 +2293,19 @@ fn owner_operation_candidate_with_product_identity(
                 payload_hash,
             }
         }
+        #[cfg(feature = "module_evaluation_lab")]
         BrokerOperation::回帰Case削除 => DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary: owner_delete_confirmation_summary(payload).ok()?,
             payload_hash,
         },
+        #[cfg(feature = "module_evaluation_lab")]
         BrokerOperation::回帰Case削除中断確認 => {
             DesktopOwnerOperationSummary::RegressionCaseRecovery {
                 summary: owner_recovery_confirmation_summary(payload).ok()?,
                 payload_hash,
             }
         }
+        #[cfg(feature = "module_evaluation_lab")]
         BrokerOperation::回帰Case登録 => {
             DesktopOwnerOperationSummary::RegressionCaseRegistration {
                 summary: owner_registration_confirmation_summary(payload).ok()?,
@@ -3373,6 +3380,7 @@ fn owner_confirmation_text_for_identity(
             ),
             payload_hash
         ),
+        #[cfg(feature = "module_evaluation_lab")]
         DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary,
             payload_hash,
@@ -3383,6 +3391,7 @@ fn owner_confirmation_text_for_identity(
             summary.ciphertext_hash,
             payload_hash
         ),
+        #[cfg(feature = "module_evaluation_lab")]
         DesktopOwnerOperationSummary::RegressionCaseRecovery {
             summary,
             payload_hash,
@@ -3391,6 +3400,7 @@ fn owner_confirmation_text_for_identity(
             summary.case_id,
             payload_hash
         ),
+        #[cfg(feature = "module_evaluation_lab")]
         DesktopOwnerOperationSummary::RegressionCaseRegistration {
             summary,
             payload_hash,
@@ -6701,218 +6711,226 @@ mod tests {
             "none"
         );
 
-        let delete_payload = serde_json::json!({
-            "版": 1,
-            "回帰CaseID": "cccccccccccccccccccccccccccccccc",
-            "定義hash": format!("sha256:{}", "d".repeat(64)),
-            "暗号文hash": format!("sha256:{}", "e".repeat(64))
-        });
-        let delete = desktop_owner_request(
-            "回帰Case削除",
-            "desktop-delete-confirmed",
-            "desktop-delete-confirmed-nonce",
-            delete_payload,
-        );
-        let mut delete_prompt_count = 0;
-        let delete_response = relay_channel_frame_with_owner_operations(
-            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&delete).unwrap()),
-            &broker_endpoint,
-            Some(&owner_operation_tx),
-            |summary| {
-                delete_prompt_count += 1;
-                let DesktopOwnerOperationSummary::RegressionCaseDelete {
-                    summary,
-                    payload_hash,
-                } = summary
-                else {
-                    panic!("削除はCase IDと両hashを示す専用確認を使う")
-                };
-                assert_eq!(summary.case_id, "cccccccccccccccccccccccccccccccc");
-                assert_eq!(
-                    summary.definition_hash,
-                    format!("sha256:{}", "d".repeat(64))
-                );
-                assert_eq!(
-                    summary.ciphertext_hash,
-                    format!("sha256:{}", "e".repeat(64))
-                );
-                assert_eq!(payload_hash, delete["payload_hash"].as_str().unwrap());
-                let text =
-                    owner_confirmation_text(&DesktopOwnerOperationSummary::RegressionCaseDelete {
-                        summary: (*summary).clone(),
-                        payload_hash: (*payload_hash).clone(),
-                    });
-                assert!(text.contains("物理消去は保証しません"));
-                true
-            },
-        )
-        .unwrap();
-        let delete_response: serde_json::Value = serde_json::from_slice(&delete_response).unwrap();
-        assert_eq!(delete_prompt_count, 1);
-        assert_eq!(delete_response["status"], "rejected");
-        assert_eq!(delete_response["error"]["code"], "削除対象不明");
-
-        let recovery_payload = serde_json::json!({
-            "版": 1,
-            "回帰CaseID": "cccccccccccccccccccccccccccccccc"
-        });
-        let recovery = desktop_owner_request(
-            "回帰Case削除中断確認",
-            "desktop-recovery-confirmed",
-            "desktop-recovery-confirmed-nonce",
-            recovery_payload,
-        );
-        let mut recovery_prompt_count = 0;
-        let recovery_response = relay_channel_frame_with_owner_operations(
-            gui_shell_windows_broker_channel::PipeFrame::Line(
-                serde_json::to_vec(&recovery).unwrap(),
-            ),
-            &broker_endpoint,
-            Some(&owner_operation_tx),
-            |summary| {
-                recovery_prompt_count += 1;
-                let DesktopOwnerOperationSummary::RegressionCaseRecovery {
-                    summary,
-                    payload_hash,
-                } = summary
-                else {
-                    panic!("中断照合はCase IDだけを示す専用確認を使う")
-                };
-                assert_eq!(summary.case_id, "cccccccccccccccccccccccccccccccc");
-                assert_eq!(payload_hash, recovery["payload_hash"].as_str().unwrap());
-                assert!(owner_confirmation_text(
-                    &DesktopOwnerOperationSummary::RegressionCaseRecovery {
-                        summary: (*summary).clone(),
-                        payload_hash: (*payload_hash).clone(),
-                    },
-                )
-                .contains("自動再削除は行いません"));
-                true
-            },
-        )
-        .unwrap();
-        let recovery_response: serde_json::Value =
-            serde_json::from_slice(&recovery_response).unwrap();
-        assert_eq!(recovery_prompt_count, 1);
-        assert_eq!(recovery_response["status"], "rejected");
-        assert_eq!(recovery_response["error"]["code"], "復旧対象不明");
-
-        let registration_payload = serde_json::json!({
-            "版": 1,
-            "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "要求hash": format!("sha256:{}", "b".repeat(64)),
-            "公開表示名": "回帰Case登録試験",
-            "入力方式": "owner_explicit_redacted",
-            "入力": {"内容表示範囲": "full", "本文": "owner-authored-redacted-input"},
-            "必要条件": ["private-required-condition"],
-            "禁止条件": [],
-            "期待状態": "成功",
-            "必要参照": ["private-reference"],
-            "期待経路": "private-route"
-        });
-        let registration = desktop_owner_request(
-            "回帰Case登録",
-            "desktop-registration-confirmed",
-            "desktop-registration-confirmed-nonce",
-            registration_payload,
-        );
-        let mut registration_prompt_count = 0;
-        let registration_response = relay_channel_frame_with_owner_operations(
-            gui_shell_windows_broker_channel::PipeFrame::Line(
-                serde_json::to_vec(&registration).unwrap(),
-            ),
-            &broker_endpoint,
-            Some(&owner_operation_tx),
-            |summary| {
-                registration_prompt_count += 1;
-                let DesktopOwnerOperationSummary::RegressionCaseRegistration {
-                    summary,
-                    payload_hash,
-                } = summary
-                else {
-                    panic!("登録は公開要約だけを表示する専用native確認を使う")
-                };
-                assert_eq!(summary.request_id, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-                assert_eq!(summary.display_name, "回帰Case登録試験");
-                assert_eq!(
-                    summary.input_characters,
-                    "owner-authored-redacted-input".chars().count()
-                );
-                assert_eq!(summary.required_condition_count, 1);
-                assert_eq!(payload_hash, registration["payload_hash"].as_str().unwrap());
-                let text = owner_confirmation_text(
-                    &DesktopOwnerOperationSummary::RegressionCaseRegistration {
-                        summary: (*summary).clone(),
-                        payload_hash: (*payload_hash).clone(),
-                    },
-                );
-                assert!(text.contains("現在の対話証跡"));
-                assert!(text.contains(&summary.request_hash));
-                assert!(!text.contains("owner-authored-redacted-input"));
-                assert!(!text.contains("private-required-condition"));
-                assert!(!text.contains("private-reference"));
-                assert!(!text.contains("private-route"));
-                true
-            },
-        )
-        .unwrap();
-        let registration_response: serde_json::Value =
-            serde_json::from_slice(&registration_response).unwrap();
-        assert_eq!(registration_prompt_count, 1);
-        assert_eq!(registration_response["status"], "rejected");
-        assert_eq!(registration_response["error"]["code"], "対話証跡不在");
-
-        let mut secret_registration = registration.clone();
-        secret_registration["request_id"] =
-            serde_json::Value::String("desktop-registration-secret-marker".into());
-        secret_registration["nonce"] =
-            serde_json::Value::String("desktop-registration-secret-marker-nonce".into());
-        secret_registration["payload"]["入力"]["本文"] =
-            serde_json::Value::String("api_key=must-not-be-shown".into());
-        secret_registration["payload_hash"] = serde_json::Value::String(
-            canonical_payload_hash(secret_registration.get("payload")).to_string(),
-        );
-        let mut secret_prompt_count = 0;
-        let secret_response = relay_channel_frame_with_owner_operations(
-            gui_shell_windows_broker_channel::PipeFrame::Line(
-                serde_json::to_vec(&secret_registration).unwrap(),
-            ),
-            &broker_endpoint,
-            Some(&owner_operation_tx),
-            |_| {
-                secret_prompt_count += 1;
-                true
-            },
-        )
-        .unwrap();
-        let secret_response: serde_json::Value = serde_json::from_slice(&secret_response).unwrap();
-        assert_eq!(secret_prompt_count, 0);
-        assert_eq!(secret_response["status"], "rejected");
-        assert_eq!(secret_response["error"]["code"], "権限拒否");
-
-        let stale_approval = desktop_owner_request(
-            "回帰Case削除中断確認",
-            "desktop-recovery-stale-approval",
-            "desktop-recovery-stale-approval-nonce",
-            serde_json::json!({
+        #[cfg(feature = "module_evaluation_lab")]
+        {
+            let delete_payload = serde_json::json!({
                 "版": 1,
                 "回帰CaseID": "cccccccccccccccccccccccccccccccc",
-                "削除承認監査ID": "audit.history.must-not-be-authority"
-            }),
-        );
-        let stale_approval_response = relay_channel_frame_with_owner_operations(
-            gui_shell_windows_broker_channel::PipeFrame::Line(
-                serde_json::to_vec(&stale_approval).unwrap(),
-            ),
-            &broker_endpoint,
-            Some(&owner_operation_tx),
-            |_| panic!("過去の承認IDを含むRecovery要求はnative確認へ進めない"),
-        )
-        .unwrap();
-        let stale_approval_response: serde_json::Value =
-            serde_json::from_slice(&stale_approval_response).unwrap();
-        assert_eq!(stale_approval_response["status"], "rejected");
-        assert_eq!(stale_approval_response["error"]["code"], "権限拒否");
+                "定義hash": format!("sha256:{}", "d".repeat(64)),
+                "暗号文hash": format!("sha256:{}", "e".repeat(64))
+            });
+            let delete = desktop_owner_request(
+                "回帰Case削除",
+                "desktop-delete-confirmed",
+                "desktop-delete-confirmed-nonce",
+                delete_payload,
+            );
+            let mut delete_prompt_count = 0;
+            let delete_response = relay_channel_frame_with_owner_operations(
+                gui_shell_windows_broker_channel::PipeFrame::Line(
+                    serde_json::to_vec(&delete).unwrap(),
+                ),
+                &broker_endpoint,
+                Some(&owner_operation_tx),
+                |summary| {
+                    delete_prompt_count += 1;
+                    let DesktopOwnerOperationSummary::RegressionCaseDelete {
+                        summary,
+                        payload_hash,
+                    } = summary
+                    else {
+                        panic!("削除はCase IDと両hashを示す専用確認を使う")
+                    };
+                    assert_eq!(summary.case_id, "cccccccccccccccccccccccccccccccc");
+                    assert_eq!(
+                        summary.definition_hash,
+                        format!("sha256:{}", "d".repeat(64))
+                    );
+                    assert_eq!(
+                        summary.ciphertext_hash,
+                        format!("sha256:{}", "e".repeat(64))
+                    );
+                    assert_eq!(payload_hash, delete["payload_hash"].as_str().unwrap());
+                    let text = owner_confirmation_text(
+                        &DesktopOwnerOperationSummary::RegressionCaseDelete {
+                            summary: (*summary).clone(),
+                            payload_hash: (*payload_hash).clone(),
+                        },
+                    );
+                    assert!(text.contains("物理消去は保証しません"));
+                    true
+                },
+            )
+            .unwrap();
+            let delete_response: serde_json::Value =
+                serde_json::from_slice(&delete_response).unwrap();
+            assert_eq!(delete_prompt_count, 1);
+            assert_eq!(delete_response["status"], "rejected");
+            assert_eq!(delete_response["error"]["code"], "削除対象不明");
+
+            let recovery_payload = serde_json::json!({
+                "版": 1,
+                "回帰CaseID": "cccccccccccccccccccccccccccccccc"
+            });
+            let recovery = desktop_owner_request(
+                "回帰Case削除中断確認",
+                "desktop-recovery-confirmed",
+                "desktop-recovery-confirmed-nonce",
+                recovery_payload,
+            );
+            let mut recovery_prompt_count = 0;
+            let recovery_response = relay_channel_frame_with_owner_operations(
+                gui_shell_windows_broker_channel::PipeFrame::Line(
+                    serde_json::to_vec(&recovery).unwrap(),
+                ),
+                &broker_endpoint,
+                Some(&owner_operation_tx),
+                |summary| {
+                    recovery_prompt_count += 1;
+                    let DesktopOwnerOperationSummary::RegressionCaseRecovery {
+                        summary,
+                        payload_hash,
+                    } = summary
+                    else {
+                        panic!("中断照合はCase IDだけを示す専用確認を使う")
+                    };
+                    assert_eq!(summary.case_id, "cccccccccccccccccccccccccccccccc");
+                    assert_eq!(payload_hash, recovery["payload_hash"].as_str().unwrap());
+                    assert!(owner_confirmation_text(
+                        &DesktopOwnerOperationSummary::RegressionCaseRecovery {
+                            summary: (*summary).clone(),
+                            payload_hash: (*payload_hash).clone(),
+                        },
+                    )
+                    .contains("自動再削除は行いません"));
+                    true
+                },
+            )
+            .unwrap();
+            let recovery_response: serde_json::Value =
+                serde_json::from_slice(&recovery_response).unwrap();
+            assert_eq!(recovery_prompt_count, 1);
+            assert_eq!(recovery_response["status"], "rejected");
+            assert_eq!(recovery_response["error"]["code"], "復旧対象不明");
+
+            let registration_payload = serde_json::json!({
+                "版": 1,
+                "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "要求hash": format!("sha256:{}", "b".repeat(64)),
+                "公開表示名": "回帰Case登録試験",
+                "入力方式": "owner_explicit_redacted",
+                "入力": {"内容表示範囲": "full", "本文": "owner-authored-redacted-input"},
+                "必要条件": ["private-required-condition"],
+                "禁止条件": [],
+                "期待状態": "成功",
+                "必要参照": ["private-reference"],
+                "期待経路": "private-route"
+            });
+            let registration = desktop_owner_request(
+                "回帰Case登録",
+                "desktop-registration-confirmed",
+                "desktop-registration-confirmed-nonce",
+                registration_payload,
+            );
+            let mut registration_prompt_count = 0;
+            let registration_response = relay_channel_frame_with_owner_operations(
+                gui_shell_windows_broker_channel::PipeFrame::Line(
+                    serde_json::to_vec(&registration).unwrap(),
+                ),
+                &broker_endpoint,
+                Some(&owner_operation_tx),
+                |summary| {
+                    registration_prompt_count += 1;
+                    let DesktopOwnerOperationSummary::RegressionCaseRegistration {
+                        summary,
+                        payload_hash,
+                    } = summary
+                    else {
+                        panic!("登録は公開要約だけを表示する専用native確認を使う")
+                    };
+                    assert_eq!(summary.request_id, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+                    assert_eq!(summary.display_name, "回帰Case登録試験");
+                    assert_eq!(
+                        summary.input_characters,
+                        "owner-authored-redacted-input".chars().count()
+                    );
+                    assert_eq!(summary.required_condition_count, 1);
+                    assert_eq!(payload_hash, registration["payload_hash"].as_str().unwrap());
+                    let text = owner_confirmation_text(
+                        &DesktopOwnerOperationSummary::RegressionCaseRegistration {
+                            summary: (*summary).clone(),
+                            payload_hash: (*payload_hash).clone(),
+                        },
+                    );
+                    assert!(text.contains("現在の対話証跡"));
+                    assert!(text.contains(&summary.request_hash));
+                    assert!(!text.contains("owner-authored-redacted-input"));
+                    assert!(!text.contains("private-required-condition"));
+                    assert!(!text.contains("private-reference"));
+                    assert!(!text.contains("private-route"));
+                    true
+                },
+            )
+            .unwrap();
+            let registration_response: serde_json::Value =
+                serde_json::from_slice(&registration_response).unwrap();
+            assert_eq!(registration_prompt_count, 1);
+            assert_eq!(registration_response["status"], "rejected");
+            assert_eq!(registration_response["error"]["code"], "対話証跡不在");
+
+            let mut secret_registration = registration.clone();
+            secret_registration["request_id"] =
+                serde_json::Value::String("desktop-registration-secret-marker".into());
+            secret_registration["nonce"] =
+                serde_json::Value::String("desktop-registration-secret-marker-nonce".into());
+            secret_registration["payload"]["入力"]["本文"] =
+                serde_json::Value::String("api_key=must-not-be-shown".into());
+            secret_registration["payload_hash"] = serde_json::Value::String(
+                canonical_payload_hash(secret_registration.get("payload")).to_string(),
+            );
+            let mut secret_prompt_count = 0;
+            let secret_response = relay_channel_frame_with_owner_operations(
+                gui_shell_windows_broker_channel::PipeFrame::Line(
+                    serde_json::to_vec(&secret_registration).unwrap(),
+                ),
+                &broker_endpoint,
+                Some(&owner_operation_tx),
+                |_| {
+                    secret_prompt_count += 1;
+                    true
+                },
+            )
+            .unwrap();
+            let secret_response: serde_json::Value =
+                serde_json::from_slice(&secret_response).unwrap();
+            assert_eq!(secret_prompt_count, 0);
+            assert_eq!(secret_response["status"], "rejected");
+            assert_eq!(secret_response["error"]["code"], "権限拒否");
+
+            let stale_approval = desktop_owner_request(
+                "回帰Case削除中断確認",
+                "desktop-recovery-stale-approval",
+                "desktop-recovery-stale-approval-nonce",
+                serde_json::json!({
+                    "版": 1,
+                    "回帰CaseID": "cccccccccccccccccccccccccccccccc",
+                    "削除承認監査ID": "audit.history.must-not-be-authority"
+                }),
+            );
+            let stale_approval_response = relay_channel_frame_with_owner_operations(
+                gui_shell_windows_broker_channel::PipeFrame::Line(
+                    serde_json::to_vec(&stale_approval).unwrap(),
+                ),
+                &broker_endpoint,
+                Some(&owner_operation_tx),
+                |_| panic!("過去の承認IDを含むRecovery要求はnative確認へ進めない"),
+            )
+            .unwrap();
+            let stale_approval_response: serde_json::Value =
+                serde_json::from_slice(&stale_approval_response).unwrap();
+            assert_eq!(stale_approval_response["status"], "rejected");
+            assert_eq!(stale_approval_response["error"]["code"], "権限拒否");
+        }
 
         let declined =
             desktop_export_request("desktop-export-declined", "desktop-export-declined-nonce");

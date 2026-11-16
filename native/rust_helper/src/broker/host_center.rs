@@ -7,17 +7,21 @@
 
 use super::protocol::{Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTERNAL_STATE};
 use super::store::{BrokerPersistentStore, BrokerStoreError};
+#[cfg(feature = "module_host_operations")]
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
+#[cfg(feature = "module_host_operations")]
 const OP_REGISTER: &str = "Host登録";
 const OP_LIST: &str = "Host一覧";
+#[cfg(feature = "module_host_operations")]
 const OP_SWITCH: &str = "Host切替";
 const VERSION: u64 = 1;
 const MAX_HOSTS: usize = 64;
 const MAX_RUNTIME_COUNT: u64 = 256;
 
+#[cfg(feature = "module_host_operations")]
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct HostRegistrationRequest {
@@ -43,6 +47,7 @@ struct HostRegistrationRequest {
     last_connection: Option<String>,
 }
 
+#[cfg(feature = "module_host_operations")]
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct HostIdentity {
@@ -51,6 +56,7 @@ struct HostIdentity {
     hash: String,
 }
 
+#[cfg(feature = "module_host_operations")]
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RuntimeSummary {
@@ -59,6 +65,7 @@ struct RuntimeSummary {
     evidence_source: String,
 }
 
+#[cfg(feature = "module_host_operations")]
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct HostSwitchRequest {
@@ -102,6 +109,7 @@ fn decode_state(state: &Value) -> Result<BTreeMap<String, Value>, String> {
     Ok(result)
 }
 
+#[cfg(feature = "module_host_operations")]
 fn state_value(hosts: &BTreeMap<String, Value>) -> Value {
     json!({
         "版": VERSION,
@@ -109,6 +117,7 @@ fn state_value(hosts: &BTreeMap<String, Value>) -> Value {
     })
 }
 
+#[cfg(feature = "module_host_operations")]
 fn persist(broker: &Broker) -> Result<(), String> {
     broker
         .state_store
@@ -116,6 +125,7 @@ fn persist(broker: &Broker) -> Result<(), String> {
         .map_err(|error| error.message())
 }
 
+#[cfg(feature = "module_host_operations")]
 fn parse_request(payload: &Value) -> Result<HostRegistrationRequest, String> {
     let request: HostRegistrationRequest = serde_json::from_value(payload.clone())
         .map_err(|_| "Host登録payloadの構造が不正".to_string())?;
@@ -137,7 +147,10 @@ fn parse_request(payload: &Value) -> Result<HostRegistrationRequest, String> {
 }
 
 /// 公開metadataだけを既存構造検査へ通し、同一Desktop native確認の説明を生成する。
-#[cfg(any(test, target_os = "linux", target_os = "macos"))]
+#[cfg(all(
+    feature = "module_host_operations",
+    any(test, target_os = "linux", target_os = "macos")
+))]
 pub(crate) fn owner_confirmation_summary(payload: &Value) -> Option<String> {
     let request = parse_request(payload).ok()?;
     if request.display_name.chars().any(char::is_control) {
@@ -150,6 +163,7 @@ pub(crate) fn owner_confirmation_summary(payload: &Value) -> Option<String> {
     ))
 }
 
+#[cfg(feature = "module_host_operations")]
 fn parse_switch_request(payload: &Value) -> Result<HostSwitchRequest, String> {
     let request: HostSwitchRequest = serde_json::from_value(payload.clone())
         .map_err(|_| "Host切替payloadの構造が不正".to_string())?;
@@ -185,11 +199,13 @@ fn valid_hash(value: &str) -> bool {
     hex.len() == 64 && hex.chars().all(|character| character.is_ascii_hexdigit())
 }
 
+#[cfg(feature = "module_host_operations")]
 fn valid_identity(identity: &HostIdentity) -> bool {
     matches!(identity.kind.as_str(), "certificate_hash" | "identity_hash")
         && valid_hash(&identity.hash)
 }
 
+#[cfg(feature = "module_host_operations")]
 fn valid_runtime_summary(summary: &RuntimeSummary) -> bool {
     summary.runtime_count <= MAX_RUNTIME_COUNT
         && summary.agent_count <= MAX_RUNTIME_COUNT
@@ -336,6 +352,7 @@ fn validate_persisted_receipt(value: &Value) -> Result<String, String> {
     Ok(host_id)
 }
 
+#[cfg(feature = "module_host_operations")]
 pub(super) fn register(
     broker: &mut Broker,
     request_id: &str,
@@ -600,6 +617,7 @@ pub(super) fn list(
     }
 }
 
+#[cfg(feature = "module_host_operations")]
 pub(super) fn switch(
     broker: &mut Broker,
     request_id: &str,
@@ -720,10 +738,11 @@ pub(super) fn switch(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "module_host_operations"))]
 mod tests {
     use super::*;
 
+    #[cfg(feature = "module_host_operations")]
     fn valid_payload(host_id: &str) -> Value {
         json!({
             "版": 1,
@@ -739,6 +758,7 @@ mod tests {
         })
     }
 
+    #[cfg(feature = "module_host_operations")]
     #[test]
     fn Host登録payloadは権限fieldとlive状態を拒否する() {
         let mut authority = valid_payload("host-authority");
@@ -749,6 +769,7 @@ mod tests {
         assert!(parse_request(&live).is_err());
     }
 
+    #[cfg(feature = "module_host_operations")]
     #[test]
     fn Host切替は未知Hostとauthority持込を拒否する() {
         let store = std::env::temp_dir().join(format!(
@@ -772,6 +793,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(store);
     }
 
+    #[cfg(feature = "module_host_operations")]
     #[test]
     fn Host切替はHost間で承認とPermissionを再利用しない() {
         let store = std::env::temp_dir().join(format!(
@@ -820,6 +842,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(store);
     }
 
+    #[cfg(feature = "module_host_operations")]
     #[test]
     fn owner登録と通常一覧はHost間でmetadataだけを保持する() {
         let store =
@@ -880,6 +903,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(store);
     }
 
+    #[cfg(feature = "module_host_operations")]
     #[test]
     fn malformedなHost_stateと過去のverified状態は再起動時にfail_closedになる() {
         let store =

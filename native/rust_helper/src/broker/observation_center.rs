@@ -17,6 +17,7 @@ use std::collections::VecDeque;
 const VERSION: u64 = 1;
 const MAX_SPANS: usize = 1024;
 const MAX_RESPONSE_SPANS: usize = 256;
+#[cfg(feature = "module_trace_inspector")]
 const MAX_TRACE_ID_LENGTH: usize = 128;
 const OP_LIST: &str = "観測一覧";
 
@@ -48,6 +49,7 @@ struct ListRequest {
     version: u64,
     #[serde(rename = "上限", default)]
     limit: Option<usize>,
+    #[cfg(feature = "module_trace_inspector")]
     #[serde(rename = "TraceID", default)]
     trace_id: Option<String>,
 }
@@ -90,18 +92,15 @@ impl ObservationCenter {
 
     fn response_body(&self, request: &ListRequest) -> Value {
         let limit = request.limit.unwrap_or(MAX_RESPONSE_SPANS);
-        let mut spans: Vec<ObservationSpan> = self
-            .spans
-            .iter()
-            .filter(|span| {
-                request
-                    .trace_id
-                    .as_deref()
-                    .map(|trace_id| span.trace_id == trace_id)
-                    .unwrap_or(true)
-            })
-            .cloned()
-            .collect();
+        let mut spans: Vec<ObservationSpan> = self.spans.iter().cloned().collect();
+        #[cfg(feature = "module_trace_inspector")]
+        spans.retain(|span| {
+            request
+                .trace_id
+                .as_deref()
+                .map(|trace_id| span.trace_id == trace_id)
+                .unwrap_or(true)
+        });
         spans.truncate(limit);
         let span_values: Vec<Value> = spans.iter().map(ObservationSpan::to_value).collect();
         let trace_values = traces_for(&spans);
@@ -294,6 +293,7 @@ pub(super) fn dispatch(
             payload_hash,
         );
     }
+    #[cfg(feature = "module_trace_inspector")]
     if request
         .trace_id
         .as_deref()

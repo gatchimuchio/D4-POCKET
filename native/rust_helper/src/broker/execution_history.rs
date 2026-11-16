@@ -34,6 +34,7 @@ pub(crate) struct AgentTaskHistoryAuditRecord {
     pub buffer_intervention_audit_event_id: Option<String>,
 }
 
+#[cfg(feature = "module_history")]
 #[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AgentTaskHistoryQuery {
@@ -41,6 +42,7 @@ pub(crate) struct AgentTaskHistoryQuery {
     pub limit: usize,
 }
 
+#[cfg(feature = "module_history")]
 #[derive(Clone)]
 struct ProjectedAgentTask {
     record: AgentTaskHistoryAuditRecord,
@@ -238,6 +240,7 @@ fn validate_agent_task_record(record: &AgentTaskHistoryAuditRecord) -> Result<()
     }
 }
 
+#[cfg(feature = "module_history")]
 pub(crate) fn agent_task_page(
     log: &BrokerAuditLog,
     runtime_id: &str,
@@ -762,6 +765,7 @@ mod tests {
         assert!(task_session_has_history(&log, "runtime-a", "session-a").is_err());
     }
 
+    #[cfg(feature = "module_history")]
     #[test]
     fn agent_task_history_projection_is_runtime_scoped_and_hash_only() {
         let mut log = BrokerAuditLog::default();
@@ -826,6 +830,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "module_history")]
     #[test]
     fn agent_task_history_rejects_malformed_and_orphan_terminal_records() {
         let task_id = "b".repeat(32);

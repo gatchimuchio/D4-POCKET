@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+#[cfg(any(feature = "module_observability", test))]
+use std::time::Instant;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -25,10 +27,13 @@ use crate::broker::runtime_registry::{ResourceObservationError, RuntimeResourceR
 use crate::broker::store::{BrokerPersistentStore, BrokerStoreError};
 use std::sync::Arc;
 
+#[cfg(feature = "module_evaluation_lab")]
 #[path = "evaluation_control.rs"]
 mod evaluation_control;
+#[cfg(feature = "module_evaluation_lab")]
 #[path = "regression_case.rs"]
 mod regression_case;
+#[cfg(feature = "module_evaluation_lab")]
 pub(crate) use regression_case::{
     owner_delete_confirmation_summary, owner_recovery_confirmation_summary,
     owner_registration_confirmation_summary, OwnerDeleteConfirmationSummary,
@@ -42,6 +47,7 @@ const REQUEST_FRESHNESS_WINDOW_SECONDS: u64 = 300;
 const ZERO_PAYLOAD_HASH: &str =
     "sha256:0000000000000000000000000000000000000000000000000000000000000000";
 
+#[cfg(feature = "module_setup_doctor")]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SetupDoctorReportRequest {
@@ -128,7 +134,7 @@ const AGENT_CLI_REGISTRATION_BOUNDARY_SUMMARY: &str =
 #[cfg(target_os = "macos")]
 const AGENT_CLI_REGISTRATION_BOUNDARY_SUMMARY: &str =
     "APFS rootとBroker内部領域との非重複を検査します。App Sandboxの外へ権限を広げません。";
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+#[cfg(all(test, not(any(target_os = "linux", target_os = "macos"))))]
 const AGENT_CLI_REGISTRATION_BOUNDARY_SUMMARY: &str =
     "Workspace rootがBroker内部の保護領域と重ならないことを確認します。";
 
@@ -375,6 +381,7 @@ impl BrokerStateStore {
             .transpose()
     }
 
+    #[cfg(feature = "module_notifications")]
     pub fn load_notification_state(&self) -> Result<Option<serde_json::Value>, BrokerStoreError> {
         if let Some(store) = &self.persistent_store {
             return store.load_notification_state().map(Some);
@@ -382,6 +389,7 @@ impl BrokerStateStore {
         Ok(None)
     }
 
+    #[cfg(feature = "module_notifications")]
     pub fn write_notification_state(
         &self,
         state: &serde_json::Value,
@@ -413,6 +421,7 @@ impl BrokerStateStore {
         Ok(None)
     }
 
+    #[cfg(feature = "module_host_operations")]
     pub fn write_host_state(&self, state: &serde_json::Value) -> Result<(), BrokerStoreError> {
         if let Some(store) = &self.persistent_store {
             store.write_host_state(state)?;
@@ -434,6 +443,7 @@ impl BrokerStateStore {
         Ok(())
     }
 
+    #[cfg(feature = "module_setup_doctor")]
     pub fn write_setup_doctor_report(&self, bytes: &[u8]) -> Result<(), BrokerStoreError> {
         let Some(store) = &self.persistent_store else {
             return Err(BrokerStoreError::Io(
@@ -1114,7 +1124,9 @@ pub struct Broker {
     対話: 対話制御,
     資源観測: RuntimeResourceRegistry,
     ライフサイクル: RuntimeLifecycleRegistry,
+    #[cfg(feature = "module_evaluation_lab")]
     評価: evaluation_control::EvaluationControl,
+    #[cfg(feature = "module_history")]
     履歴閲覧: super::history_access::HistoryAccess,
     作業領域: super::workspace::WorkspaceRegistry,
     端末: Option<super::device_link::端末制御>,
@@ -1127,7 +1139,9 @@ pub struct Broker {
     pub(super) updates: BTreeMap<String, Value>,
     pub(super) update_trust: Option<super::update_center::UpdateTrust>,
     pub(super) update_download: super::update_center::UpdateDownloadRuntime,
+    #[cfg(feature = "module_notifications")]
     pub(super) notification_states: BTreeMap<String, super::notification_center::NotificationState>,
+    #[cfg(feature = "module_observability")]
     pub(super) observations: super::observation_center::ObservationCenter,
     #[cfg(windows)]
     pub(super) protected_store: Option<crate::protected_store::ProtectedStore>,
@@ -1144,13 +1158,14 @@ pub struct Broker {
     pub(super) desktop_export_root: Option<(std::path::PathBuf, cap_std::fs::Dir)>,
     desktop_package_layout_verified: bool,
     pub(super) desktop_install_path_verified: bool,
+    #[cfg(feature = "module_setup_doctor")]
+    desktop_loopback_bind_verified: bool,
     pub(super) desktop_product_identity: Option<(String, String)>,
     #[cfg(test)]
     pub(super) desktop_product_install_local_app_data: Option<PathBuf>,
     #[cfg(test)]
     pub(super) desktop_product_start_menu_directory: Option<PathBuf>,
     desktop_agent_workspace_protected_paths: Vec<PathBuf>,
-    desktop_loopback_bind_verified: bool,
     desktop_first_run_configuration: Option<(Value, Vec<u8>)>,
 }
 
@@ -1164,7 +1179,9 @@ impl Broker {
             対話: 対話制御::for_broker_session(session_id),
             資源観測: RuntimeResourceRegistry::default(),
             ライフサイクル: RuntimeLifecycleRegistry::default(),
+            #[cfg(feature = "module_evaluation_lab")]
             評価: Default::default(),
+            #[cfg(feature = "module_history")]
             履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
@@ -1177,7 +1194,9 @@ impl Broker {
             updates: BTreeMap::new(),
             update_trust: None,
             update_download: super::update_center::UpdateDownloadRuntime::default(),
+            #[cfg(feature = "module_notifications")]
             notification_states: BTreeMap::new(),
+            #[cfg(feature = "module_observability")]
             observations: super::observation_center::ObservationCenter::default(),
             #[cfg(windows)]
             protected_store: None,
@@ -1195,12 +1214,13 @@ impl Broker {
             desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
             desktop_product_identity: None,
+            #[cfg(feature = "module_setup_doctor")]
+            desktop_loopback_bind_verified: false,
             #[cfg(test)]
             desktop_product_install_local_app_data: None,
             #[cfg(test)]
             desktop_product_start_menu_directory: None,
             desktop_agent_workspace_protected_paths: Vec::new(),
-            desktop_loopback_bind_verified: false,
             desktop_first_run_configuration: None,
         }
     }
@@ -1229,6 +1249,7 @@ impl Broker {
         let updates = super::update_center::load_persistent_updates(&persistent_store)?;
         let update_trust =
             super::update_center::load_effective_persistent_trust(&persistent_store)?;
+        #[cfg(feature = "module_notifications")]
         let notification_states =
             super::notification_center::load_persistent_states(&persistent_store)?;
         let a2a_connections = super::a2a_center::load_persistent_connections(&persistent_store)?;
@@ -1249,7 +1270,9 @@ impl Broker {
             ライフサイクル: RuntimeLifecycleRegistry::with_terminal_quarantines(
                 terminal_quarantines,
             ),
+            #[cfg(feature = "module_evaluation_lab")]
             評価: Default::default(),
+            #[cfg(feature = "module_history")]
             履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
@@ -1262,7 +1285,9 @@ impl Broker {
             updates,
             update_trust,
             update_download: super::update_center::UpdateDownloadRuntime::default(),
+            #[cfg(feature = "module_notifications")]
             notification_states,
+            #[cfg(feature = "module_observability")]
             observations: super::observation_center::ObservationCenter::default(),
             #[cfg(windows)]
             protected_store: None,
@@ -1280,12 +1305,13 @@ impl Broker {
             desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
             desktop_product_identity: None,
+            #[cfg(feature = "module_setup_doctor")]
+            desktop_loopback_bind_verified: false,
             #[cfg(test)]
             desktop_product_install_local_app_data: None,
             #[cfg(test)]
             desktop_product_start_menu_directory: None,
             desktop_agent_workspace_protected_paths: Vec::new(),
-            desktop_loopback_bind_verified: false,
             desktop_first_run_configuration: None,
         };
         broker.recover_interrupted_agent_tasks()?;
@@ -1398,7 +1424,14 @@ impl Broker {
     ) {
         self.desktop_package_layout_verified = package_layout_verified;
         self.desktop_install_path_verified = installed_path_verified;
-        self.desktop_loopback_bind_verified = loopback_bind_verified;
+        #[cfg(feature = "module_setup_doctor")]
+        {
+            self.desktop_loopback_bind_verified = loopback_bind_verified;
+        }
+        #[cfg(not(feature = "module_setup_doctor"))]
+        {
+            let _ = loopback_bind_verified;
+        }
     }
 
     pub(crate) fn set_desktop_product_identity(
@@ -2555,6 +2588,7 @@ impl Broker {
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 &payload_hash,
             ),
+            #[cfg(feature = "module_host_capabilities")]
             BrokerOperation::ホスト能力 => self.ホスト能力処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
@@ -2598,30 +2632,35 @@ impl Broker {
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 &payload_hash,
             ),
+            #[cfg(feature = "module_evaluation_lab")]
             BrokerOperation::評価Dataset登録 => self.評価Dataset登録処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
                 &payload_hash,
             ),
+            #[cfg(feature = "module_evaluation_lab")]
             BrokerOperation::回帰Case登録 => self.回帰Case登録処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
                 &payload_hash,
             ),
+            #[cfg(feature = "module_evaluation_lab")]
             BrokerOperation::回帰Case一覧 => self.回帰Case一覧処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
                 &payload_hash,
             ),
+            #[cfg(feature = "module_evaluation_lab")]
             BrokerOperation::回帰Case削除 => self.回帰Case削除処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
                 &payload_hash,
             ),
+            #[cfg(feature = "module_evaluation_lab")]
             BrokerOperation::回帰Case削除中断確認 => self.回帰Case削除中断確認処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
@@ -2739,6 +2778,7 @@ impl Broker {
                 owner,
                 &payload_hash,
             ),
+            #[cfg(feature = "module_host_operations")]
             BrokerOperation::Host登録 => super::host_center::register(
                 self,
                 &request_id,
@@ -2753,6 +2793,7 @@ impl Broker {
                 owner,
                 &payload_hash,
             ),
+            #[cfg(feature = "module_host_operations")]
             BrokerOperation::Host切替 => super::host_center::switch(
                 self,
                 &request_id,
@@ -2850,6 +2891,7 @@ impl Broker {
                     product_repair_confirmation.as_ref(),
                 )
             }
+            #[cfg(feature = "module_notifications")]
             operation @ (BrokerOperation::通知一覧
             | BrokerOperation::通知既読
             | BrokerOperation::通知破棄
@@ -2860,6 +2902,7 @@ impl Broker {
                 &request_id,
                 &payload_hash,
             ),
+            #[cfg(feature = "module_observability")]
             BrokerOperation::観測一覧 => super::observation_center::dispatch(
                 self,
                 BrokerOperation::観測一覧,
@@ -2867,6 +2910,7 @@ impl Broker {
                 &request_id,
                 &payload_hash,
             ),
+            #[cfg(feature = "module_evaluation_lab")]
             operation @ (BrokerOperation::評価Dataset一覧
             | BrokerOperation::評価実験開始
             | BrokerOperation::評価実験状態
@@ -2948,6 +2992,7 @@ impl Broker {
                 owner,
                 &payload_hash,
             ),
+            #[cfg(feature = "module_setup_doctor")]
             BrokerOperation::SetupDoctor報告取得 => self.setup_doctor_report(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
@@ -3005,6 +3050,7 @@ impl Broker {
                 project_approval_content(envelope.payload.as_ref().unwrap_or(&Value::Null)),
                 &payload_hash,
             ),
+            #[cfg(feature = "module_history")]
             operation @ (BrokerOperation::対話履歴承認
             | BrokerOperation::対話履歴失効
             | BrokerOperation::対話履歴閲覧状態
@@ -3016,6 +3062,7 @@ impl Broker {
                 owner,
                 &payload_hash,
             ),
+            #[cfg(feature = "module_history")]
             operation @ (BrokerOperation::対話再実行 | BrokerOperation::対話分岐) => self
                 .履歴再要求(
                     &request_id,
@@ -3023,6 +3070,7 @@ impl Broker {
                     envelope.payload.as_ref().unwrap_or(&Value::Null),
                     &payload_hash,
                 ),
+            #[cfg(feature = "module_history")]
             BrokerOperation::対話履歴一覧 => self.履歴要求処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
@@ -3041,6 +3089,52 @@ impl Broker {
                 normalize_inbound_payload(envelope.payload.as_ref().unwrap_or(&Value::Null)),
                 &payload_hash,
             ),
+            #[cfg(not(feature = "module_setup_doctor"))]
+            BrokerOperation::SetupDoctor報告取得 => {
+                self.optional_module_rejected(&request_id, &operation, &payload_hash)
+            }
+            #[cfg(not(feature = "module_history"))]
+            BrokerOperation::対話履歴承認
+            | BrokerOperation::対話履歴失効
+            | BrokerOperation::対話履歴閲覧状態
+            | BrokerOperation::対話履歴閲覧
+            | BrokerOperation::AgentTask履歴閲覧
+            | BrokerOperation::対話再実行
+            | BrokerOperation::対話分岐
+            | BrokerOperation::対話履歴一覧 => {
+                self.optional_module_rejected(&request_id, &operation, &payload_hash)
+            }
+            #[cfg(not(feature = "module_evaluation_lab"))]
+            BrokerOperation::評価Dataset登録
+            | BrokerOperation::回帰Case登録
+            | BrokerOperation::回帰Case一覧
+            | BrokerOperation::回帰Case削除
+            | BrokerOperation::回帰Case削除中断確認
+            | BrokerOperation::評価Dataset一覧
+            | BrokerOperation::評価実験開始
+            | BrokerOperation::評価実験状態
+            | BrokerOperation::評価比較 => {
+                self.optional_module_rejected(&request_id, &operation, &payload_hash)
+            }
+            #[cfg(not(feature = "module_host_capabilities"))]
+            BrokerOperation::ホスト能力 => {
+                self.optional_module_rejected(&request_id, &operation, &payload_hash)
+            }
+            #[cfg(not(feature = "module_notifications"))]
+            BrokerOperation::通知一覧
+            | BrokerOperation::通知既読
+            | BrokerOperation::通知破棄
+            | BrokerOperation::通知全既読 => {
+                self.optional_module_rejected(&request_id, &operation, &payload_hash)
+            }
+            #[cfg(not(feature = "module_observability"))]
+            BrokerOperation::観測一覧 => {
+                self.optional_module_rejected(&request_id, &operation, &payload_hash)
+            }
+            #[cfg(not(feature = "module_host_operations"))]
+            BrokerOperation::Host登録 | BrokerOperation::Host切替 => {
+                self.optional_module_rejected(&request_id, &operation, &payload_hash)
+            }
         }
     }
 
@@ -4228,6 +4322,7 @@ impl Broker {
                         "全Runtime停止要求" => {
                             self.全Runtime停止要求処理(id, &r.内容, &hash)
                         }
+                        #[cfg(feature = "module_notifications")]
                         "通知一覧" => super::notification_center::dispatch(
                             self,
                             BrokerOperation::通知一覧,
@@ -4235,8 +4330,15 @@ impl Broker {
                             id,
                             &hash,
                         ),
+                        #[cfg(not(feature = "module_notifications"))]
+                        "通知一覧" => self.optional_module_rejected(id, op, &hash),
+                        #[cfg(feature = "module_history")]
                         "対話履歴閲覧状態" | "対話履歴閲覧" => {
                             self.履歴閲覧処理(id, op, &r.内容, false, &hash)
+                        }
+                        #[cfg(not(feature = "module_history"))]
+                        "対話履歴閲覧状態" | "対話履歴閲覧" => {
+                            self.optional_module_rejected(id, op, &hash)
                         }
                         "作業領域一覧" => {
                             self.作業領域要求処理(id, op, &r.内容, false, &hash)
@@ -4294,6 +4396,7 @@ impl Broker {
         }
     }
 
+    #[cfg(feature = "module_history")]
     fn 履歴閲覧処理(
         &mut self,
         id: &str,
@@ -4382,6 +4485,7 @@ impl Broker {
         }
     }
 
+    #[cfg(feature = "module_history")]
     fn 履歴要求処理(
         &mut self,
         id: &str,
@@ -5772,6 +5876,7 @@ impl Broker {
         }
     }
 
+    #[cfg(feature = "module_setup_doctor")]
     fn setup_doctor_report(
         &mut self,
         request_id: &str,
@@ -6122,6 +6227,7 @@ impl Broker {
         )
     }
 
+    #[cfg(feature = "module_host_capabilities")]
     fn ホスト能力処理(
         &mut self,
         request_id: &str,
@@ -6429,6 +6535,31 @@ impl Broker {
         }
     }
 
+    #[cfg(any(
+        not(feature = "module_setup_doctor"),
+        not(feature = "module_history"),
+        not(feature = "module_evaluation_lab"),
+        not(feature = "module_host_capabilities"),
+        not(feature = "module_notifications"),
+        not(feature = "module_observability"),
+        not(feature = "module_host_operations")
+    ))]
+    fn optional_module_rejected(
+        &mut self,
+        request_id: &str,
+        operation: &str,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        self.reject_with_payload_hash(
+            request_id,
+            operation,
+            "optional_module_not_included",
+            "この独立Appに含まれないModuleのBroker操作を拒否しました。",
+            true,
+            payload_hash,
+        )
+    }
+
     pub(super) fn append_audit(
         &mut self,
         request_id: &str,
@@ -6438,7 +6569,9 @@ impl Broker {
         evidence_source: &str,
         payload_hash: &str,
     ) -> Result<BrokerAuditEvent, BrokerStoreError> {
+        #[cfg(feature = "module_observability")]
         let observation_started = Instant::now();
+        #[cfg(feature = "module_observability")]
         let observation_started_at = self.current_epoch_millis();
         let event = self.audit_log.build_next(
             request_id,
@@ -6464,6 +6597,7 @@ impl Broker {
             self.内容閲覧.revoke();
             return Err(BrokerStoreError::TamperedAuditState(error));
         }
+        #[cfg(feature = "module_observability")]
         self.observations.record_completed_span(
             &event,
             observation_started_at,
@@ -6754,6 +6888,7 @@ fn epoch_seconds_to_rfc3339(epoch_seconds: i64) -> String {
     format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
 }
 
+#[cfg(feature = "module_setup_doctor")]
 fn setup_doctor_check(
     check_id: &str,
     status: &str,
@@ -7757,24 +7892,22 @@ mod tests {
         }
         let broker =
             Broker::new_persistent("task-history-restart", &root).expect("中断Taskを再開せず隔離");
-        let page = super::super::execution_history::agent_task_page(
-            &broker.audit_log,
-            "runtime-a",
-            super::super::execution_history::AgentTaskHistoryQuery {
-                after: 0,
-                limit: 50,
-            },
-        )
-        .expect("中断履歴を読む");
-        assert_eq!(page["entries"].as_array().unwrap().len(), 1);
-        assert_eq!(page["entries"][0]["record"]["status"], "suspended");
-        assert_eq!(page["entries"][0]["record"]["failure_class"], "中断回復");
-        assert!(page["entries"][0]["record"].get("result_body").is_none());
-        assert!(broker.audit_events().iter().any(|event| {
-            event.request_id == task_id
-                && event.operation.starts_with("Agent Task中断回復")
-                && event.decision == "suspended"
-        }));
+        let recovery_event = broker
+            .audit_events()
+            .iter()
+            .find(|event| {
+                event.request_id == task_id
+                    && event.operation
+                        == super::super::execution_history::AGENT_TASK_RECOVERY_OPERATION
+            })
+            .expect("中断Taskの回復Audit");
+        let recovery_record =
+            super::super::execution_history::agent_task_audit_record(recovery_event)
+                .expect("回復Auditの構造とhash")
+                .expect("構造化回復記録");
+        assert_eq!(recovery_record.status, "suspended");
+        assert_eq!(recovery_record.failure_class.as_deref(), Some("中断回復"));
+        assert!(recovery_record.result_hash.is_none());
         drop(broker);
         fs::remove_dir_all(root).expect("履歴回復fixtureを削除");
     }
@@ -11962,6 +12095,7 @@ mod 端末統治試験 {
 #[path = "../../tests/unit/workspace_protocol.rs"]
 mod workspace_tests;
 
+#[cfg(feature = "module_history")]
 #[path = "replay.rs"]
 mod replay;
 
