@@ -40,6 +40,6 @@ macOS Runnerの実buildは`.github/workflows/apple-manual-build.yml`を`workflow
 
 - item: macOSの残る製品機能・復旧・正式配布
   classification: release_blocker
-  reason: 通常Broker接続・初回設定・正常終了は手動Actions run 37598578513で成立した。Owner専用操作・Credentials・Task・Windows固有製品機能のmacOS移植、異常終了後の起動lock復旧、正式署名・配布は未成立。bundle identifierは開発用である。
+  reason: 通常Broker接続・初回設定・正常終了は手動Actions run 37598578513で成立した。今回のmacOS TrayはNative sourceを追加した段階であり、`macos_product` targetのOS build／test evidenceは未取得。Owner専用操作・Credentials・Task・異常終了後の起動lock復旧、正式署名・配布も未成立。bundle identifierは開発用である。
   required_action: P13の製品接続から順に不足を実装する。通常接続の成功をmacOS全機能完成へ昇格せず、最終QAと正式identity／配布を別途成立させる。
   blocks_release: yes

@@ -90,6 +90,7 @@ class WindowsTrayClient {
   WindowsTrayActionHandler? _actionHandler;
   WindowsTrayVisibilityHandler? _visibilityHandler;
   bool _available = false;
+  int _availabilityGeneration = 0;
 
   bool get available => _available;
 
@@ -101,13 +102,14 @@ class WindowsTrayClient {
     _visibilityHandler = onVisibilityChanged;
     _channel.setMethodCallHandler(_handleMethodCall);
     try {
+      final generation = _availabilityGeneration;
       final windowVisible = await _channel.invokeMethod<bool>('initialize');
-      if (windowVisible == null) {
-        _available = false;
+      if (generation == _availabilityGeneration) {
+        _available = windowVisible != null;
+        if (_available) return windowVisible!;
         return false;
       }
-      _available = true;
-      return windowVisible;
+      return await _refreshVisibility();
     } on MissingPluginException {
       _available = false;
       return false;
@@ -144,6 +146,31 @@ class WindowsTrayClient {
     }
   }
 
+  Future<bool> _refreshVisibility() async {
+    if (!_available) return false;
+    try {
+      final visible = await _channel.invokeMethod<bool>('isWindowVisible');
+      if (visible == null) {
+        _available = false;
+        _availabilityGeneration++;
+        _visibilityHandler?.call(false);
+        return false;
+      }
+      _visibilityHandler?.call(visible);
+      return visible;
+    } on MissingPluginException {
+      _available = false;
+      _availabilityGeneration++;
+      _visibilityHandler?.call(false);
+      return false;
+    } on PlatformException {
+      _available = false;
+      _availabilityGeneration++;
+      _visibilityHandler?.call(false);
+      return false;
+    }
+  }
+
   Future<void> dispose() async {
     _actionHandler = null;
     _visibilityHandler = null;
@@ -157,6 +184,15 @@ class WindowsTrayClient {
     } else if (call.method == 'onWindowVisibilityChanged' &&
         call.arguments is bool) {
       _visibilityHandler?.call(call.arguments as bool);
+    } else if (call.method == 'onTrayAvailabilityChanged' &&
+        call.arguments is bool) {
+      _availabilityGeneration++;
+      _available = call.arguments as bool;
+      if (_available) {
+        await _refreshVisibility();
+      } else {
+        _visibilityHandler?.call(false);
+      }
     }
     return null;
   }

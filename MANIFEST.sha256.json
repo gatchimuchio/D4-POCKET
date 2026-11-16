@@ -113,7 +113,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "847bdd1398dc3d6c1b32fafca6701b1d19bfed90f084631704fba32cdeb1917c"
+      "sha256": "80677a3e209c7f1069e9c5400bec5b6aa8ea82f4c6f2a41022c1bdd73b9902fb"
     },
     {
       "path": "AUDIT.md",
@@ -185,7 +185,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "fd1561e8d4e762566d24204142cc37fb3a87f09863fc4bdc34e22bcd52ece710"
+      "sha256": "d7c411662f9da2e084b19df58f7e48a978e762aef7af016c6df254e7b36ae319"
     },
     {
       "path": "SECURITY.md",
@@ -213,7 +213,7 @@
     },
     {
       "path": "apps/desktop_flutter/README.md",
-      "sha256": "0807c45b3c65efefbd95412295cf8bf0d6e09bccea88a7335d734714f4995e55"
+      "sha256": "357f3c5e67d3cea1d6f78dfac5c2d96d9c639185bafb58e7c1f6d8c3eda9ca06"
     },
     {
       "path": "apps/desktop_flutter/analysis_options.yaml",
@@ -221,7 +221,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "c699fdb13f5a02f51ab35f7d78facb85d18dd8c010d6395f35b20b9c0fc85a7f"
+      "sha256": "0165cd2d68362186112777f91fd5b3a8ecd8c8edba78bb24339bd8290fe632ea"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -429,7 +429,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "1a3e8e7267ce1d6c9d3a88887bdda11dc0f363bf16d54046733199b61f293e42"
+      "sha256": "91aede2343ff2e1c17638f38bf699d29d2aadf4837808d2116d82e8b30c61072"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
@@ -437,7 +437,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
-      "sha256": "bfc5ed87f1b3da7dd7154c0ac7703644d338dcec0f2d460c2f30a8d58f9d5ba6"
+      "sha256": "e15c2ce077778614395c2200e493b41bc07e610067657c539c82a6fff41dd8d0"
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
@@ -469,7 +469,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/CMakeLists.txt",
-      "sha256": "3c9b029d8916ba9e6254343f622245fa35e287ac026f2350c683855809a9275d"
+      "sha256": "d9d5468344f987c47334952955f148efd6ac279fad45223fed0d70dddcf3642b"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.cc",
@@ -480,12 +480,28 @@
       "sha256": "67e29a074348d8250449bd35be3a6b14138fb68a01ba4aa7a74df72c244429b2"
     },
     {
+      "path": "apps/desktop_flutter/linux/runner/linux_status_notifier.cc",
+      "sha256": "608f13f7e2f406c1c97ef3f2da1027f4ad406cb3b3e83f9b9dc1cea4a019419d"
+    },
+    {
+      "path": "apps/desktop_flutter/linux/runner/linux_status_notifier.h",
+      "sha256": "aa1a838125b143e857870ac870c05f5928c09d136d117d82fa33889e649c743a"
+    },
+    {
+      "path": "apps/desktop_flutter/linux/runner/linux_tray_controller.cc",
+      "sha256": "a86d79e01d9e7c77fe9d80a83a3e4723e6f2d06a1ef12b56a29f10c2a91a33ec"
+    },
+    {
+      "path": "apps/desktop_flutter/linux/runner/linux_tray_controller.h",
+      "sha256": "d06dfe2292b014e1351822528e7133d2922c24d1f2c91c3cdb21d8a9e3839d3e"
+    },
+    {
       "path": "apps/desktop_flutter/linux/runner/main.cc",
       "sha256": "c181e155acd32aa803e3b603c9c4986297ee88fcec1390352aca9ecfbe785f5d"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.cc",
-      "sha256": "c21fcd4134a7200dc177ee9e075a3142e3ca34bb3acaeb4b42ac480b3857cf55"
+      "sha256": "2648ec2e635b06bd9f37aa313a340483778fee02ac7dac4ad6abfa88f1f71138"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.h",
@@ -605,7 +621,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/MainFlutterWindow.swift",
-      "sha256": "bf88b23d52a13ec2c845e7afc6b9d58a1c74e67e44373c50930865127981846d"
+      "sha256": "c198caa542d53018d6174e5f7cff4c8dc0b937024957ea60ce78b2c7bf2d6349"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Release.entitlements",
@@ -797,11 +813,11 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "cb1b71115e77fa323f2ed0cf0dc73be06686464188b9afb030f8794974ef28ac"
+      "sha256": "305e3ba9709ce723449ed9db48f1d1af871285dbbcdcb81648ad47d7214f3bd2"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
-      "sha256": "c455da9ba1021de03037b55678ef468dbb5343b3f8882dee89151c3c51eca748"
+      "sha256": "82b98b524b68410aa65797ba0ebca23d2d265480892b9105dec2e8677bbfef6d"
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
@@ -1556,6 +1572,26 @@
       "sha256": "579f1fdff093e05ec0e2fd3b5704e949090ad5bede10433da5a7ea02eb7ba917"
     },
     {
+      "path": "docs/QE_2026-11-16/01_D4Pocket_SPEC_v8_LLM_JA.md",
+      "sha256": "dd08f0c5c131ab2dcbdbb4e9d05466d56b83a12e5b969843fa08253b115dcaa6"
+    },
+    {
+      "path": "docs/QE_2026-11-16/02_D4Pocket_PLAN_v8_LLM_JA.md",
+      "sha256": "0ce41be5aa48a737ee990e92d05b5a577ad26c218de61f7d485f290ef4efdf5b"
+    },
+    {
+      "path": "docs/QE_2026-11-16/03_D4Pocket_CODEX_v8_LLM_JA.md",
+      "sha256": "df6fd5f708a67d2aa677ec8bbc4960cb23d6df26f0c15caada74cbd9bce31f27"
+    },
+    {
+      "path": "docs/QE_2026-11-16/\u63a1\u7528\u8a18\u9332.md",
+      "sha256": "d0aef214fd130d7295bb8ca4db35185684cdb7a19ba4fed7b6d3bbe4cfbb11c9"
+    },
+    {
+      "path": "docs/QE_2026-11-16/\u9032\u6357.md",
+      "sha256": "caac2b2b76616ee00f51e6da934de6b84adedad2d844c7beb4fd4c917aff4e3e"
+    },
+    {
       "path": "docs/RELEASE_VALIDATION.md",
       "sha256": "4dcc0dfb17332bd291e3f5b08c9b6f3ee13dd891b9aebdb68b74cab6e5a6dea5"
     },
@@ -1726,6 +1762,10 @@
     {
       "path": "docs/specs/desktop-broker-channel.md",
       "sha256": "10580657f12cc325216402af34cb805daaf71a4bf75613c5617747ddfa046b03"
+    },
+    {
+      "path": "docs/specs/desktop-tray-surface.md",
+      "sha256": "e2dc15b7b415adee74356cf6c52aef310f5630bf44a34845204c7ae361e7daff"
     },
     {
       "path": "docs/specs/desktop-ux-integration.md",
@@ -1921,7 +1961,7 @@
     },
     {
       "path": "docs/specs/windows-tray-surface.md",
-      "sha256": "cf7b7bd1ede82a29caa45f65212fdd380cbb6dc7bedc8e9f497c5f734531c5b3"
+      "sha256": "34da15901620d7330e0cefd8f317daa56dafc2fcdec3352967466afa18390e2a"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -5653,7 +5693,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "6b15c298fea0308818257be5548978759d9ad462228da05bef88d9ffa89dc6ff"
+      "sha256": "aa8716d0d2d34ea297e82e099deaae491a62b58ea8ba76b212d91407ca8aa621"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5745,7 +5785,7 @@
     },
     {
       "path": "tooling/linux_manual_export_build.sh",
-      "sha256": "874576deb7e37d26f4e987d043426440691668345e0d8c6079890af710be2d6d"
+      "sha256": "47677a4b68ba5d419381fb2b39a91eebddc33c30a2ccb91dffde2eccbf290ae7"
     },
     {
       "path": "tooling/long_run_validation.py",
@@ -5857,7 +5897,11 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "18580c0c411f69b80736036f6bf0d0ea2fcbf543015e015c0e96b88f5aa368f6"
+      "sha256": "89b28dcef39d92ff05d4cc255e30bf1cd42691fb83c8474f99d72f85f68c9144"
+    },
+    {
+      "path": "tooling/tests/linux_status_notifier_test.cc",
+      "sha256": "5b4b66e6b45ee2850b4b9d71003ae76f28f2a3e760161f25e383c37b39058ca1"
     },
     {
       "path": "tooling/tests/linux_update_https_server.py",
@@ -5905,7 +5949,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "fa8ec40396d396a24dbaec5816e8453a6827f2ab17be6ccedcf86e8b50f4c338"
+      "sha256": "0d2222269b00791907ef978b5e426a60198bfb80fc5244c2fede32d89d33a961"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",
@@ -5961,7 +6005,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "c58a21cc15ff9d6934ef5633fb259a15d2646669c3e14b83d15df89ec8973e50"
+      "sha256": "4d0f1da60642db59794ce3369e41f5864860da856c670c17c9647ca3b8dc2dc3"
     }
   ]
 }

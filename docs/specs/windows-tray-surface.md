@@ -30,4 +30,4 @@ C20は、D4 PocketのWindows日常操作をsystem tray（常駐トレイ）へ�
 
 - `release_blocker`: Windows installed productでのtray icon、前面化、常駐、終了、Broker-mediated stop requestの実機evidence。
 - `release_blocker`: 全Runtimeを実際に停止するowner承認・lifecycle実行の統合。C20は要求receiptまでを対象とする。
-- `known_limitation`: Windows以外にはnative tray実装を提供しない。
+- macOS／LinuxのNative接続と共通Authority境界は[DesktopネイティブTrayの共通契約](desktop-tray-surface.md)に従う。

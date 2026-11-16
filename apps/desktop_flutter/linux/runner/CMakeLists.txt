@@ -14,6 +14,8 @@ add_executable(${BINARY_NAME}
   "main.cc"
   "my_application.cc"
   "broker_process_channel.cc"
+  "linux_status_notifier.cc"
+  "linux_tray_controller.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 

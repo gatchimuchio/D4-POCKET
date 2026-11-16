@@ -366,6 +366,105 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Tray Broker errorの詳細をUIへ露出しない', (tester) async {
+    const channel = MethodChannel('gui_shell/tray');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      return switch (call.method) {
+        'initialize' => true,
+        'isWindowVisible' => true,
+        'publish' => null,
+        _ => null,
+      };
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    final transport = _FakeBrokerTransport(
+      const [],
+      failureForOperation: (operation, _) => operation == '全Runtime停止要求'
+          ? StateError('SECRET_SENTINEL_should_not_be_visible')
+          : null,
+    );
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+    await tester.pumpAndSettle();
+
+    const codec = StandardMethodCodec();
+    await messenger.handlePlatformMessage(
+      channel.name,
+      codec.encodeMethodCall(
+        const MethodCall('onTrayAction', 'stop_request'),
+      ),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('全Runtime停止要求の応答を確認できません'), findsOneWidget);
+    expect(find.textContaining('SECRET_SENTINEL'), findsNothing);
+    expect(transport.operations, contains('全Runtime停止要求'));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Tray accepted responseにerrorがあれば成功扱いせず詳細を隠す', (tester) async {
+    const channel = MethodChannel('gui_shell/tray');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      return switch (call.method) {
+        'initialize' => true,
+        'isWindowVisible' => true,
+        'publish' => null,
+        _ => null,
+      };
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    const secretMessage = 'SECRET_SENTINEL_response_error_message';
+    final transport = _FakeBrokerTransport(
+      const [],
+      responseForOperation: (operation, _) {
+        if (operation != '全Runtime停止要求') return null;
+        return {
+          'request_id': 'request-tray-stop',
+          'operation': '全Runtime停止要求',
+          'status': 'accepted',
+          'evidence_source': 'INTERNAL_STATE',
+          'audit_event_id': 'broker-audit-tray-stop',
+          'error': {'message': secretMessage},
+          'body': {
+            '版': 1,
+            '承認状態': 'owner_reapproval_required',
+            '停止実行済み': false,
+            '対象': <Object?>[],
+            '復旧ID': 'recover-runtime-stop-request',
+          },
+        };
+      },
+    );
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+    await tester.pumpAndSettle();
+
+    const codec = StandardMethodCodec();
+    await messenger.handlePlatformMessage(
+      channel.name,
+      codec.encodeMethodCall(
+        const MethodCall('onTrayAction', 'stop_request'),
+      ),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('全Runtime停止要求の応答を確認できません'), findsOneWidget);
+    expect(find.textContaining('全Runtime停止要求をBrokerへ渡しました'), findsNothing);
+    expect(find.textContaining(secretMessage), findsNothing);
+    expect(transport.operations, contains('全Runtime停止要求'));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('観測センターをNavigationRailから開ける', (tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
 

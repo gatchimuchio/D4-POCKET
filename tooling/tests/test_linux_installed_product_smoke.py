@@ -635,23 +635,20 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             dialog_content,
         )
 
-    def test_mcp_palette_activates_visible_command_and_refreshes_window_tree(self) -> None:
+    def test_mcp_center_uses_current_navigation_instead_of_search_actions(self) -> None:
         window = object()
-        fresh_window = object()
+        page_window = object()
+        selector = object()
+        settings_group = object()
+        settings_page = object()
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
-                side_effect=(
-                    window,
-                    window,
-                    object(),
-                    object(),
-                    fresh_window,
-                    fresh_window,
-                ),
+                side_effect=(window, window, window, page_window, object()),
             ) as find_accessible,
             patch(
-                "tooling.tests.linux_installed_product_smoke._find_operable_accessible"
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=(selector, settings_group, settings_page),
             ) as find_operable,
             patch(
                 "tooling.tests.linux_installed_product_smoke._activate_accessible"
@@ -664,46 +661,37 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             ) as run,
         ):
             self.assertIs(
-                _open_mcp_center_from_installed_ui({}, "0x42"), fresh_window
+                _open_mcp_center_from_installed_ui({}, "0x42"), page_window
             )
 
         self.assertEqual(
             find_accessible.call_args_list,
             [
                 call("D4 Pocket powered by GUI Shell", timeout=10),
-                call("コマンドパレット", root=window, timeout=10),
-                call(
-                    "MCP接続一覧とOwner確認付き切断を開く",
-                    root=window,
-                    timeout=10,
-                ),
-                call("MCP接続センター", timeout=10),
                 call("D4 Pocket powered by GUI Shell", timeout=10),
-                call("MCP接続センター", root=fresh_window, timeout=10),
+                call("D4 Pocket powered by GUI Shell", timeout=10),
+                call("D4 Pocket powered by GUI Shell", timeout=10),
+                call("MCP接続センター", root=page_window, timeout=10),
             ],
-        )
-        find_operable.assert_not_called()
-        activate.assert_not_called()
-        activate_keyboard.assert_called_once_with(
-            "MCP接続一覧とOwner確認付き切断を開く",
-            {},
-            "0x42",
         )
         self.assertEqual(
-            [entry.args[0] for entry in run.call_args_list],
+            find_operable.call_args_list,
             [
-                ["xdotool", "windowactivate", "--sync", "0x42"],
-                ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
-                [
-                    "xdotool",
-                    "type",
-                    "--clearmodifiers",
-                    "--delay",
-                    "30",
-                    "mcp",
-                ],
+                call("操作グループ選択", root=window, timeout=10, exact=True),
+                call("設定", root=window, timeout=10, exact=True),
+                call("設定", root=window, timeout=10, exact=True),
             ],
         )
+        self.assertEqual(
+            activate.call_args_list,
+            [
+                call(selector, "操作グループ選択", {}),
+                call(settings_group, "設定", {}),
+                call(settings_page, "設定", {}),
+            ],
+        )
+        activate_keyboard.assert_not_called()
+        self.assertEqual(run.call_args.args[0], ["xdotool", "windowactivate", "--sync", "0x42"])
 
     def test_keyboard_activation_sends_enter_only_after_target_focus(self) -> None:
         from unittest.mock import patch
@@ -2470,19 +2458,31 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
             self.assertEqual(run.call_count, 2)
 
-    def test_agent_palette_activates_the_observed_command_item(self) -> None:
+    def test_agent_center_uses_current_navigation_page(self) -> None:
         window = object()
+        operation_window = object()
+        page_window = object()
         destination_window = object()
-        command = object()
+        selector = object()
+        operation_group = object()
+        agent_page = object()
         environment = {"DISPLAY": ":99"}
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
-                side_effect=(window, object(), object(), destination_window, object()),
+                side_effect=(
+                    window,
+                    window,
+                    operation_window,
+                    page_window,
+                    object(),
+                    destination_window,
+                    object(),
+                ),
             ) as find_accessible,
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
-                return_value=command,
+                side_effect=(selector, operation_group, agent_page),
             ) as find_operable,
             patch(
                 "tooling.tests.linux_installed_product_smoke._activate_accessible"
@@ -2496,24 +2496,41 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 destination_window,
             )
 
-        find_operable.assert_called_once_with(
-            "エージェントセンターを開く", root=window, timeout=10
-        )
-        activate.assert_called_once_with(command, "エージェントセンターを開く", environment)
         self.assertEqual(
-            [entry.args[0] for entry in run.call_args_list],
+            find_operable.call_args_list,
             [
-                ["xdotool", "windowactivate", "--sync", "0x42"],
-                ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
+                call("操作グループ選択", root=window, timeout=10, exact=True),
+                call("運用", root=window, timeout=10, exact=True),
+                call(
+                    "エージェントセンター",
+                    root=operation_window,
+                    timeout=10,
+                    exact=True,
+                ),
             ],
         )
-        self.assertEqual(find_accessible.call_count, 5)
+        self.assertEqual(
+            activate.call_args_list,
+            [
+                call(selector, "操作グループ選択", environment),
+                call(operation_group, "運用", environment),
+                call(agent_page, "エージェントセンター", environment),
+            ],
+        )
+        self.assertEqual(
+            [entry.args[0] for entry in run.call_args_list],
+            [["xdotool", "windowactivate", "--sync", "0x42"]],
+        )
+        self.assertEqual(find_accessible.call_count, 7)
 
-    def test_wayland_agent_palette_selects_exact_visible_command_without_search_input(self) -> None:
+    def test_wayland_agent_center_uses_accessible_navigation_without_search_input(self) -> None:
         window = object()
+        operation_window = object()
+        page_window = object()
         destination_window = object()
-        palette_button = object()
-        command = object()
+        selector = object()
+        operation_group = object()
+        agent_page = object()
         environment = {
             "WAYLAND_DISPLAY": "wayland-test",
             "XDG_SESSION_TYPE": "wayland",
@@ -2521,11 +2538,19 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
-                side_effect=(window, object(), object(), destination_window, object()),
+                side_effect=(
+                    window,
+                    window,
+                    operation_window,
+                    page_window,
+                    object(),
+                    destination_window,
+                    object(),
+                ),
             ) as find_accessible,
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
-                side_effect=(palette_button, command),
+                side_effect=(selector, operation_group, agent_page),
             ) as find_operable,
             patch(
                 "tooling.tests.linux_installed_product_smoke._activate_accessible"
@@ -2541,14 +2566,14 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
 
         self.assertEqual(
             [call.args[0] for call in find_operable.call_args_list],
-            ["コマンドパレット", "エージェントセンターを開く"],
+            ["操作グループ選択", "運用", "エージェントセンター"],
         )
         self.assertEqual(
             [call.args[1] for call in activate.call_args_list],
-            ["コマンドパレット", "エージェントセンターを開く"],
+            ["操作グループ選択", "運用", "エージェントセンター"],
         )
         set_text.assert_not_called()
-        self.assertEqual(find_accessible.call_count, 5)
+        self.assertEqual(find_accessible.call_count, 7)
 
     def test_missing_agent_registration_action_reports_broker_unavailable(self) -> None:
         environment = {"DISPLAY": ":99"}

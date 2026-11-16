@@ -1477,31 +1477,46 @@ def _bounded_owner_text_diagnostics(values: list[str]) -> str:
     return " | ".join(observed)[:1800] or "(no accessible text)"
 
 
-def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: str) -> None:
+def _open_installed_navigation_page(
+    environment: dict[str, str],
+    window_id: str | None,
+    *,
+    group: str,
+    page_label: str,
+):
+    if group not in {"運用", "安全", "開発", "設定"}:
+        raise RuntimeError("installed navigation group is not supported")
+    if not page_label or len(page_label) > 64:
+        raise RuntimeError("installed navigation page label is invalid")
     window = _find_accessible(WINDOW_TITLE, timeout=10)
-    subprocess.run(
-        ["xdotool", "windowactivate", "--sync", window_id],
-        env=environment,
-        check=True,
-        timeout=5,
+    if window_id is not None and not _is_wayland_environment(environment):
+        subprocess.run(
+            ["xdotool", "windowactivate", "--sync", window_id],
+            env=environment,
+            check=True,
+            timeout=5,
+        )
+    group_selector = _find_operable_accessible(
+        "操作グループ選択", root=window, timeout=10, exact=True
     )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
-        env=environment,
-        check=True,
-        timeout=5,
+    _activate_accessible(group_selector, "操作グループ選択", environment)
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    group_option = _find_operable_accessible(
+        group, root=window, timeout=10, exact=True
     )
-    _find_accessible("コマンドパレット", root=window, timeout=10)
-    subprocess.run(
-        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "export"],
-        env=environment,
-        check=True,
-        timeout=5,
+    _activate_accessible(group_option, group, environment)
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    page = _find_operable_accessible(
+        page_label, root=window, timeout=10, exact=True
     )
-    command = _find_operable_accessible(
-        "独立Appを書き出す", root=window, timeout=10
+    _activate_accessible(page, page_label, environment)
+    return _find_accessible(WINDOW_TITLE, timeout=10)
+
+
+def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: str) -> None:
+    window = _open_installed_navigation_page(
+        environment, window_id, group="設定", page_label="設定"
     )
-    _activate_accessible(command, "独立Appを書き出す", environment)
     _activate_named_control_by_keyboard(
         "Owner確認してManifest fileを生成", environment, window_id
     )
@@ -1510,28 +1525,9 @@ def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: st
 def _open_update_center_from_installed_ui(
     environment: dict[str, str], window_id: str
 ):
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
-    subprocess.run(
-        ["xdotool", "windowactivate", "--sync", window_id],
-        env=environment,
-        check=True,
-        timeout=5,
+    window = _open_installed_navigation_page(
+        environment, window_id, group="設定", page_label="設定"
     )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    _find_accessible("コマンドパレット", root=window, timeout=10)
-    subprocess.run(
-        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "update"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    command = _find_operable_accessible("更新確認", root=window, timeout=10)
-    _activate_accessible(command, "更新確認", environment)
     _find_accessible("更新センター", root=window, timeout=10)
     return window
 
@@ -1539,47 +1535,9 @@ def _open_update_center_from_installed_ui(
 def _open_mcp_center_from_installed_ui(
     environment: dict[str, str], window_id: str
 ):
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
-    subprocess.run(
-        ["xdotool", "windowactivate", "--sync", window_id],
-        env=environment,
-        check=True,
-        timeout=5,
+    window = _open_installed_navigation_page(
+        environment, window_id, group="設定", page_label="設定"
     )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    _find_accessible("コマンドパレット", root=window, timeout=10)
-    subprocess.run(
-        [
-            "xdotool",
-            "type",
-            "--clearmodifiers",
-            "--delay",
-            "30",
-            "mcp",
-        ],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    command_label = "MCP接続一覧とOwner確認付き切断を開く"
-    _find_accessible(command_label, root=window, timeout=10)
-    # AT-SPI actionが成功を返してもhosted GTK上で候補が残ることがある。
-    # コマンドパレット内で対象行へfocusが移ったことを確認してからEnterを送る。
-    _activate_named_control_by_keyboard(
-        command_label,
-        environment,
-        window_id,
-    )
-    # コマンドパレットのdialogを閉じると、古いAT-SPI
-    # 部分木が無効になることがある。desktopから移動先を特定してから、
-    # controlを調べる呼出元へ返す前に製品windowを再取得する。
-    _find_accessible("MCP接続センター", timeout=10)
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("MCP接続センター", root=window, timeout=10)
     return window
 
@@ -1587,36 +1545,8 @@ def _open_mcp_center_from_installed_ui(
 def _open_a2a_center_from_installed_ui(
     environment: dict[str, str], window_id: str
 ):
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
-    subprocess.run(
-        ["xdotool", "windowactivate", "--sync", window_id],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    _find_accessible("コマンドパレット", root=window, timeout=10)
-    subprocess.run(
-        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "a2a"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    _find_accessible(
-        "A2A Agent Cardのloopback metadata接続面を開く",
-        root=window,
-        timeout=10,
-    )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "Return"],
-        env=environment,
-        check=True,
-        timeout=5,
+    window = _open_installed_navigation_page(
+        environment, window_id, group="運用", page_label="A2A接続"
     )
     _find_accessible("A2A接続センター", timeout=10)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
@@ -3655,44 +3585,9 @@ def _write_linux_workspace_acceptance_fixture(
 def _open_agent_center_from_installed_ui(
     environment: dict[str, str], window_id: str | None
 ):
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
-    if _is_wayland_environment(environment):
-        palette_button = _find_operable_accessible(
-            "コマンドパレット", root=window, timeout=10
-        )
-        _activate_accessible(palette_button, "コマンドパレット", environment)
-        _find_accessible("コマンドパレット", root=window, timeout=10)
-        # The product lists page commands before any query is entered. Select
-        # the exact visible action directly; the search field shares its
-        # accessible label with the launcher button and is ambiguous in some
-        # GTK/AT-SPI trees.
-        command = _find_operable_accessible(
-            "エージェントセンターを開く", root=window, timeout=10
-        )
-        _activate_accessible(command, "エージェントセンターを開く", environment)
-        _find_accessible("エージェントセンター", timeout=10)
-        window = _find_accessible(WINDOW_TITLE, timeout=10)
-        _find_accessible("エージェントセンター", root=window, timeout=10)
-        return window
-    if window_id is None:
-        raise RuntimeError("Agent Centerへ移動するX11 window IDがありません")
-    subprocess.run(
-        ["xdotool", "windowactivate", "--sync", window_id],
-        env=environment,
-        check=True,
-        timeout=5,
+    window = _open_installed_navigation_page(
+        environment, window_id, group="運用", page_label="エージェントセンター"
     )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    _find_accessible("コマンドパレット", root=window, timeout=10)
-    command = _find_operable_accessible(
-        "エージェントセンターを開く", root=window, timeout=10
-    )
-    _activate_accessible(command, "エージェントセンターを開く", environment)
     _find_accessible("エージェントセンター", timeout=10)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("エージェントセンター", root=window, timeout=10)
@@ -6756,29 +6651,9 @@ def _open_installed_host_operation_center(
         raise RuntimeError("Host登録acceptanceはX11 GTK scopeだけを対象にします")
     if window_id is None:
         raise RuntimeError("Host操作面へ移動するinstalled product windowがありません")
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
-    subprocess.run(
-        ["xdotool", "windowactivate", "--sync", window_id],
-        env=environment,
-        check=True,
-        timeout=5,
+    window = _open_installed_navigation_page(
+        environment, window_id, group="運用", page_label="Host操作面"
     )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    _find_accessible("コマンドパレット", root=window, timeout=10)
-    host_query = "Host"
-    subprocess.run(
-        ["xdotool", "type", "--clearmodifiers", "--delay", "30", host_query],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    command = _find_operable_accessible("Host操作面を開く", root=window, timeout=10)
-    _activate_accessible(command, "Host操作面を開く", environment)
     _find_accessible("D4 Pocket Host操作面", timeout=10)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("D4 Pocket Host操作面", root=window, timeout=10)
@@ -8448,30 +8323,9 @@ def _restart_installed_product(
 def _reenter_update_center_for_fresh_broker_state(
     environment: dict[str, str], window_id: str
 ):
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
-    subprocess.run(
-        ["xdotool", "windowactivate", "--sync", window_id],
-        env=environment,
-        check=True,
-        timeout=5,
+    _open_installed_navigation_page(
+        environment, window_id, group="運用", page_label="実行系センター"
     )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    _find_accessible("コマンドパレット", root=window, timeout=10)
-    subprocess.run(
-        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "runtime"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    runtime_command = _find_operable_accessible(
-        "Runtimeを開く", root=window, timeout=10
-    )
-    _activate_accessible(runtime_command, "Runtimeを開く", environment)
     time.sleep(0.25)
     return _open_update_center_from_installed_ui(environment, window_id)
 

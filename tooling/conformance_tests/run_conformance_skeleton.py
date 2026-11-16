@@ -7237,6 +7237,67 @@ def Windows常駐トレイ操作面の統治境界を検査する() -> list[str]
     return 不整合
 
 
+def DesktopTrayのOS別Native接続を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "desktop-tray-surface.md"
+    if not specification.exists():
+        return ["Desktop Trayの共通契約がない"]
+    contract = specification.read_text(encoding="utf-8")
+    for token in ("Windows", "macOS", "Linux", "owner_reapproval_required", "停止実行済み=false", "後着・切断"):
+        if token not in contract:
+            不整合.append(f"Desktop Tray共通契約に必須境界がない: {token}")
+
+    linux_notifier = (ROOT / "apps/desktop_flutter/linux/runner/linux_status_notifier.cc").read_text(encoding="utf-8")
+    linux_controller = (ROOT / "apps/desktop_flutter/linux/runner/linux_tray_controller.cc").read_text(encoding="utf-8")
+    linux_application = (ROOT / "apps/desktop_flutter/linux/runner/my_application.cc").read_text(encoding="utf-8")
+    linux_test = (ROOT / "tooling/tests/linux_status_notifier_test.cc").read_text(encoding="utf-8")
+    mac_window = (ROOT / "apps/desktop_flutter/macos/Runner/MainFlutterWindow.swift").read_text(encoding="utf-8")
+    dart_client = (DESKTOP_FLUTTER / "lib/services/windows_tray_client.dart").read_text(encoding="utf-8")
+    shell_client = (DESKTOP_FLUTTER / "lib/services/shell_core_client.dart").read_text(encoding="utf-8")
+    widget_tests = (DESKTOP_FLUTTER / "test/widget_test.dart").read_text(encoding="utf-8")
+    apple_workflow = (ROOT / ".github/workflows/apple-manual-build.yml").read_text(encoding="utf-8")
+    for token, source, label in (
+        ("StatusNotifierHostRegistered", linux_notifier, "Linux Host後着監視"),
+        ("NameOwnerChanged", linux_notifier, "Linux watcher復帰監視"),
+        ("RegisterStatusNotifierItem", linux_notifier, "Linux SNI登録"),
+        ("gui_shell/tray", linux_controller, "Linux固定Tray channel"),
+        ("onTrayAvailabilityChanged", linux_controller + dart_client, "Host availability伝達"),
+        ("stop_request", linux_controller + mac_window, "Broker要求action"),
+        ("linux_tray_controller_new", linux_application, "Linux Runner接続"),
+        ("registration_deadline", linux_test, "Linux Host後着試験"),
+        ("NSStatusBar.system.statusItem", mac_window, "macOS native status item"),
+        ("gui_shell/tray", mac_window, "macOS固定Tray channel"),
+        ("hideWindowFromCloseButton", mac_window, "macOS閉じる操作"),
+        ("onTrayAction", mac_window, "macOS action帰還"),
+        ("_availabilityGeneration", dart_client, "Flutter Host状態race制御"),
+    ):
+        if token not in source:
+            不整合.append(f"Desktop Tray {label}の接続がない: {token}")
+    stop_start = shell_client.find("Future<TrayStopResult> requestAllRuntimeStop()")
+    stop_end = shell_client.find("\n  }\n}", stop_start)
+    main_source = (DESKTOP_FLUTTER / "lib/main.dart").read_text(encoding="utf-8")
+    if stop_start == -1 or stop_end == -1:
+        不整合.append("Tray Broker要求の正規化経路がない")
+    else:
+        stop_projection = shell_client[stop_start:stop_end]
+        if "response['error'] != null" not in stop_projection:
+            不整合.append("Tray Broker accepted errorを拒否する検査がない")
+        if "response.toString()" in stop_projection or "response['error']?.toString()" in stop_projection:
+            不整合.append("Tray Broker error detailを利用者向けmessageへ投影している")
+        if "全Runtime停止要求をBrokerへ渡しました" not in stop_projection:
+            不整合.append("Tray Broker要求の固定messageがない")
+    if "全Runtime停止要求の応答を確認できません" not in main_source:
+        不整合.append("Trayの失敗応答に固定された利用者向け回復messageがない")
+    if "SECRET_SENTINEL_response_error_message" not in widget_tests:
+        不整合.append("Tray accepted error messageのsecret否定testがない")
+    if "find.textContaining('全Runtime停止要求をBrokerへ渡しました'), findsNothing" not in widget_tests:
+        不整合.append("Tray accepted error応答を成功扱いしないWidget testがない")
+    for token in ("workflow_dispatch:", "macos_product", "persist-credentials: false", "flutter build macos --debug --no-pub"):
+        if token not in apple_workflow:
+            不整合.append(f"macOS Trayの手動検証workflowに必要な境界・手順がない: {token}")
+    return 不整合
+
+
 def コマンドパレット拡張の統治境界を検査する() -> list[str]:
     不整合: list[str] = []
     specification = DOC_SPECS / "command-palette-surface.md"
@@ -13228,9 +13289,10 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "require_mcp=True",
         "result_body_absent_from_ui_audit_logs_and_acceptance_files",
         "_cleanup_mcp_fixture_group(",
+        "def _open_installed_navigation_page(",
+        'group_selector = _find_operable_accessible(\n        "操作グループ選択"',
         "def _open_agent_center_from_installed_ui(",
-        '"エージェントセンターを開く"',
-        '_activate_accessible(command, "エージェントセンターを開く", environment)',
+        'group="運用", page_label="エージェントセンター"',
         '_find_accessible("Codex実行系をBrokerへ登録", root=window, timeout=10)',
         "def _editable_text_ancestor(",
         "_editable_text_ancestor(focused)",
@@ -13304,11 +13366,8 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     if 'if [ "$D4P_ACCEPTANCE_SCOPE" = \'host_registration\' ]; then' not in build_script:
         missing.append("installed Linux Host scope selects the Host operations module")
     for token in (
-        'host_query = "Host"',
-        '"xdotool", "type", "--clearmodifiers", "--delay", "30", host_query',
+        'environment, window_id, group="運用", page_label="Host操作面"',
         '_accessible_scope_with_named_descendant(\n        dialog_title, "Host識別子"',
-        '_find_operable_accessible("Host操作面を開く", root=window, timeout=10)',
-        '_activate_accessible(command, "Host操作面を開く", environment)',
     ):
         if token not in smoke:
             missing.append(f"installed Linux Host navigation: {token}")
@@ -13873,6 +13932,7 @@ def main() -> int:
         Host操作面の観測境界とHost間非混線を検査する,
         Adapter管理操作の統治境界を検査する,
         Windows常駐トレイ操作面の統治境界を検査する,
+        DesktopTrayのOS別Native接続を検査する,
         コマンドパレット拡張の統治境界を検査する,
         グローバル検索の統治境界を検査する,
         Desktop_UX統合の表示境界を検査する,

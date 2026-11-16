@@ -615,6 +615,11 @@ class ShellCoreClient {
       '全Runtime停止要求',
       payload: {'版': 1},
     );
+    if (response['error'] != null) {
+      throw const BrokerClientException(
+        '全Runtime停止要求の応答にerrorが含まれています',
+      );
+    }
     final body = _acceptedResponseBodyMap(response, '全Runtime停止要求');
     final stopPerformed = body['停止実行済み'] == true;
     if (stopPerformed || body['承認状態'] != 'owner_reapproval_required') {
@@ -635,10 +640,7 @@ class ShellCoreClient {
       targetCount: targets.length,
       auditId: response['audit_event_id']?.toString() ?? '',
       recoveryId: body['復旧ID']?.toString() ?? 'recover-runtime-stop-request',
-      message: response['error'] is Map
-          ? (response['error'] as Map)['message']?.toString() ??
-              response.toString()
-          : '全Runtime停止要求をBrokerへ渡しました。owner再承認後に個別lifecycleを評価します。',
+      message: '全Runtime停止要求をBrokerへ渡しました。owner再承認後に個別lifecycleを評価します。',
     );
   }
 }

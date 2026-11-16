@@ -395,10 +395,12 @@ class _ShellHomePageState extends State<ShellHomePage> {
           SnackBar(content: Text(result.message)),
         );
       }
-    } on Object catch (error) {
+    } on Object {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('全Runtime停止要求を送信できません: $error')),
+          const SnackBar(
+            content: Text('全Runtime停止要求の応答を確認できません。実行状態を再確認してください。'),
+          ),
         );
       }
     }

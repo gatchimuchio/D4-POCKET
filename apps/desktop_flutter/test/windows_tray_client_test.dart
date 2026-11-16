@@ -178,6 +178,53 @@ void main() {
     await client.dispose();
   });
 
+  test('StatusNotifier hostの後着と切断をFlutterへ反映する', () async {
+    const channel = MethodChannel('gui_shell/tray_late_availability_test');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      return switch (call.method) {
+        'initialize' => null,
+        'isWindowVisible' => true,
+        _ => null,
+      };
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    final visibilityChanges = <bool>[];
+    final client = WindowsTrayClient(channel: channel);
+    expect(
+      await client.start(
+        onAction: (_) {},
+        onVisibilityChanged: visibilityChanges.add,
+      ),
+      isFalse,
+    );
+    expect(client.available, isFalse);
+
+    const codec = StandardMethodCodec();
+    await messenger.handlePlatformMessage(
+      channel.name,
+      codec.encodeMethodCall(
+        const MethodCall('onTrayAvailabilityChanged', true),
+      ),
+      (_) {},
+    );
+    expect(client.available, isTrue);
+    expect(visibilityChanges, [true]);
+
+    await messenger.handlePlatformMessage(
+      channel.name,
+      codec.encodeMethodCall(
+        const MethodCall('onTrayAvailabilityChanged', false),
+      ),
+      (_) {},
+    );
+    expect(client.available, isFalse);
+    expect(visibilityChanges, [true, false]);
+    await client.dispose();
+  });
+
   testWidgets('ウィンドウを隠すとトレイ更新を止め、再表示後に再開する', (tester) async {
     const channel = MethodChannel('gui_shell/tray');
     final messenger =
