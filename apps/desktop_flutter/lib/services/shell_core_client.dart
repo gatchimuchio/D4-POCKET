@@ -231,6 +231,70 @@ class ShellCoreClient {
 
   ShellSnapshot getSnapshot() => snapshot;
 
+  /// Lists only Runtime identifiers registered in the current Broker.
+  /// The result is metadata for selection; it grants no Runtime capability.
+  Future<List<String>> refreshRuntimeCatalog() async {
+    const operation = '実行系列挙';
+    final transport = brokerTransport;
+    if (transport == null || mode == 'local' || mode == 'broker_unavailable') {
+      throw const BrokerClientException('Broker接続がないためRuntime一覧を取得できません');
+    }
+
+    final response = await transport.request(
+      operation,
+      payload: const <String, Object?>{},
+    );
+    const responseFields = <String>{
+      'request_id',
+      'operation',
+      'status',
+      'evidence_source',
+      'audit_event_id',
+      'error',
+      'health',
+      'body',
+      'shutdown_requested',
+    };
+    final auditId = response['audit_event_id'];
+    final requestId = response['request_id'];
+    if (response.length != responseFields.length ||
+        response.keys.any((key) => !responseFields.contains(key)) ||
+        requestId is! String ||
+        !_isSafeAuditIdentifier(requestId) ||
+        response['operation'] != operation ||
+        response['status'] != 'accepted' ||
+        response['evidence_source'] != 'INTERNAL_STATE' ||
+        auditId is! String ||
+        !_isSafeAuditIdentifier(auditId) ||
+        response['error'] != null ||
+        response['health'] != null ||
+        response['shutdown_requested'] != false ||
+        response['body'] is! Map) {
+      throw const BrokerClientException('Broker Runtime一覧の応答を確認できません');
+    }
+
+    final body = Map<String, Object?>.from(response['body'] as Map);
+    final rawRuntimeIds = body['実行系'];
+    if (body.length != 1 ||
+        !body.containsKey('実行系') ||
+        rawRuntimeIds is! List ||
+        rawRuntimeIds.length > 256) {
+      throw const BrokerClientException('Broker Runtime一覧の形または件数が不正です');
+    }
+    final seen = <String>{};
+    final runtimeIds = <String>[];
+    for (final rawRuntimeId in rawRuntimeIds) {
+      if (rawRuntimeId is! String ||
+          !_isRuntimeIdentifier(rawRuntimeId) ||
+          !seen.add(rawRuntimeId)) {
+        throw const BrokerClientException('Broker Runtime一覧の識別子が不正です');
+      }
+      runtimeIds.add(rawRuntimeId);
+    }
+    runtimeIds.sort();
+    return List<String>.unmodifiable(runtimeIds);
+  }
+
   Future<SetupDoctorReportRecord> refreshSetupDoctorReport() async {
     if (!kGuiShellModuleSetupDoctor) {
       throw const BrokerClientException(

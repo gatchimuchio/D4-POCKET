@@ -23,6 +23,15 @@ class _LifecycleFixture implements BrokerTransport {
     calls.add(operation);
     payloads.add(Map<String, Object?>.from(payload ?? const {}));
     switch (operation) {
+      case '実行系列挙':
+        return _response(
+          operation,
+          'INTERNAL_STATE',
+          'runtime-catalog-audit-1',
+          {
+            '実行系': [supported ? 'fixture-runtime' : 'no-lifecycle']
+          },
+        );
       case '実行系ライフサイクル状態':
         return _response(
           operation,
@@ -171,6 +180,11 @@ void main() {
       );
 
       final transport = await TestBrokerTcpTransport.connect(normal);
+      final runtimeIds = await ShellCoreClient.mock(transport: transport)
+          .refreshRuntimeCatalog();
+      // The development lifecycle fixture is deliberately registered only in
+      // the lifecycle registry, not in the Agent Runtime catalog.
+      expect(runtimeIds, isEmpty);
       final client = RuntimeLifecycleClient(transport);
       final initial = await client.status('development-lifecycle-fixture');
       expect(initial.state, 'stopped');
@@ -239,7 +253,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: RuntimeCenter(
-            client: ShellCoreClient.mock(),
+            client: ShellCoreClient.mock(transport: fixture),
             lifecycleClient: RuntimeLifecycleClient(fixture),
           ),
         ),
@@ -248,15 +262,12 @@ void main() {
 
     await tester.tap(find.text('ライフサイクル').first);
     await tester.pumpAndSettle();
-    expect(fixture.calls, isEmpty);
-    await tester.enterText(
-      find.byKey(const ValueKey('runtime-lifecycle-runtime-id')),
-      'no-lifecycle',
-    );
-    await tester.tap(find.byKey(const ValueKey('runtime-lifecycle-refresh')));
-    await tester.pumpAndSettle();
+    expect(fixture.calls, ['実行系列挙', '実行系ライフサイクル状態']);
+    expect(find.byType(TextField), findsNothing);
 
+    expect(fixture.calls, ['実行系列挙', '実行系ライフサイクル状態']);
     expect(fixture.payloads, [
+      <String, Object?>{},
       {'版': 1, '実行系ID': 'no-lifecycle'},
     ]);
     expect(find.text('ライフサイクルCapabilityなし'), findsOneWidget);
@@ -272,7 +283,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: RuntimeCenter(
-            client: ShellCoreClient.mock(),
+            client: ShellCoreClient.mock(transport: fixture),
             lifecycleClient: RuntimeLifecycleClient(fixture),
           ),
         ),
@@ -281,16 +292,11 @@ void main() {
 
     await tester.tap(find.text('ライフサイクル').first);
     await tester.pumpAndSettle();
-    expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('PID、接続先、command、argvは入力できません。'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.byKey(const ValueKey('runtime-catalog-selection-lifecycle')),
+        findsOneWidget);
     expect(find.textContaining('owner資格を入力'), findsNothing);
 
-    await tester.enterText(
-      find.byKey(const ValueKey('runtime-lifecycle-runtime-id')),
-      'fixture-runtime',
-    );
-    await tester.tap(find.byKey(const ValueKey('runtime-lifecycle-refresh')));
-    await tester.pumpAndSettle();
     final requestStart =
         find.byKey(const ValueKey('runtime-lifecycle-request-start'));
     await tester.ensureVisible(requestStart);
@@ -298,16 +304,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(fixture.calls, [
+      '実行系列挙',
       '実行系ライフサイクル状態',
       '実行系ライフサイクル承認要求',
       '実行系ライフサイクル状態',
     ]);
     expect(fixture.payloads, [
+      <String, Object?>{},
       {'版': 1, '実行系ID': 'fixture-runtime'},
       {'版': 1, '実行系ID': 'fixture-runtime', '操作': 'start'},
       {'版': 1, '実行系ID': 'fixture-runtime'},
     ]);
-    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
     expect(find.byKey(const ValueKey('runtime-lifecycle-execute-start')),
         findsNothing);
     expect(find.textContaining('owner CLIで承認後に状態を更新してください。'), findsOneWidget);

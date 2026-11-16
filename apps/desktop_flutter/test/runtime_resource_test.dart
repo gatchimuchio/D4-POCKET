@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/runtime_center.dart';
@@ -5,8 +7,12 @@ import 'package:gui_shell_desktop/services/shell_core_client.dart';
 import 'package:gui_shell_ui/runtime_resource_client.dart';
 
 class _ResourceFixture implements BrokerTransport {
+  _ResourceFixture({this.runtimeIds = const ['local']});
+
+  final List<String> runtimeIds;
   final calls = <String>[];
   final payloads = <Map<String, Object?>>[];
+  Completer<Map<String, Object?>>? delayedObservation;
 
   @override
   Future<Map<String, Object?>> request(
@@ -14,8 +20,27 @@ class _ResourceFixture implements BrokerTransport {
     Map<String, Object?>? payload,
   }) async {
     calls.add(operation);
-    payloads.add(Map<String, Object?>.from(payload ?? const {}));
-    return _response();
+    final requestPayload = Map<String, Object?>.from(payload ?? const {});
+    payloads.add(requestPayload);
+    if (operation == '実行系列挙') {
+      return {
+        'request_id': 'runtime-catalog-request-1',
+        'operation': operation,
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'runtime-catalog-audit-1',
+        'error': null,
+        'health': null,
+        'body': {'実行系': runtimeIds},
+        'shutdown_requested': false,
+      };
+    }
+    if (operation == '実行系資源観測') {
+      final delayed = delayedObservation;
+      if (delayed != null) return await delayed.future;
+      return _response(requestPayload['実行系ID'] as String);
+    }
+    throw StateError('このfixtureでは$operationを扱いません。');
   }
 }
 
@@ -25,7 +50,7 @@ Map<String, Object?> _measured(num value, {String source = 'LIVE_RUNTIME'}) =>
 Map<String, Object?> _unknown(String reason) =>
     {'状態': 'unknown', '値': null, '証拠種別': 'INTERNAL_STATE', '理由': reason};
 
-Map<String, Object?> _response() {
+Map<String, Object?> _response(String runtimeId) {
   final metrics = <String, Object?>{
     '稼働時間Millis': _measured(2000),
     'CPU累積時間Millis': _measured(100),
@@ -51,7 +76,7 @@ Map<String, Object?> _response() {
     'shutdown_requested': false,
     'body': {
       '版': 1,
-      '実行系ID': 'local',
+      '実行系ID': runtimeId,
       '観測時刻UnixMillis': 1700000001000,
       '観測監査ID': 'resource-audit-1',
       '結合': {
@@ -84,14 +109,13 @@ Map<String, Object?> _response() {
 }
 
 void main() {
-  testWidgets('資源タブは手動更新だけでBroker観測を表示し、PID入力を置かない',
-      (tester) async {
+  testWidgets('資源タブはBroker登録済みRuntimeに束縛した一回観測を表示する', (tester) async {
     final fixture = _ResourceFixture();
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: RuntimeCenter(
-            client: ShellCoreClient.mock(),
+            client: ShellCoreClient.mock(transport: fixture),
             resourceClient: RuntimeResourceClient(fixture),
           ),
         ),
@@ -101,20 +125,17 @@ void main() {
     expect(fixture.calls, isEmpty);
     await tester.tap(find.text('資源'));
     await tester.pumpAndSettle();
-    expect(fixture.calls, isEmpty);
-    expect(find.byKey(const ValueKey('runtime-resource-runtime-id')), findsOneWidget);
-    expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('PIDや接続先は入力できません。'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const ValueKey('runtime-resource-runtime-id')),
-      'local',
-    );
+    expect(fixture.calls, ['実行系列挙']);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.byKey(const ValueKey('runtime-catalog-selection-resource')),
+        findsOneWidget);
+    expect(find.text('local'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('runtime-resource-refresh')));
     await tester.pumpAndSettle();
 
-    expect(fixture.calls, ['実行系資源観測']);
+    expect(fixture.calls, ['実行系列挙', '実行系資源観測']);
     expect(fixture.payloads, [
+      <String, Object?>{},
       {'版': 1, '実行系ID': 'local'},
     ]);
     expect(find.text('PID: 4242'), findsOneWidget);
@@ -123,5 +144,40 @@ void main() {
     expect(find.text('0.003 %'), findsWidgets);
     expect(find.text('CPU利用率の短期履歴'), findsOneWidget);
     expect(find.text('RAMワーキングセットの短期履歴'), findsOneWidget);
+  });
+
+  testWidgets('Runtime切替後に完了した旧資源応答を表示しない', (tester) async {
+    final fixture = _ResourceFixture(runtimeIds: ['local', 'other']);
+    final delayedObservation = Completer<Map<String, Object?>>();
+    fixture.delayedObservation = delayedObservation;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: RuntimeCenter(
+            client: ShellCoreClient.mock(transport: fixture),
+            resourceClient: RuntimeResourceClient(fixture),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('資源'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('runtime-resource-refresh')));
+    await tester.pump();
+    await tester
+        .tap(find.byKey(const ValueKey('runtime-catalog-selection-resource')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('other').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    delayedObservation.complete(_response('local'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('PID: 4242'), findsNothing);
+    expect(find.text('Runtimeを切り替えました。現在の状態を再取得してください。'), findsOneWidget);
   });
 }

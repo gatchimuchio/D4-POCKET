@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -36,11 +37,15 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   String? _selectedRuntimeId;
   RuntimeResourceClient? _resourceClient;
   RuntimeResourceObservation? _resourceObservation;
-  final _resourceRuntimeId = TextEditingController();
   RuntimeLifecycleClient? _lifecycleClient;
   RuntimeLifecycleStatus? _lifecycleStatus;
-  final _lifecycleRuntimeId = TextEditingController();
+  List<String>? _registeredRuntimeIds;
+  String? _selectedRegisteredRuntimeId;
+  String _runtimeCatalogMessage = 'Broker登録済みRuntime一覧は未取得です。';
   late final TabController _tabs;
+  int _lastCatalogTabIndex = 0;
+  bool _runtimeCatalogBusy = false;
+  int _runtimeCatalogGeneration = 0;
   bool _resourceBusy = false;
   int _resourceGeneration = 0;
   bool _lifecycleBusy = false;
@@ -49,9 +54,8 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   final Set<String> _adapterBusy = <String>{};
   List<AdapterCatalogRecord>? _adapterCatalogOverride;
   bool _manifestInstallBusy = false;
-  String _resourceMessage = '資源は自動更新しません。実行系IDを指定して、監査付きの一回観測を実行してください。';
-  String _lifecycleMessage =
-      'ライフサイクルは自動実行しません。Brokerへ状態を照会して、Capabilityがある操作だけを表示します。';
+  String _resourceMessage = 'Broker登録済みRuntimeを選択し、監査付きの一回観測を実行してください。';
+  String _lifecycleMessage = 'Broker登録済みRuntimeを選択して状態を照会します。対応していない操作は表示しません。';
 
   @override
   void initState() {
@@ -59,6 +63,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     _resourceClient = widget.resourceClient;
     _lifecycleClient = widget.lifecycleClient;
     _tabs = TabController(length: 3, vsync: this);
+    _tabs.addListener(_handleTabSelection);
   }
 
   @override
@@ -69,17 +74,27 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       _adapterMessages.clear();
       _adapterBusy.clear();
       _manifestInstallBusy = false;
+      _runtimeCatalogGeneration++;
+      _registeredRuntimeIds = null;
+      _selectedRegisteredRuntimeId = null;
+      _runtimeCatalogBusy = false;
+      _runtimeCatalogMessage = 'Broker接続が変わりました。Runtime一覧を再取得してください。';
+      _resourceClient = widget.resourceClient;
+      _lifecycleClient = widget.lifecycleClient;
+      _resetRuntimeObservations('Broker接続が変わりました。現在のRuntime状態を再取得してください。');
     }
-    if (oldWidget.resourceClient != widget.resourceClient ||
-        oldWidget.connectResource != widget.connectResource) {
+    if (oldWidget.client == widget.client &&
+        (oldWidget.resourceClient != widget.resourceClient ||
+            oldWidget.connectResource != widget.connectResource)) {
       _resourceGeneration++;
       _resourceClient = widget.resourceClient;
       _resourceObservation = null;
       _resourceBusy = false;
       _resourceMessage = '接続条件が変わりました。資源を更新して再観測してください。';
     }
-    if (oldWidget.lifecycleClient != widget.lifecycleClient ||
-        oldWidget.connectLifecycle != widget.connectLifecycle) {
+    if (oldWidget.client == widget.client &&
+        (oldWidget.lifecycleClient != widget.lifecycleClient ||
+            oldWidget.connectLifecycle != widget.connectLifecycle)) {
       _lifecycleGeneration++;
       _lifecycleClient = widget.lifecycleClient;
       _lifecycleStatus = null;
@@ -90,12 +105,151 @@ class _RuntimeCenterState extends State<RuntimeCenter>
 
   @override
   void dispose() {
+    _tabs.removeListener(_handleTabSelection);
     _resourceGeneration++;
     _lifecycleGeneration++;
-    _resourceRuntimeId.dispose();
-    _lifecycleRuntimeId.dispose();
+    _runtimeCatalogGeneration++;
     _tabs.dispose();
     super.dispose();
+  }
+
+  void _handleTabSelection() {
+    if (_tabs.indexIsChanging || _tabs.index == _lastCatalogTabIndex) return;
+    final previousTabIndex = _lastCatalogTabIndex;
+    _lastCatalogTabIndex = _tabs.index;
+    if (previousTabIndex == 2 && _tabs.index != 2) {
+      setState(() {
+        _lifecycleGeneration++;
+        _lifecycleStatus = null;
+        _lifecycleBusy = false;
+        _lifecycleMessage = 'Lifecycle画面を離れました。再表示後にBrokerの現在状態を照会してください。';
+      });
+    }
+    if (_tabs.index == 1 || _tabs.index == 2) {
+      unawaited(_refreshRuntimeCatalog());
+    }
+  }
+
+  void _resetRuntimeObservations(String message) {
+    _resourceGeneration++;
+    _resourceObservation = null;
+    _resourceBusy = false;
+    _resourceMessage = message;
+    _lifecycleGeneration++;
+    _lifecycleStatus = null;
+    _lifecycleBusy = false;
+    _lifecycleMessage = message;
+  }
+
+  Widget _runtimeCatalogSelector(String keySuffix) {
+    final runtimeIds = _registeredRuntimeIds;
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (runtimeIds == null)
+          Text(_runtimeCatalogMessage)
+        else if (runtimeIds.isEmpty)
+          const Text('Brokerに登録済みRuntimeはありません。')
+        else
+          SizedBox(
+            width: 360,
+            child: KeyedSubtree(
+              key: ValueKey(
+                'runtime-catalog-scope-$keySuffix-$_runtimeCatalogGeneration',
+              ),
+              child: DropdownButtonFormField<String>(
+                key: ValueKey('runtime-catalog-selection-$keySuffix'),
+                initialValue: runtimeIds.contains(_selectedRegisteredRuntimeId)
+                    ? _selectedRegisteredRuntimeId
+                    : runtimeIds.first,
+                decoration:
+                    const InputDecoration(labelText: 'Broker登録済みRuntime'),
+                items: [
+                  for (final runtimeId in runtimeIds)
+                    DropdownMenuItem(
+                      value: runtimeId,
+                      child: Text(runtimeId),
+                    ),
+                ],
+                onChanged:
+                    _runtimeCatalogBusy ? null : _selectRegisteredRuntime,
+              ),
+            ),
+          ),
+        OutlinedButton.icon(
+          key: ValueKey('runtime-catalog-refresh-$keySuffix'),
+          onPressed: _runtimeCatalogBusy
+              ? null
+              : () => unawaited(_refreshRuntimeCatalog()),
+          icon: _runtimeCatalogBusy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh),
+          label: Text(_runtimeCatalogBusy ? '一覧取得中…' : 'Runtime一覧を更新'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _refreshRuntimeCatalog() async {
+    if (_runtimeCatalogBusy) return;
+    final generation = ++_runtimeCatalogGeneration;
+    final previousSelection = _selectedRegisteredRuntimeId;
+    setState(() {
+      _runtimeCatalogBusy = true;
+      _runtimeCatalogMessage = 'Brokerから登録済みRuntime一覧を取得しています。';
+    });
+    try {
+      final runtimeIds = await widget.client.refreshRuntimeCatalog();
+      if (!mounted || generation != _runtimeCatalogGeneration) return;
+      final nextSelection = runtimeIds.contains(previousSelection)
+          ? previousSelection
+          : (runtimeIds.isEmpty ? null : runtimeIds.first);
+      final selectionChanged = nextSelection != previousSelection;
+      setState(() {
+        _registeredRuntimeIds = runtimeIds;
+        _selectedRegisteredRuntimeId = nextSelection;
+        _runtimeCatalogBusy = false;
+        _runtimeCatalogMessage = runtimeIds.isEmpty
+            ? 'Brokerに登録済みRuntimeはありません。'
+            : 'Broker登録済みRuntime ${runtimeIds.length}件を取得しました。';
+        if (selectionChanged) {
+          _resetRuntimeObservations(
+            'Runtime一覧または選択対象が変わりました。状態と資源を再取得してください。',
+          );
+        }
+      });
+      if (_tabs.index == 2 && _selectedRegisteredRuntimeId != null) {
+        unawaited(_refreshLifecycle());
+      }
+    } catch (_) {
+      if (!mounted || generation != _runtimeCatalogGeneration) return;
+      setState(() {
+        _registeredRuntimeIds = null;
+        _selectedRegisteredRuntimeId = null;
+        _runtimeCatalogBusy = false;
+        _runtimeCatalogMessage =
+            'Broker登録済みRuntime一覧を確認できません。権限状態を推測せず停止しています。';
+        _resetRuntimeObservations('Runtime一覧を確認できないため、状態と資源の表示を破棄しました。');
+      });
+    }
+  }
+
+  void _selectRegisteredRuntime(String? runtimeId) {
+    if (runtimeId == null ||
+        runtimeId == _selectedRegisteredRuntimeId ||
+        !(_registeredRuntimeIds?.contains(runtimeId) ?? false)) {
+      return;
+    }
+    setState(() {
+      _selectedRegisteredRuntimeId = runtimeId;
+      _resetRuntimeObservations('Runtimeを切り替えました。現在の状態を再取得してください。');
+    });
   }
 
   @override
@@ -123,9 +277,9 @@ class _RuntimeCenterState extends State<RuntimeCenter>
               case 0:
                 return _overview(snapshot, selectedRuntime);
               case 1:
-                return _resourcePanel(selectedRuntime);
+                return _resourcePanel();
               default:
-                return _lifecyclePanel(selectedRuntime);
+                return _lifecyclePanel();
             }
           },
         ),
@@ -426,7 +580,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     }
   }
 
-  Widget _resourcePanel(RuntimeRecord? selectedRuntime) {
+  Widget _resourcePanel() {
     final observation = _resourceObservation;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -438,44 +592,26 @@ class _RuntimeCenterState extends State<RuntimeCenter>
               Text('実行系資源', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               const Text(
-                'ここに表示する資源値は、下の「資源を更新」でBrokerが監査付きで取得した一回の観測だけです。状態タブのスナップショットやUI入力は資源証拠として使いません。',
+                'Broker登録済みRuntimeを選択します。資源値は「資源を更新」でBrokerが監査付きで取得した一回の観測だけです。状態タブのsnapshotやUI入力を資源証拠として使いません。',
               ),
               const SizedBox(height: 12),
+              _runtimeCatalogSelector('resource'),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 12,
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  SizedBox(
-                    width: 300,
-                    child: TextField(
-                      key: const ValueKey('runtime-resource-runtime-id'),
-                      controller: _resourceRuntimeId,
-                      enabled: !_resourceBusy,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      decoration: const InputDecoration(
-                        labelText: '実行系ID',
-                        helperText: 'PIDや接続先は入力できません。',
-                      ),
-                    ),
-                  ),
                   FilledButton.icon(
                     key: const ValueKey('runtime-resource-refresh'),
-                    onPressed: _resourceBusy ? null : _refreshResource,
+                    onPressed: _runtimeCatalogBusy ||
+                            _resourceBusy ||
+                            _selectedRegisteredRuntimeId == null
+                        ? null
+                        : _refreshResource,
                     icon: const Icon(Icons.refresh),
                     label: const Text('資源を更新'),
                   ),
-                  if (selectedRuntime != null)
-                    TextButton(
-                      onPressed: _resourceBusy
-                          ? null
-                          : () => setState(
-                                () => _resourceRuntimeId.text =
-                                    selectedRuntime.runtimeId,
-                              ),
-                      child: const Text('状態タブの選択IDを入力'),
-                    ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -487,7 +623,8 @@ class _RuntimeCenterState extends State<RuntimeCenter>
             ],
           ),
         ),
-        if (observation != null) ...[
+        if (observation != null &&
+            observation.runtimeId == _selectedRegisteredRuntimeId) ...[
           const SizedBox(height: 16),
           _ResourceObservationPanel(observation: observation),
         ],
@@ -496,11 +633,11 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   }
 
   Future<void> _refreshResource() async {
-    final runtimeId = _resourceRuntimeId.text.trim();
-    if (!RuntimeResourceClient.validRuntimeId(runtimeId)) {
+    final runtimeId = _selectedRegisteredRuntimeId;
+    if (runtimeId == null || !RuntimeResourceClient.validRuntimeId(runtimeId)) {
       setState(() {
         _resourceObservation = null;
-        _resourceMessage = '実行系IDは英数字、`.`、`_`、`-`だけで指定してください。';
+        _resourceMessage = 'Broker登録済みRuntimeを選択してから観測してください。';
       });
       return;
     }
@@ -535,7 +672,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     }
   }
 
-  Widget _lifecyclePanel(RuntimeRecord? selectedRuntime) {
+  Widget _lifecyclePanel() {
     final status = _lifecycleStatus;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -550,44 +687,26 @@ class _RuntimeCenterState extends State<RuntimeCenter>
               ),
               const SizedBox(height: 8),
               const Text(
-                'Flutterはprocess kill、PID指定、接続先指定、Capability付与、owner承認を行いません。Brokerが登録済みadapterの状態と統治対応を照会し、Capabilityがある操作だけを表示します。',
+                'Broker登録済みRuntimeを選択します。Flutterはprocess kill、PID指定、接続先指定、Capability付与、owner承認を行いません。Brokerが状態と統治対応を照会し、対応済みの操作だけを表示します。',
               ),
               const SizedBox(height: 12),
+              _runtimeCatalogSelector('lifecycle'),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 12,
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  SizedBox(
-                    width: 300,
-                    child: TextField(
-                      key: const ValueKey('runtime-lifecycle-runtime-id'),
-                      controller: _lifecycleRuntimeId,
-                      enabled: !_lifecycleBusy,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      decoration: const InputDecoration(
-                        labelText: '実行系ID',
-                        helperText: 'PID、接続先、command、argvは入力できません。',
-                      ),
-                    ),
-                  ),
                   FilledButton.icon(
                     key: const ValueKey('runtime-lifecycle-refresh'),
-                    onPressed: _lifecycleBusy ? null : _refreshLifecycle,
+                    onPressed: _runtimeCatalogBusy ||
+                            _lifecycleBusy ||
+                            _selectedRegisteredRuntimeId == null
+                        ? null
+                        : _refreshLifecycle,
                     icon: const Icon(Icons.refresh),
                     label: const Text('状態を更新'),
                   ),
-                  if (selectedRuntime != null)
-                    TextButton(
-                      onPressed: _lifecycleBusy
-                          ? null
-                          : () => setState(
-                                () => _lifecycleRuntimeId.text =
-                                    selectedRuntime.runtimeId,
-                              ),
-                      child: const Text('状態タブの選択IDを入力'),
-                    ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -599,7 +718,8 @@ class _RuntimeCenterState extends State<RuntimeCenter>
             ],
           ),
         ),
-        if (status != null) ...[
+        if (status != null &&
+            status.runtimeId == _selectedRegisteredRuntimeId) ...[
           const SizedBox(height: 16),
           if (!status.supported)
             const BorderedPanel(
@@ -636,11 +756,12 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   }
 
   Future<void> _refreshLifecycle() async {
-    final runtimeId = _lifecycleRuntimeId.text.trim();
-    if (!RuntimeLifecycleClient.validRuntimeId(runtimeId)) {
+    final runtimeId = _selectedRegisteredRuntimeId;
+    if (runtimeId == null ||
+        !RuntimeLifecycleClient.validRuntimeId(runtimeId)) {
       setState(() {
         _lifecycleStatus = null;
-        _lifecycleMessage = '実行系IDは英数字、`.`、`_`、`-`だけで指定してください。';
+        _lifecycleMessage = 'Broker登録済みRuntimeを選択してから照会してください。';
       });
       return;
     }
