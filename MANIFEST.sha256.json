@@ -1589,7 +1589,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "426b3fe54c19cb894398a2cec0f49d3534e520cb69e0ff7648cd6510782c80b3"
+      "sha256": "3dc27c410caa6772ded592794ea8452521127fed6e5731c90c593327fa897dee"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5261,7 +5261,7 @@
     },
     {
       "path": "specs/gui_shell_module_comparison_evidence.schema.json",
-      "sha256": "49dc5bcfa6a62175b15e983b294c1ca5e99629dafa1d9cc6c9a36d2ce7bae9b3"
+      "sha256": "465810d3024738b557f95b49df1982625d04e5ea602390cb838ecca0dbf5bf16"
     },
     {
       "path": "specs/gui_shell_preview.schema.json",
@@ -5693,7 +5693,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "aa8716d0d2d34ea297e82e099deaae491a62b58ea8ba76b212d91407ca8aa621"
+      "sha256": "2d6544220c945ba1d5b1347df3f51d59f8a72821f95ed6d756cd2beedf897e0d"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
