@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/evaluation_client.dart';
 import '../services/regression_case_client.dart';
+import '../services/shell_core_client.dart';
 import 'shared.dart';
 
 /// C5の通常資格向け評価操作面。
@@ -12,6 +15,7 @@ class EvaluationLab extends StatefulWidget {
     super.key,
     this.client,
     this.connect = connectEvaluationClient,
+    this.shellCoreClient,
     this.regressionCaseClient,
     this.connectRegressionCases = connectRegressionCaseClient,
     this.regressionCaseOwnerClient,
@@ -20,6 +24,7 @@ class EvaluationLab extends StatefulWidget {
 
   final EvaluationClient? client;
   final EvaluationClientConnector connect;
+  final ShellCoreClient? shellCoreClient;
   final RegressionCaseClient? regressionCaseClient;
   final RegressionCaseClientConnector connectRegressionCases;
   final RegressionCaseOwnerClient? regressionCaseOwnerClient;
@@ -33,7 +38,6 @@ class _EvaluationLabState extends State<EvaluationLab>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
   final _runDatasetId = TextEditingController();
-  final _runRuntimeIds = TextEditingController();
   final _resultExperimentId = TextEditingController();
   final _comparisonExperimentId = TextEditingController();
   final _recoveryCaseId = TextEditingController();
@@ -46,16 +50,22 @@ class _EvaluationLabState extends State<EvaluationLab>
   int? _regressionNextCursor;
   int _regressionTotalCount = 0;
   String? _regressionAuditId;
+  List<String>? _runRuntimeCatalog;
+  final Set<String> _selectedRunRuntimeIds = <String>{};
   EvaluationExperiment? _startedExperiment;
   EvaluationExperimentStatus? _status;
   EvaluationComparison? _comparison;
   bool _busy = false;
   int _generation = 0;
+  int _runtimeCatalogGeneration = 0;
+  int _lastRuntimeCatalogTabIndex = 0;
+  bool _runtimeCatalogBusy = false;
   String _datasetMessage = 'Dataset一覧は自動更新しません。更新要求を作成してください。';
   String _regressionMessage = '回帰Caseの公開metadataだけを手動更新します。';
   String _regressionOwnerActionMessage =
       'Owner操作はWindowsのnative確認後にBrokerへ送られます。';
-  String _runMessage = 'Dataset IDと1〜8件の実行系IDだけをBrokerへ送ります。';
+  String _runMessage = 'Dataset IDとBroker登録済みRuntimeを選択してください。';
+  String _runtimeCatalogMessage = 'Broker登録済みRuntime一覧は未取得です。';
   String _resultMessage = '評価Experiment IDを指定して、公開済みの結果projectionだけを更新します。';
   String _comparisonMessage = '評価Experiment IDを指定して、集計比較だけを更新します。';
 
@@ -66,6 +76,7 @@ class _EvaluationLabState extends State<EvaluationLab>
     _regressionClient = widget.regressionCaseClient;
     _regressionOwnerClient = widget.regressionCaseOwnerClient;
     _tabs = TabController(length: 5, vsync: this);
+    _tabs.addListener(_handleTabSelection);
   }
 
   @override
@@ -73,6 +84,7 @@ class _EvaluationLabState extends State<EvaluationLab>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.client != widget.client ||
         oldWidget.connect != widget.connect ||
+        oldWidget.shellCoreClient != widget.shellCoreClient ||
         oldWidget.regressionCaseClient != widget.regressionCaseClient ||
         oldWidget.connectRegressionCases != widget.connectRegressionCases ||
         oldWidget.regressionCaseOwnerClient !=
@@ -88,6 +100,11 @@ class _EvaluationLabState extends State<EvaluationLab>
       _regressionNextCursor = null;
       _regressionTotalCount = 0;
       _regressionAuditId = null;
+      _runtimeCatalogGeneration++;
+      _runRuntimeCatalog = null;
+      _selectedRunRuntimeIds.clear();
+      _runtimeCatalogBusy = false;
+      _runtimeCatalogMessage = '接続条件が変わりました。Runtime一覧を再取得してください。';
       _startedExperiment = null;
       _status = null;
       _comparison = null;
@@ -104,13 +121,24 @@ class _EvaluationLabState extends State<EvaluationLab>
   @override
   void dispose() {
     _generation += 1;
+    _runtimeCatalogGeneration++;
+    _tabs.removeListener(_handleTabSelection);
     _tabs.dispose();
     _runDatasetId.dispose();
-    _runRuntimeIds.dispose();
     _resultExperimentId.dispose();
     _comparisonExperimentId.dispose();
     _recoveryCaseId.dispose();
     super.dispose();
+  }
+
+  void _handleTabSelection() {
+    if (_tabs.indexIsChanging || _tabs.index == _lastRuntimeCatalogTabIndex) {
+      return;
+    }
+    _lastRuntimeCatalogTabIndex = _tabs.index;
+    if (_tabs.index == 1) {
+      unawaited(_refreshRuntimeCatalog());
+    }
   }
 
   @override
@@ -334,7 +362,7 @@ class _EvaluationLabState extends State<EvaluationLab>
               Text('評価実験を要求', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               const Text(
-                '入力できるのは評価Dataset IDとcomma-separatedの実行系ID（1〜8件、重複なし）だけです。',
+                '評価Dataset IDを指定し、Broker登録済みRuntimeを1〜8件選択します。要求ごとに現在のBrokerが再検証します。',
               ),
               const SizedBox(height: 12),
               SizedBox(
@@ -353,25 +381,69 @@ class _EvaluationLabState extends State<EvaluationLab>
                 ),
               ),
               const SizedBox(height: 8),
-              SizedBox(
-                width: 640,
-                child: TextField(
-                  key: const ValueKey('evaluation-run-runtime-ids'),
-                  controller: _runRuntimeIds,
-                  enabled: !_busy,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  maxLength: 1031,
-                  decoration: const InputDecoration(
-                    labelText: '実行系ID（comma-separated）',
-                    helperText: '例: runtime-a, runtime-b。PID、接続先、本文は入力できません。',
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text('Broker登録済みRuntime（最大8件）'),
+                  OutlinedButton.icon(
+                    key: const ValueKey('evaluation-run-runtime-refresh'),
+                    onPressed: _busy || _runtimeCatalogBusy
+                        ? null
+                        : () => unawaited(_refreshRuntimeCatalog()),
+                    icon: _runtimeCatalogBusy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    label: Text(
+                      _runtimeCatalogBusy ? '一覧取得中…' : 'Runtime一覧を更新',
+                    ),
                   ),
-                ),
+                ],
               ),
+              const SizedBox(height: 6),
+              Text(_runtimeCatalogMessage),
+              if (_runRuntimeCatalog case final runtimeIds?) ...[
+                if (runtimeIds.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text('Brokerに登録済みRuntimeはありません。'),
+                  )
+                else ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      for (final runtimeId in runtimeIds)
+                        FilterChip(
+                          key: ValueKey('evaluation-run-runtime-$runtimeId'),
+                          label: Text(runtimeId),
+                          selected: _selectedRunRuntimeIds.contains(runtimeId),
+                          onSelected: _busy ||
+                                  _runtimeCatalogBusy ||
+                                  (!_selectedRunRuntimeIds
+                                          .contains(runtimeId) &&
+                                      _selectedRunRuntimeIds.length >= 8)
+                              ? null
+                              : (selected) =>
+                                  _selectRunRuntime(runtimeId, selected),
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Text('選択中: ${_selectedRunRuntimeIds.length} / 8'),
+              ],
               const SizedBox(height: 4),
               FilledButton.icon(
                 key: const ValueKey('evaluation-run-submit'),
-                onPressed: _busy ? null : _startExperiment,
+                onPressed:
+                    _busy || !_canStartExperiment ? null : _startExperiment,
                 icon: const Icon(Icons.play_arrow),
                 label: const Text('評価実験を要求'),
               ),
@@ -645,16 +717,122 @@ class _EvaluationLabState extends State<EvaluationLab>
     }
   }
 
+  Future<void> _refreshRuntimeCatalog() async {
+    if (_busy || _runtimeCatalogBusy) return;
+    final coreClient = widget.shellCoreClient;
+    if (coreClient == null) {
+      setState(() {
+        _runRuntimeCatalog = null;
+        _selectedRunRuntimeIds.clear();
+        _startedExperiment = null;
+        _runtimeCatalogMessage = 'Broker Runtime一覧を取得できません。評価要求を停止しています。';
+        _runMessage = 'Runtime一覧を確認できないため評価要求を送信できません。';
+      });
+      return;
+    }
+
+    final generation = ++_generation;
+    final catalogGeneration = ++_runtimeCatalogGeneration;
+    setState(() {
+      _busy = true;
+      _runtimeCatalogBusy = true;
+      _runtimeCatalogMessage = 'Brokerから登録済みRuntime一覧を取得しています。';
+    });
+    try {
+      final runtimeIds = await coreClient.refreshRuntimeCatalog();
+      if (!mounted ||
+          generation != _generation ||
+          catalogGeneration != _runtimeCatalogGeneration) {
+        return;
+      }
+      final previousSelection = Set<String>.from(_selectedRunRuntimeIds);
+      final retainedSelection =
+          previousSelection.where(runtimeIds.contains).take(8).toSet();
+      final selectionChanged =
+          retainedSelection.length != previousSelection.length;
+      setState(() {
+        _runRuntimeCatalog = runtimeIds;
+        _selectedRunRuntimeIds
+          ..clear()
+          ..addAll(retainedSelection);
+        _runtimeCatalogMessage = runtimeIds.isEmpty
+            ? 'Brokerに登録済みRuntimeはありません。'
+            : 'Broker登録済みRuntime ${runtimeIds.length}件を監査付きで確認しました。';
+        if (selectionChanged) {
+          _startedExperiment = null;
+          _runMessage = 'Runtime一覧が変わりました。残っている選択を確認してください。';
+        }
+      });
+    } catch (_) {
+      if (!mounted ||
+          generation != _generation ||
+          catalogGeneration != _runtimeCatalogGeneration) {
+        return;
+      }
+      setState(() {
+        _runRuntimeCatalog = null;
+        _selectedRunRuntimeIds.clear();
+        _startedExperiment = null;
+        _runtimeCatalogMessage = 'Broker Runtime一覧を確認できません。権限状態を推測せず停止しています。';
+        _runMessage = 'Runtime一覧を確認できないため評価要求を停止しています。';
+      });
+    } finally {
+      if (mounted &&
+          generation == _generation &&
+          catalogGeneration == _runtimeCatalogGeneration) {
+        setState(() {
+          _runtimeCatalogBusy = false;
+          _busy = false;
+        });
+      }
+    }
+  }
+
+  void _selectRunRuntime(String runtimeId, bool selected) {
+    final runtimeCatalog = _runRuntimeCatalog;
+    if (_busy ||
+        _runtimeCatalogBusy ||
+        runtimeCatalog == null ||
+        !runtimeCatalog.contains(runtimeId)) {
+      return;
+    }
+    setState(() {
+      if (selected) {
+        if (_selectedRunRuntimeIds.length >= 8) return;
+        _selectedRunRuntimeIds.add(runtimeId);
+      } else {
+        _selectedRunRuntimeIds.remove(runtimeId);
+      }
+      _startedExperiment = null;
+      _runMessage = '選択したRuntimeで評価実験を要求できます。Brokerが現在条件を再検証します。';
+    });
+  }
+
+  bool get _canStartExperiment {
+    final runtimeCatalog = _runRuntimeCatalog;
+    if (runtimeCatalog == null || _runtimeCatalogBusy) return false;
+    final selected = runtimeCatalog
+        .where(_selectedRunRuntimeIds.contains)
+        .toList(growable: false);
+    return selected.length == _selectedRunRuntimeIds.length &&
+        EvaluationClient.validRuntimeIds(selected);
+  }
+
   Future<void> _startExperiment() async {
     final datasetId = _runDatasetId.text.trim();
-    final rawRuntimeIds = _runRuntimeIds.text.split(',');
-    final runtimeIds = rawRuntimeIds.map((value) => value.trim()).toList();
-    if (rawRuntimeIds.any((value) => value.trim().isEmpty) ||
-        !EvaluationClient.validDatasetId(datasetId) ||
+    final runtimeCatalog = _runRuntimeCatalog;
+    final runtimeIds = runtimeCatalog == null
+        ? <String>[]
+        : runtimeCatalog
+            .where(_selectedRunRuntimeIds.contains)
+            .toList(growable: false);
+    if (!EvaluationClient.validDatasetId(datasetId) ||
+        runtimeCatalog == null ||
+        runtimeIds.length != _selectedRunRuntimeIds.length ||
         !EvaluationClient.validRuntimeIds(runtimeIds)) {
       setState(() {
         _startedExperiment = null;
-        _runMessage = '評価Dataset IDと、重複しない1〜8件の実行系IDを指定してください。';
+        _runMessage = 'Dataset IDとBroker登録済みRuntimeを1〜8件選択してください。';
       });
       return;
     }

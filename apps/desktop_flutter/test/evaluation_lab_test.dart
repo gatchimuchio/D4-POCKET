@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/evaluation_lab.dart';
 import 'package:gui_shell_desktop/services/evaluation_client.dart';
 import 'package:gui_shell_desktop/services/regression_case_client.dart';
+import 'package:gui_shell_desktop/services/shell_core_client.dart';
 import 'package:gui_shell_ui/evaluation_client.dart' show BrokerTransport;
 
 const _datasetId = '11111111111111111111111111111111';
@@ -18,6 +19,11 @@ void main() {
 
   testWidgets('評価ラボは五tabを持ちowner資格の入力面を作らない', (tester) async {
     final transport = _FixtureTransport({
+      '実行系列挙': [
+        _accepted('実行系列挙', {
+          '実行系': ['runtime-a', 'runtime-b'],
+        }),
+      ],
       '評価実験開始': [
         _accepted(
           '評価実験開始',
@@ -26,7 +32,12 @@ void main() {
         ),
       ],
     });
-    await tester.pumpWidget(_testApp(EvaluationClient(transport)));
+    await tester.pumpWidget(
+      _testApp(
+        EvaluationClient(transport),
+        shellCoreClient: ShellCoreClient.mock(transport: transport),
+      ),
+    );
 
     expect(find.text('Dataset'), findsOneWidget);
     expect(find.text('Run'), findsOneWidget);
@@ -53,7 +64,15 @@ void main() {
         .map((field) => field.decoration?.labelText)
         .toList();
     expect(labels, contains('評価Dataset ID'));
-    expect(labels, contains('実行系ID（comma-separated）'));
+    expect(labels, isNot(contains('実行系ID（comma-separated）')));
+    expect(
+      find.byKey(const ValueKey('evaluation-run-runtime-ids')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('evaluation-run-runtime-runtime-a')),
+      findsOneWidget,
+    );
     expect(labels.join(' '), isNot(contains('owner')));
     expect(labels.join(' '), isNot(contains('資格')));
 
@@ -61,18 +80,30 @@ void main() {
       find.byKey(const ValueKey('evaluation-run-dataset-id')),
       _datasetId,
     );
-    await tester.enterText(
-      find.byKey(const ValueKey('evaluation-run-runtime-ids')),
-      'runtime-a, runtime-b',
-    );
+    final runtimeA =
+        find.byKey(const ValueKey('evaluation-run-runtime-runtime-a'));
+    await tester.ensureVisible(runtimeA);
+    await tester.tap(runtimeA);
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(runtimeA).selected, isTrue);
+    final runtimeB =
+        find.byKey(const ValueKey('evaluation-run-runtime-runtime-b'));
+    await tester.ensureVisible(runtimeB);
+    await tester.tap(runtimeB);
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(runtimeB).selected, isTrue);
     final runSubmit = find.byKey(const ValueKey('evaluation-run-submit'));
+    expect(tester.widget<FilledButton>(runSubmit).onPressed, isNotNull);
     await tester.ensureVisible(runSubmit);
     await tester.tap(runSubmit);
     await tester.pumpAndSettle();
 
-    expect(transport.requests, hasLength(1));
-    expect(transport.requests.single.operation, '評価実験開始');
-    expect(transport.requests.single.payload, {
+    expect(
+      transport.requests.map((request) => request.operation),
+      ['実行系列挙', '評価実験開始'],
+    );
+    expect(transport.requests.first.payload, isEmpty);
+    expect(transport.requests.last.payload, {
       '版': 1,
       '評価DatasetID': _datasetId,
       '対象Runtime一覧': const ['runtime-a', 'runtime-b'],
@@ -84,12 +115,45 @@ void main() {
     );
   });
 
+  testWidgets('Broker Runtime一覧を確認できなければ評価実験を送らない', (tester) async {
+    final transport = _FixtureTransport({
+      '実行系列挙': [
+        _accepted(
+          '実行系列挙',
+          {
+            '実行系': ['runtime-a']
+          },
+          evidenceSource: 'FIXTURE',
+        ),
+      ],
+    });
+    await tester.pumpWidget(
+      _testApp(
+        EvaluationClient(transport),
+        shellCoreClient: ShellCoreClient.mock(transport: transport),
+      ),
+    );
+
+    await tester.tap(find.text('Run'));
+    await tester.pumpAndSettle();
+
+    final submit = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('evaluation-run-submit')),
+    );
+    expect(submit.onPressed, isNull);
+    expect(transport.requests.map((request) => request.operation), ['実行系列挙']);
+    expect(find.textContaining('権限状態を推測せず停止'), findsOneWidget);
+  });
+
   testWidgets('C6一覧はmetadataだけを表示しOwner削除を別操作で送る', (tester) async {
     final transport = _FixtureTransport({
       '回帰Case一覧': [_accepted('回帰Case一覧', _regressionCaseListBody())],
     });
     await tester.pumpWidget(
-      _testApp(EvaluationClient(transport), RegressionCaseClient(transport)),
+      _testApp(
+        EvaluationClient(transport),
+        regressionCaseClient: RegressionCaseClient(transport),
+      ),
     );
     await tester.tap(find.text('回帰Case'));
     await tester.pumpAndSettle();
@@ -132,8 +196,8 @@ void main() {
     });
     await tester.pumpWidget(_testApp(
       EvaluationClient(transport),
-      RegressionCaseClient(transport),
-      RegressionCaseOwnerClient(transport),
+      regressionCaseClient: RegressionCaseClient(transport),
+      regressionCaseOwnerClient: RegressionCaseOwnerClient(transport),
     ));
     await tester.tap(find.text('回帰Case'));
     await tester.pumpAndSettle();
@@ -184,8 +248,8 @@ void main() {
     });
     await tester.pumpWidget(_testApp(
       EvaluationClient(transport),
-      RegressionCaseClient(transport),
-      RegressionCaseOwnerClient(transport),
+      regressionCaseClient: RegressionCaseClient(transport),
+      regressionCaseOwnerClient: RegressionCaseOwnerClient(transport),
     ));
     await tester.tap(find.text('回帰Case'));
     await tester.pumpAndSettle();
@@ -278,14 +342,16 @@ void main() {
 }
 
 Widget _testApp(
-  EvaluationClient client, [
+  EvaluationClient client, {
   RegressionCaseClient? regressionCaseClient,
   RegressionCaseOwnerClient? regressionCaseOwnerClient,
-]) =>
+  ShellCoreClient? shellCoreClient,
+}) =>
     MaterialApp(
       home: Scaffold(
         body: EvaluationLab(
           client: client,
+          shellCoreClient: shellCoreClient,
           regressionCaseClient: regressionCaseClient,
           regressionCaseOwnerClient: regressionCaseOwnerClient,
         ),

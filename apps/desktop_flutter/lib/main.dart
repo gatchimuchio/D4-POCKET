@@ -456,6 +456,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         EvaluationLab(
           client: widget.evaluationClient,
           connect: widget.evaluationConnect ?? connectEvaluationClient,
+          shellCoreClient: widget.client,
         )
       else
         const SizedBox.shrink(),
