@@ -345,7 +345,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
         for (final adapter in adapterCatalog)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: _adapterManagementPanel(adapter),
+            child: _adapterManagementPanel(adapter, snapshot),
           ),
         if (adapterCatalog.isEmpty)
           const EmptyStatePanel(
@@ -404,7 +404,10 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     );
   }
 
-  Widget _adapterManagementPanel(AdapterCatalogRecord adapter) {
+  Widget _adapterManagementPanel(
+    AdapterCatalogRecord adapter,
+    ShellSnapshot snapshot,
+  ) {
     final busy = _adapterBusy.contains(adapter.adapterId);
     final message = _adapterMessages[adapter.adapterId];
     return BorderedPanel(
@@ -419,6 +422,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
               '出所（source）: ${adapter.source} / 接続方式（transport）: ${adapter.transport} / 版（version）: ${adapter.version}'),
           Text(
               '署名: ${adapter.signatureStatus} / 検証: ${adapter.verificationStatus} / 管理: ${adapter.managementState} / 有効: ${adapter.activeState}'),
+          Text(_runtimeDependencyObservation(snapshot, adapter)),
           Text(
               '内容露出（Content Exposure）: ${adapter.contentExposure} / 互換性: ${adapter.compatibility}'),
           Text('要求Capability: ${adapter.requestedCapabilities.join(', ')}'),
@@ -457,6 +461,27 @@ class _RuntimeCenterState extends State<RuntimeCenter>
         ],
       ),
     );
+  }
+
+  String _runtimeDependencyObservation(
+    ShellSnapshot snapshot,
+    AdapterCatalogRecord adapter,
+  ) {
+    if (snapshot.snapshotSource != 'broker' ||
+        snapshot.snapshotFreshness == 'unknown' ||
+        snapshot.snapshotFreshness.isEmpty) {
+      return '宣言Runtime依存: Brokerの現在Snapshotを確認できないためunknownです。';
+    }
+    final matches = snapshot.runtimes
+        .where((runtime) => runtime.runtimeId == adapter.runtimeId)
+        .toList(growable: false);
+    if (matches.length > 1) {
+      return '宣言Runtime依存: Runtime IDがSnapshot内で重複しているためunknownです。';
+    }
+    if (matches.isEmpty) {
+      return '宣言Runtime依存: ${adapter.runtimeId}はBroker Snapshotの登録Runtime一覧にありません。Runtime製品の未導入とは断定しません。';
+    }
+    return '宣言Runtime依存: ${adapter.runtimeId}の登録metadataあり（status=${matches.single.status}）。Runtime package導入・版互換性・起動は未確認です。';
   }
 
   Future<void> _manageAdapter(
