@@ -192,6 +192,9 @@ def build_steps(
             post_v1_reason="C30のlocal回帰マトリクス。installed製品・外部Agent・実端末の証拠は別に収集する",
         )
     )
+    desktop_flutter_test_command = ["flutter", "test"]
+    if platform.system() == "Windows":
+        desktop_flutter_test_command.append("--concurrency=1")
     steps.extend([
         ValidationStep(
             "broker_authority_parity",
@@ -223,7 +226,7 @@ def build_steps(
             ROOT,
             "cargo",
         ),
-        ValidationStep("desktop_flutter_test", ["flutter", "test"], ROOT / "apps" / "desktop_flutter", "flutter"),
+        ValidationStep("desktop_flutter_test", desktop_flutter_test_command, ROOT / "apps" / "desktop_flutter", "flutter"),
     ])
     current = current_desktop_platform()
     target_linux = desktop_platform == "linux" or desktop_platform == "all" or (

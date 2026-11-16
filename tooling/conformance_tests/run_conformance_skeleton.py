@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -9217,6 +9218,13 @@ def test_flutter_temp_parent_rejects_onedrive_and_flutter_filter_includes_prereq
 
 def test_validate_all_selects_one_flutter_step_and_required_prerequisite() -> list[str]:
     steps = build_validation_steps(False, "windows")
+    desktop_test = next((step for step in steps if step.name == "desktop_flutter_test"), None)
+    expected_test_command = ["flutter", "test"]
+    if platform.system() == "Windows":
+        expected_test_command.append("--concurrency=1")
+    if desktop_test is None or desktop_test.command != expected_test_command:
+        actual = None if desktop_test is None else desktop_test.command
+        return [f"Windows Flutter test concurrency commandがhost policyに一致しない: {actual}"]
     selected_test = select_flutter_validation_steps(
         steps,
         selected_step_name="desktop_flutter_test",

@@ -1593,7 +1593,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "642d9d9300747cec470d5fc039c4107509360d77d0c39952eaaf24f6f4f1710b"
+      "sha256": "4faac6e4a894f411617d5cf6fd39b0b4174e206456ca806001a7d342e5cac994"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5701,7 +5701,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "babf8f98610213b341c3602953e79e2c4168ba26513d67f8b448424aaecc6459"
+      "sha256": "a651e909583dc3b558429abc8351b8f9e5fbcf53372f78d268f4eca8b5cef0b5"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5997,7 +5997,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "9cb291be8f6b91d3df6f1aa3bc89dbff6948f82d33767e789a915695c6315428"
+      "sha256": "c39ea51ea48f7d64ed5743152a9c990759f9979f069abc65ef3f231b48ec1490"
     },
     {
       "path": "tooling/windows_dpapi_check.ps1",
