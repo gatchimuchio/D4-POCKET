@@ -243,6 +243,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   Timer? _trayRefreshTimer;
   bool _trayWindowVisible = false;
   bool _trayRefreshInFlight = false;
+  bool _trayRefreshRequested = false;
   int _trayProjectionGeneration = 0;
   int _brokerSearchGeneration = 0;
   AgentTaskExecutionCoordinator? _agentTaskExecutionCoordinator;
@@ -266,10 +267,18 @@ class _ShellHomePageState extends State<ShellHomePage> {
       widget.client.brokerTransport,
     )) {
       _brokerSearchGeneration++;
+      _trayProjectionGeneration++;
       _agentTaskExecutionCoordinator?.dispose();
       final transport = widget.client.brokerTransport;
       _agentTaskExecutionCoordinator =
           transport == null ? null : AgentTaskExecutionCoordinator(transport);
+      if (_trayClient.available) {
+        if (_trayWindowVisible) {
+          unawaited(_refreshWindowsTrayProjection());
+        } else {
+          unawaited(_publishUnavailableWindowsTrayProjection());
+        }
+      }
     }
   }
 
@@ -312,34 +321,60 @@ class _ShellHomePageState extends State<ShellHomePage> {
   }
 
   Future<void> _refreshWindowsTrayProjection() async {
-    if (!mounted || !_trayClient.available || _trayRefreshInFlight) return;
+    if (!mounted || !_trayClient.available) return;
+    if (_trayRefreshInFlight) {
+      _trayRefreshRequested = true;
+      return;
+    }
     _trayRefreshInFlight = true;
     try {
+      final visibilityGeneration = _trayProjectionGeneration;
       final visibleBefore = await _trayClient.isWindowVisible();
       if (!mounted) return;
+      if (visibilityGeneration != _trayProjectionGeneration) return;
       if (visibleBefore != true) {
         _setWindowsTrayVisibility(false);
         return;
       }
       if (!_trayWindowVisible) _setWindowsTrayVisibility(true);
       final generation = _trayProjectionGeneration;
+      final brokerTransport = widget.client.brokerTransport;
       final projection = await WindowsTrayProjection.fromSnapshot(
         widget.client.getSnapshot(),
-        widget.client.brokerTransport,
+        brokerTransport,
         windowVisible: true,
       );
+      if (!mounted ||
+          !_trayWindowVisible ||
+          generation != _trayProjectionGeneration ||
+          !identical(widget.client.brokerTransport, brokerTransport)) {
+        return;
+      }
+      final visibleAfterGeneration = _trayProjectionGeneration;
       final visibleAfter = await _trayClient.isWindowVisible();
       if (!mounted) return;
+      if (visibleAfterGeneration != _trayProjectionGeneration) return;
       if (visibleAfter != true) {
         _setWindowsTrayVisibility(false);
         return;
       }
-      if (!_trayWindowVisible || generation != _trayProjectionGeneration) {
+      if (!_trayWindowVisible ||
+          generation != _trayProjectionGeneration ||
+          !identical(widget.client.brokerTransport, brokerTransport)) {
         return;
       }
       await _trayClient.publish(projection);
     } finally {
       _trayRefreshInFlight = false;
+      final refreshRequested = _trayRefreshRequested;
+      _trayRefreshRequested = false;
+      if (refreshRequested && mounted && _trayClient.available) {
+        if (_trayWindowVisible) {
+          unawaited(_refreshWindowsTrayProjection());
+        } else {
+          unawaited(_publishUnavailableWindowsTrayProjection());
+        }
+      }
     }
   }
 

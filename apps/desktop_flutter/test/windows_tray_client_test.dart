@@ -9,6 +9,9 @@ import 'package:gui_shell_desktop/services/windows_tray_client.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
 class _TrayTransport implements BrokerTransport {
+  _TrayTransport({this.criticalCount = 3});
+
+  final int criticalCount;
   final operations = <String>[];
   bool _holdNextNotification = false;
   Completer<void>? _notificationStarted;
@@ -42,7 +45,7 @@ class _TrayTransport implements BrokerTransport {
         '通知一覧': <Object?>[],
         '件数': 3,
         '未読件数': 3,
-        '重大件数': 3,
+        '重大件数': criticalCount,
         '証拠種別': 'INTERNAL_STATE',
         '表示範囲': 'summary',
         '権限生成': 'なし',
@@ -362,5 +365,58 @@ void main() {
     await tester.pumpAndSettle();
     expect(published, hasLength(hiddenProjectionCount));
     expect(published.last['runtime_status'], '不明');
+  });
+
+  testWidgets('Broker切替中の旧通知射影を捨てて新Broker状態をすぐ取得する', (tester) async {
+    const channel = MethodChannel('gui_shell/tray');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var windowVisible = true;
+    final oldTransport = _TrayTransport(criticalCount: 1);
+    final newTransport = _TrayTransport(criticalCount: 2);
+    final published = <Map<Object?, Object?>>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      return switch (call.method) {
+        'initialize' => windowVisible,
+        'isWindowVisible' => windowVisible,
+        'publish' => () {
+            published.add(call.arguments! as Map<Object?, Object?>);
+            return null;
+          }(),
+        _ => null,
+      };
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      messenger.setMockMethodCallHandler(channel, null);
+    });
+
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: oldTransport)),
+    );
+    await tester.pumpAndSettle();
+    expect(published.last['critical_notification_count'], 1);
+
+    oldTransport.holdNextNotification();
+    await tester.pump(const Duration(seconds: 30));
+    await oldTransport.notificationStarted;
+
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: newTransport)),
+    );
+    await tester.pump();
+    expect(newTransport.operations, isEmpty);
+
+    oldTransport.releaseNotification();
+    await tester.pumpAndSettle();
+
+    expect(newTransport.operations, contains('通知一覧'));
+    expect(published.last['critical_notification_count'], 2);
+    expect(
+      published.where(
+          (projection) => projection['critical_notification_count'] == 1),
+      hasLength(1),
+    );
+    expect(tester.takeException(), isNull);
   });
 }
