@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/models/generated_contracts.dart';
@@ -94,7 +97,114 @@ void main() {
     expect(find.textContaining('再送しないでください'), findsOneWidget);
     expect(transport.requests, hasLength(1));
   });
+
+  testWidgets('Broker切替後に旧Adapter receiptから新Brokerを更新しない', (tester) async {
+    final oldResponse = Completer<Map<String, Object?>>();
+    final oldTransport = _AdapterTransport(responseCompleter: oldResponse);
+    final newTransport = _AdapterTransport();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RuntimeCenter(client: _client(oldTransport))),
+      ),
+    );
+
+    final verifyButton =
+        find.byKey(const ValueKey('adapter-fixture_adapter-検証'));
+    await tester.ensureVisible(verifyButton);
+    await tester.tap(verifyButton);
+    await tester.pump();
+    expect(oldTransport.requests, ['アダプター検証']);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RuntimeCenter(client: _client(newTransport))),
+      ),
+    );
+    oldResponse.complete(_acceptedVerificationResponse());
+    await tester.pumpAndSettle();
+
+    expect(newTransport.requests, isEmpty);
+    expect(find.textContaining('audit-adapter-operation-2'), findsNothing);
+    expect(find.textContaining('旧BrokerのAudit'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Broker切替中に開いたManifestを新Brokerへ送信しない', (tester) async {
+    final oldTransport = _AdapterTransport();
+    final newTransport = _AdapterTransport();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RuntimeCenter(client: _client(oldTransport))),
+      ),
+    );
+
+    final installButton =
+        find.byKey(const ValueKey('adapter-manifest-install'));
+    await tester.ensureVisible(installButton);
+    await tester.tap(installButton);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('adapter-manifest-json-input')),
+      jsonEncode(_adapterManifestFixture()),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RuntimeCenter(client: _client(newTransport))),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('adapter-manifest-submit')));
+    await tester.pumpAndSettle();
+
+    expect(oldTransport.requests, isEmpty);
+    expect(newTransport.requests, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 }
+
+Map<String, Object?> _acceptedVerificationResponse() => {
+      'request_id': 'adapter-request-2',
+      'operation': 'アダプター検証',
+      'status': 'accepted',
+      'evidence_source': 'INTERNAL_STATE',
+      'audit_event_id': 'audit-adapter-operation-2',
+      'error': null,
+      'health': null,
+      'body': {
+        '版': 1,
+        'Adapter ID': 'fixture_adapter',
+        '操作': '検証',
+        '実行状態': 'accepted',
+        '管理状態': 'verified',
+        '検証状態': 'verified',
+        '権限生成': 'なし',
+        'authority_strip': true,
+        '公開範囲': 'metadata_only',
+        '証拠種別': 'INTERNAL_STATE',
+        '復旧ID': 'recover-adapter-management',
+      },
+      'shutdown_requested': false,
+    };
+
+Map<String, Object?> _adapterManifestFixture() => {
+      '版': 1,
+      'Adapter ID': 'fixture_new_adapter',
+      'Runtime ID': 'fixture_runtime',
+      '発行者': 'UI試験fixture',
+      'source': 'owner_manifest',
+      'version': '1.0.0',
+      'transport': 'mock',
+      'Content Exposure': 'summary',
+      '要求Capability': ['runtime.read'],
+      '許可差分': ['content_visibility:none->summary'],
+      '既知の危険': ['試験用未検証発行者'],
+      '互換性': 'compatible',
+      'authority_strip': true,
+      'signed_manifest': true,
+      '署名対象': '7b',
+      '署名': List.filled(128, '0').join(),
+      '署名者fingerprint': 'sha256:${List.filled(64, '0').join()}',
+    };
 
 ShellCoreClient _client(BrokerTransport transport) => ShellCoreClient.mock(
       snapshot: ShellSnapshot.fromJson({
@@ -165,9 +275,10 @@ Map<String, Object?> _responseEnvelope({
     };
 
 class _AdapterTransport implements BrokerTransport {
-  _AdapterTransport({this.response, this.failure});
+  _AdapterTransport({this.response, this.responseCompleter, this.failure});
 
   final Map<String, Object?>? response;
+  final Completer<Map<String, Object?>>? responseCompleter;
   final Object? failure;
   final requests = <String>[];
 
@@ -178,6 +289,7 @@ class _AdapterTransport implements BrokerTransport {
   }) async {
     requests.add(operation);
     if (failure != null) throw failure!;
+    if (responseCompleter != null) return responseCompleter!.future;
     return response!;
   }
 }

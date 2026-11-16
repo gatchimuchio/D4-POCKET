@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -8,9 +9,10 @@ import 'package:gui_shell_ui/runtime_lifecycle_client.dart';
 import 'support/test_broker_tcp_transport.dart';
 
 class _LifecycleFixture implements BrokerTransport {
-  _LifecycleFixture({required this.supported});
+  _LifecycleFixture({required this.supported, this.delayedApproval});
 
   final bool supported;
+  final Completer<Map<String, Object?>>? delayedApproval;
   final calls = <String>[];
   final payloads = <Map<String, Object?>>[];
   bool _approvalRequested = false;
@@ -43,12 +45,15 @@ class _LifecycleFixture implements BrokerTransport {
         );
       case '実行系ライフサイクル承認要求':
         _approvalRequested = true;
-        return _response(
+        final response = _response(
           operation,
           'INTERNAL_STATE',
           'lifecycle-approval-audit-1',
           _approval('pending'),
         );
+        final delayed = delayedApproval;
+        if (delayed != null) return delayed.future;
+        return response;
       default:
         throw StateError('このfixtureでは$operationを扱いません。');
     }
@@ -319,5 +324,54 @@ void main() {
     expect(find.byKey(const ValueKey('runtime-lifecycle-execute-start')),
         findsNothing);
     expect(find.textContaining('owner CLIで承認後に状態を更新してください。'), findsOneWidget);
+  });
+
+  testWidgets('Broker切替後に旧Lifecycle承認応答で新Brokerを照会しない', (tester) async {
+    final oldApproval = Completer<Map<String, Object?>>();
+    final oldFixture = _LifecycleFixture(
+      supported: true,
+      delayedApproval: oldApproval,
+    );
+    final newFixture = _LifecycleFixture(supported: true);
+    RuntimeCenter screen(_LifecycleFixture fixture) => RuntimeCenter(
+          client: ShellCoreClient.mock(transport: fixture),
+          lifecycleClient: RuntimeLifecycleClient(fixture),
+        );
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: screen(oldFixture))),
+    );
+    await tester.tap(find.text('ライフサイクル').first);
+    await tester.pumpAndSettle();
+    final requestStart =
+        find.byKey(const ValueKey('runtime-lifecycle-request-start'));
+    await tester.ensureVisible(requestStart);
+    await tester.tap(requestStart);
+    await tester.pump();
+    expect(oldFixture.calls.last, '実行系ライフサイクル承認要求');
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: screen(newFixture))),
+    );
+    oldApproval.complete(
+      _response(
+        '実行系ライフサイクル承認要求',
+        'INTERNAL_STATE',
+        'lifecycle-approval-audit-1',
+        _approval('pending'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(newFixture.calls, isEmpty);
+    expect(
+      oldFixture.calls,
+      [
+        '実行系列挙',
+        '実行系ライフサイクル状態',
+        '実行系ライフサイクル承認要求',
+      ],
+    );
+    expect(tester.takeException(), isNull);
   });
 }

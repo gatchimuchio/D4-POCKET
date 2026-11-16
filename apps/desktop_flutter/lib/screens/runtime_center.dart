@@ -46,6 +46,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   int _lastCatalogTabIndex = 0;
   bool _runtimeCatalogBusy = false;
   int _runtimeCatalogGeneration = 0;
+  int _brokerClientGeneration = 0;
   bool _resourceBusy = false;
   int _resourceGeneration = 0;
   bool _lifecycleBusy = false;
@@ -69,9 +70,16 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   @override
   void didUpdateWidget(covariant RuntimeCenter oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.client != widget.client) {
+    if (!identical(oldWidget.client, widget.client)) {
+      _brokerClientGeneration++;
+      final adapterActionWasInFlight =
+          _adapterBusy.isNotEmpty || _manifestInstallBusy;
       _adapterCatalogOverride = null;
       _adapterMessages.clear();
+      if (adapterActionWasInFlight) {
+        _adapterMessages['__broker_switch__'] =
+            'Broker切替前に開始したAdapter操作の結果は未照合です。旧BrokerのAuditで結果を確認し、確定前に再送しないでください。';
+      }
       _adapterBusy.clear();
       _manifestInstallBusy = false;
       _runtimeCatalogGeneration++;
@@ -83,7 +91,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       _lifecycleClient = widget.lifecycleClient;
       _resetRuntimeObservations('Broker接続が変わりました。現在のRuntime状態を再取得してください。');
     }
-    if (oldWidget.client == widget.client &&
+    if (identical(oldWidget.client, widget.client) &&
         (oldWidget.resourceClient != widget.resourceClient ||
             oldWidget.connectResource != widget.connectResource)) {
       _resourceGeneration++;
@@ -92,7 +100,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       _resourceBusy = false;
       _resourceMessage = '接続条件が変わりました。資源を更新して再観測してください。';
     }
-    if (oldWidget.client == widget.client &&
+    if (identical(oldWidget.client, widget.client) &&
         (oldWidget.lifecycleClient != widget.lifecycleClient ||
             oldWidget.connectLifecycle != widget.connectLifecycle)) {
       _lifecycleGeneration++;
@@ -109,6 +117,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     _resourceGeneration++;
     _lifecycleGeneration++;
     _runtimeCatalogGeneration++;
+    _brokerClientGeneration++;
     _tabs.dispose();
     super.dispose();
   }
@@ -140,6 +149,11 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     _lifecycleBusy = false;
     _lifecycleMessage = message;
   }
+
+  bool _isCurrentBrokerClient(ShellCoreClient client, int generation) =>
+      mounted &&
+      generation == _brokerClientGeneration &&
+      identical(widget.client, client);
 
   Widget _runtimeCatalogSelector(String keySuffix) {
     final runtimeIds = _registeredRuntimeIds;
@@ -488,21 +502,24 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     AdapterCatalogRecord adapter,
     String operation,
   ) async {
+    final client = widget.client;
+    final generation = _brokerClientGeneration;
     setState(() => _adapterBusy.add(adapter.adapterId));
     try {
-      final result = await widget.client.manageAdapter(
+      final result = await client.manageAdapter(
         adapter.adapterId,
         operation,
         selectedAdapter: adapter,
       );
-      if (!mounted) return;
+      if (!_isCurrentBrokerClient(client, generation)) return;
       var refreshMessage = '';
       if (result.status == 'accepted') {
         try {
-          final catalog = await widget.client.refreshAdapterCatalog();
-          if (!mounted) return;
+          final catalog = await client.refreshAdapterCatalog();
+          if (!_isCurrentBrokerClient(client, generation)) return;
           _adapterCatalogOverride = catalog;
         } catch (_) {
+          if (!_isCurrentBrokerClient(client, generation)) return;
           refreshMessage = '（処理結果は受理済み。catalog再取得は未確認です）';
         }
       }
@@ -511,11 +528,11 @@ class _RuntimeCenterState extends State<RuntimeCenter>
             '${result.status} / ${result.message} / 監査（Audit）=${result.auditId} / 復旧（Recovery）=${result.recoveryId}$refreshMessage';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!_isCurrentBrokerClient(client, generation)) return;
       setState(() => _adapterMessages[adapter.adapterId] =
           'Adapter操作の結果を確認できません。Adapter一覧とAuditを確認し、結果が確定するまで再送しないでください。');
     } finally {
-      if (mounted) {
+      if (_isCurrentBrokerClient(client, generation)) {
         setState(() => _adapterBusy.remove(adapter.adapterId));
       }
     }
@@ -525,6 +542,8 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     String operation, {
     AdapterCatalogRecord? adapter,
   }) async {
+    final client = widget.client;
+    final generation = _brokerClientGeneration;
     final rawManifest = await showDialog<String>(
       context: context,
       builder: (_) => _AdapterManifestEntryDialog(
@@ -536,6 +555,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     if (rawManifest == null || !mounted) {
       return;
     }
+    if (!_isCurrentBrokerClient(client, generation)) return;
 
     try {
       if (utf8.encode(rawManifest).length > 48 * 1024) {
@@ -565,18 +585,21 @@ class _RuntimeCenterState extends State<RuntimeCenter>
         }
         _adapterMessages.remove(adapterKey);
       });
-      final result = await widget.client.manageAdapterManifest(
+      final result = await client.manageAdapterManifest(
         operation,
         manifest,
         currentAdapterId: adapter?.adapterId,
         currentAdapterHash: adapter?.hash,
       );
-      if (!mounted) return;
+      if (!_isCurrentBrokerClient(client, generation)) return;
       var refreshMessage = '';
       if (result.status == 'accepted') {
         try {
-          _adapterCatalogOverride = await widget.client.refreshAdapterCatalog();
+          final catalog = await client.refreshAdapterCatalog();
+          if (!_isCurrentBrokerClient(client, generation)) return;
+          _adapterCatalogOverride = catalog;
         } catch (_) {
+          if (!_isCurrentBrokerClient(client, generation)) return;
           refreshMessage = '（処理は受理済み。catalog再取得は未確認です）';
         }
       }
@@ -586,17 +609,17 @@ class _RuntimeCenterState extends State<RuntimeCenter>
             '${result.status} / ${result.message} / 監査（Audit）=${result.auditId} / 復旧（Recovery）=${result.recoveryId}$refreshMessage';
       });
     } on FormatException {
-      if (mounted) {
+      if (_isCurrentBrokerClient(client, generation)) {
         setState(() => _adapterMessages[adapterKey] =
             'Manifest JSONを解析できません。本文は画面外へ出していません。');
       }
     } catch (_) {
-      if (mounted) {
+      if (_isCurrentBrokerClient(client, generation)) {
         setState(() => _adapterMessages[adapterKey] =
             'Manifest操作を完了できませんでした。本文は記録していません。');
       }
     } finally {
-      if (mounted) {
+      if (_isCurrentBrokerClient(client, generation)) {
         setState(() {
           _adapterBusy.remove(adapterKey);
           _manifestInstallBusy = false;
@@ -673,9 +696,15 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       _resourceMessage = 'Brokerへ資源観測を要求しています。';
     });
     try {
-      _resourceClient ??=
-          widget.resourceClient ?? await widget.connectResource();
-      final observation = await _resourceClient!.observe(runtimeId);
+      var client = _resourceClient ?? widget.resourceClient;
+      if (client == null) {
+        final connector = widget.connectResource;
+        client = await connector();
+        if (!mounted || generation != _resourceGeneration) return;
+        _resourceClient = client;
+      }
+      if (!mounted || generation != _resourceGeneration) return;
+      final observation = await client.observe(runtimeId);
       if (!mounted || generation != _resourceGeneration) {
         return;
       }
@@ -797,9 +826,15 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       _lifecycleMessage = 'Brokerへライフサイクル状態を照会しています。';
     });
     try {
-      _lifecycleClient ??=
-          widget.lifecycleClient ?? await widget.connectLifecycle();
-      final status = await _lifecycleClient!.status(runtimeId);
+      var client = _lifecycleClient ?? widget.lifecycleClient;
+      if (client == null) {
+        final connector = widget.connectLifecycle;
+        client = await connector();
+        if (!mounted || generation != _lifecycleGeneration) return;
+        _lifecycleClient = client;
+      }
+      if (!mounted || generation != _lifecycleGeneration) return;
+      final status = await client.status(runtimeId);
       if (!mounted || generation != _lifecycleGeneration) return;
       final stateLabel = _lifecycleStateLabel(status.state);
       final evidenceLabel =
@@ -836,13 +871,20 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       _lifecycleMessage = '$actionLabelの承認をBrokerへ要求しています。';
     });
     try {
-      _lifecycleClient ??=
-          widget.lifecycleClient ?? await widget.connectLifecycle();
-      final approval = await _lifecycleClient!.requestApproval(
+      var client = _lifecycleClient ?? widget.lifecycleClient;
+      if (client == null) {
+        final connector = widget.connectLifecycle;
+        client = await connector();
+        if (!mounted || generation != _lifecycleGeneration) return;
+        _lifecycleClient = client;
+      }
+      if (!mounted || generation != _lifecycleGeneration) return;
+      final approval = await client.requestApproval(
         status.runtimeId,
         operation.action,
       );
-      final refreshed = await _lifecycleClient!.status(status.runtimeId);
+      if (!mounted || generation != _lifecycleGeneration) return;
+      final refreshed = await client.status(status.runtimeId);
       if (!mounted || generation != _lifecycleGeneration) return;
       setState(() {
         _lifecycleStatus = refreshed;
@@ -878,14 +920,21 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       _lifecycleMessage = '$actionLabelをBrokerへ要求しています。';
     });
     try {
-      _lifecycleClient ??=
-          widget.lifecycleClient ?? await widget.connectLifecycle();
-      final transition = await _lifecycleClient!.execute(
+      var client = _lifecycleClient ?? widget.lifecycleClient;
+      if (client == null) {
+        final connector = widget.connectLifecycle;
+        client = await connector();
+        if (!mounted || generation != _lifecycleGeneration) return;
+        _lifecycleClient = client;
+      }
+      if (!mounted || generation != _lifecycleGeneration) return;
+      final transition = await client.execute(
         status.runtimeId,
         operation.action,
         approval.approvalId,
       );
-      final refreshed = await _lifecycleClient!.status(status.runtimeId);
+      if (!mounted || generation != _lifecycleGeneration) return;
+      final refreshed = await client.status(status.runtimeId);
       if (!mounted || generation != _lifecycleGeneration) return;
       final transitionActionLabel = _lifecycleActionLabel(transition.action);
       final previousStateLabel = _lifecycleStateLabel(transition.previousState);

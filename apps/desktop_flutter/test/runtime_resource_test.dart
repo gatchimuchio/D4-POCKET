@@ -180,4 +180,45 @@ void main() {
     expect(find.text('PID: 4242'), findsNothing);
     expect(find.text('Runtimeを切り替えました。現在の状態を再取得してください。'), findsOneWidget);
   });
+
+  testWidgets('Broker切替後に完了した旧Resource接続を呼び出さない', (tester) async {
+    final oldBroker = _ResourceFixture();
+    final oldResourceBroker = _ResourceFixture();
+    final newBroker = _ResourceFixture();
+    final newResourceBroker = _ResourceFixture();
+    final pendingResourceClient = Completer<RuntimeResourceClient>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: RuntimeCenter(
+            client: ShellCoreClient.mock(transport: oldBroker),
+            connectResource: () => pendingResourceClient.future,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('資源'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('runtime-resource-refresh')));
+    await tester.pump();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: RuntimeCenter(
+            client: ShellCoreClient.mock(transport: newBroker),
+            resourceClient: RuntimeResourceClient(newResourceBroker),
+          ),
+        ),
+      ),
+    );
+    pendingResourceClient.complete(RuntimeResourceClient(oldResourceBroker));
+    await tester.pumpAndSettle();
+
+    expect(oldResourceBroker.calls, isEmpty);
+    expect(newResourceBroker.calls, isEmpty);
+    expect(newBroker.calls, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 }
