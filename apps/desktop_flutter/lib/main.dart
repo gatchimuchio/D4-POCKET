@@ -244,6 +244,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   bool _trayWindowVisible = false;
   bool _trayRefreshInFlight = false;
   int _trayProjectionGeneration = 0;
+  int _brokerSearchGeneration = 0;
   AgentTaskExecutionCoordinator? _agentTaskExecutionCoordinator;
 
   @override
@@ -264,6 +265,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       oldWidget.client.brokerTransport,
       widget.client.brokerTransport,
     )) {
+      _brokerSearchGeneration++;
       _agentTaskExecutionCoordinator?.dispose();
       final transport = widget.client.brokerTransport;
       _agentTaskExecutionCoordinator =
@@ -939,6 +941,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       _showCurrentSearchUnavailable(context);
       return;
     }
+    final brokerGeneration = _brokerSearchGeneration;
 
     late final List<GlobalSearchResult> entries;
     try {
@@ -948,6 +951,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
       return;
     }
     if (!mounted || !context.mounted) return;
+    if (brokerGeneration != _brokerSearchGeneration ||
+        !identical(widget.client.brokerTransport, broker)) {
+      _showSearchInvalidated(context);
+      return;
+    }
 
     final availablePageIndices =
         _pageEntries().map((page) => page.index).toSet();
@@ -961,7 +969,12 @@ class _ShellHomePageState extends State<ShellHomePage> {
         label: commandPalette ? 'コマンドパレット' : '全体検索',
       ),
     );
-    if (selected == null || !mounted) return;
+    if (selected == null || !mounted || !context.mounted) return;
+    if (brokerGeneration != _brokerSearchGeneration ||
+        !identical(widget.client.brokerTransport, broker)) {
+      _showSearchInvalidated(context);
+      return;
+    }
 
     // Search and palette selections navigate only. They do not pass the
     // indexed record or any authority to the destination.
@@ -972,6 +985,14 @@ class _ShellHomePageState extends State<ShellHomePage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Brokerの現在Host／Workspace状態を取得できません。検索結果を表示していません。'),
+      ),
+    );
+  }
+
+  void _showSearchInvalidated(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Broker接続先が切り替わったため、古い検索結果を破棄しました。再度検索してください。'),
       ),
     );
   }
