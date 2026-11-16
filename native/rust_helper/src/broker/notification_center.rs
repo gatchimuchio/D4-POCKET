@@ -252,7 +252,8 @@ fn action(
             )
         }
     };
-    let current = project_notifications(broker)
+    let candidates = notification_candidates(broker);
+    let current = visible_notifications(&candidates)
         .into_iter()
         .find(|item| item.notification_id == request.notification_id);
     let Some(current) = current else {
@@ -293,7 +294,9 @@ fn action(
             "通知状態操作の受信Auditを確定できない",
         );
     }
-    let previous = broker.notification_states.insert(
+    let previous = broker.notification_states.clone();
+    broker.notification_states = retain_current_notification_states(&previous, &candidates);
+    broker.notification_states.insert(
         request.notification_id.clone(),
         NotificationState {
             notification_id: request.notification_id.clone(),
@@ -302,16 +305,7 @@ fn action(
         },
     );
     if let Err(reason) = persist(broker) {
-        match previous {
-            Some(value) => {
-                broker
-                    .notification_states
-                    .insert(request.notification_id.clone(), value);
-            }
-            None => {
-                broker.notification_states.remove(&request.notification_id);
-            }
-        }
+        broker.notification_states = previous;
         return broker.audit_store_failed_response(
             request_id,
             operation,
@@ -352,8 +346,11 @@ fn read_all(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) 
         }
     };
     let _ = request;
+    let candidates = notification_candidates(broker);
+    let current = visible_notifications(&candidates);
     let previous = broker.notification_states.clone();
-    for current in project_notifications(broker) {
+    broker.notification_states = retain_current_notification_states(&previous, &candidates);
+    for current in current {
         broker.notification_states.insert(
             current.notification_id.clone(),
             NotificationState {
@@ -408,6 +405,19 @@ fn read_all(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) 
 }
 
 fn project_notifications(broker: &Broker) -> Vec<NotificationRecord> {
+    visible_notifications(&notification_candidates(broker))
+}
+
+fn visible_notifications(candidates: &[NotificationRecord]) -> Vec<NotificationRecord> {
+    candidates
+        .iter()
+        .filter(|record| record.state != "dismissed")
+        .take(MAX_NOTIFICATIONS)
+        .cloned()
+        .collect()
+}
+
+fn notification_candidates(broker: &Broker) -> Vec<NotificationRecord> {
     let mut result = Vec::new();
     for event in broker.audit_log.events().iter().rev().take(MAX_AUDIT_SCAN) {
         let task_record = execution_history::agent_task_audit_record(event)
@@ -428,16 +438,32 @@ fn project_notifications(broker: &Broker) -> Vec<NotificationRecord> {
             .filter(|state| state.notification_hash == record.notification_hash)
             .map(|state| state.state.as_str())
             .unwrap_or("unread");
-        if state == "dismissed" {
-            continue;
-        }
         record.state = state.to_string();
         result.push(record);
-        if result.len() >= MAX_NOTIFICATIONS {
-            break;
-        }
     }
     result
+}
+
+fn retain_current_notification_states(
+    states: &BTreeMap<String, NotificationState>,
+    candidates: &[NotificationRecord],
+) -> BTreeMap<String, NotificationState> {
+    let current_hashes = candidates
+        .iter()
+        .map(|record| {
+            (
+                record.notification_id.clone(),
+                record.notification_hash.clone(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    states
+        .iter()
+        .filter(|(notification_id, state)| {
+            current_hashes.get(*notification_id) == Some(&state.notification_hash)
+        })
+        .map(|(notification_id, state)| (notification_id.clone(), state.clone()))
+        .collect()
 }
 
 fn build_record(event: &BrokerAuditEvent, source: &str, target: &str) -> NotificationRecord {
@@ -706,6 +732,39 @@ mod tests {
             .event_id
     }
 
+    fn append_update_notification(broker: &mut Broker, request_id: &str) -> NotificationRecord {
+        broker
+            .append_audit(
+                request_id,
+                "更新確認",
+                "accepted",
+                "内部理由は通知へ出さない",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
+            .expect("update audit");
+        project_notifications(broker)
+            .into_iter()
+            .find(|record| {
+                record.related_audit_id == broker.audit_log.events().last().unwrap().event_id
+            })
+            .expect("update notification")
+    }
+
+    fn seed_stale_notification_states(broker: &mut Broker, count: usize) {
+        for index in 0..count {
+            let notification_id = format!("notification-broker-audit-stale-{index}");
+            broker.notification_states.insert(
+                notification_id.clone(),
+                NotificationState {
+                    notification_id,
+                    notification_hash: format!("sha256:{}", "b".repeat(64)),
+                    state: "read".to_string(),
+                },
+            );
+        }
+    }
+
     #[test]
     fn 監査eventからsummaryだけを生成しraw_reasonを含めない() {
         let mut broker = Broker::new("session");
@@ -890,6 +949,126 @@ mod tests {
         let notifications = project_notifications(&reopened);
         assert_eq!(notifications.len(), 1);
         assert_eq!(notifications[0].state, "read");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn 既読操作は監査窓外stateを剪定して永続上限内に保つ() {
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-notification-bounded-action-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let mut broker = Broker::new_persistent("session", &root).expect("永続Broker");
+        let notification = append_update_notification(&mut broker, "bounded-action-update");
+        seed_stale_notification_states(&mut broker, MAX_PERSISTED_STATES);
+
+        let response = action(
+            &mut broker,
+            &json!({
+                "版": VERSION,
+                "通知ID": notification.notification_id,
+                "通知hash": notification.notification_hash,
+            }),
+            "bounded-action-read",
+            "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "read",
+        );
+
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        assert_eq!(broker.notification_states.len(), 1);
+        drop(broker);
+
+        let reopened = Broker::new_persistent("session-after-action", &root)
+            .expect("剪定済み通知状態でBroker再起動");
+        assert_eq!(reopened.notification_states.len(), 1);
+        assert_eq!(project_notifications(&reopened)[0].state, "read");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn 既読操作の永続化失敗時はstate剪定をrollbackする() {
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-notification-bounded-failure-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let mut broker = Broker::new_persistent("session", &root).expect("永続Broker");
+        let notification = append_update_notification(&mut broker, "bounded-failure-update");
+        seed_stale_notification_states(&mut broker, MAX_PERSISTED_STATES);
+        let previous = broker.notification_states.clone();
+        let state_path = root.join("notifications.json");
+        std::fs::remove_file(&state_path).expect("通知状態fileをtest隔離");
+        std::fs::create_dir(&state_path).expect("同名directoryで永続化失敗を構成");
+
+        let response = action(
+            &mut broker,
+            &json!({
+                "版": VERSION,
+                "通知ID": notification.notification_id,
+                "通知hash": notification.notification_hash,
+            }),
+            "bounded-failure-read",
+            "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "read",
+        );
+
+        assert_eq!(response.status, BrokerStatus::Suspended);
+        assert_eq!(broker.notification_states, previous);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn 全既読は監査窓外stateを剪定し現在のdismissedを保持する() {
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-notification-bounded-read-all-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let mut broker = Broker::new_persistent("session", &root).expect("永続Broker");
+        let dismissed = append_update_notification(&mut broker, "bounded-dismissed-update");
+        let dismissed_response = action(
+            &mut broker,
+            &json!({
+                "版": VERSION,
+                "通知ID": dismissed.notification_id,
+                "通知hash": dismissed.notification_hash,
+            }),
+            "bounded-dismiss-current",
+            "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "dismissed",
+        );
+        assert_eq!(dismissed_response.status, BrokerStatus::Accepted);
+        let current = append_update_notification(&mut broker, "bounded-current-update");
+        seed_stale_notification_states(&mut broker, MAX_PERSISTED_STATES);
+
+        let response = read_all(
+            &mut broker,
+            &json!({"版": VERSION}),
+            "bounded-read-all",
+            "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        );
+
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        assert_eq!(broker.notification_states.len(), 2);
+        assert_eq!(
+            broker.notification_states[&dismissed.notification_id].state,
+            "dismissed"
+        );
+        drop(broker);
+
+        let reopened = Broker::new_persistent("session-after-read-all", &root)
+            .expect("剪定済み通知状態でBroker再起動");
+        assert_eq!(reopened.notification_states.len(), 2);
+        assert_eq!(
+            reopened.notification_states[&dismissed.notification_id].state,
+            "dismissed"
+        );
+        assert_eq!(
+            reopened.notification_states[&current.notification_id].state,
+            "read"
+        );
+        assert_eq!(project_notifications(&reopened).len(), 1);
         let _ = std::fs::remove_dir_all(root);
     }
 
