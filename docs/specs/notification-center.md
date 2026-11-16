@@ -6,7 +6,7 @@
 
 通知センターは、Rust Brokerが確定した監査eventから、操作者向けのsummaryを限定射影する。通知をcallerが登録する操作は持たず、監査reason、payload、metadata、資格情報を表示しない。
 
-通知のsourceはBroker operationの固定対応からだけ決まり、`Runtime`、`Approval`、`Audit`、`Recovery`、`Device`、`MCP`、`A2A`、`Update`、`Evaluation`に限定する。通知は`INTERNAL_STATE`の観測であり、Permission、Approval、Authority、Capability、Credentialを生成しない。
+通知のsourceはBroker operationまたはBrokerが検証した構造化Task Auditの固定対応からだけ決まり、`Runtime`、`Task`、`Permission`、`Approval`、`Audit`、`Recovery`、`Device`、`MCP`、`A2A`、`Update`、`Evaluation`に限定する。Agent TaskはBrokerのhash検証済み履歴から開始・完了・失敗・取消・中断のstatusだけを投影し、指示本文・結果本文・Task識別子・failure classを表示しない。Workspace PermissionとOwner Approvalの発行・拒否は各Broker operationから区別して投影する。通知は`INTERNAL_STATE`の観測であり、Permission、Approval、Authority、Capability、Credentialを生成しない。
 
 ## 実装経路
 
@@ -22,4 +22,4 @@ Desktop Client／画面はBroker拒否文、transport例外、malformed response
 
 ## 検証
 
-`notification.schema.json`、`notification_list.schema.json`、`notification_action.schema.json`、負例fixture、Rust Notification Center単体試験、Desktop client／navigation試験、Schema／Conformanceへ接続する。
+`notification.schema.json`、`notification_list.schema.json`、`notification_action.schema.json`、負例fixture、Rust Notification Center単体試験、Desktop client／navigation試験、Schema／Conformanceへ接続する。Task完了・失敗AuditとPermission operationの投影、summary／Authority非生成境界をRust単体試験とSchema／Conformanceで確認する。これらはFIXTURE／INTERNAL_STATE範囲であり、installed productやLIVE_RUNTIMEの証拠へ昇格しない。

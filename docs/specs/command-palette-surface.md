@@ -2,33 +2,23 @@
 
 ## 目的
 
-C21は、既存のコマンドパレットへD4 Pocketの新機能を明示的な検索語で登録し、keyboard-firstの画面移動を成立させる。パレットは操作面であり、Authority、Permission、Approval、Credential、Runtime実行を所有しない。
+コマンドパレットは全体検索と同じBroker現在状態indexを使うkeyboard操作面である。固定機能commandを列挙するcommand registryではない。検索・選択は画面移動だけを行い、Authority、Permission、Approval、Credential、Runtime作用を所有しない。
 
-## 登録コマンド
+## 現在検索する内容
 
-| コマンド | 遷移先 | 成立する挙動 |
-| --- | --- | --- |
-| Runtimeを開く | 実行系センター | Runtimeの表示面を開く |
-| Agentを開く | エージェントセンター | Agentの表示面を開く |
-| 履歴検索 | 実行履歴 | 履歴の検索面を開く |
-| 評価実行 | 評価ラボ | 評価画面を開く。実行は既存のBroker・owner承認経路だけを使う |
-| MCP接続 | 設定 | MCP接続の設定面を開く。接続要求を直接実行しない |
-| 通知表示 | 通知センター | 通知の表示面を開く |
-| 資源監視 | 実行系センター | Broker観測の資源面を開く |
-| 資格情報 | 設定 | 資格情報の管理面を開く。秘密値を表示しない |
-| 更新確認 | 設定 | 更新センターを開く。download・installを実行しない |
-| Host切替 | Host操作面 | Host操作面を開く。切替はBrokerの表示コンテキスト操作で行う |
-| 全Runtime停止要求を確認 | 実行系センター | Brokerの承認境界を確認する。直接停止は行わない |
+対象・取得元・露出上限は[Search操作面の責任正本](global-search-surface.md)に従う。対象は現在のHost、Workspace、および現在有効なWorkspace読取だけである。Brokerの現Host／Workspace一覧を取得できない場合は、Paletteを表示せず、古いSnapshotや固定commandへfallbackしない。
 
-## 境界
+任意Host操作Moduleが除外されたbuildでは、Host操作面へ遷移するHost結果を候補から除く。Workspace結果と有効なWorkspace読取結果も、buildに含まれる目的画面だけへ遷移できる。
 
-- `Ctrl+K` と `Ctrl+P` は同じパレットを開く。
-- 検索結果は最大30件にboundedし、表示文言・Broker由来のmetadata・UI状態を検索するだけである。
-- パレットからBrokerの通常IPC、owner control、filesystem、process、network、credentialへ直接到達しない。
-- 検索結果の選択は画面遷移だけであり、検索結果からPermission、Approval、Authorityを生成しない。
-- `評価実行`、`MCP接続`、`Host切替`、`全Runtime停止要求を確認`は画面を開く名称であり、処理の承認や実行を意味しない。
+## 操作と境界
 
-## 未成立範囲
+- `Ctrl+K`と`Ctrl+P`は同じPaletteを開く。
+- Paletteと`Ctrl+Shift+F`の全体検索は、開くたびに同じ現在Broker indexを再取得する。
+- 検索語は128文字、indexは最大96件、結果は最大30件にboundedする。
+- 選択は現在の結果recordやAuthorityを渡さず、許可された画面へのnavigationだけを行う。対象画面で始める作用は既存のBroker経路で再評価する。
+- 固定ページ遷移、通知・問題・復旧のSnapshot検索、Clipboard操作、停止要求などの作用commandはPaletteへ登録しない。
+- UI close、検索結果選択、通知表示をRuntime stopとして扱わない。
 
-- `release_blocker`: 全機能を実際のRuntime・Agent・MCP・Hostへ接続した製品操作と、Windows installed productでのkeyboard／palette実機evidence。
-- `known_limitation`: パレットは現在、各操作面への遷移までを提供し、横断検索のindex作成はC22の対象とする。
+## 検証
+
+Broker一覧取得の正常・拒否・失効・transport failure、stale結果の不使用、Host／Workspace／Grantのbounded projection、画面遷移だけでBroker actionを起こさないことをDesktop testとConformanceで確認する。これらのtestはinstalled productやLIVE_RUNTIMEの証拠を代替しない。

@@ -221,7 +221,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "026ba671fda4bca71cb0a071caa94b2413aba25fef51d34dc4b503696055ce83"
+      "sha256": "c699fdb13f5a02f51ab35f7d78facb85d18dd8c010d6395f35b20b9c0fc85a7f"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -797,7 +797,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "0859e2dbe88d84c64187587c18ce92a385cfa548ff47a46adc37666df7fa57ea"
+      "sha256": "cb1b71115e77fa323f2ed0cf0dc73be06686464188b9afb030f8794974ef28ac"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1713,7 +1713,7 @@
     },
     {
       "path": "docs/specs/command-palette-surface.md",
-      "sha256": "42d802ebd63829634069ffa4fb71a3eeb60fac5d1d39e2b808bf76673c9b9aa5"
+      "sha256": "0244da41322bf9e1697d73d172e0418efaec2bd03674909770d77c3c623e00c4"
     },
     {
       "path": "docs/specs/content-exposure-policy.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "docs/specs/notification-center.md",
-      "sha256": "29ff1b7c80aadc2a7aa0f82164091b4b82952c5d9a776b672beb6027b24f943f"
+      "sha256": "642a170000cf97375bc703efdfbbb17c51dd6d5633d9a06fa097fea87e02fc42"
     },
     {
       "path": "docs/specs/observability-center.md",
@@ -4085,7 +4085,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/notification_center.rs",
-      "sha256": "461866fc25498bac0068f21fda9dcf6a48cda2002f59f53645a11f1e67b53617"
+      "sha256": "cf97c1d5321645afa57a37e7c5033134d1753c0ed75b1c214122b8d1182997f5"
     },
     {
       "path": "native/rust_helper/src/broker/observation_center.rs",
@@ -5349,7 +5349,7 @@
     },
     {
       "path": "specs/notification.schema.json",
-      "sha256": "41316e370d342b9aeb84b495de7c06d885682509ea14a1c27a67365f3a0c02e0"
+      "sha256": "b137d9054642caca36b92f24edc039f5b5e8b2c349da87c9e7cff69a9d40609f"
     },
     {
       "path": "specs/notification_action.schema.json",
@@ -5653,7 +5653,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "0df7a8608c71140fe0c011d0a94a5784626032825b02267a0b924c74addd8db8"
+      "sha256": "6b15c298fea0308818257be5548978759d9ad462228da05bef88d9ffa89dc6ff"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",

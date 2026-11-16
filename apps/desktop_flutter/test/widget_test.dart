@@ -304,6 +304,68 @@ void main() {
     expect(find.textContaining('Broker接続がないため'), findsOneWidget);
   });
 
+  testWidgets('Permission通知を開くと権限対応図へ移動しBroker作用を起こさない', (tester) async {
+    final transport = _FakeBrokerTransport(
+      [],
+      responseForOperation: (operation, _) {
+        if (operation != '通知一覧') return null;
+        return {
+          'request_id': 'request-notification-list',
+          'operation': '通知一覧',
+          'status': 'accepted',
+          'evidence_source': 'INTERNAL_STATE',
+          'audit_event_id': 'broker-audit-20',
+          'error': null,
+          'body': {
+            '版': 1,
+            '通知一覧': [
+              {
+                '版': 1,
+                '通知ID': 'notification-broker-audit-10',
+                'source': 'Permission',
+                'severity': 'info',
+                'タイトル': 'Permission発行',
+                '概要': 'Permission状態を確認してください。',
+                '作成順': 10,
+                '関連監査ID': 'broker-audit-10',
+                '関連監査hash': 'sha256:${'a' * 64}',
+                '遷移先': 'permission',
+                '状態': 'unread',
+                '通知hash': 'sha256:${'b' * 64}',
+                '表示範囲': 'summary',
+                '権限生成': 'なし',
+              }
+            ],
+            '件数': 1,
+            '未読件数': 1,
+            '重大件数': 0,
+            '証拠種別': 'INTERNAL_STATE',
+            '表示範囲': 'summary',
+            '権限生成': 'なし',
+            '操作': 'navigation_only',
+          },
+        };
+      },
+    );
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    rail.onDestinationSelected!(16);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Permission発行'), findsOneWidget);
+    await tester.tap(find.text('開く'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex,
+      4,
+    );
+    expect(transport.operations, ['通知一覧']);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('観測センターをNavigationRailから開ける', (tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
 

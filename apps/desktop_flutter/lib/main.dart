@@ -821,6 +821,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   void _navigateFromNotification(String target) {
     final index = switch (target) {
       'approval' => 6,
+      'permission' => 4,
       'runtime' => 3,
       'audit' => 7,
       'recovery' => 8,

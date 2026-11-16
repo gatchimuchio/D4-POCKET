@@ -1288,6 +1288,13 @@ def test_notification_center_contract_and_navigation_boundary() -> list[str]:
         errors.append("通知summaryがsummary表示範囲ではない")
     if "payload" in notification or "reason" in notification:
         errors.append("通知summaryへ監査reasonまたはraw payloadが露出している")
+    for source, target in (("Task", "agent"), ("Permission", "permission")):
+        projected = dict(notification)
+        projected["source"] = source
+        projected["遷移先"] = target
+        errors.extend(
+            validate_instance(projected, load_schema("notification.schema.json"))
+        )
     for name in ("ipc_request", "ipc_response"):
         operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
         for operation in ("通知一覧", "通知既読", "通知破棄", "通知全既読"):
@@ -7237,30 +7244,30 @@ def コマンドパレット拡張の統治境界を検査する() -> list[str]:
         return ["C21コマンドパレットの日本語意味正本がない"]
     specification_text = specification.read_text(encoding="utf-8")
     main = (DESKTOP_FLUTTER / "lib" / "main.dart").read_text(encoding="utf-8")
-    start = main.find("List<_CommandEntry> _featureCommandEntries()")
-    end = main.find("\n  }\n}", start)
-    if start == -1 or end == -1:
-        return ["C21コマンドパレットの新機能登録実装がない"]
-    feature_commands = main[start:end]
     for token in (
-        "Runtimeを開く",
-        "Agentを開く",
-        "履歴検索",
-        "評価実行",
-        "MCP接続",
-        "通知表示",
-        "資源監視",
-        "資格情報",
-        "更新確認",
-        "Host切替",
-        "全Runtime停止要求を確認",
+        "Future<void> _openCommandPalette(BuildContext context)",
+        "Future<void> _openGlobalSearch(BuildContext context)",
+        "GlobalSearchIndex.loadCurrent(broker)",
+        "availablePageIndices.contains(entry.pageIndex)",
+        "_selectPage(selected.pageIndex)",
     ):
-        if token not in feature_commands or token not in specification_text:
-            不整合.append(f"C21コマンドパレットに必須コマンドがない: {token}")
-    for forbidden in ("brokerTransport", "transport.request", "BrokerClient", "requestAllRuntimeStop"):
-        if forbidden in feature_commands:
-            不整合.append(f"C21コマンドパレットが直接権限経路へ到達している: {forbidden}")
-    for token in ("Ctrl+K", "Ctrl+P", "最大30件", "画面遷移だけ"):
+        if token not in main:
+            不整合.append(f"C21コマンドパレットの現在Broker検索接続がない: {token}")
+    start = main.find("Future<void> _openCurrentBrokerSearch(")
+    end = main.find("\n  void _showCurrentSearchUnavailable", start)
+    if start == -1 or end == -1:
+        不整合.append("C21コマンドパレットの共通検索処理がない")
+    else:
+        search_action = main[start:end]
+        for forbidden in (
+            "requestAllRuntimeStop",
+            "Clipboard.setData",
+            "Process.run",
+            "Process.start",
+        ):
+            if forbidden in search_action:
+                不整合.append(f"C21コマンドパレットが検索結果から直接作用する: {forbidden}")
+    for token in ("Ctrl+K", "Ctrl+P", "Broker現在状態index", "画面移動だけ"):
         if token not in specification_text:
             不整合.append(f"C21コマンドパレット正本にbounded／keyboard境界がない: {token}")
     return 不整合
@@ -7276,22 +7283,11 @@ def グローバル検索の統治境界を検査する() -> list[str]:
     specification_text = specification.read_text(encoding="utf-8")
     index_text = index.read_text(encoding="utf-8")
     required = (
-        ("Runtime", "実行系"),
-        ("Agent", "エージェント"),
-        ("Session", "対話セッション"),
-        ("Permission", "権限"),
-        ("Approval", "承認"),
-        ("Audit", "監査"),
-        ("Recovery", "復旧"),
-        ("Problem", "問題"),
-        ("Evidence", "証拠"),
-        ("MCP", "MCP"),
-        ("A2A", "A2A"),
-        ("Host", "接続先"),
-        ("Adapter", "アダプター"),
-        ("Profile", "プロファイル"),
-        ("Evaluation", "評価"),
-        ("Notification", "通知"),
+        ("GlobalSearchTarget.host", "Host"),
+        ("GlobalSearchTarget.workspace", "Workspace"),
+        ("GlobalSearchTarget.grantedAction", "Workspace読取"),
+        ("HostRegistrationClient", "Host一覧"),
+        ("WorkspaceClient", "作業領域一覧"),
     )
     for token, japanese in required:
         if (
@@ -7300,10 +7296,12 @@ def グローバル検索の統治境界を検査する() -> list[str]:
         ) or (token not in index_text and japanese not in index_text):
             不整合.append(f"C22グローバル検索に検索対象がない: {token}")
     for token in (
-        "GlobalSearchIndex.maxQueryLength",
-        "GlobalSearchIndex.maxResults",
+        "maxEntries",
+        "maxQueryLength",
+        "maxResults",
         "Ctrl+Shift+F",
-        "検索結果は表示専用",
+        "Ctrl+K",
+        "画面遷移だけ",
     ):
         if (
             token not in specification_text
@@ -7321,13 +7319,26 @@ def グローバル検索の統治境界を検査する() -> list[str]:
     ):
         if forbidden in index_text:
             不整合.append(f"C22グローバル検索が権限・外部作用へ到達している: {forbidden}")
-    start = main.find("Future<void> _openGlobalSearch")
-    end = main.find("\n  List<_CommandEntry> _commandEntries", start)
+    start = main.find("Future<void> _openCurrentBrokerSearch(")
+    end = main.find("\n  void _showCurrentSearchUnavailable", start)
     if start == -1 or end == -1:
         不整合.append("C22グローバル検索の画面遷移経路がない")
     else:
         navigation = main[start:end]
-        for forbidden in ("BrokerClient", "transport.request", "Clipboard.setData", "Process."):
+        for required_token in (
+            "GlobalSearchIndex.loadCurrent(broker)",
+            "availablePageIndices.contains(entry.pageIndex)",
+            "_selectPage(selected.pageIndex)",
+        ):
+            if required_token not in navigation:
+                不整合.append(f"C22グローバル検索の現在値・navigation contractがない: {required_token}")
+        for forbidden in (
+            "BrokerClient",
+            "transport.request",
+            "Clipboard.setData",
+            "Process.",
+            "requestAllRuntimeStop",
+        ):
             if forbidden in navigation:
                 不整合.append(f"C22グローバル検索の選択操作が直接作用を持つ: {forbidden}")
     return 不整合
@@ -11261,13 +11272,13 @@ def test_gui_shell_module_build_is_untrusted_ui_only_selection() -> list[str]:
             pass
 
     desktop_source = (DESKTOP_FLUTTER / "lib" / "main.dart").read_text(encoding="utf-8")
-    command_start = desktop_source.index("List<_CommandEntry> _featureCommandEntries")
-    command_block = desktop_source[command_start : desktop_source.index("class _OpenCommandPaletteIntent")]
-    if not re.search(
-        r"if\s*\(kGuiShellModuleHostOperations\)\s*const _CommandEntry\(\s*title: 'Host切替'",
-        command_block,
-    ):
-        errors.append("除外可能なHost操作Moduleへのコマンドパレット導線が未連動")
+    search_index = (DESKTOP_FLUTTER / "lib" / "services" / "global_search_index.dart").read_text(encoding="utf-8")
+    if "GlobalSearchIndex.loadCurrent(broker)" not in desktop_source:
+        errors.append("Host操作ModuleとPaletteの現在Broker検索が接続されていない")
+    if "availablePageIndices.contains(entry.pageIndex)" not in desktop_source:
+        errors.append("除外Moduleの画面へ検索結果から遷移できる")
+    if "target: GlobalSearchTarget.host" not in search_index or "pageIndex: 19" not in search_index:
+        errors.append("現在Host検索結果がHost操作面へ接続されていない")
 
     if set(EXPECTED_CORE_IDS) != set(catalog["unprunable_core_ids"]):
         errors.append("開発build計画が除去禁止Core境界を保持しない")
@@ -13285,11 +13296,11 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
             missing.append(f"installed Linux smoke: {token}")
     for token in (
         "_ShellPageEntry(19, 'Host操作面'",
-        "title: 'Host切替'",
-        "pageIndex: 19",
+        "GlobalSearchIndex.loadCurrent(broker)",
+        "availablePageIndices.contains(entry.pageIndex)",
     ):
         if token not in product_ui:
-            missing.append(f"installed Linux Host UI command: {token}")
+            missing.append(f"installed Linux Host UI search/navigation: {token}")
     if 'if [ "$D4P_ACCEPTANCE_SCOPE" = \'host_registration\' ]; then' not in build_script:
         missing.append("installed Linux Host scope selects the Host operations module")
     for token in (

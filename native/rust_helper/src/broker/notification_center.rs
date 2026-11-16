@@ -4,6 +4,7 @@
 //! source、decision、event id/hashだけから限定射影し、reason、payload、metadataを表示しない。
 #![allow(non_snake_case)]
 
+use super::execution_history;
 use super::protocol::{
     canonical_payload_hash, Broker, BrokerOperation, BrokerResponse, BrokerStatus,
     EVIDENCE_SOURCE_INTERNAL_STATE,
@@ -409,20 +410,27 @@ fn read_all(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) 
 fn project_notifications(broker: &Broker) -> Vec<NotificationRecord> {
     let mut result = Vec::new();
     for event in broker.audit_log.events().iter().rev().take(MAX_AUDIT_SCAN) {
-        let Some((source, target)) = source_for_operation(&event.operation) else {
-            continue;
+        let task_record = execution_history::agent_task_audit_record(event)
+            .ok()
+            .flatten();
+        let mut record = if let Some(task_record) = task_record.as_ref() {
+            task_notification(event, task_record)
+        } else {
+            let Some((source, target)) = source_for_operation(&event.operation) else {
+                continue;
+            };
+            build_record(event, source, target)
         };
-        let notification_id = format!("notification-{}", event.event_id);
+        let notification_id = record.notification_id.clone();
         let state = broker
             .notification_states
             .get(&notification_id)
-            .filter(|state| state.notification_hash == notification_hash(event, source, target))
+            .filter(|state| state.notification_hash == record.notification_hash)
             .map(|state| state.state.as_str())
             .unwrap_or("unread");
         if state == "dismissed" {
             continue;
         }
-        let mut record = build_record(event, source, target);
         record.state = state.to_string();
         result.push(record);
         if result.len() >= MAX_NOTIFICATIONS {
@@ -466,6 +474,56 @@ fn build_record(event: &BrokerAuditEvent, source: &str, target: &str) -> Notific
     record
 }
 
+fn task_notification(
+    event: &BrokerAuditEvent,
+    task: &execution_history::AgentTaskHistoryAuditRecord,
+) -> NotificationRecord {
+    let (severity, title, summary, target) = match (task.stage.as_str(), task.status.as_str()) {
+        ("start", "running") => (
+            "info",
+            "Agent Task開始",
+            "Agent Taskを開始しました。進行状況はAgent Centerで確認できます。",
+            "agent",
+        ),
+        ("terminal", "completed") => (
+            "info",
+            "Agent Task完了",
+            "Agent Taskが完了しました。結果と変更をAgent Centerで確認してください。",
+            "agent",
+        ),
+        ("terminal", "failed") => (
+            "error",
+            "Agent Task失敗",
+            "Agent Taskが失敗しました。状態と復旧手順をAgent Centerで確認してください。",
+            "agent",
+        ),
+        ("terminal", "cancelled") => (
+            "info",
+            "Agent Task取消",
+            "Agent Taskを取消しました。最終状態はAgent Centerで確認できます。",
+            "agent",
+        ),
+        ("terminal", "suspended") => (
+            "error",
+            "Agent Task中断",
+            "Agent Taskが中断されました。Workspace差分とRecoveryを確認してください。",
+            "recovery",
+        ),
+        _ => (
+            "warning",
+            "Agent Task状態更新",
+            "Agent Taskの状態をAgent Centerで確認してください。",
+            "agent",
+        ),
+    };
+    let mut record = build_record(event, "Task", target);
+    record.severity = severity.to_string();
+    record.title = title.to_string();
+    record.summary = summary.to_string();
+    record.notification_hash = notification_hash(event, "Task", target);
+    record
+}
+
 fn notification_hash(event: &BrokerAuditEvent, source: &str, target: &str) -> String {
     let record = build_hash_projection(event, source, target);
     canonical_payload_hash(Some(&record))
@@ -498,6 +556,21 @@ fn build_hash_projection(event: &BrokerAuditEvent, source: &str, target: &str) -
 fn source_for_operation(operation: &str) -> Option<(&'static str, &'static str)> {
     if operation.starts_with("通知") {
         return None;
+    }
+    if operation == "AgentTaskWorkspacePermissionGrant" {
+        return Some(("Permission", "permission"));
+    }
+    if matches!(
+        operation,
+        "AgentTaskOwnerApprovalGrant" | "AgentTask結果表示承認"
+    ) {
+        return Some(("Approval", "approval"));
+    }
+    if matches!(
+        operation,
+        "AgentTask実行" | "AgentTask状態" | "AgentTask取消" | "AgentTask結果取得"
+    ) {
+        return Some(("Task", "agent"));
     }
     if operation.starts_with("端末") {
         return Some(("Device", "device"));
@@ -615,6 +688,24 @@ fn reject(
 mod tests {
     use super::*;
 
+    fn append_task_history_record(
+        broker: &mut Broker,
+        record: &execution_history::AgentTaskHistoryAuditRecord,
+    ) -> String {
+        let (reason, hash) = execution_history::encode_agent_task_audit(record).expect("Task履歴");
+        broker
+            .append_audit(
+                &record.task_id,
+                "AgentTask実行",
+                "recorded",
+                &reason,
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &hash,
+            )
+            .expect("Task Audit")
+            .event_id
+    }
+
     #[test]
     fn 監査eventからsummaryだけを生成しraw_reasonを含めない() {
         let mut broker = Broker::new("session");
@@ -657,6 +748,96 @@ mod tests {
     fn audit_failure_is_critical() {
         assert_eq!(severity_for("Audit", "rejected"), "critical");
         assert_eq!(severity_for("Runtime", "suspended"), "error");
+    }
+
+    #[test]
+    fn 実AgentTaskの完了と失敗を構造化Auditからsummary通知へ射影する() {
+        let mut broker = Broker::new("session");
+        let start = execution_history::AgentTaskHistoryAuditRecord {
+            version: 1,
+            stage: "start".into(),
+            task_id: "task-completed".into(),
+            runtime_id: "runtime-1".into(),
+            session_id: "session-1".into(),
+            workspace_id: "workspace-1".into(),
+            instruction_hash: format!("sha256:{}", "a".repeat(64)),
+            request_hash: format!("sha256:{}", "b".repeat(64)),
+            created_at: 100,
+            status: "running".into(),
+            updated_at: 100,
+            result_hash: None,
+            failure_class: None,
+            start_audit_event_id: None,
+            buffer_intervention_record_hash: None,
+            buffer_intervention_status: None,
+            buffer_intervention_audit_event_id: None,
+        };
+        let start_event_id = append_task_history_record(&mut broker, &start);
+        let completed = execution_history::AgentTaskHistoryAuditRecord {
+            stage: "terminal".into(),
+            status: "completed".into(),
+            updated_at: 101,
+            result_hash: Some(format!("sha256:{}", "c".repeat(64))),
+            start_audit_event_id: Some(start_event_id),
+            ..start.clone()
+        };
+        append_task_history_record(&mut broker, &completed);
+
+        let failed_start = execution_history::AgentTaskHistoryAuditRecord {
+            task_id: "task-failed".into(),
+            ..start
+        };
+        let failed_start_event_id = append_task_history_record(&mut broker, &failed_start);
+        let failed = execution_history::AgentTaskHistoryAuditRecord {
+            stage: "terminal".into(),
+            status: "failed".into(),
+            updated_at: 102,
+            failure_class: Some("通信失敗".into()),
+            start_audit_event_id: Some(failed_start_event_id),
+            ..failed_start
+        };
+        append_task_history_record(&mut broker, &failed);
+
+        let notifications = project_notifications(&broker);
+        let completed = notifications
+            .iter()
+            .find(|notification| notification.title == "Agent Task完了")
+            .expect("完了通知");
+        assert_eq!(completed.source, "Task");
+        assert_eq!(completed.severity, "info");
+        assert_eq!(completed.navigation_target, "agent");
+        let failed = notifications
+            .iter()
+            .find(|notification| notification.title == "Agent Task失敗")
+            .expect("失敗通知");
+        assert_eq!(failed.source, "Task");
+        assert_eq!(failed.severity, "error");
+        assert_eq!(failed.navigation_target, "agent");
+        let serialized = serde_json::to_string(&notifications).expect("通知JSON");
+        assert!(!serialized.contains("task-completed"));
+        assert!(!serialized.contains("task-failed"));
+        assert!(!serialized.contains("通信失敗"));
+    }
+
+    #[test]
+    fn TaskPermissionAuditをPermission画面向け通知へ射影し理由を隠す() {
+        let mut broker = Broker::new("session");
+        broker
+            .append_audit(
+                "session-1",
+                "AgentTaskWorkspacePermissionGrant",
+                "recorded",
+                "private workspace path and owner metadata",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
+            .expect("Permission Audit");
+        let notifications = project_notifications(&broker);
+        assert_eq!(notifications.len(), 1);
+        assert_eq!(notifications[0].source, "Permission");
+        assert_eq!(notifications[0].navigation_target, "permission");
+        let serialized = serde_json::to_string(&notifications).expect("通知JSON");
+        assert!(!serialized.contains("private workspace path"));
     }
 
     #[test]
