@@ -39,6 +39,52 @@ bool _jsonContractEquals(Object? left, Object? right) {
   return left == right;
 }
 
+List<String> _permissionApprovalRows(ShellSnapshot snapshot) {
+  final brokerSnapshot = snapshot.snapshotSource == 'broker' &&
+      snapshot.snapshotFreshness.isNotEmpty &&
+      snapshot.snapshotFreshness != 'unknown';
+  final rows = <String>[
+    brokerSnapshot
+        ? '参照元: Broker Snapshot（${snapshot.snapshotFreshness}）'
+        : '参照元: Brokerの現在Snapshot未確認。Permission／Approvalはunknownです。',
+  ];
+
+  if (!brokerSnapshot || !snapshot.permissionInventoryKnown) {
+    rows.add('Permission一覧: unknown');
+  } else if (snapshot.permissions.isEmpty) {
+    rows.add('Permission一覧: 既知の0件');
+  } else {
+    rows.add('Permission一覧: ${snapshot.permissions.length}件');
+    for (final permission in snapshot.permissions.take(24)) {
+      rows.add(
+        '${permission.permissionId} / ${permission.capabilityId} / decision=${permission.decision} / source=${permission.source}',
+      );
+    }
+    if (snapshot.permissions.length > 24) {
+      rows.add('残り${snapshot.permissions.length - 24}件は省略');
+    }
+  }
+
+  if (!brokerSnapshot || !snapshot.pendingApprovalsInventoryKnown) {
+    rows.add('Pending Approval一覧: unknown');
+  } else if (snapshot.pendingApprovals.isEmpty) {
+    rows.add('Pending Approval一覧: 既知の0件');
+  } else {
+    rows.add('Pending Approval一覧: ${snapshot.pendingApprovals.length}件');
+    for (final approval in snapshot.pendingApprovals.take(24)) {
+      rows.add(
+        '${approval.approvalId} / operation=${approval.operation} / status=${approval.status} / content=${approval.contentVisibility}（本文は非表示）',
+      );
+    }
+    if (snapshot.pendingApprovals.length > 24) {
+      rows.add('残り${snapshot.pendingApprovals.length - 24}件は省略');
+    }
+  }
+
+  rows.add('この一覧表示はPermission／Approvalを発行・消費・変更しません。');
+  return rows;
+}
+
 const guiShellProductVersion = String.fromEnvironment(
   'GUI_SHELL_PRODUCT_VERSION',
   defaultValue: '開発版',
@@ -240,7 +286,8 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = widget.client.getSnapshot().settings;
+    final shellSnapshot = widget.client.getSnapshot();
+    final settings = shellSnapshot.settings;
     final filtered = settings.where(_matchesFilters).toList();
     return ShellPage(
       title: '設定',
@@ -304,6 +351,10 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
             '初期化、書き出し、変更操作はShell Coreの承認経路を通す必要があります。',
             '危険または権限関連の設定には、操作者確認用の印を付けます。',
           ],
+        ),
+        SectionList(
+          title: 'Permission / Approval 状態',
+          rows: _permissionApprovalRows(shellSnapshot),
         ),
         McpConnectionCenterPanel(
           transport: widget.client.brokerTransport,
