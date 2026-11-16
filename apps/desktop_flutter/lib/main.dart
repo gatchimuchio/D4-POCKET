@@ -245,7 +245,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   bool _trayRefreshInFlight = false;
   bool _trayRefreshRequested = false;
   int _trayProjectionGeneration = 0;
-  int _brokerSearchGeneration = 0;
+  int _brokerTransportGeneration = 0;
   AgentTaskExecutionCoordinator? _agentTaskExecutionCoordinator;
 
   @override
@@ -266,7 +266,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       oldWidget.client.brokerTransport,
       widget.client.brokerTransport,
     )) {
-      _brokerSearchGeneration++;
+      _brokerTransportGeneration++;
       _trayProjectionGeneration++;
       _agentTaskExecutionCoordinator?.dispose();
       final transport = widget.client.brokerTransport;
@@ -407,22 +407,42 @@ class _ShellHomePageState extends State<ShellHomePage> {
       return;
     }
     if (action != 'stop_request') return;
+    final brokerTransport = widget.client.brokerTransport;
+    final brokerGeneration = _brokerTransportGeneration;
     try {
       final result = await widget.client.requestAllRuntimeStop();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result.message)),
-        );
+      if (!mounted) return;
+      if (brokerGeneration != _brokerTransportGeneration ||
+          !identical(widget.client.brokerTransport, brokerTransport)) {
+        _showStaleTrayStopResult();
+        return;
       }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message)),
+      );
     } on Object {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('全Runtime停止要求の応答を確認できません。実行状態を再確認してください。'),
-          ),
-        );
+      if (!mounted) return;
+      if (brokerGeneration != _brokerTransportGeneration ||
+          !identical(widget.client.brokerTransport, brokerTransport)) {
+        _showStaleTrayStopResult();
+        return;
       }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('全Runtime停止要求の応答を確認できません。実行状態を再確認してください。'),
+        ),
+      );
     }
+  }
+
+  void _showStaleTrayStopResult() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Broker接続先が切り替わったため、旧Brokerの停止要求結果を破棄しました。旧Brokerの状態を確認してください。',
+        ),
+      ),
+    );
   }
 
   @override
@@ -976,7 +996,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       _showCurrentSearchUnavailable(context);
       return;
     }
-    final brokerGeneration = _brokerSearchGeneration;
+    final brokerGeneration = _brokerTransportGeneration;
 
     late final List<GlobalSearchResult> entries;
     try {
@@ -986,7 +1006,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       return;
     }
     if (!mounted || !context.mounted) return;
-    if (brokerGeneration != _brokerSearchGeneration ||
+    if (brokerGeneration != _brokerTransportGeneration ||
         !identical(widget.client.brokerTransport, broker)) {
       _showSearchInvalidated(context);
       return;
@@ -1005,7 +1025,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       ),
     );
     if (selected == null || !mounted || !context.mounted) return;
-    if (brokerGeneration != _brokerSearchGeneration ||
+    if (brokerGeneration != _brokerTransportGeneration ||
         !identical(widget.client.brokerTransport, broker)) {
       _showSearchInvalidated(context);
       return;

@@ -16,6 +16,10 @@ class _TrayTransport implements BrokerTransport {
   bool _holdNextNotification = false;
   Completer<void>? _notificationStarted;
   Completer<void>? _notificationRelease;
+  bool _holdNextStopRequest = false;
+  bool _failHeldStopRequest = false;
+  Completer<void>? _stopRequestStarted;
+  Completer<void>? _stopRequestRelease;
 
   void holdNextNotification() {
     _holdNextNotification = true;
@@ -27,6 +31,17 @@ class _TrayTransport implements BrokerTransport {
 
   void releaseNotification() => _notificationRelease!.complete();
 
+  void holdNextStopRequest({bool fail = false}) {
+    _holdNextStopRequest = true;
+    _failHeldStopRequest = fail;
+    _stopRequestStarted = Completer<void>();
+    _stopRequestRelease = Completer<void>();
+  }
+
+  Future<void> get stopRequestStarted => _stopRequestStarted!.future;
+
+  void releaseStopRequest() => _stopRequestRelease!.complete();
+
   @override
   Future<Map<String, Object?>> request(
     String operation, {
@@ -37,6 +52,18 @@ class _TrayTransport implements BrokerTransport {
       _holdNextNotification = false;
       _notificationStarted!.complete();
       await _notificationRelease!.future;
+    }
+    if (operation == '全Runtime停止要求') {
+      if (_holdNextStopRequest) {
+        _holdNextStopRequest = false;
+        _stopRequestStarted!.complete();
+        await _stopRequestRelease!.future;
+        if (_failHeldStopRequest) {
+          throw StateError('SECRET_SENTINEL_old_broker_stop_failure');
+        }
+        return _acceptedStopRequest();
+      }
+      return _acceptedStopRequest();
     }
     return {
       'status': 'accepted',
@@ -53,6 +80,21 @@ class _TrayTransport implements BrokerTransport {
       },
     };
   }
+
+  Map<String, Object?> _acceptedStopRequest() => {
+        'operation': '全Runtime停止要求',
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'broker-audit-tray-stop',
+        'error': null,
+        'body': {
+          '版': 1,
+          '承認状態': 'owner_reapproval_required',
+          '停止実行済み': false,
+          '対象': <Object?>[],
+          '復旧ID': 'recover-runtime-stop-request',
+        },
+      };
 }
 
 void main() {
@@ -417,6 +459,114 @@ void main() {
           (projection) => projection['critical_notification_count'] == 1),
       hasLength(1),
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Broker切替後に旧Brokerの停止要求receiptを表示しない', (tester) async {
+    const channel = MethodChannel('gui_shell/tray');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      return switch (call.method) {
+        'initialize' => true,
+        'isWindowVisible' => true,
+        'publish' => null,
+        _ => null,
+      };
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      messenger.setMockMethodCallHandler(channel, null);
+    });
+
+    final oldTransport = _TrayTransport()..holdNextStopRequest();
+    final newTransport = _TrayTransport();
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: oldTransport)),
+    );
+    await tester.pumpAndSettle();
+
+    const codec = StandardMethodCodec();
+    final pendingAction = messenger.handlePlatformMessage(
+      channel.name,
+      codec.encodeMethodCall(
+        const MethodCall('onTrayAction', 'stop_request'),
+      ),
+      (_) {},
+    );
+    await oldTransport.stopRequestStarted;
+
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: newTransport)),
+    );
+    await tester.pumpAndSettle();
+    oldTransport.releaseStopRequest();
+    await pendingAction;
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining(
+        'Broker接続先が切り替わったため、旧Brokerの停止要求結果を破棄しました',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('全Runtime停止要求をBrokerへ渡しました'), findsNothing);
+    expect(oldTransport.operations, contains('全Runtime停止要求'));
+    expect(newTransport.operations, isNot(contains('全Runtime停止要求')));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Broker切替後に旧Brokerの停止要求errorも露出しない', (tester) async {
+    const channel = MethodChannel('gui_shell/tray');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      return switch (call.method) {
+        'initialize' => true,
+        'isWindowVisible' => true,
+        'publish' => null,
+        _ => null,
+      };
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      messenger.setMockMethodCallHandler(channel, null);
+    });
+
+    final oldTransport = _TrayTransport()..holdNextStopRequest(fail: true);
+    final newTransport = _TrayTransport();
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: oldTransport)),
+    );
+    await tester.pumpAndSettle();
+
+    const codec = StandardMethodCodec();
+    final pendingAction = messenger.handlePlatformMessage(
+      channel.name,
+      codec.encodeMethodCall(
+        const MethodCall('onTrayAction', 'stop_request'),
+      ),
+      (_) {},
+    );
+    await oldTransport.stopRequestStarted;
+
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: newTransport)),
+    );
+    await tester.pumpAndSettle();
+    oldTransport.releaseStopRequest();
+    await pendingAction;
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining(
+        'Broker接続先が切り替わったため、旧Brokerの停止要求結果を破棄しました',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('全Runtime停止要求の応答を確認できません'), findsNothing);
+    expect(find.textContaining('SECRET_SENTINEL'), findsNothing);
+    expect(newTransport.operations, isNot(contains('全Runtime停止要求')));
     expect(tester.takeException(), isNull);
   });
 }
