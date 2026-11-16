@@ -452,6 +452,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     final pages = [
       Dashboard(
         client: widget.client,
+        active: selectedIndex == 0,
         onOpenProductSetup: _openProductSetup,
         onOpenAgentSetup: _openAgentSetup,
       ),

@@ -225,7 +225,7 @@ class ShellStatusBar extends StatelessWidget {
               const StatusPill(label: '段階', value: 'B 所有者利用'),
               const SizedBox(width: 8),
               StatusPill(
-                  label: dialogueContext ? '対話状態' : '実行系',
+                  label: dialogueContext ? '対話状態' : 'スナップショット実行系',
                   value:
                       dialogueContext ? '各実行系欄に表示' : operation.runtimeStatus),
               const SizedBox(width: 8),

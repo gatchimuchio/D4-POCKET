@@ -560,7 +560,9 @@ void main() {
       GuiShellDesktopApp(client: ShellCoreClient.mock(transport: newTransport)),
     );
     await tester.pump();
-    expect(newTransport.operations, isEmpty);
+    // The active Dashboard now reads current Broker Health after a client
+    // switch; the Tray must still wait before projecting notification data.
+    expect(newTransport.operations, ['health']);
 
     oldTransport.releaseNotification();
     await tester.pumpAndSettle();

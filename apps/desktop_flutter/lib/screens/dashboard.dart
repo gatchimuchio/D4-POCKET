@@ -1,23 +1,170 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../services/broker_client.dart' show BrokerTransport;
+import '../services/broker_health_client.dart';
 import '../services/shell_core_client.dart';
 import 'shared.dart';
 
-class Dashboard extends StatelessWidget {
+class Dashboard extends StatefulWidget {
   const Dashboard({
     super.key,
     required this.client,
+    this.active = true,
     this.onOpenProductSetup,
     this.onOpenAgentSetup,
   });
 
   final ShellCoreClient client;
+  final bool active;
   final VoidCallback? onOpenProductSetup;
   final VoidCallback? onOpenAgentSetup;
 
   @override
+  State<Dashboard> createState() => _DashboardState();
+}
+
+class _DashboardState extends State<Dashboard> {
+  int _generation = 0;
+  BrokerHealthObservation? _health;
+  BrokerUiStatus? _unavailableStatus;
+  bool _loading = false;
+  bool _requestInFlight = false;
+  bool _refreshQueued = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startHealthRead();
+  }
+
+  @override
+  void didUpdateWidget(covariant Dashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final clientChanged = !identical(oldWidget.client, widget.client) ||
+        !identical(
+          oldWidget.client.brokerTransport,
+          widget.client.brokerTransport,
+        );
+    final activeChanged = oldWidget.active != widget.active;
+    if (!clientChanged && !activeChanged) return;
+
+    _generation++;
+    _refreshQueued = false;
+    if (clientChanged) {
+      _health = null;
+      _unavailableStatus = null;
+      _loading = false;
+    }
+    if (!widget.active) {
+      _loading = false;
+      return;
+    }
+    _startHealthRead();
+  }
+
+  void _startHealthRead({bool notify = false}) {
+    if (!widget.active) return;
+    final transport = widget.client.brokerTransport;
+    if (transport == null) {
+      void showUnavailable() {
+        _health = null;
+        _unavailableStatus = widget.client.mode == 'broker_unavailable'
+            ? BrokerUiStatus.recoverableError
+            : BrokerUiStatus.unsupported;
+        _loading = false;
+      }
+
+      if (notify && mounted) {
+        setState(showUnavailable);
+      } else {
+        showUnavailable();
+      }
+      return;
+    }
+    if (_requestInFlight) {
+      _refreshQueued = true;
+      if (notify && mounted) {
+        setState(() => _loading = true);
+      } else {
+        _loading = true;
+      }
+      return;
+    }
+
+    _refreshQueued = false;
+    final generation = _generation;
+    final client = widget.client;
+    void markLoading() {
+      _health = null;
+      _unavailableStatus = null;
+      _loading = true;
+    }
+
+    if (notify && mounted) {
+      setState(markLoading);
+    } else {
+      markLoading();
+    }
+    _requestInFlight = true;
+    unawaited(_readHealth(client, transport, generation));
+  }
+
+  Future<void> _readHealth(
+    ShellCoreClient client,
+    BrokerTransport transport,
+    int generation,
+  ) async {
+    BrokerHealthObservation? observation;
+    const unavailableStatus = BrokerUiStatus.recoverableError;
+    try {
+      observation = await BrokerHealthClient.read(transport);
+    } on Object {
+      // Error details can contain Broker or transport data; expose only state.
+    }
+
+    _requestInFlight = false;
+    if (!mounted) return;
+    final isCurrent = widget.active &&
+        generation == _generation &&
+        identical(widget.client, client) &&
+        identical(widget.client.brokerTransport, transport);
+    if (isCurrent) {
+      setState(() {
+        _health = observation;
+        _unavailableStatus = observation == null ? unavailableStatus : null;
+        _loading = false;
+      });
+    }
+
+    final refreshQueued = _refreshQueued;
+    _refreshQueued = false;
+    if (refreshQueued && widget.active) _startHealthRead();
+  }
+
+  void _retryHealth() => _startHealthRead(notify: true);
+
+  String get _displayedStatus => _loading
+      ? '確認中'
+      : _health?.uiStatus.label ?? _unavailableStatus?.label ?? '不明';
+
+  String get _healthMessage {
+    final health = _health;
+    if (health != null) return health.safeSummary;
+    if (_loading) return '現在のBroker状態を確認しています。';
+    if (_unavailableStatus == BrokerUiStatus.unsupported) {
+      return 'この接続状態ではライブBroker Healthを取得できません。';
+    }
+    if (_unavailableStatus == BrokerUiStatus.recoverableError) {
+      return 'ライブBroker Healthを取得できません。接続後に再取得できます。';
+    }
+    return '現在のBroker Healthは未取得です。';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final snapshot = client.getSnapshot();
+    final snapshot = widget.client.getSnapshot();
     final phase = snapshot.phaseStatus;
     final operation = snapshot.operationStatus;
     final evidence = snapshot.evidenceSummary;
@@ -40,7 +187,7 @@ class Dashboard extends StatelessWidget {
               const SizedBox(height: 8),
               FilledButton.icon(
                 key: const ValueKey('open-product-setup'),
-                onPressed: onOpenProductSetup,
+                onPressed: widget.onOpenProductSetup,
                 icon: const Icon(Icons.install_desktop_outlined),
                 label: const Text('インストール・更新センターを開く'),
               ),
@@ -62,7 +209,7 @@ class Dashboard extends StatelessWidget {
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 key: const ValueKey('open-agent-setup'),
-                onPressed: onOpenAgentSetup,
+                onPressed: widget.onOpenAgentSetup,
                 icon: const Icon(Icons.smart_toy_outlined),
                 label: const Text('実行系・Agent管理を開く'),
               ),
@@ -86,7 +233,12 @@ class Dashboard extends StatelessWidget {
         MetricRow(
           items: [
             MetricItem(
-              label: '実行系状態',
+              label: 'Broker状態',
+              evidenceLabel: 'Broker Health Status',
+              value: _displayedStatus,
+            ),
+            MetricItem(
+              label: '実行系状態（スナップショット）',
               evidenceLabel: 'Runtime Status',
               value: operation.runtimeStatus,
             ),
@@ -109,6 +261,27 @@ class Dashboard extends StatelessWidget {
               value: '${snapshot.recoveryPlaybook.length}件',
             ),
           ],
+        ),
+        BorderedPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _healthMessage,
+                key: const ValueKey('dashboard-broker-health-summary'),
+              ),
+              if (_unavailableStatus == BrokerUiStatus.recoverableError &&
+                  !_loading) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const ValueKey('dashboard-broker-health-retry'),
+                  onPressed: _retryHealth,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Broker状態を再取得'),
+                ),
+              ],
+            ],
+          ),
         ),
         const SectionList(
           title: '所有者操作の境界',
