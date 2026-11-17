@@ -17,6 +17,8 @@ class _McpTransport implements BrokerTransport {
   final payloads = <Map<String, Object?>?>[];
   bool connected = true;
   Completer<void>? holdNextConnectionList;
+  Completer<void>? holdNextToolCall;
+  Completer<void>? toolCallStarted;
   bool toolError = false;
   String toolConnectionState = 'connected';
   final credentialMetadata = <Map<String, Object?>>[
@@ -262,6 +264,13 @@ class _McpTransport implements BrokerTransport {
       };
     }
     if (operation == 'MCP Tool実行') {
+      final hold = holdNextToolCall;
+      holdNextToolCall = null;
+      if (hold != null) {
+        final started = toolCallStarted;
+        if (started != null && !started.isCompleted) started.complete();
+        await hold.future;
+      }
       return {
         'status': 'accepted',
         'evidence_source': 'LIVE_RUNTIME',
@@ -910,6 +919,71 @@ void main() {
     expect(find.textContaining('result hash: sha256:'), findsOneWidget);
     expect(find.textContaining('SECRET_RESULT_MARKER'), findsNothing);
     expect(find.textContaining('needle'), findsNothing);
+  });
+
+  testWidgets('MCP Tool進行中のBroker切替は結果unknownを表示し旧応答を再送しない', (tester) async {
+    final oldToolResponse = Completer<void>();
+    final toolCallStarted = Completer<void>();
+    final oldTransport = _McpTransport()
+      ..displayName = '旧BrokerのMCP'
+      ..holdNextToolCall = oldToolResponse
+      ..toolCallStarted = toolCallStarted;
+    final currentTransport = _McpTransport()..displayName = '現在BrokerのMCP';
+    var transport = oldTransport;
+    late StateSetter updateTransport;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              updateTransport = setState;
+              return McpConnectionCenterPanel(transport: transport);
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('接続一覧を取得'));
+    await tester.tap(find.text('接続一覧を取得'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Tool一覧：1件'));
+    await tester.tap(find.text('Tool一覧：1件'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('確認して実行'));
+    await tester.tap(find.text('確認して実行'));
+    await tester.pumpAndSettle();
+    final argumentEditor = find.byType(TextField).last;
+    await tester.enterText(argumentEditor, '{"query":"pending-result"}');
+    await tester.tap(find.text('入力内容を確認'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('"query": "pending-result"'), findsOneWidget);
+
+    await tester.tap(find.text('Windows確認へ進む'));
+    await tester.pumpAndSettle();
+    await toolCallStarted.future;
+    expect(oldTransport.operations, ['MCP接続一覧', 'MCP Tool実行']);
+
+    updateTransport(() => transport = currentTransport);
+    await tester.pump();
+    expect(
+      find.textContaining('Broker切替前のMCP作用結果は不明です。'),
+      findsOneWidget,
+    );
+    expect(find.text('旧BrokerのMCP'), findsNothing);
+
+    oldToolResponse.complete();
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Broker切替前のMCP作用結果は不明です。'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('result hash: sha256:'), findsNothing);
+    expect(find.text('現在BrokerのMCP'), findsNothing);
+    expect(oldTransport.operations, ['MCP接続一覧', 'MCP Tool実行']);
+    expect(currentTransport.operations, isEmpty);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Mac MCP Toolの入力確認は小さい製品窓でも画面を破壊しない', (tester) async {
