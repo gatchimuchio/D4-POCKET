@@ -33,10 +33,11 @@ void main() {
     expect(record.toolSupportStatus, 'unknown');
   });
 
-  testWidgets('Setup DoctorはAgent Provider IDに対応するCredential件数だけを表示する',
+  testWidgets('Setup DoctorはBroker保管庫参照AgentのCredential件数だけを表示する',
       (tester) async {
     final transport = _SetupDoctorTransport()
-      ..agentEntries.add(_agentAdapterFixture(method: 'api_key_reference'))
+      ..agentEntries
+          .add(_agentAdapterFixture(method: 'local_credential_reference'))
       ..credentialEntries.add(_providerCredentialFixture());
     final client = await ShellCoreClient.product(transport: transport);
 
@@ -50,6 +51,10 @@ void main() {
       find.textContaining('authentication_sourceやCredential IDを公開せず'),
       findsOneWidget,
     );
+    expect(
+      find.textContaining('authentication.method=local_credential_reference'),
+      findsOneWidget,
+    );
     expect(find.textContaining('Provider認証成功は未確認'), findsOneWidget);
     expect(find.textContaining('a' * 32), findsNothing);
     expect(find.textContaining('b' * 64), findsNothing);
@@ -61,9 +66,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Setup Doctorは0件とCLI管理認証をD4資格不足と混同しない', (tester) async {
+  testWidgets('Setup DoctorはBroker保管庫の0件とCLI管理認証を区別する', (tester) async {
     final transport = _SetupDoctorTransport()
-      ..agentEntries.add(_agentAdapterFixture(method: 'api_key_reference'));
+      ..agentEntries
+          .add(_agentAdapterFixture(method: 'local_credential_reference'));
     final client = await ShellCoreClient.product(transport: transport);
 
     await tester.pumpWidget(
@@ -88,6 +94,31 @@ void main() {
     expect(
       managedTransport.requests
           .where((request) => request['operation'] == '資格情報一覧'),
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Setup Doctorは一般のAPI-key参照をD4 Broker資格へ誤結合しない', (tester) async {
+    final transport = _SetupDoctorTransport()
+      ..agentEntries.add(_agentAdapterFixture(method: 'api_key_reference'))
+      ..credentialEntries.add(_providerCredentialFixture());
+    final client = await ShellCoreClient.product(transport: transport);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: SetupDoctor(client: client))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining(
+        'API-key参照だけではD4 Broker資格保管庫との結合を確認できないためunknownです。',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('有効な対象Credential metadata='), findsNothing);
+    expect(
+      transport.requests.where((request) => request['operation'] == '資格情報一覧'),
       isEmpty,
     );
     expect(tester.takeException(), isNull);

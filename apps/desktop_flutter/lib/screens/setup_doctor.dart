@@ -330,7 +330,7 @@ class _ProviderCredentialReadinessSectionState
       widget.snapshot.agentAdapters
           .where((agent) =>
               agent.providerId == _providerId &&
-              agent.authenticationMethod == 'api_key_reference')
+              agent.authenticationMethod == 'local_credential_reference')
           .toList(growable: false);
 
   @override
@@ -370,6 +370,9 @@ class _ProviderCredentialReadinessSectionState
     final cliManagedAgents = targetAgents
         .where((agent) => agent.authenticationMethod == 'codex_cli_managed')
         .length;
+    final genericApiKeyReferenceAgents = targetAgents
+        .where((agent) => agent.authenticationMethod == 'api_key_reference')
+        .length;
 
     if (widget.snapshot.snapshotSource != 'broker' ||
         widget.transport == null) {
@@ -392,8 +395,11 @@ class _ProviderCredentialReadinessSectionState
         rows: [
           if (cliManagedAgents > 0)
             'CLI管理認証方式が$cliManagedAgents件あります。D4 Broker保管庫の資格有無からCLIログイン状態は判定しません。',
-          if (cliManagedAgents < targetAgents.length)
-            'API-key参照方式以外のAgent metadataは、資格要件をこの一覧へ結合できないためunknownです。',
+          if (genericApiKeyReferenceAgents > 0)
+            'API-key参照だけではD4 Broker資格保管庫との結合を確認できないためunknownです。',
+          if (cliManagedAgents + genericApiKeyReferenceAgents <
+              targetAgents.length)
+            'D4 Broker保管庫の参照を確認できないAgent metadataがあり、資格要件はunknownです。',
           '外部Providerの認証成功は別途未確認です。',
         ],
       );
@@ -407,8 +413,14 @@ class _ProviderCredentialReadinessSectionState
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(
-            '対象Agent metadata=${brokerAgents.length}件 / provider_id=$_providerId / authentication.method=api_key_reference。Agent SnapshotはTaskごとのauthentication_sourceやCredential IDを公開せず、資格一覧とは別々のBroker readです。',
+            '対象Agent metadata=${brokerAgents.length}件 / provider_id=$_providerId / authentication.method=local_credential_reference。Agent SnapshotはTaskごとのauthentication_sourceやCredential IDを公開せず、資格一覧とは別々のBroker readです。',
           ),
+          if (genericApiKeyReferenceAgents > 0) ...[
+            const SizedBox(height: 4),
+            const Text(
+              '一般のapi_key_referenceはD4 Broker保管庫との結合を確認できないためunknownです。',
+            ),
+          ],
           const SizedBox(height: 8),
           OutlinedButton.icon(
             key: const ValueKey('setup-doctor-provider-credentials-refresh'),
