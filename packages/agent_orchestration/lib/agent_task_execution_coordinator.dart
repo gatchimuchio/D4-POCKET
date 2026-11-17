@@ -27,12 +27,22 @@ class AgentTaskExecutionCoordinator {
   AgentTaskExecutionCoordinator(
     BrokerTransport transport, {
     this.platform = AgentRuntimePlatform.other,
-  }) : _transport = transport;
+    Duration maximumMonitorDuration = const Duration(minutes: 16),
+  }) : _transport = transport,
+       _maximumMonitorDuration = maximumMonitorDuration {
+    if (maximumMonitorDuration.isNegative) {
+      throw ArgumentError.value(
+        maximumMonitorDuration,
+        'maximumMonitorDuration',
+        'must not be negative',
+      );
+    }
+  }
 
   static const _maximumRememberedTaskIds = 2048;
-  static const _maximumMonitorDuration = Duration(minutes: 16);
 
   final BrokerTransport _transport;
+  final Duration _maximumMonitorDuration;
   final StreamController<AgentTaskExecutionUpdate> _updates =
       StreamController<AgentTaskExecutionUpdate>.broadcast();
   final AgentRuntimePlatform platform;
@@ -176,8 +186,47 @@ class AgentTaskExecutionCoordinator {
         }
       }
       if (const {'pending', 'running'}.contains(current.status)) {
-        _emit(run, error: '自動監視の上限時間を過ぎました。Broker Taskは保持されています。');
-        return;
+        if (!_isCurrent(run)) return;
+        try {
+          final observed = await AgentTaskClient(
+            _transport,
+          ).state(current.taskId);
+          if (!_isCurrent(run)) return;
+          if (!_sameTaskExecutionBinding(run.initialTask, observed)) {
+            _emit(
+              run,
+              error:
+                  '監視上限後に取得したBroker Task状態のTask／Runtime／Session／Workspace／指示hashが開始時から変化したため、結果連携を停止しました。',
+            );
+            return;
+          }
+          current = observed;
+        } on Object catch (error) {
+          if (!_isCurrent(run)) return;
+          _emit(
+            run,
+            error:
+                '監視上限後のBroker状態再取得に失敗しました。Task状態／Audit／Recoveryは未確認です。${_errorMessage(error)}',
+          );
+          return;
+        }
+        if (!_isCurrent(run)) return;
+        final canContinueAfterCompletion =
+            current.status == 'completed' &&
+            run.allowMcpContinuation &&
+            run.request.mcpCapabilitySnapshotHash != null;
+        final monitorLimitMessage = switch (current.status) {
+          'pending' || 'running' =>
+            '16分の画面監視上限後にBroker状態を再取得しました。Taskは${current.status}です。監視終了はTask取消を意味しません。Task監査参照=${current.auditEventId}。必要ならAgent Centerで状態を更新し、Recovery CenterでBroker診断を確認してください。',
+          'completed' when canContinueAfterCompletion =>
+            '16分の画面監視上限後にBroker完了状態を再取得しました。Task監査参照=${current.auditEventId}。既存の結果依存Broker経路を続行します。',
+          'completed' =>
+            '16分の画面監視上限後にBroker完了状態を再取得しました。Task監査参照=${current.auditEventId}。',
+          _ =>
+            '16分の画面監視上限後にBroker終端状態を再取得しました。状態=${current.status}、Task監査参照=${current.auditEventId}。Recovery Centerで必要なBroker診断を確認してください。',
+        };
+        _emit(run, task: current, message: monitorLimitMessage);
+        if (const {'pending', 'running'}.contains(current.status)) return;
       }
     }
 

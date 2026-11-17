@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:agent_orchestration/agent_task_execution_coordinator.dart'
+    as orchestration;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
@@ -791,6 +793,176 @@ void main() {
     observerGate.complete();
   });
 
+  test('16分監視上限後にBroker状態と監査参照を再取得しTaskは取消さない', () async {
+    final transport = _FakeBrokerTransport([
+      _taskStateResponse(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'running',
+        auditEventId: 'audit-after-monitor-limit',
+      ),
+    ]);
+    final coordinator = orchestration.AgentTaskExecutionCoordinator(
+      transport,
+      maximumMonitorDuration: Duration.zero,
+    );
+    final updates = <AgentTaskExecutionUpdate>[];
+
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: const AgentTaskRecord(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'running',
+        auditEventId: 'audit-source-task-running',
+      ),
+      expectedInstructionHash: _instructionHash,
+      onUpdate: updates.add,
+    );
+
+    expect(transport.operations, ['AgentTask状態']);
+    expect(updates.last.task?.status, 'running');
+    expect(updates.last.task?.auditEventId, 'audit-after-monitor-limit');
+    expect(updates.last.message, contains('Recovery Center'));
+    expect(updates.last.message, contains('Task取消を意味しません'));
+    coordinator.dispose();
+  });
+
+  test('16分監視上限後に完了を再取得したTaskは通常の結果依存経路へ戻る', () async {
+    final transport = _FakeBrokerTransport([
+      _taskStateResponse(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'completed',
+        auditEventId: 'audit-completed-after-monitor-limit',
+        resultHash: _sourceResultHash,
+        resultContentAvailable: true,
+      ),
+      ..._successfulResponses(),
+      _taskStateResponse(
+        taskId: _followupTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'running',
+        auditEventId: 'audit-followup-after-monitor-limit',
+      ),
+    ]);
+    final coordinator = orchestration.AgentTaskExecutionCoordinator(
+      transport,
+      maximumMonitorDuration: Duration.zero,
+    );
+    final updates = <AgentTaskExecutionUpdate>[];
+    final followupLimitObserved = Completer<void>();
+
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: const AgentTaskRecord(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'running',
+        auditEventId: 'audit-source-task-running',
+      ),
+      expectedInstructionHash: _instructionHash,
+      onUpdate: (update) {
+        updates.add(update);
+        if (update.task?.auditEventId == 'audit-followup-after-monitor-limit' &&
+            !followupLimitObserved.isCompleted) {
+          followupLimitObserved.complete();
+        }
+      },
+    );
+    await followupLimitObserved.future.timeout(const Duration(seconds: 1));
+
+    expect(transport.operations, [
+      'AgentTask状態',
+      'AgentTask結果表示承認',
+      'AgentTask結果取得',
+      'MCP接続一覧',
+      'MCP Tool実行',
+      'Agent作業要求検査',
+      'AgentTaskWorkspacePermissionGrant',
+      'AgentTaskOwnerApprovalGrant',
+      'AgentTask実行',
+      'AgentTask状態',
+    ]);
+    expect(
+      updates.any(
+        (update) =>
+            update.task?.auditEventId == 'audit-completed-after-monitor-limit',
+      ),
+      isTrue,
+    );
+    expect(
+      updates.any(
+        (update) =>
+            update.mcpUpdate?.stage == AgentMcpTaskStage.followupTaskStarted,
+      ),
+      isTrue,
+    );
+    coordinator.dispose();
+  });
+
+  test('監視上限後の状態再取得でWorkspace差替えを検知したらMCPを停止する', () async {
+    final transport = _FakeBrokerTransport([
+      _taskStateResponse(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-replaced',
+        instructionHash: _instructionHash,
+        status: 'completed',
+        auditEventId: 'audit-replaced-workspace-after-limit',
+        resultHash: _sourceResultHash,
+        resultContentAvailable: true,
+      ),
+    ]);
+    final coordinator = orchestration.AgentTaskExecutionCoordinator(
+      transport,
+      maximumMonitorDuration: Duration.zero,
+    );
+    final updates = <AgentTaskExecutionUpdate>[];
+
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: const AgentTaskRecord(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'running',
+        auditEventId: 'audit-source-task-running',
+      ),
+      expectedInstructionHash: _instructionHash,
+      onUpdate: updates.add,
+    );
+
+    expect(transport.operations, ['AgentTask状態']);
+    expect(
+      updates.any(
+        (update) => update.error?.contains('Workspace／指示hash') ?? false,
+      ),
+      isTrue,
+    );
+    expect(transport.operations, isNot(contains('AgentTask結果表示承認')));
+    expect(transport.operations, isNot(contains('MCP Tool実行')));
+    coordinator.dispose();
+  });
+
   test('通常のTask結果ではMCPやPermission/Approvalを要求しない', () async {
     final responses = _successfulResponses(resultText: 'Task完了しました。');
     responses.removeRange(2, responses.length);
@@ -990,6 +1162,31 @@ AgentTaskRecord get _sourceTask => const AgentTaskRecord(
       resultHash: _sourceResultHash,
       resultContentAvailable: true,
     );
+
+Map<String, Object?> _taskStateResponse({
+  required String taskId,
+  required String runtimeId,
+  required String sessionId,
+  required String workspaceId,
+  required String instructionHash,
+  required String status,
+  required String auditEventId,
+  String? resultHash,
+  bool resultContentAvailable = false,
+}) =>
+    _accepted('AgentTask状態', {
+      'task_id': taskId,
+      'record_version': 2,
+      'agent_runtime_id': runtimeId,
+      'session_id': sessionId,
+      'workspace_id': workspaceId,
+      'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+      'instruction_hash': instructionHash,
+      'status': status,
+      'audit_event_id': auditEventId,
+      if (resultHash != null) 'result_hash': resultHash,
+      'result_content_available': resultContentAvailable,
+    });
 
 List<Map<String, Object?>> _successfulResponses({
   String? resultText,
