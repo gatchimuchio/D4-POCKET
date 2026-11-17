@@ -1629,7 +1629,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "88a9ffb32a8c89e8e6b6e5fa07c44a2192e64091bbd59319377662606f2f17eb"
+      "sha256": "d7ae74fd6673631c95bd705b7527a9ca9fb42440a8430860aaced253d807ff99"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5704,6 +5704,10 @@
       "sha256": "960816772d5369f875016aa34c892bd202b28f37ba899bf935185248a780911d"
     },
     {
+      "path": "tooling/build_environment.py",
+      "sha256": "91ca970715fcb20f2b9028e083eb5614aaeb0e36c9fef0ab6de593eab7a1c39e"
+    },
+    {
       "path": "tooling/build_module_pruned_windows.py",
       "sha256": "513acfc49ef868c141aa4d2cdca9dcaeb1a8f45b15ca11def8b3582a0da0bd25"
     },
@@ -5733,7 +5737,7 @@
     },
     {
       "path": "tooling/compare_module_builds_windows.py",
-      "sha256": "876aa64c991e40df2efb96b90fbb5708388680aaa6157c08b4bbe6313f3e30b3"
+      "sha256": "6ee75ef2f319d60873e443c5262b903afc3270ea058b2aa4f9bb61ef0281abbd"
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
@@ -5977,7 +5981,7 @@
     },
     {
       "path": "tooling/tests/test_compare_module_builds_windows.py",
-      "sha256": "e9fa50f69db3336110c065c1aff81cf409e82bc11afed84bf9fb31c6631e2cdf"
+      "sha256": "aadb81131d30065ad579d2581b2f026d7aef9e2cf0721b4628eec9c17a7b02c4"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",

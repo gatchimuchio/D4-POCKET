@@ -12,6 +12,7 @@ from tooling.compare_module_builds_windows import (
     _runtime_dependency_tree_from_json,
     package_dependency_comparison,
     resource_inventory_comparison,
+    _symbol_inventory_record,
     symbol_set_comparison,
     validate_comparison_evidence,
 )
@@ -59,6 +60,17 @@ Static symbols
         self.assertEqual(
             symbol_set_comparison(["core", "optional_old"], ["core", "optional_new"]),
             {"removed_symbols": ["optional_old"], "added_symbols": ["optional_new"]},
+        )
+
+    def test_symbol_inventory_record_matches_nested_contract_shape(self) -> None:
+        symbol_file = {
+            "path": "baseline/rust/public-symbols.txt",
+            "size_bytes": 12,
+            "sha256": "a" * 64,
+        }
+        self.assertEqual(
+            _symbol_inventory_record(symbol_file, ["symbol_a", "symbol_b"]),
+            {"file": symbol_file, "symbol_count": 2},
         )
 
     def test_resource_comparison_uses_packaged_flutter_asset_files(self) -> None:

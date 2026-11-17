@@ -753,6 +753,12 @@ def symbol_set_comparison(
     }
 
 
+def _symbol_inventory_record(
+    symbol_file_record: dict[str, Any], symbols: list[str]
+) -> dict[str, Any]:
+    return {"file": symbol_file_record, "symbol_count": len(symbols)}
+
+
 def _redact_local_paths(value: str) -> str:
     candidates = {
         str(ROOT.resolve()): "{repository}",
@@ -973,10 +979,7 @@ def _capture_rust_helper_run(
         "build_duration_ms": duration_ms,
         "binary": binary,
         "linker_map": map_record,
-        "symbol_inventory": {
-            **symbol_record,
-            "symbol_count": len(symbols),
-        },
+        "symbol_inventory": _symbol_inventory_record(symbol_record, symbols),
         "runtime_dependency_tree": {
             "command": [
                 "cargo",
