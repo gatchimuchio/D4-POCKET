@@ -1629,7 +1629,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "735280a0a2ad5c99806ffe3039989bda2c486469c5441ae0569e426a8f35c24a"
+      "sha256": "7319b5fd0585f7231737cdd1c318bee122a69f759e9a3262a4e4c51ae835f18d"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5848,6 +5848,10 @@
       "sha256": "7daa9b71dc12bea520f68d7a63e239fd45b29f8a7eab2d90b8093296b4ae24e1"
     },
     {
+      "path": "tooling/mobile_product_candidate_metadata.py",
+      "sha256": "847186c1519322b6de5500b28bd8cceff545e2cf8657c7b2440d3f71f2fdf24a"
+    },
+    {
       "path": "tooling/package_android_product_candidate.py",
       "sha256": "a9858770b345d89596e8f0e751be14a86be3867ad5f473cb584da2430e78c8f5"
     },
@@ -6014,6 +6018,10 @@
     {
       "path": "tooling/tests/test_linux_workflow_helpers.py",
       "sha256": "0569578e9a96ecded4ac9eee27cc07d6241569233264e356cbf976ef25d8bb59"
+    },
+    {
+      "path": "tooling/tests/test_mobile_product_candidate_metadata.py",
+      "sha256": "6f5a27a7be7b39b72a2a35da479732749705760bfdfad5363142d83f803ca15b"
     },
     {
       "path": "tooling/tests/test_module_feature_selection.py",
