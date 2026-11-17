@@ -8454,6 +8454,7 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    #[cfg(feature = "module_setup_doctor")]
     #[test]
     fn setup_doctor_report_is_broker_generated_audited_and_keeps_unknown_unknown() {
         let root = temp_store_dir("setup-doctor-report");

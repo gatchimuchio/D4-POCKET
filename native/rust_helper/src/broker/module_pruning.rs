@@ -1,9 +1,9 @@
-//! Compile-time Module selection enforced at the authenticated Broker IPC boundary.
+//! Optional Module selection enforced at the authenticated Broker IPC boundary.
 //!
-//! This gate prevents an excluded optional surface from invoking its Broker
-//! operation through an alternate client. The optional implementation code is
-//! not yet conditionally omitted from the Rust binary; build evidence must keep
-//! `binary_pruning_verified` false until that source-level pruning is complete.
+//! This gate rejects excluded operations before dispatch, including requests
+//! from alternate clients. It is one runtime boundary; it does not by itself
+//! prove that an exported product launches or that every excluded surface is
+//! absent from its UI, command, and launcher paths.
 
 use serde_json::Value;
 
@@ -180,30 +180,76 @@ mod tests {
     }
 
     #[test]
-    fn excluded_broker_operation_is_rejected_with_an_audit_receipt() {
-        let mut broker = Broker::new("module-pruning-test-session");
-        let request = json!({
-            "request_id": "module-pruning-test-request",
-            "operation": "Setup Doctor報告取得",
-            "payload_hash": "sha256:test-payload-hash",
-            "nonce": "module-pruning-test-nonce",
-            "issued_at": "2026-11-16T00:00:00Z",
-            "metadata": {},
-            "payload": {"version": 1}
-        })
-        .to_string();
+    fn every_excluded_optional_operation_is_audited_and_never_echoes_payload() {
+        let cases = [
+            ("Setup Doctor報告取得", "shell.setup_doctor", false),
+            ("対話履歴承認", "shell.history", false),
+            ("対話履歴失効", "shell.history", false),
+            ("対話履歴閲覧状態", "shell.history", false),
+            ("対話履歴閲覧", "shell.history", false),
+            ("AgentTask履歴閲覧", "shell.history", false),
+            ("対話再実行", "shell.history", false),
+            ("対話分岐", "shell.history", false),
+            ("対話履歴一覧", "shell.history", false),
+            ("評価Dataset登録", "shell.evaluation_lab", false),
+            ("評価Dataset一覧", "shell.evaluation_lab", false),
+            ("評価実験開始", "shell.evaluation_lab", false),
+            ("評価実験状態", "shell.evaluation_lab", false),
+            ("評価比較", "shell.evaluation_lab", false),
+            ("回帰Case登録", "shell.evaluation_lab", false),
+            ("回帰Case一覧", "shell.evaluation_lab", false),
+            ("回帰Case削除", "shell.evaluation_lab", false),
+            ("回帰Case削除中断確認", "shell.evaluation_lab", false),
+            ("ホスト能力", "shell.host_capabilities", false),
+            ("通知一覧", "shell.notifications", false),
+            ("通知既読", "shell.notifications", false),
+            ("通知破棄", "shell.notifications", false),
+            ("通知全既読", "shell.notifications", false),
+            ("観測一覧", "shell.observability", false),
+            ("観測一覧", "shell.trace_inspector", true),
+            ("Host登録", "shell.host_operations", false),
+            ("Host切替", "shell.host_operations", false),
+        ];
 
-        let response = reject_if_pruned(&mut broker, &request);
-        if cfg!(feature = "module_setup_doctor") {
-            assert!(response.is_none());
-        } else {
+        for (index, (operation, module_id, is_trace)) in cases.iter().enumerate() {
+            let marker = format!("private-module-payload-{index}");
+            let mut payload = json!({"version": 1, "private_probe": marker});
+            if *is_trace {
+                payload["TraceID"] = json!(format!("trace-{index}"));
+            }
+            let request = json!({
+                "request_id": format!("module-pruning-request-{index}"),
+                "operation": operation,
+                "payload_hash": "sha256:test-payload-hash",
+                "nonce": format!("module-pruning-nonce-{index}"),
+                "issued_at": "2026-11-16T00:00:00Z",
+                "metadata": {},
+                "payload": payload
+            })
+            .to_string();
+            let mut broker = Broker::new("module-pruning-test-session");
+            let response = reject_if_pruned(&mut broker, &request);
+
+            if module_enabled(module_id) {
+                assert!(
+                    response.is_none(),
+                    "included operation was rejected: {operation}"
+                );
+                continue;
+            }
+
             let response = response.expect("excluded optional operation must be rejected");
-            assert_eq!(response.status, BrokerStatus::Rejected);
-            assert_eq!(response.operation, "Setup Doctor報告取得");
-            assert!(!response.audit_event_id.is_empty());
+            assert_eq!(response.status, BrokerStatus::Rejected, "{operation}");
+            assert_eq!(response.operation, *operation);
+            assert!(!response.audit_event_id.is_empty(), "{operation}");
             assert_eq!(
                 response.error.as_ref().map(|value| value.code.as_str()),
-                Some("optional_module_not_included")
+                Some("optional_module_not_included"),
+                "{operation}"
+            );
+            assert!(
+                !serde_json::to_string(&response).unwrap().contains(&marker),
+                "rejection must not echo private payload for {operation}"
             );
         }
     }

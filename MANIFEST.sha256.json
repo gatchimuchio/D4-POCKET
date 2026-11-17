@@ -1629,7 +1629,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "f85b0aca5a04ce4fd6a00d469e86ea3b6733c813baef0dc513a0757f5154fbe8"
+      "sha256": "4b8a1a76313d0859d72ba47801dec698b6481303b860564fa9761db669ea9659"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4165,7 +4165,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/module_pruning.rs",
-      "sha256": "b4aa79fb89d8794ac0934ed0a5f29a938941fc6fc9d227ad4b0d14ef1779eb40"
+      "sha256": "726de0b090d12eb2eeb5cd0c8e332f2fb856e724b933a89e1a64c6fc06267414"
     },
     {
       "path": "native/rust_helper/src/broker/notification_center.rs",
@@ -4185,7 +4185,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "0c57d61be6f6d6b4ddd30d3534c02cf75f5d7902336f1e03e6be71c0d4429d03"
+      "sha256": "f8f0ad56ade18fb62b98a96adc2f64de586f8af027f280387acc9e666493863b"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
