@@ -230,7 +230,7 @@ class AgentTaskExecutionCoordinator {
     }
   }
 
-  Future<void> _emitSessionNotice(_TaskRun run, String message) async {
+  void _emitSessionNotice(_TaskRun run, String message) {
     if (_disposed) return;
     final update = AgentTaskExecutionUpdate(
       sessionId: run.request.sessionId,
@@ -241,7 +241,9 @@ class AgentTaskExecutionCoordinator {
     final observer = run.onUpdate;
     if (observer == null) return;
     try {
-      await observer(update);
+      unawaited(
+        Future<void>.sync(() => observer(update)).catchError((Object _) {}),
+      );
     } on Object {
       // Recovery notices are informational and never own execution progression.
     }

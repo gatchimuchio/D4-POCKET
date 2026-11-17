@@ -772,6 +772,25 @@ void main() {
     );
   });
 
+  test('未完了のRecovery通知observerはBroker取消とTask監視完了を止めない', () async {
+    final observerGate = Completer<void>();
+    final noticeObserved = Completer<void>();
+
+    final result = await _runStaleFollowup(
+      onUpdate: (update) {
+        if (update.sessionRecoveryNotice != null) {
+          if (!noticeObserved.isCompleted) noticeObserved.complete();
+          return observerGate.future;
+        }
+        return null;
+      },
+    );
+
+    expect(noticeObserved.isCompleted, isTrue);
+    expect(result.transport.operations.last, 'AgentTask取消');
+    observerGate.complete();
+  });
+
   test('通常のTask結果ではMCPやPermission/Approvalを要求しない', () async {
     final responses = _successfulResponses(resultText: 'Task完了しました。');
     responses.removeRange(2, responses.length);
@@ -1136,7 +1155,10 @@ Future<
     ({
       List<AgentTaskExecutionUpdate> updates,
       _FakeBrokerTransport transport,
-    })> _runStaleFollowup({bool cancelRequestFails = false}) async {
+    })> _runStaleFollowup({
+  bool cancelRequestFails = false,
+  AgentTaskExecutionUpdateHandler? onUpdate,
+}) async {
   final taskStartGate = Completer<void>();
   final taskStartRequested = Completer<void>();
   final responses = _successfulResponses()
@@ -1166,7 +1188,7 @@ Future<
     request: _sourceRequest,
     task: _sourceTask,
     expectedInstructionHash: _instructionHash,
-    onUpdate: updates.add,
+    onUpdate: onUpdate ?? updates.add,
   );
 
   await taskStartRequested.future.timeout(const Duration(seconds: 1));
