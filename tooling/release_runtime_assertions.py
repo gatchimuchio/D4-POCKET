@@ -20,6 +20,7 @@ class RuntimeAssertion:
     blocks_release: str
     reason: str
     required_action: str
+    readiness_status: str | None = None
 
 
 def _pass(name: str, evidence_scope: str, reason: str, required_action: str) -> RuntimeAssertion:
@@ -27,7 +28,16 @@ def _pass(name: str, evidence_scope: str, reason: str, required_action: str) -> 
 
 
 def _fail(name: str, evidence_scope: str, reason: str, required_action: str) -> RuntimeAssertion:
-    return RuntimeAssertion(name, "failed", evidence_scope, "release_blocker", "yes", reason, required_action)
+    return RuntimeAssertion(
+        name,
+        "failed",
+        evidence_scope,
+        "release_blocker",
+        "yes",
+        reason,
+        required_action,
+        "BUILD_GAP",
+    )
 
 
 def _read(relative: str) -> str:

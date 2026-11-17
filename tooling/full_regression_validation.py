@@ -166,6 +166,7 @@ def _run(command: ValidationCommand) -> dict[str, Any]:
         return {
             "command": command.display,
             "status": "unavailable",
+            "readiness_status": "NOT_RUN",
             "exit": None,
             "elapsedMillis": round((time.perf_counter() - started) * 1000, 2),
             "reason": f"必須toolが利用できない: {command.required_tool}",
@@ -184,6 +185,7 @@ def _run(command: ValidationCommand) -> dict[str, Any]:
         return {
             "command": command.display,
             "status": "timeout",
+            "readiness_status": "FAIL",
             "exit": None,
             "elapsedMillis": round((time.perf_counter() - started) * 1000, 2),
             "reason": "検証commandがbounded timeoutを超過した",
@@ -192,6 +194,7 @@ def _run(command: ValidationCommand) -> dict[str, Any]:
         return {
             "command": command.display,
             "status": "unavailable",
+            "readiness_status": "NOT_RUN",
             "exit": None,
             "elapsedMillis": round((time.perf_counter() - started) * 1000, 2),
             "reason": f"commandを起動できない: {type(error).__name__}",
@@ -199,6 +202,7 @@ def _run(command: ValidationCommand) -> dict[str, Any]:
     result = {
         "command": command.display,
         "status": "passed" if completed.returncode == 0 else "failed",
+        "readiness_status": "PASS" if completed.returncode == 0 else "FAIL",
         "exit": completed.returncode,
         "elapsedMillis": round((time.perf_counter() - started) * 1000, 2),
         "reason": "command完了。raw outputは意図的に保持しない",
@@ -241,6 +245,7 @@ def _run_report() -> dict[str, Any]:
                 "area": area.area,
                 "group": area.group,
                 "status": status,
+                "readiness_status": "PASS" if status == "passed" else ("FAIL" if status == "failed" else "NOT_RUN"),
                 "evidence": list(area.evidence),
                 "claim_scope": area.claim_scope,
                 "commands": results,
@@ -257,6 +262,7 @@ def _run_report() -> dict[str, Any]:
     return {
         "版": 1,
         "状態": state,
+        "readiness_status": "PASS" if state == "passed" else ("FAIL" if state == "failed" else "NOT_RUN"),
         "証拠範囲": sorted({source for item in matrix for source in item["evidence"]}),
         "回帰対象": [
             "Trust",

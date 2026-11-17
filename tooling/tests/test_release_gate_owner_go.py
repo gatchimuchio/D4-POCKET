@@ -37,6 +37,30 @@ class OwnerGoReleaseGateTests(unittest.TestCase):
     def test_manual_owner_go_without_evidence_result_is_valid(self) -> None:
         self.assertEqual([], self.registry_errors_for(owner_go_blocker()))
 
+    def test_unresolved_owner_go_is_reported_as_blocked_authority(self) -> None:
+        effective = release_gate_check.effective_release_blocker(owner_go_blocker(), {})
+        self.assertEqual("BLOCKED_AUTHORITY", effective["readiness_status"])
+
+    def test_source_runtime_assertion_gap_reaches_release_gate(self) -> None:
+        from tooling import release_runtime_assertions
+
+        assertion = release_runtime_assertions._fail(
+            "source_gap", "CONFIG", "source contract is absent", "implement the source"
+        )
+        with patch.object(release_runtime_assertions, "run_release_runtime_assertions", return_value=[assertion]):
+            errors = release_gate_check.release_runtime_assertion_errors()
+        self.assertEqual(["release runtime assertion [BUILD_GAP] source_gap: source contract is absent"], errors)
+
+    def test_unknown_runtime_assertion_status_is_not_ignored(self) -> None:
+        from tooling import release_runtime_assertions
+
+        assertion = release_runtime_assertions.RuntimeAssertion(
+            "unknown", "not_available", "CONFIG", "none", "no", "unknown state", "retry"
+        )
+        with patch.object(release_runtime_assertions, "run_release_runtime_assertions", return_value=[assertion]):
+            errors = release_gate_check.release_runtime_assertion_errors()
+        self.assertEqual(["release runtime assertion [NOT_RUN] unknown: unknown state"], errors)
+
     def test_windows_evidence_cannot_resolve_owner_go(self) -> None:
         blocker = owner_go_blocker()
         blocker["status_source"] = "windows_release_evidence"

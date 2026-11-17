@@ -1629,7 +1629,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "956bc82aa4fd20cb479755c32e68f946ab805a6ad68b6b48dd10c38952f45117"
+      "sha256": "785a44b0250434105747a6b50364305e1beddd84609684f467c6e1dcaa8d695a"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5697,7 +5697,7 @@
     },
     {
       "path": "tooling/audit_checkpoint_verifier.py",
-      "sha256": "272b860007e5b0405153cc1973dbb4f5c7624e7f72c2e923eff65ee8211eb3ef"
+      "sha256": "f36b4234af1b5412fc56f3fb769bb9eab437c65f1669727f54389b3d7328bed6"
     },
     {
       "path": "tooling/broker_parity/run_authority_parity.py",
@@ -5781,7 +5781,7 @@
     },
     {
       "path": "tooling/evidence_bundle.py",
-      "sha256": "de48f55521adda17ff16f729037c6944f247d12478a43080e4ba059a2e27244d"
+      "sha256": "07bdf2ef1382f11b1d039d85af2180f732d81a13a2213ada3dda3a412124c6dd"
     },
     {
       "path": "tooling/export_linux_product.py",
@@ -5809,7 +5809,7 @@
     },
     {
       "path": "tooling/full_regression_validation.py",
-      "sha256": "347f088559b348fd15c1c63ef46531fc65ce5e5a6e082469da965525b2939045"
+      "sha256": "9fbcb97e9d8484def24872d89ae8dd4e278993f778585eb1aedb1d06a4730462"
     },
     {
       "path": "tooling/ios_native_device_link_check.py",
@@ -5897,11 +5897,11 @@
     },
     {
       "path": "tooling/release_gate_check.py",
-      "sha256": "62c162599d5d920f87e5f0de4c04a9f517fd4c6aeb5e0ad78d59085066fcbfcc"
+      "sha256": "5a7fa09365f30725400bee7cc5dda4bf1badd490f16e0bac20a68e3c9d4990d3"
     },
     {
       "path": "tooling/release_runtime_assertions.py",
-      "sha256": "c6429774e98b4e99b1da4e59ffe15c4628e02187a9b80ff19089ea42e41e0601"
+      "sha256": "4679f361e103a1cd265aea53dae3a868b5560d0ad628d27a10c99e87486ec439"
     },
     {
       "path": "tooling/release_smoke.py",
@@ -6032,6 +6032,10 @@
       "sha256": "79271b6dbd91c629ec95d51f5e465dc2ff329bc54e13ebac708754a1448a332f"
     },
     {
+      "path": "tooling/tests/test_release_gate_owner_go.py",
+      "sha256": "c5e7879d362b42b3856bf3626543594e6e33213f0bcc3d69d4109164c84469eb"
+    },
+    {
       "path": "tooling/tests/test_windows_bootstrap_setup.py",
       "sha256": "64185fd3b63ce29c926ed9252b1ee8222d0d84ab0da944f7b730306d431aed54"
     },
@@ -6053,7 +6057,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "a620f2c247b4444c59d54f8a80c509b7953b691862ca3eab58553f9af42fbfec"
+      "sha256": "34145af6b2e92b8886501ae2bd1126b97ccb0b2faf2bab234ef6f8d7336a64be"
     },
     {
       "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",

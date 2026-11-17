@@ -8,14 +8,23 @@ import hashlib
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class CheckpointVerificationFailure(ValueError):
+    def __init__(self, readiness_status: str, message: str) -> None:
+        super().__init__(message)
+        self.readiness_status = readiness_status
+
+
 def verify_collected(evidence: dict) -> dict:
     inputs = evidence.get("checkpoint_inputs")
     if not isinstance(inputs, dict):
-        raise ValueError("署名checkpointの実検証入力がない")
+        raise CheckpointVerificationFailure("NOT_RUN", "署名checkpointの実検証入力がない")
     # 継続性記録は証拠束の自己申告から採用しない。ownerが別に指定する。
     floor = os.environ.get("GUI_SHELL_AUDIT_TRUSTED_HEAD")
     if not floor:
-        raise ValueError("owner管理のGUI_SHELL_AUDIT_TRUSTED_HEADが未指定")
+        raise CheckpointVerificationFailure(
+            "BLOCKED_AUTHORITY",
+            "owner管理のGUI_SHELL_AUDIT_TRUSTED_HEADが未指定",
+        )
     root = Path(inputs["installed_root"]).resolve(strict=True)
     store = Path(inputs["audit_dir"]).resolve(strict=True)
     if not store.is_relative_to(root):

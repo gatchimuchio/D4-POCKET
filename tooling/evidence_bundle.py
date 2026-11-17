@@ -17,6 +17,9 @@ from tooling.windows_release_evidence import validate_windows_release_evidence
 
 
 DEFAULT_BUNDLE_PATH = ROOT / "release_evidence" / "evidence_bundle.json"
+RELEASE_READINESS_STATUSES = frozenset(
+    {"BUILD_GAP", "NOT_RUN", "QA_NOT_ESTABLISHED", "BLOCKED_AUTHORITY"}
+)
 
 
 def build_evidence_bundle() -> dict:
@@ -31,6 +34,7 @@ def build_evidence_bundle() -> dict:
             "status": result.status,
             "classification": result.classification,
             "blocks_release": result.blocks_release == "yes",
+            "readiness_status": result.readiness_status,
             "reason": result.reason,
             "required_action": result.required_action,
         }
@@ -91,13 +95,23 @@ def validate_evidence_bundle(bundle: dict) -> list[str]:
         if not isinstance(blocker, dict):
             errors.append(f"evidence bundle blocker {index}がobjectではない")
             continue
-        for key in ["name", "status", "classification", "blocks_release", "reason", "required_action"]:
+        for key in [
+            "name",
+            "status",
+            "classification",
+            "blocks_release",
+            "readiness_status",
+            "reason",
+            "required_action",
+        ]:
             if key not in blocker:
                 errors.append(f"evidence bundle blocker {index}に{key}がない")
         if blocker.get("classification") != "release_blocker":
             errors.append(f"evidence bundle blocker {index}がrelease_blockerではない")
         if blocker.get("blocks_release") is not True:
             errors.append(f"evidence bundle blocker {index}はreleaseを阻止しなければならない")
+        if blocker.get("readiness_status") not in RELEASE_READINESS_STATUSES:
+            errors.append(f"evidence bundle blocker {index}のreadiness_statusはv8の状態分類ではない")
     return errors
 
 

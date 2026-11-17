@@ -86,14 +86,20 @@ class EvidenceResult:
     blocks_release: str
     reason: str
     required_action: str
+    readiness_status: str | None = None
 
 
-def _failed(name: str, reason: str, required_action: str) -> EvidenceResult:
-    return EvidenceResult(name, "failed", "release_blocker", "yes", reason, required_action)
+def _failed(
+    name: str,
+    reason: str,
+    required_action: str,
+    readiness_status: str = "QA_NOT_ESTABLISHED",
+) -> EvidenceResult:
+    return EvidenceResult(name, "failed", "release_blocker", "yes", reason, required_action, readiness_status)
 
 
 def _passed(name: str, reason: str, required_action: str) -> EvidenceResult:
-    return EvidenceResult(name, "passed", "none", "no", reason, required_action)
+    return EvidenceResult(name, "passed", "none", "no", reason, required_action, "PASS")
 
 
 def _get(data: dict[str, Any], dotted: str) -> Any:
@@ -1219,6 +1225,7 @@ def _validate_setup_doctor_operator_readability(data: dict[str, Any], setup: dic
 
 def validate_audit_anchor_external_tamper_evidence(data: dict[str, Any]) -> EvidenceResult:
     errors: list[str] = []
+    readiness_status = "QA_NOT_ESTABLISHED"
     provenance = data.get("provenance")
     if not isinstance(provenance, dict):
         errors.append("audit anchor evidence の provenance object がない")
@@ -1241,12 +1248,14 @@ def validate_audit_anchor_external_tamper_evidence(data: dict[str, Any]) -> Evid
     evidence = data.get("audit_anchor_external_tamper_evidence")
     if not isinstance(evidence, dict):
         errors.append("audit_anchor_external_tamper_evidence object がない")
+        readiness_status = "NOT_RUN"
     else:
         try:
             from tooling.audit_checkpoint_verifier import verify_collected
             verify_collected(evidence)
         except (ValueError, OSError, KeyError, TypeError, subprocess.SubprocessError) as error:
             errors.append("署名checkpointの独立した実検証が失敗: " + str(error))
+            readiness_status = getattr(error, "readiness_status", readiness_status)
         if evidence.get("status") != "passed":
             errors.append("audit_anchor_external_tamper_evidence.status は passed でなければならない")
         if evidence.get("installed_path_verified") is not True:
@@ -1293,6 +1302,7 @@ def validate_audit_anchor_external_tamper_evidence(data: dict[str, Any]) -> Evid
             "audit_anchor_external_tamper_evidence_proof",
             "; ".join(errors),
             "ownerの公開鍵fingerprintと外部継続性記録を固定し、現在installed状態に結合したオフライン署名checkpointを収集・再検証する。",
+            readiness_status,
         )
     return _passed(
         "audit_anchor_external_tamper_evidence_proof",
@@ -1304,31 +1314,37 @@ def validate_audit_anchor_external_tamper_evidence(data: dict[str, Any]) -> Evid
 def validate_windows_release_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> list[EvidenceResult]:
     data, error = load_evidence(path)
     if data is None:
+        readiness_status = "NOT_RUN" if not path.exists() else "QA_NOT_ESTABLISHED"
         return [
             _failed(
                 "windows_evidence_provenance_isolation",
                 error or "Windows installed smoke evidence がない",
                 "正確な source commit と artifact hash に結び付いた分離済み native Windows run から release_evidence/windows_installed_smoke.json を作成する。",
+                readiness_status,
             ),
             _failed(
                 "windows_installer_first_run_smoke",
                 error or "Windows installed smoke evidence がない",
                 "broker を介した Flutter .exe 起動、-NoPythonRuntime 起動、測定済み window、visible-surface、config、audit probe evidence を含む native Windows installed-app smoke から release_evidence/windows_installed_smoke.json を作成する。",
+                readiness_status,
             ),
             _failed(
                 "windows_setup_doctor_smoke",
                 error or "Windows Setup Doctor evidence がない",
                 "Windows の native installed smoke を実行し、installed app に機械可読な Setup Doctor の product evidence を書き出させる。外部 collector probe の出力は product evidence として受理しない。",
+                readiness_status,
             ),
             _failed(
                 "windows_broker_installed_smoke",
                 error or "Windows broker の installed smoke evidence がない",
                 "installer/windows/collect_broker_smoke.ps1 を実行し、broker evidence を release_evidence/windows_installed_smoke.json に含める。",
+                readiness_status,
             ),
             _failed(
                 "audit_anchor_external_tamper_evidence_proof",
                 error or "Audit anchor の external tamper-evidence proof がない",
                 "ownerの公開鍵fingerprintと外部継続性記録を固定し、現在installed状態に結合したオフライン署名checkpointを収集・再検証する。",
+                readiness_status,
             ),
         ]
     return [

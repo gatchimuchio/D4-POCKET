@@ -175,6 +175,20 @@ def manifest_check_errors() -> list[str]:
     return [f"manifest checkが失敗: {line}" for line in output.splitlines()]
 
 
+def release_runtime_assertion_errors() -> list[str]:
+    from tooling.release_runtime_assertions import run_release_runtime_assertions
+
+    errors: list[str] = []
+    for assertion in run_release_runtime_assertions():
+        if assertion.status == "passed":
+            continue
+        state = assertion.readiness_status
+        if state not in {"BUILD_GAP", "NOT_RUN", "QA_NOT_ESTABLISHED", "BLOCKED_AUTHORITY"}:
+            state = "BUILD_GAP" if assertion.status == "failed" else "NOT_RUN"
+        errors.append(f"release runtime assertion [{state}] {assertion.name}: {assertion.reason}")
+    return errors
+
+
 def blocker_cause_category_errors(blocker: dict) -> list[str]:
     name = blocker.get("name", "unknown")
     category = blocker.get("cause_category")
@@ -357,13 +371,20 @@ def effective_release_blocker(blocker: dict, windows_results: dict[str, object])
     effective = dict(blocker)
     if blocker.get("name") == "owner_go":
         effective["effective_status_source"] = "manual"
+        effective["readiness_status"] = "PASS" if blocker.get("status") == "resolved" else "BLOCKED_AUTHORITY"
         if blocker.get("status_source") != "manual" or blocker.get("evidence_result") is not None:
             effective["status"] = "unresolved"
+            effective["readiness_status"] = "BLOCKED_AUTHORITY"
             effective["reason"] = "Owner本人の明示Release GOが必要です。Windows evidenceでは解決できません。"
             effective["required_action"] = "Owner本人の明示Release GOをmanual statusで記録してください。"
         return effective
     if blocker.get("status_source") != WINDOWS_EVIDENCE_STATUS_SOURCE:
         effective["effective_status_source"] = blocker.get("status_source", "manual")
+        if blocker.get("status") == "unresolved":
+            if blocker.get("cause_category") in {"owner_decision", "production_secret", "distribution_identity"}:
+                effective["readiness_status"] = "BLOCKED_AUTHORITY"
+            elif blocker.get("cause_category") == "platform_evidence":
+                effective["readiness_status"] = "QA_NOT_ESTABLISHED"
         return effective
 
     evidence_result_name = str(blocker.get("evidence_result") or blocker.get("name") or "")
@@ -371,17 +392,23 @@ def effective_release_blocker(blocker: dict, windows_results: dict[str, object])
     effective["effective_status_source"] = WINDOWS_EVIDENCE_STATUS_SOURCE
     if result is None:
         effective["status"] = "unresolved"
+        effective["readiness_status"] = "NOT_RUN"
         effective["reason"] = f"Windows evidence resultがない: {evidence_result_name}"
         effective["required_action"] = "tooling/windows_release_evidence.pyを実行し、registryのevidence_result nameを同期させる。"
         return effective
 
     if getattr(result, "status", "") == "passed" and getattr(result, "classification", "") != "release_blocker":
         effective["status"] = "resolved"
+        effective["readiness_status"] = "PASS"
         effective["reason"] = f"Windows evidenceにより解決: {getattr(result, 'reason', '')}"
         effective["required_action"] = getattr(result, "required_action", "")
         return effective
 
     effective["status"] = "unresolved"
+    readiness_status = getattr(result, "readiness_status", None)
+    if readiness_status not in {"BUILD_GAP", "NOT_RUN", "QA_NOT_ESTABLISHED", "BLOCKED_AUTHORITY"}:
+        readiness_status = "NOT_RUN" if getattr(result, "status", "") == "unavailable" else "QA_NOT_ESTABLISHED"
+    effective["readiness_status"] = readiness_status
     effective["reason"] = getattr(result, "reason", "")
     effective["required_action"] = getattr(result, "required_action", "")
     return effective
@@ -595,6 +622,7 @@ def main() -> int:
             combined += "\n" + path.read_text(encoding="utf-8")
         errors.extend(scan_file(path))
 
+    errors.extend(release_runtime_assertion_errors())
     registry_validation_errors = registry_errors()
     errors.extend(registry_validation_errors)
     if args.strict_release:
@@ -608,16 +636,20 @@ def main() -> int:
         errors.extend(release_blocker_doc_sync_errors())
     if args.technical_complete and not registry_validation_errors:
         for blocker in unresolved_windows_technical_complete_blockers():
+            readiness_status = blocker.get("readiness_status")
+            state_prefix = f"[{readiness_status}] " if readiness_status else ""
             errors.append(
                 "Windows Technical Completeのblockerが未解決: "
-                f"{blocker['name']} - {blocker['reason']}"
+                f"{state_prefix}{blocker['name']} - {blocker['reason']}"
             )
     elif args.strict_release and not registry_validation_errors:
         track = None if args.release_track == "all" else args.release_track
         for blocker in unresolved_active_blockers(track):
+            readiness_status = blocker.get("readiness_status")
+            state_prefix = f"[{readiness_status}] " if readiness_status else ""
             errors.append(
                 "strict releaseのactive blockerが未解決: "
-                f"{blocker['name']} - {blocker['reason']}"
+                f"{state_prefix}{blocker['name']} - {blocker['reason']}"
             )
     if release_claim_exists_without_classification(combined):
         errors.append("release_blockerが存在するのにrelease claimがある")
