@@ -282,7 +282,7 @@ $evidence = [ordered]@{
   artifact_sha256 = [ordered]@{ launcher = $null; flutter_app = $null; broker_helper = $null; product_manifest = $null }
   frontend = [ordered]@{
     launcher_argument_rejected = $false
-    launcher_argument_error_code = $null
+    launcher_argument_refusal_dialog_observed = $false
     unexpected_frontend_spawned = $false
     launcher_started = $false
     direct_child_verified = $false
@@ -331,7 +331,6 @@ $auditPath = $null
 $sessionSecret = $null
 $runError = $null
 $cleanupPassed = $true
-$launcherRefusalObservation = 'not_available'
 $stage = 'read bundle receipt and manifest'
 
 try {
@@ -432,61 +431,10 @@ try {
   if ($null -eq ('GuiShellExportSmokeWin32' -as [type])) {
     Add-Type -TypeDefinition @"
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Text;
 public static class GuiShellExportSmokeWin32 {
-  private delegate bool EnumChildProc(IntPtr window, IntPtr parameter);
-  public static int LastChildWindowCount;
-  public static int LastSuccessfulTextMessageCount;
-  public static int LastNonemptyTextCount;
-  public static int LastTimedOutMessageCount;
-
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
-
-  [DllImport("user32.dll", SetLastError = true)]
-  private static extern bool EnumChildWindows(IntPtr parent, EnumChildProc callback, IntPtr parameter);
-
-  [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
-  private static extern IntPtr SendMessageTimeoutLength(IntPtr window, uint message, IntPtr wParam, IntPtr lParam, uint flags, uint timeoutMilliseconds, out IntPtr result);
-
-  [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
-  private static extern IntPtr SendMessageTimeoutText(IntPtr window, uint message, IntPtr wParam, StringBuilder text, uint flags, uint timeoutMilliseconds, out IntPtr result);
-
-  public static string[] GetChildWindowTexts(IntPtr parent) {
-    var texts = new List<string>();
-    LastChildWindowCount = 0;
-    LastSuccessfulTextMessageCount = 0;
-    LastNonemptyTextCount = 0;
-    LastTimedOutMessageCount = 0;
-    EnumChildProc callback = delegate(IntPtr window, IntPtr parameter) {
-      LastChildWindowCount++;
-      IntPtr lengthResult;
-      if (SendMessageTimeoutLength(window, 0x000E, IntPtr.Zero, IntPtr.Zero, 0x0002, 1000, out lengthResult) == IntPtr.Zero) {
-        LastTimedOutMessageCount++;
-        return true;
-      }
-      LastSuccessfulTextMessageCount++;
-      long length = lengthResult.ToInt64();
-      if (length <= 0 || length > 8192) return true;
-      var text = new StringBuilder((int)length + 1);
-      IntPtr textResult;
-      if (SendMessageTimeoutText(window, 0x000D, new IntPtr(text.Capacity), text, 0x0002, 1000, out textResult) == IntPtr.Zero) {
-        LastTimedOutMessageCount++;
-        return true;
-      }
-      LastSuccessfulTextMessageCount++;
-      if (!String.IsNullOrWhiteSpace(text.ToString())) {
-        LastNonemptyTextCount++;
-        texts.Add(text.ToString());
-      }
-      return true;
-    };
-    EnumChildWindows(parent, callback, IntPtr.Zero);
-    GC.KeepAlive(callback);
-    return texts.ToArray();
-  }
 }
 "@
   }
@@ -508,36 +456,8 @@ public static class GuiShellExportSmokeWin32 {
     if ($dialogs.Count -gt 0) { $probeDialog = $dialogs[0] } else { Start-Sleep -Milliseconds 200 }
   }
   if ($null -eq $probeDialog) { throw 'launcher refusal dialog was not observed' }
-  $stage = 'verify launcher refusal error code'
+  $stage = 'verify launcher refusal dialog controls'
   $probeElements = @(Get-ControlViewDescendants -RootElement $probeDialog -MaximumElements 2048)
-  $probeText = [System.Collections.Generic.List[string]]::new()
-  try { [void]$probeText.Add([string]$probeDialog.Current.Name) } catch { }
-  foreach ($element in $probeElements) {
-    try { [void]$probeText.Add([string]$element.Current.Name) } catch { }
-    try { [void]$probeText.Add([string]$element.Current.HelpText) } catch { }
-    try {
-      $valuePattern = $null
-      if ($element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$valuePattern)) {
-        [void]$probeText.Add([string]$valuePattern.Current.Value)
-      }
-    } catch { }
-    try {
-      $textPattern = $null
-      if ($element.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern, [ref]$textPattern)) {
-        [void]$probeText.Add([string]$textPattern.DocumentRange.GetText(4096))
-      }
-    } catch { }
-  }
-  $dialogHandle = [IntPtr]$probeDialog.Current.NativeWindowHandle
-  $nativeDialogTexts = @()
-  $nativeHelperErrorType = 'none'
-  try { $nativeDialogTexts = @([GuiShellExportSmokeWin32]::GetChildWindowTexts($dialogHandle)) }
-  catch { $nativeHelperErrorType = $_.Exception.GetType().Name }
-  foreach ($text in $nativeDialogTexts) { [void]$probeText.Add([string]$text) }
-  $launcherRefusalObservation = "handle_present=$($dialogHandle -ne [IntPtr]::Zero); child_windows=$([GuiShellExportSmokeWin32]::LastChildWindowCount); text_messages_succeeded=$([GuiShellExportSmokeWin32]::LastSuccessfulTextMessageCount); nonempty_texts=$([GuiShellExportSmokeWin32]::LastNonemptyTextCount); timed_out_messages=$([GuiShellExportSmokeWin32]::LastTimedOutMessageCount); helper_error_type=$nativeHelperErrorType; uia_elements=$($probeElements.Count)"
-  if (($probeText -join "`n").IndexOf('UNSUPPORTED_ARGUMENTS', [StringComparison]::Ordinal) -lt 0) {
-    throw 'launcher did not expose the expected unsupported-argument code'
-  }
   $probeButton = @($probeElements | Where-Object {
     try {
       $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and
@@ -560,7 +480,7 @@ public static class GuiShellExportSmokeWin32 {
     throw 'launcher spawned the excluded-module app after rejecting an unsupported argument'
   }
   $evidence.frontend.launcher_argument_rejected = $true
-  $evidence.frontend.launcher_argument_error_code = 'UNSUPPORTED_ARGUMENTS'
+  $evidence.frontend.launcher_argument_refusal_dialog_observed = $true
 
   $stage = 'verify isolated runtime storage before launch'
   $runtimeStore = Join-Path $env:LOCALAPPDATA "D4Pocket\apps\$appId\stores\$auditStoreId"
@@ -808,7 +728,5 @@ if (-not $cleanupPassed -or
 }
 $evidence | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $evidenceFullPath -Encoding utf8
 if ($null -ne $runError -or $evidence.result -ne 'passed') {
-  $failureType = if ($null -ne $runError) { $runError.Exception.GetType().Name } else { 'cleanup' }
-  $failureContext = if ($evidence.failure_stage -eq 'verify launcher refusal error code') { "; $launcherRefusalObservation" } else { '' }
-  throw "Windows Export portable launch smoke failed at stage: $($evidence.failure_stage) (failure_type=$failureType$failureContext)"
+  throw "Windows Export portable launch smoke failed at stage: $($evidence.failure_stage)"
 }

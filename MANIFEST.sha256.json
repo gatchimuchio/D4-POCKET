@@ -4237,7 +4237,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "1a51649fdd45d4b210dd623cf5cf00c792b08cee92efb16f6aa1979f82a6571e"
+      "sha256": "2be508714c23cb6fbe278df419980bf30e25ed7f0e131900e92d72c6dbf4adbf"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -6049,7 +6049,7 @@
     },
     {
       "path": "tooling/tests/windows_export_portable_launch_smoke.ps1",
-      "sha256": "93249ae17fae23608827622a0fcdc671fafdff43ada074c244bea5d802245e50"
+      "sha256": "d2b14748acc41bc921f8633233f3a93322d7d155b041a3d0128a556bba226150"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",

@@ -4508,6 +4508,20 @@ mod tests {
         }
     }
 
+    #[test]
+    fn launcher_error_dialog_includes_error_code_and_recovery_guidance() {
+        let error = DesktopLaunchError::new(
+            "UNSUPPORTED_ARGUMENTS",
+            "この起動方法では追加のcommandやpathを指定できません。",
+        );
+
+        let text = error.dialog_text();
+
+        assert!(text.contains("この起動方法では追加のcommandやpathを指定できません。"));
+        assert!(text.contains("エラーコード: UNSUPPORTED_ARGUMENTS"));
+        assert!(text.contains("D4 Pocketを終了して再起動してください。"));
+    }
+
     #[cfg(windows)]
     fn automate_native_owner_confirmation(
         summary: &DesktopOwnerOperationSummary,
