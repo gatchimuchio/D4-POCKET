@@ -4077,7 +4077,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/compose_center.rs",
-      "sha256": "3b910b417d5029f54d757c1470a0ffea892f2a54c9aa41f00f86f4e09f4c526a"
+      "sha256": "db5cac5acd27e89c4b0a5aaa379e188fb734001a6a1328f67823be0b3c33fd95"
     },
     {
       "path": "native/rust_helper/src/broker/content_access.rs",

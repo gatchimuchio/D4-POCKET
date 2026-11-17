@@ -78,6 +78,30 @@ fn latest_host_switch_generation(broker: &Broker) -> String {
         .unwrap_or_else(|| crate::audit_hash::sha256_tagged(b"host-context:no-switch"))
 }
 
+#[cfg(feature = "module_host_capabilities")]
+fn local_host_catalog_snapshot() -> Value {
+    super::host_capability::current()
+}
+
+#[cfg(not(feature = "module_host_capabilities"))]
+fn local_host_catalog_snapshot() -> Value {
+    let platform = match std::env::consts::OS {
+        "windows" => "windows",
+        "macos" => "macos",
+        "linux" => "linux",
+        "android" => "android",
+        "ios" => "ios",
+        _ => "unknown",
+    };
+    json!({
+        "ホストID": format!("gui-shell-local-{platform}"),
+        "表示名": format!("ローカル {platform}"),
+        "プラットフォーム": platform,
+        "状態": "unknown",
+        "能力": [],
+    })
+}
+
 /// Manifest選択候補の現在metadataを一度だけ正規化する。
 /// capability宣言、接続、Host metadataはいずれもPermissionや実行Authorityを発行しない。
 fn catalog_snapshot(broker: &mut Broker) -> Result<Value, String> {
@@ -210,7 +234,7 @@ fn catalog_snapshot(broker: &mut Broker) -> Result<Value, String> {
         }
     }
 
-    let current_host = super::host_capability::current();
+    let current_host = local_host_catalog_snapshot();
     let local_host = json!({
         "host_id": current_host.get("ホストID").cloned().unwrap_or(Value::Null),
         "display_name": current_host.get("表示名").cloned().unwrap_or(Value::Null),
@@ -1267,6 +1291,35 @@ mod tests {
             call_catalog(&mut broker, json!({"owner": true})).status,
             BrokerStatus::Rejected
         );
+    }
+
+    #[cfg(not(feature = "module_host_capabilities"))]
+    #[test]
+    fn ComposeCatalogはHost能力Module除外時も能力を推測せずLocalHostを投影する() {
+        let mut broker = Broker::new("session-1");
+        let response = call_catalog(&mut broker, json!({}));
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        let body = response.body.expect("Catalog body");
+        let platform = match std::env::consts::OS {
+            "windows" => "windows",
+            "macos" => "macos",
+            "linux" => "linux",
+            "android" => "android",
+            "ios" => "ios",
+            _ => "unknown",
+        };
+        assert_eq!(
+            body["hosts"][0]["host_id"],
+            format!("gui-shell-local-{platform}")
+        );
+        assert_eq!(
+            body["hosts"][0]["display_name"],
+            format!("ローカル {platform}")
+        );
+        assert_eq!(body["hosts"][0]["status"], "unknown");
+        assert_eq!(body["hosts"][0]["scope"]["capabilities"], json!([]));
+        assert_eq!(body["hosts"][0]["permissions"]["status"], "not_granted");
+        assert_eq!(body["hosts"][0]["authority_strip"], true);
     }
 
     #[test]
