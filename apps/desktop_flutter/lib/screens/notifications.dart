@@ -26,6 +26,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _unreadOnly = false;
   String? _message;
   int _clientGeneration = 0;
+  int _pendingMutationCount = 0;
+
+  static const _unknownMutationAfterBrokerSwitch =
+      'Broker接続先が切り替わったため、切替前の通知更新の反映結果は不明です。自動再送していません。必要なら現在のBrokerの通知一覧を更新してください。';
 
   @override
   void initState() {
@@ -49,11 +53,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
 
+    final hadPendingMutation = _pendingMutationCount > 0;
     _clientGeneration++;
     _notificationClient = _clientFor(widget.client);
     _notificationsFuture = null;
     _unreadOnly = false;
-    _message = null;
+    _message = hadPendingMutation ? _unknownMutationAfterBrokerSwitch : null;
     _refresh();
   }
 
@@ -66,10 +71,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _notificationsFuture = client.list(unreadOnly: _unreadOnly);
   }
 
-  Future<void> _run(Future<Map<String, Object?>> operation) async {
+  Future<void> _run(
+    NotificationClient client,
+    Future<Map<String, Object?>> Function() operation,
+  ) async {
+    if (!identical(client, _notificationClient)) return;
     final generation = _clientGeneration;
+    _pendingMutationCount++;
     try {
-      await operation;
+      await operation();
       if (!mounted || generation != _clientGeneration) return;
       setState(() {
         _message = '通知の表示状態を更新しました。';
@@ -80,6 +90,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       setState(() {
         _message = '通知の状態を更新できません。Broker接続と通知状態を確認してください。';
       });
+    } finally {
+      _pendingMutationCount--;
     }
   }
 
@@ -151,7 +163,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 }),
               ),
               FilledButton.tonal(
-                onPressed: () => _run(client.markAllRead()),
+                onPressed: () => _run(client, client.markAllRead),
                 child: const Text('全て既読'),
               ),
               OutlinedButton(
@@ -222,7 +234,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 if (unread)
                   TextButton(
                     onPressed: () => _run(
-                      client.markRead(
+                      client,
+                      () => client.markRead(
                         notificationId: id,
                         notificationHash: notificationHash,
                       ),
@@ -231,7 +244,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
                 TextButton(
                   onPressed: () => _run(
-                    client.dismiss(
+                    client,
+                    () => client.dismiss(
                       notificationId: id,
                       notificationHash: notificationHash,
                     ),

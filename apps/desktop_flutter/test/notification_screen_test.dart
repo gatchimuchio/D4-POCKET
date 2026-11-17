@@ -90,6 +90,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('通知 B'), findsOneWidget);
     expect(find.text('通知 A'), findsNothing);
+    expect(
+      find.text(
+        'Broker接続先が切り替わったため、切替前の通知更新の反映結果は不明です。自動再送していません。必要なら現在のBrokerの通知一覧を更新してください。',
+      ),
+      findsOneWidget,
+    );
 
     first.gates['通知全既読']!.complete();
     first.gates['通知一覧']!.complete();
@@ -97,6 +103,12 @@ void main() {
     expect(find.text('通知 B'), findsOneWidget);
     expect(find.text('通知 A'), findsNothing);
     expect(find.text('通知の表示状態を更新しました。'), findsNothing);
+    expect(
+      find.text(
+        'Broker接続先が切り替わったため、切替前の通知更新の反映結果は不明です。自動再送していません。必要なら現在のBrokerの通知一覧を更新してください。',
+      ),
+      findsOneWidget,
+    );
     expect(second.operations, ['通知一覧']);
     await tester.pumpWidget(const SizedBox());
   });
