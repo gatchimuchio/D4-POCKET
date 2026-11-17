@@ -11803,6 +11803,12 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         "$evidence.frontend.tray_exit_callback_posted = [bool]$trayExit.callback_posted",
         "$evidence.frontend.tray_exit_item_observed = [bool]$trayExit.exit_item_observed",
         "$evidence.frontend.tray_exit_item_invoked = [bool]$trayExit.exit_item_invoked",
+        "$evidence.frontend.tray_popup_window_observed = [bool]$trayExit.popup_window_observed",
+        "$evidence.frontend.tray_keyboard_fallback_sent = [bool]$trayExit.keyboard_fallback_sent",
+        "GetOwnedTrayPopup(IntPtr ownerWindow)",
+        'GetWindowClassName(candidate) == "#32768"',
+        "GetWindow(candidate, kWindowOwner) == ownerWindow",
+        "SendEndEnterToOwnedTrayPopup",
         "$evidence.frontend.graceful_exit_attempted = $true",
         "$evidence.broker.audit_validation.file_observed = $true",
         "$evidence.broker.audit_validation.excluded_event_id_bound = $auditText.Contains(",
@@ -11816,11 +11822,21 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         "if: always() && steps.portable_export_build.outcome != 'success'",
         "EXPORT_BUILD_OUTCOME: ${{ steps.portable_export_build.outcome }}",
         "Exit/cleanup: tray attempted",
+        "popup observed",
         "Audit validation: file observed",
         "Summary omits request payloads, private markers, session secrets, and raw exception text.",
     ):
         if token not in smoke_source + export_workflow:
             errors.append(f"Windows Export smokeの失敗証拠／UIA独立検査規則が欠けている: {token}")
+    tray_source = (
+        ROOT / "apps" / "desktop_flutter" / "windows" / "runner" / "tray_controller.cpp"
+    ).read_text(encoding="utf-8")
+    exit_item = tray_source.find("AppendMenuW(menu, MF_STRING, kTrayExitCommand")
+    next_menu_item = tray_source.find("AppendMenuW(menu", exit_item + 1) if exit_item >= 0 else -1
+    if exit_item < 0 or next_menu_item >= 0:
+        errors.append(
+            "Windows trayの終了項目が最終menu entryではなく、End key fallbackを安全に限定できない"
+        )
     launcher_source = (
         ROOT / "native" / "rust_helper" / "src" / "desktop_launcher.rs"
     ).read_text(encoding="utf-8")

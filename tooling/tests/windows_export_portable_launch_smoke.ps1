@@ -164,6 +164,9 @@ function Request-FrontendExit {
     callback_posted = $false
     exit_item_observed = $false
     exit_item_invoked = $false
+    popup_window_observed = $false
+    keyboard_fallback_attempted = $false
+    keyboard_fallback_sent = $false
   }
   $Frontend.Refresh()
   if ($Frontend.HasExited -or $Frontend.MainWindowHandle -eq [IntPtr]::Zero) {
@@ -226,6 +229,14 @@ function Request-FrontendExit {
       }
     }
     Start-Sleep -Milliseconds 200
+  }
+  $popupWindow = [GuiShellExportSmokeWin32]::GetOwnedTrayPopup($Frontend.MainWindowHandle)
+  if ($popupWindow -ne [IntPtr]::Zero) {
+    $result.popup_window_observed = $true
+    $result.keyboard_fallback_attempted = $true
+    $result.keyboard_fallback_sent = [GuiShellExportSmokeWin32]::SendEndEnterToOwnedTrayPopup(
+      $Frontend.MainWindowHandle
+    )
   }
   return [pscustomobject]$result
 }
@@ -306,6 +317,9 @@ $evidence = [ordered]@{
     tray_exit_callback_posted = $false
     tray_exit_item_observed = $false
     tray_exit_item_invoked = $false
+    tray_popup_window_observed = $false
+    tray_keyboard_fallback_attempted = $false
+    tray_keyboard_fallback_sent = $false
     graceful_exit_attempted = $false
     graceful_exit = $false
     forced_exit = $false
@@ -462,6 +476,50 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class GuiShellExportSmokeWin32 {
+  private const uint kWindowOwner = 4;
+  private const uint kKeyboardInput = 1;
+  private const uint kKeyUp = 2;
+
+  private delegate bool EnumThreadWindowsCallback(IntPtr window, IntPtr parameter);
+
+  [StructLayout(LayoutKind.Sequential)]
+  private struct KeyboardInput {
+    public ushort virtualKey;
+    public ushort scanCode;
+    public uint flags;
+    public uint time;
+    public IntPtr extraInfo;
+  }
+
+  [StructLayout(LayoutKind.Explicit, Size = 32)]
+  private struct InputUnion {
+    [FieldOffset(0)] public KeyboardInput keyboard;
+  }
+
+  [StructLayout(LayoutKind.Sequential)]
+  private struct Input {
+    public uint type;
+    public InputUnion data;
+  }
+
+  [DllImport("user32.dll", SetLastError = true)]
+  private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+  [DllImport("user32.dll", SetLastError = true)]
+  private static extern bool EnumThreadWindows(uint threadId, EnumThreadWindowsCallback callback, IntPtr parameter);
+
+  [DllImport("user32.dll")]
+  private static extern IntPtr GetWindow(IntPtr window, uint command);
+
+  [DllImport("user32.dll")]
+  private static extern bool IsWindowVisible(IntPtr window);
+
+  [DllImport("user32.dll")]
+  private static extern IntPtr GetForegroundWindow();
+
+  [DllImport("user32.dll", SetLastError = true)]
+  private static extern uint SendInput(uint inputCount, Input[] inputs, int inputSize);
+
   [DllImport("user32.dll", EntryPoint = "GetClassNameW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
   private static extern int GetClassNameW(IntPtr window, StringBuilder className, int maximumCount);
 
@@ -473,6 +531,56 @@ public static class GuiShellExportSmokeWin32 {
 
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
+  public static IntPtr GetOwnedTrayPopup(IntPtr ownerWindow) {
+    if (ownerWindow == IntPtr.Zero) return IntPtr.Zero;
+    uint ownerProcessId;
+    uint ownerThreadId = GetWindowThreadProcessId(ownerWindow, out ownerProcessId);
+    if (ownerThreadId == 0 || ownerProcessId == 0) return IntPtr.Zero;
+    IntPtr result = IntPtr.Zero;
+    EnumThreadWindowsCallback callback = (candidate, parameter) => {
+      uint candidateProcessId;
+      GetWindowThreadProcessId(candidate, out candidateProcessId);
+      if (candidateProcessId == ownerProcessId &&
+          IsWindowVisible(candidate) &&
+          GetWindowClassName(candidate) == "#32768" &&
+          GetWindow(candidate, kWindowOwner) == ownerWindow) {
+        result = candidate;
+        return false;
+      }
+      return true;
+    };
+    EnumThreadWindows(ownerThreadId, callback, IntPtr.Zero);
+    return result;
+  }
+
+  public static bool SendEndEnterToOwnedTrayPopup(IntPtr ownerWindow) {
+    // Keyboard input is limited to the visible #32768 popup owned by the exact frontend HWND.
+    IntPtr popup = GetOwnedTrayPopup(ownerWindow);
+    if (popup == IntPtr.Zero) return false;
+    IntPtr foreground = GetForegroundWindow();
+    if (foreground != popup && foreground != ownerWindow) return false;
+    Input[] inputs = new Input[] {
+      KeyInput(0x23, false), KeyInput(0x23, true),
+      KeyInput(0x0D, false), KeyInput(0x0D, true)
+    };
+    return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(Input))) == (uint)inputs.Length;
+  }
+
+  private static Input KeyInput(ushort virtualKey, bool keyUp) {
+    return new Input {
+      type = kKeyboardInput,
+      data = new InputUnion {
+        keyboard = new KeyboardInput {
+          virtualKey = virtualKey,
+          scanCode = 0,
+          flags = keyUp ? kKeyUp : 0,
+          time = 0,
+          extraInfo = IntPtr.Zero
+        }
+      }
+    };
+  }
 }
 "@
   }
@@ -744,7 +852,11 @@ public static class GuiShellExportSmokeWin32 {
         $evidence.frontend.tray_exit_callback_posted = [bool]$trayExit.callback_posted
         $evidence.frontend.tray_exit_item_observed = [bool]$trayExit.exit_item_observed
         $evidence.frontend.tray_exit_item_invoked = [bool]$trayExit.exit_item_invoked
+        $evidence.frontend.tray_popup_window_observed = [bool]$trayExit.popup_window_observed
+        $evidence.frontend.tray_keyboard_fallback_attempted = [bool]$trayExit.keyboard_fallback_attempted
+        $evidence.frontend.tray_keyboard_fallback_sent = [bool]$trayExit.keyboard_fallback_sent
         $gracefulRequested = [bool]$trayExit.exit_item_invoked
+        if ($trayExit.keyboard_fallback_sent) { $gracefulRequested = $true }
         $frontendExited = $false
         if ($gracefulRequested) { $frontendExited = $frontendProcess.WaitForExit(30000) }
         if ($gracefulRequested -and $frontendExited) {
