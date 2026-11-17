@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_ui/gui_shell_ui.dart';
+import 'package:gui_shell_desktop/screens/history_screen.dart';
 import 'package:gui_shell_desktop/screens/history_content_dialog.dart';
 import 'history_screen_test.dart' show Fixture;
 
@@ -149,6 +150,80 @@ void main() {
       }
       await tester.pumpWidget(const SizedBox());
     }
+  });
+  testWidgets('Broker接続世代変更で保存内容を消し遅延応答から復活させない', (tester) async {
+    for (final delayed in [false, true]) {
+      final f = ContentFixture();
+      final c = HistoryClient(f);
+      final e = await entry(c);
+      final sourceGeneration = ValueNotifier<int>(0);
+      if (delayed) f.contentGate = Completer<void>();
+      await tester.pumpWidget(MaterialApp(
+        home: HistoryContentDialog(
+          client: c,
+          entry: e,
+          sourceGeneration: sourceGeneration,
+        ),
+      ));
+      if (delayed) {
+        await tester.pump();
+        await tester.pump();
+        expect(f.operations, contains('対話内容閲覧'));
+      } else {
+        await tester.pumpAndSettle();
+        expect(find.text('保存された応答'), findsOneWidget);
+      }
+
+      sourceGeneration.value++;
+      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(find.text('履歴接続先が変わったため表示を消去しました。'), findsOneWidget,
+          reason: 'delayed=$delayed');
+      expect(find.text('保存された応答'), findsNothing);
+      expect(find.text('保存された入力'), findsNothing);
+      if (delayed) {
+        f.contentGate!.complete();
+        await tester.pumpAndSettle();
+        expect(find.text('保存された応答'), findsNothing);
+        expect(find.text('保存された入力'), findsNothing);
+      }
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
+  testWidgets('履歴画面のBroker切替で開いている本文dialogを失効させる', (tester) async {
+    final first = ContentFixture();
+    final second = ContentFixture();
+    var active = first;
+    StateSetter? updateHost;
+    await tester.pumpWidget(StatefulBuilder(
+      builder: (context, setState) {
+        updateHost = setState;
+        return MaterialApp(
+          home: Scaffold(
+            body: HistoryScreen(client: HistoryClient(active)),
+          ),
+        );
+      },
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(ExpansionTile).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('現在承認で保存内容を開く'));
+    await tester.pumpAndSettle();
+    expect(find.text('保存された応答'), findsOneWidget);
+    final oldStatusReads =
+        first.operations.where((op) => op == '対話内容閲覧状態').length;
+
+    active = second;
+    updateHost!(() {});
+    await tester.pumpAndSettle();
+    expect(find.text('保存された応答'), findsNothing);
+    expect(find.text('保存された入力'), findsNothing);
+    expect(find.text('履歴接続先が変わったため表示を消去しました。'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    expect(first.operations.where((op) => op == '対話内容閲覧状態').length,
+        oldStatusReads);
+    await tester.pumpWidget(const SizedBox());
   });
   testWidgets('実時間の期限を過ぎた本文を消去する', (tester) async {
     final f = ContentFixture();

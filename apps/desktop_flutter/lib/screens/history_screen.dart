@@ -28,6 +28,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   final _expanded = <String>{};
   HistoryEntry? _selected;
   Map<String, Object?>? _created;
+  final ValueNotifier<int> _contentSourceGeneration = ValueNotifier<int>(0);
   void _clearSelection() {
     _expanded.clear();
     _selected = null;
@@ -53,6 +54,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       return;
     }
 
+    _contentSourceGeneration.value++;
     _generation++;
     _expiryTimer?.cancel();
     _grantCheckTimer?.cancel();
@@ -101,6 +103,8 @@ class _HistoryScreenState extends State<HistoryScreen>
   @override
   void dispose() {
     _generation++;
+    _contentSourceGeneration.value++;
+    _contentSourceGeneration.dispose();
     _expiryTimer?.cancel();
     _grantCheckTimer?.cancel();
     _replayRefreshTimer?.cancel();
@@ -557,10 +561,11 @@ class _HistoryScreenState extends State<HistoryScreen>
                                         ? null
                                         : () => showDialog<void>(
                                             context: context,
-                                            builder: (_) =>
-                                                HistoryContentDialog(
-                                                    client: _client!,
-                                                    entry: e)),
+                                            builder: (_) => HistoryContentDialog(
+                                                client: _client!,
+                                                entry: e,
+                                                sourceGeneration:
+                                                    _contentSourceGeneration)),
                                     child: const Text('現在承認で保存内容を開く')),
                                 SelectableText(
                                     '保存監査: ${e.receipt!.auditId}\n保存監査hash: ${e.receipt!.eventHash}\n暗号文hash: ${e.receipt!.cipherHash}\n内容閲覧には別途ownerの現在承認が必要です。'),

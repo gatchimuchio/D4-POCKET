@@ -1,13 +1,18 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:gui_shell_ui/gui_shell_ui.dart';
 
 /// 現在承認に限定した本文表示。owner承認を発行しない。
 class HistoryContentDialog extends StatefulWidget {
   const HistoryContentDialog(
-      {super.key, required this.client, required this.entry});
+      {super.key,
+      required this.client,
+      required this.entry,
+      this.sourceGeneration});
   final HistoryClient client;
   final HistoryEntry entry;
+  final ValueListenable<int>? sourceGeneration;
   @override
   State<HistoryContentDialog> createState() => _HistoryContentDialogState();
 }
@@ -18,12 +23,38 @@ class _HistoryContentDialogState extends State<HistoryContentDialog>
   Timer? _expiry, _poll;
   bool _checking = true, _active = true;
   int _generation = 0;
+  int? _sourceGenerationAtOpen;
+  bool _sourceInvalidated = false;
   String _message = '現在の内容閲覧承認を確認中';
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _sourceGenerationAtOpen = widget.sourceGeneration?.value;
+    widget.sourceGeneration?.addListener(_sourceChanged);
     _load();
+  }
+
+  void _sourceChanged() {
+    final source = widget.sourceGeneration;
+    if (_sourceInvalidated ||
+        source == null ||
+        source.value == _sourceGenerationAtOpen) {
+      return;
+    }
+    _sourceInvalidated = true;
+    _generation++;
+    _expiry?.cancel();
+    _expiry = null;
+    _poll?.cancel();
+    _poll = null;
+    _content = null;
+    _checking = false;
+    _message = '履歴接続先が変わったため表示を消去しました。';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void _clear(String message) {
@@ -115,6 +146,7 @@ class _HistoryContentDialogState extends State<HistoryContentDialog>
   void dispose() {
     _generation++;
     _content = null;
+    widget.sourceGeneration?.removeListener(_sourceChanged);
     _expiry?.cancel();
     _poll?.cancel();
     WidgetsBinding.instance.removeObserver(this);
