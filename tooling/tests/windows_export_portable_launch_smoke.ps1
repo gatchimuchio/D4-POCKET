@@ -59,12 +59,12 @@ function Assert-ArtifactHash {
   return $actual
 }
 
-function Get-ControlViewDescendants {
+function Get-RawViewDescendants {
   param(
     [Parameter(Mandatory = $true)]$RootElement,
     [int]$MaximumElements = 8192
   )
-  $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+  $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
   $pending = New-Object 'System.Collections.Generic.Stack[object]'
   $elements = New-Object 'System.Collections.Generic.List[object]'
   $child = $walker.GetFirstChild($RootElement)
@@ -551,7 +551,7 @@ public static class GuiShellExportSmokeWin32 {
     throw 'Flutter process has no native main-window handle'
   }
   $stage = 'enumerate live app UI Automation controls'
-  $elements = @(Get-ControlViewDescendants -RootElement $window)
+  $elements = @(Get-RawViewDescendants -RootElement $window)
   $stage = 'locate live NavigationRail semantic root'
   $navRoot = @($elements | Where-Object {
     try {
@@ -560,7 +560,7 @@ public static class GuiShellExportSmokeWin32 {
   } | Select-Object -First 1)
   if ($navRoot.Count -ne 1) { throw 'NavigationRail semantic root was not observed' }
   $stage = 'enumerate live NavigationRail semantic children'
-  $navigationElements = @(Get-ControlViewDescendants -RootElement $navRoot[0])
+  $navigationElements = @(Get-RawViewDescendants -RootElement $navRoot[0])
   $navigationNames = @($navigationElements | ForEach-Object {
     try { [string]$_.Current.Name } catch { '' }
   } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
