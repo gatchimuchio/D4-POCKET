@@ -432,7 +432,17 @@ try {
     Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 public static class GuiShellExportSmokeWin32 {
+  [DllImport("user32.dll", EntryPoint = "GetClassNameW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+  private static extern int GetClassNameW(IntPtr window, StringBuilder className, int maximumCount);
+
+  public static string GetWindowClassName(IntPtr window) {
+    var className = new StringBuilder(256);
+    int length = GetClassNameW(window, className, className.Capacity);
+    return length > 0 ? className.ToString() : String.Empty;
+  }
+
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 }
@@ -456,17 +466,19 @@ public static class GuiShellExportSmokeWin32 {
     if ($dialogs.Count -gt 0) { $probeDialog = $dialogs[0] } else { Start-Sleep -Milliseconds 200 }
   }
   if ($null -eq $probeDialog) { throw 'launcher refusal dialog was not observed' }
-  $stage = 'verify launcher refusal dialog controls'
-  $probeElements = @(Get-ControlViewDescendants -RootElement $probeDialog -MaximumElements 2048)
-  $probeButton = @($probeElements | Where-Object {
-    try {
-      $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and
-        $_.Current.Name -eq 'OK' -and $_.Current.IsEnabled
-    } catch { $false }
-  } | Select-Object -First 1)
-  if ($probeButton.Count -ne 1) { throw 'launcher refusal dialog OK action was not available' }
+  $stage = 'verify launcher refusal dialog class'
+  $probeDialogHandle = [IntPtr]$probeDialog.Current.NativeWindowHandle
+  if ($probeDialogHandle -eq [IntPtr]::Zero -or
+      [GuiShellExportSmokeWin32]::GetWindowClassName($probeDialogHandle) -cne '#32770') {
+    throw 'launcher did not present a native refusal dialog'
+  }
+  $evidence.frontend.launcher_argument_refusal_dialog_observed = $true
   $stage = 'dismiss launcher refusal dialog'
-  $probeButton[0].GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+  if (-not [GuiShellExportSmokeWin32]::PostMessage(
+      $probeDialogHandle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero
+    )) {
+    throw 'launcher refusal dialog close request failed'
+  }
   $stage = 'verify launcher unsupported-argument exit code'
   if (-not $launcherProbe.WaitForExit(10000) -or $launcherProbe.ExitCode -ne 1) {
     throw 'launcher did not exit with the expected unsupported-argument status'
@@ -480,7 +492,6 @@ public static class GuiShellExportSmokeWin32 {
     throw 'launcher spawned the excluded-module app after rejecting an unsupported argument'
   }
   $evidence.frontend.launcher_argument_rejected = $true
-  $evidence.frontend.launcher_argument_refusal_dialog_observed = $true
 
   $stage = 'verify isolated runtime storage before launch'
   $runtimeStore = Join-Path $env:LOCALAPPDATA "D4Pocket\apps\$appId\stores\$auditStoreId"
