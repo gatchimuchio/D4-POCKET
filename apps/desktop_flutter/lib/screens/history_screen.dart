@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gui_shell_ui/gui_shell_ui.dart';
 import '../services/broker_client.dart';
+import 'agent_task_history_branch_dialog.dart';
 import 'history_content_dialog.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -342,6 +343,30 @@ class _HistoryScreenState extends State<HistoryScreen>
     }
   }
 
+  Future<void> _branchAgentTask(AgentTaskHistoryEntry entry) async {
+    final client = _client;
+    final grant = _grant;
+    if (_busy ||
+        !_active ||
+        client == null ||
+        grant == null ||
+        !grant.current ||
+        entry.runtimeId != grant.runtime ||
+        !const {'completed', 'failed', 'cancelled', 'suspended'}
+            .contains(entry.status)) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AgentTaskHistoryBranchDialog(
+        client: client,
+        grant: grant,
+        source: entry,
+      ),
+    );
+    if (mounted && _active) _load(after: 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final page = _page;
@@ -490,7 +515,21 @@ class _HistoryScreenState extends State<HistoryScreen>
                               'Workspace: ${entry.workspaceId} ／ 更新: $updated'),
                           children: [
                             SelectableText(
-                                'Session: ${entry.sessionId}\nRuntime: ${entry.runtimeId}\n指示hash: ${entry.instructionHash}\n結果hash: ${entry.resultHash ?? 'なし'}\n失敗分類: ${entry.failureClass ?? 'なし'}\n作成: $created\n開始Audit: ${entry.startAuditEventId}\n最新Audit: ${entry.auditId}\nこれはAudit由来の過去状態です。本文・Permission・Approval・Credential・Authorityは復元しません。')
+                                'Session: ${entry.sessionId}\nRuntime: ${entry.runtimeId}\n指示hash: ${entry.instructionHash}\n結果hash: ${entry.resultHash ?? 'なし'}\n失敗分類: ${entry.failureClass ?? 'なし'}\n作成: $created\n開始Audit: ${entry.startAuditEventId}\n最新Audit: ${entry.auditId}\nこれはAudit由来の過去状態です。本文・Permission・Approval・Credential・Authorityは復元しません。'),
+                            if (const {
+                              'completed',
+                              'failed',
+                              'cancelled',
+                              'suspended'
+                            }.contains(entry.status))
+                              TextButton(
+                                key: ValueKey(
+                                    'agent-task-branch-${entry.taskId}'),
+                                onPressed: _busy
+                                    ? null
+                                    : () => _branchAgentTask(entry),
+                                child: const Text('新しいAgent Taskへ分岐'),
+                              ),
                           ],
                         );
                       })

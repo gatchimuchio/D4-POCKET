@@ -370,6 +370,73 @@ class HistoryClient {
         List<AgentTaskHistoryEntry>.unmodifiable(parsed), next, more, grant);
   }
 
+  Future<Map<String, Object?>> branchAgentTask(
+      HistoryGrant grant, AgentTaskHistoryEntry parent, String instruction) async {
+    if (!grant.current ||
+        parent.runtimeId != grant.runtime ||
+        !RuntimeDialogueClient.validId(parent.taskId) ||
+        !RuntimeDialogueClient.validId(parent.sessionId) ||
+        !_hash(parent.eventHash) ||
+        !_text(parent.auditId) ||
+        !const {'completed', 'failed', 'cancelled', 'suspended'}
+            .contains(parent.status) ||
+        instruction.trim().isEmpty ||
+        instruction.runes.length > 32768) {
+      _reject();
+    }
+    final before = await status();
+    if (before == null || !grant.same(before) || !grant.current) _reject();
+    const op = '対話分岐';
+    final response = await transport.request(op, payload: {
+      'approval_id': grant.id,
+      '実行系ID': grant.runtime,
+      '参照監査ID': parent.auditId,
+      '参照event_hash': parent.eventHash,
+      'source_task_id': parent.taskId,
+      '入力': instruction
+    });
+    if (response['operation'] != op ||
+        response['status'] != 'accepted' ||
+        response['evidence_source'] != 'INTERNAL_STATE' ||
+        !_text(response['audit_event_id'])) {
+      _reject();
+    }
+    final branchAuditEventId = response['audit_event_id'] as String;
+    final body = _shape(response['body'], {
+      '要求ID',
+      '要求hash',
+      '状態',
+      '期限',
+      '対話セッションID',
+      '実行系ID',
+      '参照監査ID',
+      '参照event_hash',
+      '種別',
+      'source_task_id',
+      '作業領域ID'
+    });
+    if (!RuntimeDialogueClient.validId(body['要求ID']) ||
+        !RuntimeDialogueClient.validId(body['対話セッションID']) ||
+        body['対話セッションID'] == parent.sessionId ||
+        !_hash(body['要求hash']) ||
+        body['状態'] != 'Task開始前' ||
+        body['期限'] != grant.expires ||
+        body['実行系ID'] != grant.runtime ||
+        body['参照監査ID'] != parent.auditId ||
+        body['参照event_hash'] != parent.eventHash ||
+        body['種別'] != 'AgentTask分岐' ||
+        body['source_task_id'] != parent.taskId ||
+        body['作業領域ID'] != parent.workspaceId) {
+      _reject();
+    }
+    final after = await status();
+    if (after == null || !grant.same(after) || !grant.current) _reject();
+    return Map<String, Object?>.unmodifiable({
+      ...body.cast<String, Object?>(),
+      'branch_audit_event_id': branchAuditEventId
+    });
+  }
+
   Future<Map<String, Object?>> replay(
       HistoryGrant grant, HistoryEntry parent, String input,
       {required bool branch}) async {

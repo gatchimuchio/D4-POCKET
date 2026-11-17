@@ -513,12 +513,30 @@
               "type": "string",
               "pattern": "^sha256:[0-9a-f]{64}$"
             },
+            "source_task_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
             "入力": {
               "type": "string",
               "minLength": 1,
               "maxLength": 4096
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "required": ["source_task_id"]
+              },
+              "then": {
+                "properties": {
+                  "入力": {
+                    "maxLength": 32768
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     },

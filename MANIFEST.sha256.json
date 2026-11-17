@@ -240,6 +240,10 @@
       "sha256": "70444919588efb71f90cf9e7a9a65f41cb9e3341ab10d3cf96401e10c67544e9"
     },
     {
+      "path": "apps/desktop_flutter/lib/screens/agent_task_history_branch_dialog.dart",
+      "sha256": "3651ebbf3ee61bcf42b8db287f50978aa60b206bcfd759c28a466513d855595b"
+    },
+    {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
       "sha256": "2e9969b7ba77ce091733dadc3ef3d9ac9259c162cb9fed0885422bbc5279542e"
     },
@@ -269,7 +273,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/history_screen.dart",
-      "sha256": "02f60031709b54e08fed0d9bf0c3d03d4baaecbbe97ac2aafbd819d40f5a7e7e"
+      "sha256": "1b3ed9622f94cc567930a7f5c581252fba923ef1d4acff5a09eba7acc904ae2e"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/host_capability_center.dart",
@@ -729,7 +733,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/history_screen_test.dart",
-      "sha256": "ec8b144b392a3ade168c92782b6a55bec65140ece7aaee94d5a35d48d2ea87d2"
+      "sha256": "bc75b2788a42dd8856bc2cbad238c85299ec7c354673763089df43785e23856c"
     },
     {
       "path": "apps/desktop_flutter/test/host_operation_center_test.dart",
@@ -1629,7 +1633,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "91a7f4dd0024dd138fca0c1fef048c2f1a334bdb5f5db867655703881dba3179"
+      "sha256": "39ae120b2475dcf241a3a8f968ac77c22027d682528d668d07886c2a17ba0cfe"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4193,7 +4197,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/replay.rs",
-      "sha256": "0f28d5ad362add15fc9302a2dc0d784342a2df5a23273066ef542395a3dba5e8"
+      "sha256": "619e54563dd09f0b27da4e92d863e1faff32049400fb7fff8f61dddf7c2730c5"
     },
     {
       "path": "native/rust_helper/src/broker/runtime_lifecycle.rs",
@@ -4753,7 +4757,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/src/history_client.dart",
-      "sha256": "f70a21342d6c85a80d3051e6cd53cf40b56541f82ab9e1b2e3387074d986b312"
+      "sha256": "54e37ecd31cc5981f5f6e79d10cfb3d6d0c04291c77724302e3b1d84f2f4c245"
     },
     {
       "path": "packages/gui_shell_ui/lib/src/regression_case_client.dart",
@@ -5565,7 +5569,7 @@
     },
     {
       "path": "specs/runtime_dialogue_operation.schema.json",
-      "sha256": "5b13aae6551a5a834a148d350598cfecc999abdbe70f8a70735f6e352bce6a38"
+      "sha256": "c360db76b9ad049bddbb0dc8aabad623505d9667af8400e2a38904d62dc44675"
     },
     {
       "path": "specs/runtime_dialogue_request.schema.json",
@@ -5617,7 +5621,7 @@
     },
     {
       "path": "specs/runtime_replay_response.schema.json",
-      "sha256": "b7a63e9ae89d179fe638b7fb390b85cf32be26061cb21489e3dd8aefd63735d4"
+      "sha256": "1c18fa147865f206449b0dd364a86799dfcf6b770d162f7ccfb8ee0100c46ad9"
     },
     {
       "path": "specs/runtime_resource_observation.schema.json",

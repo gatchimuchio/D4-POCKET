@@ -13,6 +13,7 @@ class Fixture implements BrokerTransport {
   Map<String, Object?>? sent;
   Map? lastFilter;
   void Function(Map<String, Object?>)? alterReplay;
+  void Function(Map<String, Object?>)? alterTaskBranch;
   void Function(Map<String, Object?>)? alterRecord;
   bool revokeDuringRead = false;
   String runtime = 'local';
@@ -22,6 +23,7 @@ class Fixture implements BrokerTransport {
   String state = '成功';
   Completer<void>? gate;
   final operations = <String>[];
+  final taskRequests = <String, Map<String, Object?>>{};
   int expiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 290;
   Map<String, Object?> get grant =>
       {'approval_id': 'a' * 32, 'runtime_id': runtime, 'expires_at': expiry};
@@ -105,24 +107,123 @@ class Fixture implements BrokerTransport {
     }
     if (op == '対話再実行' || op == '対話分岐') {
       sent = payload;
+      final isTaskBranch =
+          op == '対話分岐' && payload?.containsKey('source_task_id') == true;
       final body = <String, Object?>{
         '要求ID': 'f' * 32,
-        '要求hash': 'sha256:${'0' * 64}',
-        '状態': '承認待ち',
+        '要求hash': isTaskBranch ? 'sha256:${'5' * 64}' : 'sha256:${'0' * 64}',
+        '状態': isTaskBranch ? 'Task開始前' : '承認待ち',
         '期限': expiry,
         '対話セッションID': '1' * 32,
         '実行系ID': 'local',
-        '参照監査ID': 'history-1',
-        '参照event_hash': 'sha256:${'c' * 64}',
-        '種別': op
+        '参照監査ID': isTaskBranch ? payload!['参照監査ID'] : 'history-1',
+        '参照event_hash':
+            isTaskBranch ? payload!['参照event_hash'] : 'sha256:${'c' * 64}',
+        '種別': isTaskBranch ? 'AgentTask分岐' : op,
+        if (isTaskBranch) ...{
+          'source_task_id': payload!['source_task_id'],
+          '作業領域ID': 'workspace-a'
+        }
       };
-      alterReplay?.call(body);
+      if (isTaskBranch) {
+        alterTaskBranch?.call(body);
+      } else {
+        alterReplay?.call(body);
+      }
       return {
         'operation': op,
         'status': 'accepted',
         'evidence_source': 'INTERNAL_STATE',
-        'audit_event_id': 'replay-audit',
+        'audit_event_id': isTaskBranch ? 'task-branch-audit' : 'replay-audit',
         'body': body
+      };
+    }
+    if (op == 'Agent作業要求検査') {
+      taskRequests[op] = payload ?? const {};
+      return {
+        'operation': op,
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'task-inspect-audit',
+        'body': {
+          '版': 1,
+          '状態': '要求検査済み',
+          '実行状態': '未実行',
+          'Permission状態': '未付与',
+          'Approval状態': '未取得',
+          '実行系ID': 'local',
+          '対話セッションID': '1' * 32,
+          '作業領域ID': 'workspace-a',
+          '指示hash': 'sha256:${'5' * 64}'
+        }
+      };
+    }
+    if (op == 'AgentTaskWorkspacePermissionGrant') {
+      taskRequests[op] = payload ?? const {};
+      return {
+        'operation': op,
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'task-permission-audit',
+        'body': {
+          'permission_id': '2' * 32,
+          'agent_runtime_id': 'local',
+          'session_id': '1' * 32,
+          'workspace_id': 'workspace-a',
+          'workspace_registration_hash': 'sha256:${'6' * 64}',
+          'operation': 'agent_task.execute',
+          'scope': 'session_workspace_once',
+          'decision': 'allow',
+          'source': 'owner',
+          'expires_at_epoch_seconds': expiry,
+          'use_limit': 1,
+          'uses_remaining': 1,
+          'status': 'active'
+        }
+      };
+    }
+    if (op == 'AgentTaskOwnerApprovalGrant') {
+      taskRequests[op] = payload ?? const {};
+      return {
+        'operation': op,
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'task-owner-approval-audit',
+        'body': {
+          '状態': 'Owner Approval発行済み',
+          '実行状態': '未実行',
+          '実行系ID': 'local',
+          '対話セッションID': '1' * 32,
+          '作業領域ID': 'workspace-a',
+          '指示hash': 'sha256:${'5' * 64}',
+          '実行条件hash': 'sha256:${'7' * 64}',
+          '適用ポリシー': 'gui-shell-agent-task-sandbox-v1-max-runtime-900s',
+          'expires_at_epoch_seconds': expiry,
+          'use_limit': 1,
+          'uses_remaining': 1,
+          'status': 'issued_unconsumed'
+        }
+      };
+    }
+    if (op == 'AgentTask実行') {
+      taskRequests[op] = payload ?? const {};
+      return {
+        'operation': op,
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'task-start-audit',
+        'body': {
+          'task_id': '3' * 32,
+          'record_version': 2,
+          'agent_runtime_id': 'local',
+          'session_id': '1' * 32,
+          'workspace_id': 'workspace-a',
+          'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+          'instruction_hash': 'sha256:${'5' * 64}',
+          'status': 'pending',
+          'audit_event_id': 'task-start-audit',
+          'result_content_available': false
+        }
       };
     }
     final isRead = op == '対話履歴閲覧';
@@ -496,6 +597,51 @@ void main() {
     f.revokeDuringRead = true;
     await expectLater(c.taskPage(grant), throwsA(isA<BrokerClientException>()));
   });
+  test('Agent Task履歴分岐は現行終端参照と新Session・新instruction hashを検査する', () async {
+    final f = Fixture();
+    final c = HistoryClient(f);
+    final grant = (await c.status())!;
+    final source = (await c.taskPage(grant)).entries.single;
+    final branch = await c.branchAgentTask(grant, source, 'fresh task input');
+    expect(f.sent, {
+      'approval_id': grant.id,
+      '実行系ID': grant.runtime,
+      '参照監査ID': source.auditId,
+      '参照event_hash': source.eventHash,
+      'source_task_id': source.taskId,
+      '入力': 'fresh task input'
+    });
+    expect(branch['状態'], 'Task開始前');
+    expect(branch['種別'], 'AgentTask分岐');
+    expect(branch['source_task_id'], source.taskId);
+    expect(branch['対話セッションID'], isNot(source.sessionId));
+    expect(branch['branch_audit_event_id'], 'task-branch-audit');
+    final activeSource = AgentTaskHistoryEntry(
+      source.taskId,
+      source.runtimeId,
+      source.sessionId,
+      source.workspaceId,
+      source.instructionHash,
+      'running',
+      source.createdAt,
+      source.updatedAt,
+      null,
+      null,
+      source.startAuditEventId,
+      source.auditId,
+      source.eventHash,
+    );
+    await expectLater(
+      c.branchAgentTask(grant, activeSource, 'fresh task input'),
+      throwsA(isA<BrokerClientException>()),
+    );
+
+    f.alterTaskBranch = (body) => body['source_task_id'] = 'c' * 32;
+    await expectLater(
+      c.branchAgentTask(grant, source, 'fresh task input'),
+      throwsA(isA<BrokerClientException>()),
+    );
+  });
   testWidgets('Task履歴一覧はhashと状態だけを表示し承認失効で破棄する', (tester) async {
     final f = Fixture();
     await tester.pumpWidget(MaterialApp(
@@ -517,6 +663,70 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
     expect(find.textContaining('completed ／ ${'a' * 32}'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Agent Task履歴から新Permission・Approvalを経て新Taskだけを開始する',
+      (tester) async {
+    final f = Fixture();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: HistoryScreen(client: HistoryClient(f)))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Agent Task履歴'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('agent-task-${'a' * 32}')));
+    await tester.pumpAndSettle();
+    final branchButton = find.byKey(ValueKey('agent-task-branch-${'a' * 32}'));
+    await tester.ensureVisible(branchButton);
+    await tester.pumpAndSettle();
+    await tester.tap(branchButton);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('agent-task-history-branch-input')),
+        'new task instruction');
+    await tester.tap(find.text('新しいSessionを作成して事前検査'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Permission: 未付与'), findsOneWidget);
+    expect(f.sent!['source_task_id'], 'a' * 32);
+    expect(f.sent!['入力'], 'new task instruction');
+    expect(f.operations.contains('AgentTask実行'), false);
+
+    final permissionButton = find.text('新しいWorkspace Permissionを発行');
+    await tester.ensureVisible(permissionButton);
+    await tester.pumpAndSettle();
+    await tester.tap(permissionButton);
+    await tester.pumpAndSettle();
+    expect(f.operations, contains('AgentTaskWorkspacePermissionGrant'));
+    final approvalButton = find.text('新しいOwner Approvalを発行');
+    await tester.ensureVisible(approvalButton);
+    await tester.pumpAndSettle();
+    await tester.tap(approvalButton);
+    await tester.pumpAndSettle();
+    expect(f.operations, contains('AgentTaskOwnerApprovalGrant'));
+    final startButton = find.text('新しいAgent Taskを開始');
+    await tester.ensureVisible(startButton);
+    await tester.pumpAndSettle();
+    await tester.tap(startButton);
+    await tester.pumpAndSettle();
+    final permissionIndex =
+        f.operations.indexOf('AgentTaskWorkspacePermissionGrant');
+    final approvalIndex = f.operations.indexOf('AgentTaskOwnerApprovalGrant');
+    final startIndex = f.operations.indexOf('AgentTask実行');
+    expect(permissionIndex, greaterThanOrEqualTo(0));
+    expect(approvalIndex, greaterThan(permissionIndex));
+    expect(startIndex, greaterThan(approvalIndex));
+    expect(f.taskRequests['Agent作業要求検査']!['require_unused_task_session'], true);
+    expect(
+        f.taskRequests['AgentTaskOwnerApprovalGrant']![
+            'require_unused_task_session'],
+        true);
+    expect(f.taskRequests['AgentTask実行']!['require_unused_task_session'], true);
+    expect(find.textContaining('新Task: ${'3' * 32} ／ pending'), findsOneWidget);
+    expect(find.textContaining('分岐Audit: task-branch-audit'), findsOneWidget);
+    expect(find.textContaining('結果本文はここでは取得していません。'), findsOneWidget);
+    expect(find.textContaining('new task instruction'), findsNothing);
+    await tester.tap(find.text('閉じる'));
+    await tester.pumpAndSettle();
     await tester.pumpWidget(const SizedBox());
   });
 
