@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../models/generated_contracts.dart';
+import '../services/compose_client.dart';
 import '../services/runtime_lifecycle_client.dart';
 import '../services/runtime_resource_client.dart';
 import '../services/shell_core_client.dart';
@@ -51,6 +52,10 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   int _resourceGeneration = 0;
   bool _lifecycleBusy = false;
   int _lifecycleGeneration = 0;
+  ComposeRuntimeAgentCatalog? _runtimeAgentCatalog;
+  bool _runtimeAgentCatalogBusy = false;
+  int _runtimeAgentCatalogGeneration = 0;
+  String _runtimeAgentCatalogMessage = 'Agent Catalogは未取得です。';
   final Map<String, String> _adapterMessages = <String, String>{};
   final Set<String> _adapterBusy = <String>{};
   List<AdapterCatalogRecord>? _adapterCatalogOverride;
@@ -87,6 +92,10 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       _selectedRegisteredRuntimeId = null;
       _runtimeCatalogBusy = false;
       _runtimeCatalogMessage = 'Broker接続が変わりました。Runtime一覧を再取得してください。';
+      _runtimeAgentCatalogGeneration++;
+      _runtimeAgentCatalog = null;
+      _runtimeAgentCatalogBusy = false;
+      _runtimeAgentCatalogMessage = 'Broker接続が変わりました。Agent Catalogを再取得してください。';
       _resourceClient = widget.resourceClient;
       _lifecycleClient = widget.lifecycleClient;
       _resetRuntimeObservations('Broker接続が変わりました。現在のRuntime状態を再取得してください。');
@@ -117,6 +126,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     _resourceGeneration++;
     _lifecycleGeneration++;
     _runtimeCatalogGeneration++;
+    _runtimeAgentCatalogGeneration++;
     _brokerClientGeneration++;
     _tabs.dispose();
     super.dispose();
@@ -254,6 +264,55 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     }
   }
 
+  Future<void> _refreshRuntimeAgentCatalog() async {
+    if (_runtimeAgentCatalogBusy) return;
+    final client = widget.client;
+    final transport = client.brokerTransport;
+    if (transport == null) {
+      setState(() {
+        _runtimeAgentCatalog = null;
+        _runtimeAgentCatalogMessage =
+            'Broker接続がないためRuntime／Agent Catalogを取得できません。';
+      });
+      return;
+    }
+    final generation = ++_runtimeAgentCatalogGeneration;
+    final brokerGeneration = _brokerClientGeneration;
+    setState(() {
+      _runtimeAgentCatalogBusy = true;
+      _runtimeAgentCatalog = null;
+      _runtimeAgentCatalogMessage = 'BrokerからRuntime／Agent Catalogを取得しています。';
+    });
+    try {
+      final catalog =
+          await ComposeClient(transport).refreshRuntimeAgentCatalog();
+      if (!_isCurrentBrokerClient(client, brokerGeneration) ||
+          generation != _runtimeAgentCatalogGeneration) {
+        return;
+      }
+      setState(() {
+        _runtimeAgentCatalog = catalog;
+        _runtimeAgentCatalogMessage =
+            'BrokerからRuntime ${catalog.runtimeIds.length}件、Agent ${catalog.agents.length}件を取得しました。';
+      });
+    } catch (_) {
+      if (!_isCurrentBrokerClient(client, brokerGeneration) ||
+          generation != _runtimeAgentCatalogGeneration) {
+        return;
+      }
+      setState(() {
+        _runtimeAgentCatalog = null;
+        _runtimeAgentCatalogMessage =
+            'Broker Runtime／Agent Catalogを確認できません。値を推測せず停止しています。';
+      });
+    } finally {
+      if (_isCurrentBrokerClient(client, brokerGeneration) &&
+          generation == _runtimeAgentCatalogGeneration) {
+        setState(() => _runtimeAgentCatalogBusy = false);
+      }
+    }
+  }
+
   void _selectRegisteredRuntime(String? runtimeId) {
     if (runtimeId == null ||
         runtimeId == _selectedRegisteredRuntimeId ||
@@ -344,6 +403,8 @@ class _RuntimeCenterState extends State<RuntimeCenter>
             },
           ),
         const SizedBox(height: 16),
+        _runtimeAgentCatalogPanel(),
+        const SizedBox(height: 16),
         Align(
           alignment: Alignment.centerLeft,
           child: OutlinedButton.icon(
@@ -415,6 +476,73 @@ class _RuntimeCenterState extends State<RuntimeCenter>
           ],
         ),
       ],
+    );
+  }
+
+  Widget _runtimeAgentCatalogPanel() {
+    final catalog = _runtimeAgentCatalog;
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Runtime／Agent Catalog',
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+          const Text(
+            'Brokerの現在登録からProvider、Adapter、版、能力、Workspace、認証、Host、Healthのmetadataを表示します。metadataは未信頼情報で、Permission／Approval／Trust／Authorityを生成しません。',
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const ValueKey('runtime-agent-catalog-refresh'),
+            onPressed: _runtimeAgentCatalogBusy
+                ? null
+                : () => unawaited(_refreshRuntimeAgentCatalog()),
+            icon: _runtimeAgentCatalogBusy
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+            label: Text(_runtimeAgentCatalogBusy
+                ? 'Catalog取得中…'
+                : 'Runtime／Agent Catalogを更新'),
+          ),
+          const SizedBox(height: 6),
+          Text(_runtimeAgentCatalogMessage),
+          if (catalog != null && catalog.agents.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('BrokerにAgent metadataを公開するRuntimeはありません。'),
+            ),
+          if (catalog != null)
+            for (final entry in catalog.agents)
+              ExpansionTile(
+                key: ValueKey(
+                  'runtime-agent-metadata-${entry.runtimeId}-${entry.agent.agentId}',
+                ),
+                tilePadding: EdgeInsets.zero,
+                title: Text('${entry.runtimeId} / ${entry.agent.agentId}'),
+                subtitle: Text(
+                  '${entry.agent.provider} / ${entry.agent.adapterId} / ${entry.agent.version} / ${entry.agent.status}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                children: [
+                  SectionList(
+                    title: '能力と境界（metadata）',
+                    rows: [
+                      'Provider ID: ${entry.agent.providerId ?? 'unknown'} / model: ${entry.agent.model}',
+                      'Capability: ${entry.agent.capabilities.isEmpty ? 'unknown' : entry.agent.capabilities.map((item) => '${item.capabilityId}: ${item.status}').join(', ')}',
+                      'Workspace: ${entry.workspaceMode} / ${entry.agent.workspaceBoundary}',
+                      '認証方式／状態: ${entry.agent.authenticationMethod} / ${entry.agent.authenticationStatus}（秘密値は表示しません）',
+                      'Host: ${entry.hostPlatforms.join(', ')} / network=${entry.networkScope} / process_spawn=${entry.agent.processSpawnStatus}',
+                      'Provider health: ${entry.agent.providerHealthStatus} / evidence=${entry.agent.evidenceSource}',
+                    ],
+                  ),
+                ],
+              ),
+        ],
+      ),
     );
   }
 

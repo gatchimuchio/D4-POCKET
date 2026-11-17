@@ -205,6 +205,9 @@ void main() {
         catalog.agents.map((entry) => entry.agent.agentId), ['codex', 'codex']);
     expect(catalog.agents.map((entry) => entry.agent.model),
         ['model-a', 'model-b']);
+    expect(catalog.agents.first.workspaceMode, 'required');
+    expect(catalog.agents.first.hostPlatforms, ['windows']);
+    expect(catalog.agents.first.networkScope, 'loopback_only');
   });
 
   test('Compose CatalogはRuntime重複とAgent型IDの別Adapter衝突を拒否する', () async {
@@ -231,6 +234,44 @@ void main() {
       ComposeClient(conflictingAgentType).refreshRuntimeAgentCatalog(),
       throwsA(isA<BrokerClientException>()),
     );
+  });
+
+  test('Compose CatalogはWorkspace境界とHostの未知enumを拒否する', () async {
+    final invalidWorkspace = _agentEntry(
+      'runtime-a',
+      adapterId: 'minidora-product-http',
+      agentId: 'minidora',
+    );
+    (invalidWorkspace['metadata']!
+        as Map<String, Object?>)['workspace_requirements'] = {
+      'mode': 'required',
+      'boundary_policy': 'allow_outside_workspace',
+      'secret_paths': ['.env'],
+    };
+
+    final invalidHost = _agentEntry(
+      'runtime-a',
+      adapterId: 'minidora-product-http',
+      agentId: 'minidora',
+    );
+    (invalidHost['metadata']! as Map<String, Object?>)['host_requirements'] = {
+      'platforms': ['plan9'],
+      'network_scope': 'loopback_only',
+      'process_spawn': {
+        'status': 'unsupported',
+        'reason': 'fixture does not start a process',
+      },
+    };
+
+    for (final agent in [invalidWorkspace, invalidHost]) {
+      await expectLater(
+        ComposeClient(_FakeComposeTransport(_catalogResponse(
+          runtimeIds: const ['runtime-a'],
+          agents: [agent],
+        ))).refreshRuntimeAgentCatalog(),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
   });
 
   test('構成参照IDは空行と前後空白だけを整理し重複はBroker検証へ残す', () {
@@ -310,6 +351,19 @@ Map<String, Object?> _agentEntry(
         'model': model,
         'status': 'ready',
         'capabilities': <Object?>[],
+        'workspace_requirements': {
+          'mode': 'required',
+          'boundary_policy': 'deny_outside_workspace',
+          'secret_paths': ['.env', '.ssh', 'secrets/'],
+        },
+        'host_requirements': {
+          'platforms': ['windows'],
+          'network_scope': 'loopback_only',
+          'process_spawn': {
+            'status': 'unsupported',
+            'reason': 'fixture does not start a process',
+          },
+        },
       },
     };
 

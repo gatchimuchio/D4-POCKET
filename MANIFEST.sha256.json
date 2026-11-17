@@ -317,7 +317,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_center.dart",
-      "sha256": "dc7042b707e61181ab7fba165fb1242aa31b6644a9b0f4679e7f86f3499883b8"
+      "sha256": "78c0143e8eb3b93d58d7896c635ef732290b714409e76281bdc0f85319841b4f"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_dialogue.dart",
@@ -393,7 +393,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
-      "sha256": "171bafbf0e11cb742353f794416cb389c895254a070b91923387b8fd8c591c30"
+      "sha256": "d177e78a28940e223b6def1f522e7135f148ac1a71d31c6e9f1e456f9f9f63a9"
     },
     {
       "path": "apps/desktop_flutter/lib/services/evaluation_client.dart",
@@ -705,7 +705,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/compose_client_test.dart",
-      "sha256": "c29f86a605d586cccefd1d89c937933fb4ce908eb2ff89a7ca4183004972ee4a"
+      "sha256": "25d8f8c5dedd5de6d0cc73276f3fb5f54b0c37a7c35dd0deff8ceec12fbd6f4f"
     },
     {
       "path": "apps/desktop_flutter/test/dashboard_broker_health_test.dart",
@@ -1633,7 +1633,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "43e50af4fc5a1089012031a00a4654954207047406c70ca660e0ef07a29394e3"
+      "sha256": "4dafbb58f61c456918d714574c7db2dba4e4e2193b8ce38626f8286176245c51"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",

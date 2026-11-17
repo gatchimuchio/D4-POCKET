@@ -8,10 +8,16 @@ class ComposeAgentCatalogEntry {
   const ComposeAgentCatalogEntry({
     required this.runtimeId,
     required this.agent,
+    required this.workspaceMode,
+    required this.hostPlatforms,
+    required this.networkScope,
   });
 
   final String runtimeId;
   final AgentAdapterRecord agent;
+  final String workspaceMode;
+  final List<String> hostPlatforms;
+  final String networkScope;
 }
 
 class ComposeRuntimeAgentCatalog {
@@ -120,9 +126,51 @@ class ComposeClient {
           'Compose CatalogのAgentとRuntimeの対応が不正です',
         );
       }
-      final agent = AgentAdapterRecord.fromJson(
-        Map<String, Object?>.from(metadata),
-      );
+      final metadataMap = Map<String, Object?>.from(metadata);
+      final workspace = _objectMap(metadataMap['workspace_requirements']);
+      final host = _objectMap(metadataMap['host_requirements']);
+      const workspaceFields = {'mode', 'boundary_policy', 'secret_paths'};
+      const validModes = {'required', 'optional'};
+      const validPlatforms = {
+        'windows',
+        'macos',
+        'linux',
+        'android',
+        'ios',
+        'unknown'
+      };
+      const validNetworkScopes = {
+        'loopback_only',
+        'outbound_allowed',
+        'unsupported',
+        'unknown',
+      };
+      const hostFields = {'platforms', 'network_scope', 'process_spawn'};
+      final secretPaths = workspace?['secret_paths'];
+      final rawPlatforms = host?['platforms'];
+      if (workspace == null ||
+          workspace.length != workspaceFields.length ||
+          !workspace.keys.toSet().containsAll(workspaceFields) ||
+          !validModes.contains(workspace['mode']) ||
+          workspace['boundary_policy'] != 'deny_outside_workspace' ||
+          secretPaths is! List ||
+          secretPaths.length > 64 ||
+          secretPaths.any(
+              (path) => path is! String || path.isEmpty || path.length > 256) ||
+          host == null ||
+          host.length != hostFields.length ||
+          !host.keys.toSet().containsAll(hostFields) ||
+          rawPlatforms is! List ||
+          rawPlatforms.isEmpty ||
+          rawPlatforms.length > 8 ||
+          rawPlatforms.any((platform) =>
+              platform is! String || !validPlatforms.contains(platform)) ||
+          !validNetworkScopes.contains(host['network_scope'])) {
+        throw const BrokerClientException(
+          'Compose CatalogのWorkspace／Host要件が不正です',
+        );
+      }
+      final agent = AgentAdapterRecord.fromJson(metadataMap);
       final existingAdapterId = adapterByAgentId.putIfAbsent(
         agent.agentId,
         () => agent.adapterId,
@@ -137,7 +185,13 @@ class ComposeClient {
           'Compose CatalogのAgent metadataが不正または重複しています',
         );
       }
-      agents.add(ComposeAgentCatalogEntry(runtimeId: runtimeId, agent: agent));
+      agents.add(ComposeAgentCatalogEntry(
+        runtimeId: runtimeId,
+        agent: agent,
+        workspaceMode: workspace['mode']! as String,
+        hostPlatforms: List.unmodifiable(rawPlatforms.cast<String>()),
+        networkScope: host['network_scope']! as String,
+      ));
     }
     return ComposeRuntimeAgentCatalog(
       runtimeIds: List.unmodifiable(runtimeIds),
