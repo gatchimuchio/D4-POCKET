@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:gui_shell_ui/gui_shell_ui.dart';
 import '../services/broker_client.dart';
@@ -6,8 +7,13 @@ import 'agent_task_history_branch_dialog.dart';
 import 'history_content_dialog.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key, this.client});
+  const HistoryScreen({
+    super.key,
+    this.client,
+    this.hostContextGeneration,
+  });
   final HistoryClient? client;
+  final ValueListenable<int>? hostContextGeneration;
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
@@ -44,13 +50,23 @@ class _HistoryScreenState extends State<HistoryScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.hostContextGeneration?.addListener(_hostContextChanged);
     _load();
   }
 
   @override
   void didUpdateWidget(covariant HistoryScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final hostGenerationChanged = !identical(
+      oldWidget.hostContextGeneration,
+      widget.hostContextGeneration,
+    );
+    if (hostGenerationChanged) {
+      oldWidget.hostContextGeneration?.removeListener(_hostContextChanged);
+      widget.hostContextGeneration?.addListener(_hostContextChanged);
+    }
     if (identical(oldWidget.client?.transport, widget.client?.transport)) {
+      if (hostGenerationChanged) _clearForHostContextChange();
       return;
     }
 
@@ -83,6 +99,31 @@ class _HistoryScreenState extends State<HistoryScreen>
     });
   }
 
+  void _hostContextChanged() {
+    if (!mounted) return;
+    setState(_clearForHostContextChange);
+  }
+
+  void _clearForHostContextChange() {
+    _contentSourceGeneration.value++;
+    _generation++;
+    _expiryTimer?.cancel();
+    _grantCheckTimer?.cancel();
+    _replayRefreshTimer?.cancel();
+    _page = null;
+    _taskPage = null;
+    _grant = null;
+    _busy = false;
+    _showTaskHistory = false;
+    _requestId = null;
+    _sessionId = null;
+    _state = null;
+    _requestFilter.clear();
+    _sessionFilter.clear();
+    _clearSelection();
+    _message = 'Hostが切り替わったため履歴と旧承認を破棄しました。再読込してください。';
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _active = state == AppLifecycleState.resumed;
@@ -103,6 +144,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   @override
   void dispose() {
     _generation++;
+    widget.hostContextGeneration?.removeListener(_hostContextChanged);
     _contentSourceGeneration.value++;
     _contentSourceGeneration.dispose();
     _expiryTimer?.cancel();

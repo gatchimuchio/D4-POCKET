@@ -7,9 +7,14 @@ import '../services/host_registration_client.dart';
 import 'shared.dart';
 
 class HostOperationCenter extends StatefulWidget {
-  const HostOperationCenter({super.key, required this.client});
+  const HostOperationCenter({
+    super.key,
+    required this.client,
+    this.onHostContextChanged,
+  });
 
   final ShellCoreClient client;
+  final VoidCallback? onHostContextChanged;
 
   @override
   State<HostOperationCenter> createState() => _HostOperationCenterState();
@@ -133,6 +138,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
             'Host切替を監査しました。監査ID=${receipt.auditId} / 承認=${receipt.approvalState} / 権限生成=${receipt.authorityGenerated}';
         _busy = false;
       });
+      widget.onHostContextChanged?.call();
     } on Object {
       if (!mounted || generation != _clientGeneration) return;
       setState(() {

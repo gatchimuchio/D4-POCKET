@@ -225,6 +225,48 @@ void main() {
         oldStatusReads);
     await tester.pumpWidget(const SizedBox());
   });
+  testWidgets('Host切替世代変更で履歴本文と旧Grantを破棄する', (tester) async {
+    final fixture = ContentFixture();
+    final client = HistoryClient(fixture);
+    final hostContextGeneration = ValueNotifier<int>(0);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: HistoryScreen(
+          client: client,
+          hostContextGeneration: hostContextGeneration,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('成功 ／'), findsOneWidget);
+    await tester.tap(find.byType(ExpansionTile).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('現在承認で保存内容を開く'));
+    await tester.pumpAndSettle();
+    expect(find.text('保存された応答'), findsOneWidget);
+    final oldStatusReads =
+        fixture.operations.where((op) => op == '対話内容閲覧状態').length;
+
+    hostContextGeneration.value++;
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('保存された応答'), findsNothing);
+    expect(find.text('保存された入力'), findsNothing);
+    await tester.pump(const Duration(seconds: 3));
+    expect(
+      fixture.operations.where((op) => op == '対話内容閲覧状態').length,
+      oldStatusReads,
+    );
+    await tester.tap(find.text('閉じる'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Hostが切り替わったため履歴と旧承認を破棄しました。再読込してください。'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('成功 ／'), findsNothing);
+    expect(fixture.operations, isNot(contains('対話再実行')));
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets('実時間の期限を過ぎた本文を消去する', (tester) async {
     final f = ContentFixture();
     final c = HistoryClient(f);

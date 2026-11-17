@@ -69,8 +69,17 @@ ShellCoreClient _client(
   );
 }
 
-Widget _screen(ShellCoreClient client) => MaterialApp(
-      home: Scaffold(body: HostOperationCenter(client: client)),
+Widget _screen(
+  ShellCoreClient client, {
+  VoidCallback? onHostContextChanged,
+}) =>
+    MaterialApp(
+      home: Scaffold(
+        body: HostOperationCenter(
+          client: client,
+          onHostContextChanged: onHostContextChanged,
+        ),
+      ),
     );
 
 void main() {
@@ -115,6 +124,34 @@ void main() {
     expect(find.text('Host A 新規'), findsNothing);
   }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 
+  testWidgets('Broker受理後にHost文脈変更を通知する', (tester) async {
+    final transport = _HostSwitchTransport();
+    var notifications = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: HostOperationCenter(
+          client: _client(transport, [
+            _host('host-a-current', 'Host A 現在'),
+            _host('host-a-target', 'Host A 切替先'),
+          ]),
+          onHostContextChanged: () => notifications++,
+        ),
+      ),
+    ));
+
+    await tester.tap(find.widgetWithText(ListTile, 'Host A 切替先').first);
+    await tester.pump();
+    final switchButton = find.widgetWithText(FilledButton, 'Host切替');
+    await tester.ensureVisible(switchButton);
+    await tester.tap(switchButton);
+    await tester.pumpAndSettle();
+
+    expect(transport.operations, ['Host切替']);
+    expect(transport.requests.single['Host ID'], 'host-a-target');
+    expect(notifications, 1);
+    expect(find.textContaining('権限生成=なし'), findsOneWidget);
+  });
+
   testWidgets('Host操作画面はBroker切替後に旧Hostと遅延切替結果を破棄する', (tester) async {
     final oldRequest = Completer<void>();
     final first = _HostSwitchTransport()..switchGate = oldRequest;
@@ -122,9 +159,13 @@ void main() {
     final oldCurrent = _host('host-a-current', 'Host A 現在');
     final oldCandidate = _host('host-a-candidate', 'Host A 切替先');
     final current = _host('host-b-current', 'Host B 現在');
+    var notifications = 0;
+    void onHostContextChanged() => notifications++;
 
-    await tester
-        .pumpWidget(_screen(_client(first, [oldCurrent, oldCandidate])));
+    await tester.pumpWidget(_screen(
+      _client(first, [oldCurrent, oldCandidate]),
+      onHostContextChanged: onHostContextChanged,
+    ));
     expect(find.text('Host A 現在'), findsWidgets);
     expect(find.text('Host A 切替先'), findsWidgets);
 
@@ -137,7 +178,10 @@ void main() {
     expect(first.operations, ['Host切替']);
     expect(first.requests.single['Host ID'], 'host-a-candidate');
 
-    await tester.pumpWidget(_screen(_client(second, [current])));
+    await tester.pumpWidget(_screen(
+      _client(second, [current]),
+      onHostContextChanged: onHostContextChanged,
+    ));
     await tester.pumpAndSettle();
     expect(find.text('Host B 現在'), findsWidgets);
     expect(find.text('Host A 現在'), findsNothing);
@@ -155,5 +199,6 @@ void main() {
     expect(find.text('Host A 切替先'), findsNothing);
     expect(find.textContaining('Host切替を監査しました。'), findsNothing);
     expect(second.operations, isEmpty);
+    expect(notifications, 0);
   }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
 }

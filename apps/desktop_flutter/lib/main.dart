@@ -246,6 +246,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   bool _trayRefreshRequested = false;
   int _trayProjectionGeneration = 0;
   int _brokerTransportGeneration = 0;
+  final ValueNotifier<int> _hostContextGeneration = ValueNotifier<int>(0);
   AgentTaskExecutionCoordinator? _agentTaskExecutionCoordinator;
 
   @override
@@ -288,6 +289,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   void dispose() {
     _trayRefreshTimer?.cancel();
     _agentTaskExecutionCoordinator?.dispose();
+    _hostContextGeneration.dispose();
     unawaited(_trayClient.dispose());
     super.dispose();
   }
@@ -509,6 +511,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         HistoryScreen(
           client:
               historyTransport == null ? null : HistoryClient(historyTransport),
+          hostContextGeneration: _hostContextGeneration,
         )
       else
         const SizedBox.shrink(),
@@ -540,7 +543,10 @@ class _ShellHomePageState extends State<ShellHomePage> {
       else
         const SizedBox.shrink(),
       if (kGuiShellModuleHostOperations)
-        HostOperationCenter(client: widget.client)
+        HostOperationCenter(
+          client: widget.client,
+          onHostContextChanged: () => _hostContextGeneration.value++,
+        )
       else
         const SizedBox.shrink(),
       A2aConnectionCenter(
