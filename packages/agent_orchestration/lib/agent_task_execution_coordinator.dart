@@ -361,11 +361,10 @@ class AgentTaskExecutionCoordinator {
     );
     _publishToStream(update);
     if (onUpdate == null) return;
-    try {
-      await onUpdate(update);
-    } on Object {
-      // A display observer cannot convert an unbound Task into an accepted one.
-    }
+    // The Task is already rejected; its display notification must not block the caller.
+    unawaited(
+      Future<void>.sync(() => onUpdate(update)).catchError((Object _) {}),
+    );
   }
 
   void _emit(

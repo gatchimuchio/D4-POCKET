@@ -738,6 +738,44 @@ void main() {
     }
   });
 
+  test('拒否されたTaskの非同期表示observerは観測開始Futureを停止しない', () async {
+    final observerGate = Completer<void>();
+    final transport = _FakeBrokerTransport([]);
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+    var observed = false;
+    var returned = false;
+
+    try {
+      await coordinator
+          .observeStartedTask(
+            request: _sourceRequest,
+            task: const AgentTaskRecord(
+              taskId: _sourceTaskId,
+              runtimeId: 'codex-other',
+              sessionId: _session,
+              workspaceId: 'workspace-local',
+              instructionHash: _instructionHash,
+              status: 'completed',
+              auditEventId: 'audit-other-runtime-observer-pending',
+            ),
+            expectedInstructionHash: _instructionHash,
+            onUpdate: (_) {
+              observed = true;
+              return observerGate.future;
+            },
+          )
+          .timeout(const Duration(seconds: 1));
+      returned = true;
+    } finally {
+      if (!observerGate.isCompleted) observerGate.complete();
+      coordinator.dispose();
+    }
+
+    expect(observed, isTrue);
+    expect(returned, isTrue);
+    expect(transport.operations, isEmpty);
+  });
+
   test('Task状態のWorkspace差替え後は結果露出とMCP作用を停止する', () async {
     final transport = _FakeBrokerTransport([
       _accepted('AgentTask状態', {
