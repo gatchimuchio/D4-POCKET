@@ -40,6 +40,9 @@ class AndroidProductCandidateTests(unittest.TestCase):
         self._write_apk(self.debug_apk)
         self._write_apk(self.release_apk, marker=b"release-build")
         self.app_id, self.version_name, self.version_code = candidate._application_identity()
+        self.min_sdk_line = "sdkVersion:'24'\n"
+        self.target_sdk_line = "targetSdkVersion:'37'\n"
+        self.permissions_output = "uses-permission: name='android.permission.INTERNET'\n"
         self.debug_dn_prefix = "V2 Signer: certificate DN: "
         self.release_unsigned_diagnostic = "ERROR: No signatures found in APK\n"
         sdk_tools = self.root / "sdk" / "build-tools" / "37.0.0"
@@ -67,10 +70,18 @@ class AndroidProductCandidateTests(unittest.TestCase):
                 archive.writestr("META-INF/CERT.RSA", b"signature-marker")
 
     def _run_tool(self, arguments: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
-        if arguments[0] == str(self.aapt):
+        if arguments[0] == str(self.aapt) and arguments[1:3] == ["dump", "badging"]:
             output = (
                 f"package: name='{self.app_id}' versionCode='{self.version_code}' "
                 f"versionName='{self.version_name}'\n"
+                f"{self.min_sdk_line}"
+                f"{self.target_sdk_line}"
+            )
+            return subprocess.CompletedProcess(arguments, 0, stdout=output, stderr="")
+        if arguments[0] == str(self.aapt) and arguments[1:3] == ["dump", "permissions"]:
+            output = (
+                f"package: {self.app_id}\n"
+                f"{self.permissions_output}"
             )
             return subprocess.CompletedProcess(arguments, 0, stdout=output, stderr="")
         if arguments[0] == str(self.apksigner) and "emulator-debug" in Path(arguments[-1]).name:
@@ -126,6 +137,24 @@ class AndroidProductCandidateTests(unittest.TestCase):
         self.assertEqual(record["application_identity_confirmed"], False)
         self.assertEqual(record["credential_included"], False)
         self.assertEqual(record["installed_product_verified"], False)
+        self.assertEqual(record["channel"], "qa_candidate")
+        self.assertEqual(
+            record["artifacts"]["release_candidate"]["native_permissions"],
+            ["android.permission.INTERNET"],
+        )
+        self.assertEqual(
+            record["artifacts"]["release_candidate"]["build_settings"]["target_sdk_version"],
+            37,
+        )
+        self.assertEqual(
+            set(record["device_link_contract"]["files"]),
+            {
+                "device_link_control.schema.json",
+                "device_link_credential.schema.json",
+                "device_link_invitation.schema.json",
+                "device_link_request.schema.json",
+            },
+        )
 
     def test_accepts_legacy_apksigner_debug_signer_line(self) -> None:
         self.debug_dn_prefix = "Signer #1 certificate DN: "
@@ -136,6 +165,18 @@ class AndroidProductCandidateTests(unittest.TestCase):
         self.release_unsigned_diagnostic = "ERROR: Missing META-INF/MANIFEST.MF\n"
         evidence = self._package()
         self.assertEqual(evidence["release_signature_state"], "unsigned")
+
+    def test_refuses_unclassifiable_compiled_native_permissions(self) -> None:
+        self.permissions_output = "uses-permission: malformed\n"
+        with self.assertRaisesRegex(ValueError, "実効Native permission"):
+            self._package()
+        self.assertFalse(self.output.exists())
+
+    def test_refuses_android_sdk_settings_missing_from_artifact(self) -> None:
+        self.target_sdk_line = ""
+        with self.assertRaisesRegex(ValueError, "実測Android SDK設定"):
+            self._package()
+        self.assertFalse(self.output.exists())
 
     def test_schema_fixtures_separate_candidate_from_distribution_readiness(self) -> None:
         schema = json.loads(candidate.SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -223,7 +264,11 @@ class AndroidProductCandidateTests(unittest.TestCase):
                 return subprocess.CompletedProcess(
                     arguments,
                     0,
-                    stdout="package: name='com.other.app' versionCode='1' versionName='0.1.0'\n",
+                    stdout=(
+                        "package: name='com.other.app' versionCode='1' versionName='0.1.0'\n"
+                        "sdkVersion:'24'\n"
+                        "targetSdkVersion:'37'\n"
+                    ),
                     stderr="",
                 )
             return self._run_tool(arguments, **kwargs)

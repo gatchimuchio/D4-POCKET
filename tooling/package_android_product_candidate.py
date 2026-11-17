@@ -27,6 +27,11 @@ VERSION_PATTERN = re.compile(r"^[0-9][A-Za-z0-9.+_-]{0,63}$")
 PACKAGE_LINE = re.compile(
     r"(?m)^package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']*)'"
 )
+SDK_VERSION_LINE = re.compile(r"(?m)^sdkVersion:'([0-9]+)'$")
+TARGET_SDK_VERSION_LINE = re.compile(r"(?m)^targetSdkVersion:'([0-9]+)'$")
+PERMISSION_LINE = re.compile(
+    r"(?m)^uses-permission(?:-[A-Za-z0-9_-]+)?:\s+name='([A-Za-z][A-Za-z0-9_.-]{0,254})'\s*$"
+)
 DEBUG_CERTIFICATE_DN = frozenset({"cn=androiddebug", "o=android", "c=us"})
 APK_SIGNING_BLOCK_MAGIC = b"APK Sig Block 42"
 UNSIGNED_APK_DIAGNOSTIC = re.compile(
@@ -37,6 +42,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tooling.schema_check.check_schemas import validate_instance  # noqa: E402
+from tooling.mobile_product_candidate_metadata import device_link_schema_evidence  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -48,6 +54,9 @@ class ApkFacts:
     version_code: int
     version_name: str
     native_abis: tuple[str, ...]
+    native_permissions: tuple[str, ...]
+    min_sdk_version: int
+    target_sdk_version: int
     signature_state: str
 
 
@@ -341,6 +350,15 @@ def _inspect_apk(
     matches = PACKAGE_LINE.findall(package_result.stdout) if package_result.returncode == 0 else []
     if len(matches) != 1:
         raise ValueError(f"{variant} APKのapplication identityを読めない")
+    min_sdk_matches = SDK_VERSION_LINE.findall(package_result.stdout)
+    target_sdk_matches = TARGET_SDK_VERSION_LINE.findall(package_result.stdout)
+    if (
+        len(min_sdk_matches) != 1
+        or len(target_sdk_matches) != 1
+        or int(min_sdk_matches[0]) < 1
+        or int(target_sdk_matches[0]) < int(min_sdk_matches[0])
+    ):
+        raise ValueError(f"{variant} APKの実測Android SDK設定を読めない")
     application_id, version_code_text, version_name = matches[0]
     if (
         application_id != expected_app_id
@@ -349,6 +367,27 @@ def _inspect_apk(
         or version_name != expected_version_name
     ):
         raise ValueError(f"{variant} APK identity/versionがAndroid sourceと一致しない")
+
+    permissions_result = _run_tool(
+        [str(aapt), "dump", "permissions", str(path)],
+        label="aapt permissions",
+    )
+    permission_packages = re.findall(
+        r"(?m)^package:\s*([A-Za-z][A-Za-z0-9_.-]{0,254})\s*$",
+        permissions_result.stdout,
+    )
+    permission_lines = [
+        line for line in permissions_result.stdout.splitlines()
+        if line.startswith("uses-permission")
+    ]
+    permission_matches = PERMISSION_LINE.findall(permissions_result.stdout)
+    if (
+        permissions_result.returncode != 0
+        or permission_packages != [expected_app_id]
+        or len(permission_matches) != len(permission_lines)
+        or len(set(permission_matches)) != len(permission_matches)
+    ):
+        raise ValueError(f"{variant} APKの実効Native permissionを分類できない")
 
     signature = _run_tool(
         [str(apksigner), "verify", "--verbose", "--print-certs", str(path)],
@@ -384,6 +423,9 @@ def _inspect_apk(
         version_code=int(version_code_text),
         version_name=version_name,
         native_abis=native_abis,
+        native_permissions=tuple(sorted(permission_matches)),
+        min_sdk_version=int(min_sdk_matches[0]),
+        target_sdk_version=int(target_sdk_matches[0]),
         signature_state=signature_state,
     )
 
@@ -473,6 +515,7 @@ def package_android_product_candidate(
             raise ValueError("Debug APKとRelease APKのhashが同じ")
         if debug.application_id != release.application_id:
             raise ValueError("Debug APKとRelease APKのapplication IDが異なる")
+        device_link_contract = device_link_schema_evidence(ROOT)
         if _require_clean_source(source_commit) != source:
             raise ValueError("APK検査中にsource identityが変化した")
 
@@ -484,8 +527,10 @@ def package_android_product_candidate(
             "source_clean": True,
             "application_id": app_id,
             "application_identity_confirmed": False,
+            "channel": "qa_candidate",
             "version_code": version_code,
             "version_name": version_name,
+            "device_link_contract": device_link_contract,
             "toolchain": {
                 "flutter": flutter_version,
                 "java": java_version,
@@ -499,6 +544,15 @@ def package_android_product_candidate(
                     "build_configuration": "debug",
                     "signature_state": debug.signature_state,
                     "native_abis": list(debug.native_abis),
+                    "native_permissions": list(debug.native_permissions),
+                    "build_settings": {
+                        "application_id": debug.application_id,
+                        "version_code": debug.version_code,
+                        "version_name": debug.version_name,
+                        "min_sdk_version": debug.min_sdk_version,
+                        "target_sdk_version": debug.target_sdk_version,
+                        "native_abis": list(debug.native_abis),
+                    },
                 },
                 "release_candidate": {
                     "file_name": staged_release.name,
@@ -507,6 +561,15 @@ def package_android_product_candidate(
                     "build_configuration": "release",
                     "signature_state": release.signature_state,
                     "native_abis": list(release.native_abis),
+                    "native_permissions": list(release.native_permissions),
+                    "build_settings": {
+                        "application_id": release.application_id,
+                        "version_code": release.version_code,
+                        "version_name": release.version_name,
+                        "min_sdk_version": release.min_sdk_version,
+                        "target_sdk_version": release.target_sdk_version,
+                        "native_abis": list(release.native_abis),
+                    },
                 },
             },
             "distribution_ready": False,

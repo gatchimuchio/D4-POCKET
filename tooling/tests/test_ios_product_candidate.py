@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import plistlib
 import subprocess
 import tempfile
@@ -44,9 +45,24 @@ class IosProductCandidateTests(unittest.TestCase):
         bundle = self.root / name / "Runner.app"
         bundle.mkdir(parents=True)
         (bundle / "Runner").write_bytes(executable)
+        is_simulator = name.startswith("simulator")
+        platform_name = "iphonesimulator" if is_simulator else "iphoneos"
+        supported_platform = "iPhoneSimulator" if is_simulator else "iPhoneOS"
         with (bundle / "Info.plist").open("wb") as handle:
             plistlib.dump(
-                {"CFBundleIdentifier": bundle_id, "CFBundleExecutable": "Runner"},
+                {
+                    "CFBundleIdentifier": bundle_id,
+                    "CFBundleExecutable": "Runner",
+                    "CFBundleShortVersionString": "0.1.0",
+                    "CFBundleVersion": "1",
+                    "DTPlatformName": platform_name,
+                    "DTSDKName": f"{platform_name}18.5",
+                    "DTPlatformVersion": "18.5",
+                    "MinimumOSVersion": "13.0",
+                    "CFBundleSupportedPlatforms": [supported_platform],
+                    "UIDeviceFamily": [1, 2],
+                    "NSLocalNetworkUsageDescription": "D4 Pocketへ暗号化接続します。",
+                },
                 handle,
             )
         return bundle
@@ -80,14 +96,15 @@ class IosProductCandidateTests(unittest.TestCase):
         raise AssertionError(f"unexpected command: {arguments}")
 
     def _build(self) -> dict[str, object]:
-        return candidate.build_ios_product_candidate(
-            self.simulator,
-            self.device,
-            self.output,
-            source_commit="a" * 40,
-            flutter_version="3.44.0",
-            xcode_version="16.4",
-        )
+        with patch.object(candidate, "_require_clean_source", return_value="a" * 40):
+            return candidate.build_ios_product_candidate(
+                self.simulator,
+                self.device,
+                self.output,
+                source_commit="a" * 40,
+                flutter_version="3.44.0",
+                xcode_version="16.4",
+            )
 
     def test_creates_distinct_simulator_and_device_candidate_archives(self) -> None:
         evidence = self._build()
@@ -96,6 +113,29 @@ class IosProductCandidateTests(unittest.TestCase):
         self.assertEqual(evidence["formal_distribution_claimed"], False)
         self.assertEqual(evidence["simulator_artifact"]["build_configuration"], "debug")
         self.assertEqual(evidence["device_artifact"]["build_configuration"], "release")
+        self.assertEqual(evidence["evidence_source"], "INTERNAL_STATE")
+        self.assertEqual(evidence["channel"], "qa_candidate")
+        self.assertEqual(evidence["bundle_identity"]["version_name"], "0.1.0")
+        self.assertEqual(
+            evidence["native_permissions"]["device_usage_keys"],
+            ["NSLocalNetworkUsageDescription"],
+        )
+        self.assertFalse(evidence["native_permissions"]["applied_entitlements_observed"])
+        self.assertEqual(
+            evidence["device_artifact"]["build_settings"]["minimum_os_version"],
+            "13.0",
+        )
+        self.assertEqual(
+            set(evidence["device_link_contract"]["files"]),
+            {
+                "device_link_control.schema.json",
+                "device_link_credential.schema.json",
+                "device_link_invitation.schema.json",
+                "device_link_request.schema.json",
+            },
+        )
+        schema = json.loads(candidate.SCHEMA_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(candidate.validate_instance(evidence, schema), [])
         self.assertEqual(
             evidence["simulator_artifact"]["app_bundle_signature_state"],
             "unsigned",
@@ -123,6 +163,66 @@ class IosProductCandidateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Bundle Identifier"):
             self._build()
         self.assertFalse(self.output.exists())
+
+    def test_rejects_simulator_and_device_version_mismatch(self) -> None:
+        info_path = self.device / "Info.plist"
+        info = plistlib.loads(info_path.read_bytes())
+        info["CFBundleVersion"] = "2"
+        info_path.write_bytes(plistlib.dumps(info))
+        with self.assertRaisesRegex(ValueError, "versionが異なる"):
+            self._build()
+        self.assertFalse(self.output.exists())
+
+    def test_rejects_artifact_build_settings_that_disagree_with_platform(self) -> None:
+        info_path = self.simulator / "Info.plist"
+        info = plistlib.loads(info_path.read_bytes())
+        info["DTPlatformName"] = "iphoneos"
+        info_path.write_bytes(plistlib.dumps(info))
+        with self.assertRaisesRegex(ValueError, "実測build settings"):
+            self._build()
+        self.assertFalse(self.output.exists())
+
+    def test_rejects_empty_native_permission_usage_description(self) -> None:
+        info_path = self.device / "Info.plist"
+        info = plistlib.loads(info_path.read_bytes())
+        info["NSLocalNetworkUsageDescription"] = "  "
+        info_path.write_bytes(plistlib.dumps(info))
+        with self.assertRaisesRegex(ValueError, "usage descriptionが空"):
+            self._build()
+        self.assertFalse(self.output.exists())
+
+    def test_source_provenance_rejects_dirty_checkout(self) -> None:
+        head = subprocess.CompletedProcess(["git"], 0, stdout="a" * 40, stderr="")
+        dirty = subprocess.CompletedProcess(["git"], 0, stdout=" M apps/mobile_flutter/ios/Runner/Info.plist\n", stderr="")
+        with patch.object(candidate.subprocess, "run", side_effect=[head, dirty]):
+            with self.assertRaisesRegex(ValueError, "未commit差分"):
+                candidate._require_clean_source("a" * 40)
+
+    def test_source_provenance_allows_only_workflow_evidence_output(self) -> None:
+        self._run.stop()
+        source_root = self.root / "source"
+        source_root.mkdir()
+        subprocess.run(["git", "init", "-q", str(source_root)], check=True)
+        subprocess.run(["git", "-C", str(source_root), "config", "user.name", "Candidate Test"], check=True)
+        subprocess.run(["git", "-C", str(source_root), "config", "user.email", "candidate@example.invalid"], check=True)
+        tracked = source_root / "README.md"
+        tracked.write_text("source\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(source_root), "add", "README.md"], check=True)
+        subprocess.run(["git", "-C", str(source_root), "commit", "-q", "-m", "fixture"], check=True)
+        source_commit = subprocess.run(
+            ["git", "-C", str(source_root), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        evidence = source_root / "evidence"
+        evidence.mkdir()
+        (evidence / "workflow.log").write_text("build log\n", encoding="utf-8")
+        with patch.object(candidate, "ROOT", source_root):
+            self.assertEqual(candidate._require_clean_source(source_commit), source_commit)
+            (source_root / "source.py").write_text("uncommitted source\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "未commit差分"):
+                candidate._require_clean_source(source_commit)
 
     def test_rejects_developer_identity_and_provisioning_profile(self) -> None:
         (self.device / "_CodeSignature").mkdir()
@@ -263,15 +363,16 @@ class IosProductCandidateTests(unittest.TestCase):
         inside = candidate.ROOT / "generated-ios-candidate"
         with patch.object(candidate, "ROOT", self.root):
             inside = self.root / "generated-ios-candidate"
-            with self.assertRaisesRegex(ValueError, "Repository外"):
-                candidate.build_ios_product_candidate(
-                    self.simulator,
-                    self.device,
-                    inside,
-                    source_commit="a" * 40,
-                    flutter_version="3.44.0",
-                    xcode_version="16.4",
-                )
+            with patch.object(candidate, "_require_clean_source", return_value="a" * 40):
+                with self.assertRaisesRegex(ValueError, "Repository外"):
+                    candidate.build_ios_product_candidate(
+                        self.simulator,
+                        self.device,
+                        inside,
+                        source_commit="a" * 40,
+                        flutter_version="3.44.0",
+                        xcode_version="16.4",
+                    )
         self.assertFalse(inside.exists())
 
 

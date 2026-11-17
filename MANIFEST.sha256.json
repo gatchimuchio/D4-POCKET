@@ -1629,7 +1629,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "1ce51b0fa2a7db5e56c48152f2de8c5700996bc0b10e05b4e413912afd5bc238"
+      "sha256": "735280a0a2ad5c99806ffe3039989bda2c486469c5441ae0569e426a8f35c24a"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -2405,7 +2405,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_android_product_candidate.valid.json",
-      "sha256": "83af20ee5695896c7c219df70e1401aeeb699f4ae48518cdc0d41206d12470ce"
+      "sha256": "d5468522bbb7d764b79a0f20b9a1c79124f6bc615271e85cebec7c8680fcf582"
     },
     {
       "path": "examples/contracts/gui_shell_compose.valid.json",
@@ -2441,7 +2441,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_ios_product_candidate.valid.json",
-      "sha256": "69d791366f090d71ae94adb71d16c3636d3be20db55f417ba5e678025147a064"
+      "sha256": "689bafb2553de106abdd2ab56fa8dba06fde0ecb5ec20898f6ac8ea7c9013feb"
     },
     {
       "path": "examples/contracts/gui_shell_linux_export_build.valid.json",
@@ -2913,7 +2913,7 @@
     },
     {
       "path": "examples/contracts/invalid/gui_shell_android_product_candidate_distribution_ready.invalid.json",
-      "sha256": "beded6d67eff4e3e13a4f257f0db3b9b80de20a3f7d7b22c0d3a0812641d960f"
+      "sha256": "b6c58a6737e94ba5af8c577085874609e9911f6daf9cc1157abe18e6dd45f9e0"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_compose_authority.invalid.json",
@@ -5245,7 +5245,7 @@
     },
     {
       "path": "specs/gui_shell_android_product_candidate.schema.json",
-      "sha256": "7197f3de4147bd33a7778da064b1c95ac4208efc102d57227490dedda9e2219f"
+      "sha256": "ae02fd75959004f07ad7d292018bd2f3efc07101d0b27790b336056ab67d18f9"
     },
     {
       "path": "specs/gui_shell_compose.schema.json",
@@ -5281,7 +5281,7 @@
     },
     {
       "path": "specs/gui_shell_ios_product_candidate.schema.json",
-      "sha256": "3c0b6a0b45df869a102aefad3989002721191799eaddab8cd58b0923f534cc4f"
+      "sha256": "36999d946857dd3c5a47501a13964474209230b511904e77092dde0f45525ad4"
     },
     {
       "path": "specs/gui_shell_linux_export_build.schema.json",
@@ -5849,11 +5849,11 @@
     },
     {
       "path": "tooling/package_android_product_candidate.py",
-      "sha256": "603b39c53a41344dfaf77e02f5b298b0a445af0ec1d1b7c9258886a17d20dd74"
+      "sha256": "a9858770b345d89596e8f0e751be14a86be3867ad5f473cb584da2430e78c8f5"
     },
     {
       "path": "tooling/package_ios_product_candidate.py",
-      "sha256": "6c382aab3786d1629bfa031578e7292ec3f6e73e740f4e4a28c75220b42b0a84"
+      "sha256": "447e11c03c6050bfb33400f2cbc71268e11b9cd8eeff25bf91a87850123da5be"
     },
     {
       "path": "tooling/package_linux_deb_setup.py",
@@ -5969,7 +5969,7 @@
     },
     {
       "path": "tooling/tests/test_android_product_candidate.py",
-      "sha256": "d78d76c9ef91991e5cf27f7932cd05492395b843f8aa2954928c74444f7adfba"
+      "sha256": "3b95e450c185e6bf67467ccc786399b4e2d0aab301b92f394e1de0578f565932"
     },
     {
       "path": "tooling/tests/test_compare_module_builds_windows.py",
@@ -5985,7 +5985,7 @@
     },
     {
       "path": "tooling/tests/test_ios_product_candidate.py",
-      "sha256": "c582e42c9e989adb1f9912c16c18fbc65d1f7c67a14c099fac046e9f17d41f34"
+      "sha256": "adb3f458796678475ad68db33227c4df4423509bdadd321766708bffcb210147"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",

@@ -12,8 +12,10 @@
     "source_clean",
     "application_id",
     "application_identity_confirmed",
+    "channel",
     "version_code",
     "version_name",
+    "device_link_contract",
     "toolchain",
     "artifacts",
     "distribution_ready",
@@ -30,8 +32,28 @@
     "source_clean": { "const": true },
     "application_id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$" },
     "application_identity_confirmed": { "const": false },
+    "channel": { "const": "qa_candidate" },
     "version_code": { "type": "integer", "minimum": 1 },
     "version_name": { "type": "string", "pattern": "^[0-9][A-Za-z0-9.+_-]{0,63}$" },
+    "device_link_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "files"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "files": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["device_link_control.schema.json", "device_link_credential.schema.json", "device_link_invitation.schema.json", "device_link_request.schema.json"],
+          "properties": {
+            "device_link_control.schema.json": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "device_link_credential.schema.json": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "device_link_invitation.schema.json": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "device_link_request.schema.json": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          }
+        }
+      }
+    },
     "toolchain": {
       "type": "object",
       "additionalProperties": false,
@@ -61,7 +83,7 @@
     "baseArtifact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["file_name", "sha256", "size_bytes", "build_configuration", "signature_state", "native_abis"],
+      "required": ["file_name", "sha256", "size_bytes", "build_configuration", "signature_state", "native_abis", "native_permissions", "build_settings"],
       "properties": {
         "file_name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\\.apk$" },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
@@ -73,6 +95,30 @@
           "maxItems": 32,
           "uniqueItems": true,
           "items": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" }
+        },
+        "native_permissions": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,254}$" }
+        },
+        "build_settings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["application_id", "version_code", "version_name", "min_sdk_version", "target_sdk_version", "native_abis"],
+          "properties": {
+            "application_id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$" },
+            "version_code": { "type": "integer", "minimum": 1 },
+            "version_name": { "type": "string", "pattern": "^[0-9][A-Za-z0-9.+_-]{0,63}$" },
+            "min_sdk_version": { "type": "integer", "minimum": 1 },
+            "target_sdk_version": { "type": "integer", "minimum": 1 },
+            "native_abis": {
+              "type": "array",
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" }
+            }
+          }
         }
       }
     },

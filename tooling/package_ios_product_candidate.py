@@ -35,12 +35,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tooling.schema_check.check_schemas import validate_instance  # noqa: E402
+from tooling.mobile_product_candidate_metadata import device_link_schema_evidence  # noqa: E402
 
 
 @dataclass(frozen=True)
 class BundleFacts:
     path: Path
     bundle_identifier: str
+    version_name: str
+    version_code: str
     executable_sha256: str
     tree_sha256: str
     entry_count: int
@@ -49,6 +52,8 @@ class BundleFacts:
     platform: str
     build_configuration: str
     signature_state: str
+    build_settings: dict[str, Any]
+    privacy_usage_keys: tuple[str, ...]
 
 
 def _sha256_file(path: Path) -> str:
@@ -57,6 +62,77 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _require_clean_source(expected_commit: str) -> str:
+    """Bind source inputs while allowing only untracked Apple workflow evidence files."""
+    if COMMIT_PATTERN.fullmatch(expected_commit) is None:
+        raise ValueError("iOS candidate source commitがfull SHA-1ではない")
+    try:
+        head = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+        ).stdout.strip()
+        status_output = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(ROOT),
+                "status",
+                "--porcelain=v1",
+                "-z",
+                "--untracked-files=all",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+        ).stdout
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ValueError("iOS candidate source commitとworking tree状態を確認できない") from error
+    dirty_entries = []
+    for entry in status_output.split("\0"):
+        if not entry:
+            continue
+        status = entry[:2]
+        path = entry[3:] if len(entry) > 3 else ""
+        if status == "??" and path.replace("\\", "/").startswith("evidence/"):
+            continue
+        dirty_entries.append(entry)
+    if head != expected_commit or dirty_entries:
+        raise ValueError("iOS candidate source commitがHEADと不一致、またはsourceに未commit差分がある")
+    return head
+
+
+def _source_entitlement_declarations() -> dict[str, Any]:
+    path = ROOT / "apps/mobile_flutter/ios/Runner/Runner.entitlements"
+    try:
+        metadata = path.lstat()
+    except OSError as error:
+        raise ValueError("iOS entitlement sourceを確認できない") from error
+    if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode) or metadata.st_size > 64_000:
+        raise ValueError("iOS entitlement sourceが通常fileまたはsize上限に適合しない")
+    try:
+        with path.open("rb") as handle:
+            value = plistlib.load(handle)
+    except (OSError, plistlib.InvalidFileException) as error:
+        raise ValueError("iOS entitlement sourceを読めない") from error
+    if not isinstance(value, dict) or any(
+        not isinstance(key, str) or re.fullmatch(r"[A-Za-z0-9.-]{1,128}", key) is None
+        for key in value
+    ):
+        raise ValueError("iOS entitlement sourceの構造が不正")
+    return {
+        "source_sha256": _sha256_file(path),
+        "declared_keys": sorted(value),
+    }
 
 
 def _inspect_app_bundle_signature(bundle: Path) -> str:
@@ -114,14 +190,52 @@ def _safe_app_bundle(
         raise ValueError("iOS app Info.plistのrootがobjectではない")
     bundle_identifier = info.get("CFBundleIdentifier")
     executable_name = info.get("CFBundleExecutable")
+    version_name = info.get("CFBundleShortVersionString")
+    version_code = info.get("CFBundleVersion")
     if (
         not isinstance(bundle_identifier, str)
         or re.fullmatch(r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+){1,7}", bundle_identifier)
         is None
         or not isinstance(executable_name, str)
         or re.fullmatch(r"[A-Za-z0-9._-]{1,128}", executable_name) is None
+        or not isinstance(version_name, str)
+        or VERSION_PATTERN.fullmatch(version_name) is None
+        or not isinstance(version_code, str)
+        or VERSION_PATTERN.fullmatch(version_code) is None
     ):
-        raise ValueError("iOS app identityまたは実行file名が不正")
+        raise ValueError("iOS app identity、versionまたは実行file名が不正")
+
+    platform_name = info.get("DTPlatformName")
+    sdk_name = info.get("DTSDKName")
+    sdk_version = info.get("DTPlatformVersion")
+    minimum_os_version = info.get("MinimumOSVersion")
+    supported_platforms = info.get("CFBundleSupportedPlatforms")
+    device_families = info.get("UIDeviceFamily")
+    expected_platform_name = "iphonesimulator" if expected_platform == "IOSSIMULATOR" else "iphoneos"
+    expected_supported_platform = "iPhoneSimulator" if expected_platform == "IOSSIMULATOR" else "iPhoneOS"
+    if (
+        platform_name != expected_platform_name
+        or not isinstance(sdk_name, str)
+        or re.fullmatch(r"(?:iphoneos|iphonesimulator)[0-9]+(?:\.[0-9]+){0,2}", sdk_name) is None
+        or not sdk_name.startswith(expected_platform_name)
+        or not isinstance(sdk_version, str)
+        or re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,2}", sdk_version) is None
+        or not isinstance(minimum_os_version, str)
+        or re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,2}", minimum_os_version) is None
+        or not isinstance(supported_platforms, list)
+        or supported_platforms != [expected_supported_platform]
+        or not isinstance(device_families, list)
+        or not device_families
+        or any(type(value) is not int or value not in {1, 2} for value in device_families)
+        or len(set(device_families)) != len(device_families)
+    ):
+        raise ValueError("iOS artifactの実測build settingsがplatform契約に適合しない")
+    privacy_usage_keys: list[str] = []
+    for key, value in info.items():
+        if isinstance(key, str) and key.startswith("NS") and key.endswith("UsageDescription"):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("iOS native permissionのusage descriptionが空または不正")
+            privacy_usage_keys.append(key)
     executable = bundle / executable_name
     executable_metadata = executable.lstat()
     if not stat.S_ISREG(executable_metadata.st_mode) or stat.S_ISLNK(executable_metadata.st_mode):
@@ -169,6 +283,23 @@ def _safe_app_bundle(
             f"observed={observed}; output={detail}"
         )
 
+    build_settings: dict[str, Any] = {
+        "target": "Runner",
+        "configuration": build_configuration,
+        "platform": expected_platform,
+        "bundle_identifier": bundle_identifier,
+        "version_name": version_name,
+        "version_code": version_code,
+        "sdk": sdk_name,
+        "sdk_version": sdk_version,
+        "minimum_os_version": minimum_os_version,
+        "device_families": device_families,
+        "architectures": list(architectures),
+    }
+    build_settings["sha256"] = hashlib.sha256(
+        json.dumps(build_settings, sort_keys=True, separators=(",", ":")).encode("ascii")
+    ).hexdigest()
+
     digest = hashlib.sha256()
     entry_count = 0
     total_bytes = 0
@@ -205,6 +336,8 @@ def _safe_app_bundle(
     return BundleFacts(
         path=bundle,
         bundle_identifier=bundle_identifier,
+        version_name=version_name,
+        version_code=version_code,
         executable_sha256=_sha256_file(executable),
         tree_sha256=digest.hexdigest(),
         entry_count=entry_count,
@@ -213,6 +346,8 @@ def _safe_app_bundle(
         platform=expected_platform,
         build_configuration=build_configuration,
         signature_state=signature_state,
+        build_settings=build_settings,
+        privacy_usage_keys=tuple(sorted(privacy_usage_keys)),
     )
 
 
@@ -254,6 +389,8 @@ def _artifact_record(path: Path, bundle: BundleFacts) -> dict[str, Any]:
         "sha256": _sha256_file(path),
         "size_bytes": path.stat().st_size,
         "bundle_identifier": bundle.bundle_identifier,
+        "version_name": bundle.version_name,
+        "version_code": bundle.version_code,
         "main_executable_sha256": bundle.executable_sha256,
         "bundle_tree_sha256": bundle.tree_sha256,
         "bundle_file_count": bundle.entry_count,
@@ -261,6 +398,8 @@ def _artifact_record(path: Path, bundle: BundleFacts) -> dict[str, Any]:
         "architectures": list(bundle.architectures),
         "platform": bundle.platform,
         "build_configuration": bundle.build_configuration,
+        "build_settings": bundle.build_settings,
+        "privacy_usage_keys": list(bundle.privacy_usage_keys),
         "app_bundle_signature_state": bundle.signature_state,
         "signature_inspection": "codesign_display",
         "provisioning_profile_present": False,
@@ -292,8 +431,7 @@ def build_ios_product_candidate(
 ) -> dict[str, Any]:
     if platform.system() != "Darwin":
         raise ValueError("iOS product candidate生成にはmacOS native build hostが必要")
-    if COMMIT_PATTERN.fullmatch(source_commit) is None:
-        raise ValueError("iOS candidate source commitがfull SHA-1ではない")
+    source = _require_clean_source(source_commit)
     if VERSION_PATTERN.fullmatch(flutter_version) is None or VERSION_PATTERN.fullmatch(xcode_version) is None:
         raise ValueError("iOS candidate toolchain versionが不正")
 
@@ -310,6 +448,8 @@ def build_ios_product_candidate(
     )
     if simulator.bundle_identifier != device.bundle_identifier:
         raise ValueError("Simulatorとdevice appのBundle Identifierが異なる")
+    if (simulator.version_name, simulator.version_code) != (device.version_name, device.version_code):
+        raise ValueError("Simulatorとdevice appのversionが異なる")
     if simulator.executable_sha256 == device.executable_sha256:
         raise ValueError("Simulatorとdevice appの実行binaryが同一")
 
@@ -326,10 +466,15 @@ def build_ios_product_candidate(
             or simulator.executable_sha256 == device.executable_sha256
         ):
             raise ValueError("iOS Simulatorとdevice artifactのbinary identityが分離されていない")
+        entitlement_declarations = _source_entitlement_declarations()
+        device_link_contract = device_link_schema_evidence(ROOT)
         evidence: dict[str, Any] = {
             "schema_version": 1,
             "evidence_type": "d4_pocket_ios_product_build_candidate",
-            "source_commit": source_commit,
+            "evidence_source": "INTERNAL_STATE",
+            "source_commit": source,
+            "source_clean": True,
+            "channel": "qa_candidate",
             "toolchain": {
                 "flutter_version": flutter_version,
                 "xcode_version": xcode_version,
@@ -337,9 +482,20 @@ def build_ios_product_candidate(
             },
             "bundle_identity": {
                 "bundle_identifier": simulator.bundle_identifier,
+                "version_name": simulator.version_name,
+                "version_code": simulator.version_code,
                 "owner_confirmed": False,
                 "distribution_identity": False,
             },
+            "native_permissions": {
+                "evidence_source": "built_info_plist_and_source_entitlements",
+                "simulator_usage_keys": list(simulator.privacy_usage_keys),
+                "device_usage_keys": list(device.privacy_usage_keys),
+                "source_entitlements_sha256": entitlement_declarations["source_sha256"],
+                "source_entitlement_keys": entitlement_declarations["declared_keys"],
+                "applied_entitlements_observed": False,
+            },
+            "device_link_contract": device_link_contract,
             "simulator_artifact": simulator_artifact,
             "device_artifact": device_artifact,
             "relationship": {
@@ -355,6 +511,8 @@ def build_ios_product_candidate(
         errors = validate_instance(evidence, json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
         if errors:
             raise ValueError("iOS candidate evidenceがSchema不適合: " + "; ".join(errors[:8]))
+        if _require_clean_source(source_commit) != source:
+            raise ValueError("iOS candidate source identity changed during packaging")
         (stage / "ios-product-candidate.json").write_text(
             json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )

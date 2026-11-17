@@ -1,7 +1,10 @@
 {
   "schema_version": 1,
   "evidence_type": "d4_pocket_ios_product_build_candidate",
+  "evidence_source": "INTERNAL_STATE",
   "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_clean": true,
+  "channel": "qa_candidate",
   "toolchain": {
     "flutter_version": "3.44.0",
     "xcode_version": "16.4",
@@ -9,14 +12,35 @@
   },
   "bundle_identity": {
     "bundle_identifier": "com.example.guiShellMobile",
+    "version_name": "0.1.0",
+    "version_code": "1",
     "owner_confirmed": false,
     "distribution_identity": false
+  },
+  "native_permissions": {
+    "evidence_source": "built_info_plist_and_source_entitlements",
+    "simulator_usage_keys": ["NSLocalNetworkUsageDescription"],
+    "device_usage_keys": ["NSLocalNetworkUsageDescription"],
+    "source_entitlements_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "source_entitlement_keys": ["keychain-access-groups"],
+    "applied_entitlements_observed": false
+  },
+  "device_link_contract": {
+    "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "files": {
+      "device_link_control.schema.json": "4444444444444444444444444444444444444444444444444444444444444444",
+      "device_link_credential.schema.json": "5555555555555555555555555555555555555555555555555555555555555555",
+      "device_link_invitation.schema.json": "6666666666666666666666666666666666666666666666666666666666666666",
+      "device_link_request.schema.json": "7777777777777777777777777777777777777777777777777777777777777777"
+    }
   },
   "simulator_artifact": {
     "file_name": "d4-pocket-ios-simulator-app.zip",
     "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "size_bytes": 104857600,
     "bundle_identifier": "com.example.guiShellMobile",
+    "version_name": "0.1.0",
+    "version_code": "1",
     "main_executable_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "bundle_tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "bundle_file_count": 240,
@@ -24,6 +48,21 @@
     "architectures": ["arm64"],
     "platform": "IOSSIMULATOR",
     "build_configuration": "debug",
+    "build_settings": {
+      "target": "Runner",
+      "configuration": "debug",
+      "platform": "IOSSIMULATOR",
+      "bundle_identifier": "com.example.guiShellMobile",
+      "version_name": "0.1.0",
+      "version_code": "1",
+      "sdk": "iphonesimulator18.5",
+      "sdk_version": "18.5",
+      "minimum_os_version": "13.0",
+      "device_families": [1, 2],
+      "architectures": ["arm64"],
+      "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "privacy_usage_keys": ["NSLocalNetworkUsageDescription"],
     "app_bundle_signature_state": "adhoc_no_identity",
     "signature_inspection": "codesign_display",
     "provisioning_profile_present": false
@@ -33,6 +72,8 @@
     "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "size_bytes": 99000000,
     "bundle_identifier": "com.example.guiShellMobile",
+    "version_name": "0.1.0",
+    "version_code": "1",
     "main_executable_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     "bundle_tree_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
     "bundle_file_count": 240,
@@ -40,6 +81,21 @@
     "architectures": ["arm64"],
     "platform": "IOS",
     "build_configuration": "release",
+    "build_settings": {
+      "target": "Runner",
+      "configuration": "release",
+      "platform": "IOS",
+      "bundle_identifier": "com.example.guiShellMobile",
+      "version_name": "0.1.0",
+      "version_code": "1",
+      "sdk": "iphoneos18.5",
+      "sdk_version": "18.5",
+      "minimum_os_version": "13.0",
+      "device_families": [1, 2],
+      "architectures": ["arm64"],
+      "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+    },
+    "privacy_usage_keys": ["NSLocalNetworkUsageDescription"],
     "app_bundle_signature_state": "adhoc_no_identity",
     "signature_inspection": "codesign_display",
     "provisioning_profile_present": false
