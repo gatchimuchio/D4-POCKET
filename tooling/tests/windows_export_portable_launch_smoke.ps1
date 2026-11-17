@@ -431,10 +431,38 @@ try {
   if ($null -eq ('GuiShellExportSmokeWin32' -as [type])) {
     Add-Type -TypeDefinition @"
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 public static class GuiShellExportSmokeWin32 {
+  private delegate bool EnumChildProc(IntPtr window, IntPtr parameter);
+
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
+  [DllImport("user32.dll", SetLastError = true)]
+  private static extern bool EnumChildWindows(IntPtr parent, EnumChildProc callback, IntPtr parameter);
+
+  [DllImport("user32.dll", EntryPoint = "GetWindowTextLengthW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+  private static extern int GetWindowTextLengthW(IntPtr window);
+
+  [DllImport("user32.dll", EntryPoint = "GetWindowTextW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+  private static extern int GetWindowTextW(IntPtr window, StringBuilder text, int maximumCount);
+
+  public static string[] GetChildWindowTexts(IntPtr parent) {
+    var texts = new List<string>();
+    EnumChildProc callback = delegate(IntPtr window, IntPtr parameter) {
+      int length = GetWindowTextLengthW(window);
+      if (length <= 0 || length > 8192) return true;
+      var text = new StringBuilder(length + 1);
+      GetWindowTextW(window, text, text.Capacity);
+      if (!String.IsNullOrWhiteSpace(text.ToString())) texts.Add(text.ToString());
+      return true;
+    };
+    EnumChildWindows(parent, callback, IntPtr.Zero);
+    GC.KeepAlive(callback);
+    return texts.ToArray();
+  }
 }
 "@
   }
@@ -476,6 +504,10 @@ public static class GuiShellExportSmokeWin32 {
       }
     } catch { }
   }
+  $nativeDialogTexts = [GuiShellExportSmokeWin32]::GetChildWindowTexts(
+    [IntPtr]$probeDialog.Current.NativeWindowHandle
+  )
+  foreach ($text in $nativeDialogTexts) { [void]$probeText.Add([string]$text) }
   if (($probeText -join "`n").IndexOf('UNSUPPORTED_ARGUMENTS', [StringComparison]::Ordinal) -lt 0) {
     throw 'launcher did not expose the expected unsupported-argument code'
   }
