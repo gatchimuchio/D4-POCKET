@@ -558,7 +558,17 @@ public static class GuiShellExportSmokeWin32 {
       $_.Current.Name -eq 'ナビゲーション' -or $_.Current.AutomationId -eq 'gui_shell.surface.navigation_rail'
     } catch { $false }
   } | Select-Object -First 1)
-  if ($navRoot.Count -ne 1) { throw 'NavigationRail semantic root was not observed' }
+  if ($navRoot.Count -ne 1) {
+    $knownNavigationLabels = @('観測', '追跡', '診断', '履歴', '評価ラボ', 'ホスト能力', '通知', 'Host操作')
+    $observedKnownNavigationLabels = @($elements | ForEach-Object {
+      try { [string]$_.Current.Name } catch { '' }
+    } | Where-Object { $knownNavigationLabels -ccontains $_ } | Sort-Object -Unique)
+    $railIdentifierCount = @($elements | Where-Object {
+      try { $_.Current.AutomationId -eq 'gui_shell.surface.navigation_rail' } catch { $false }
+    }).Count
+    $stage = "locate live NavigationRail semantic root (raw_nodes=$($elements.Count); known_labels=$($observedKnownNavigationLabels -join ','); rail_identifier_count=$railIdentifierCount)"
+    throw 'NavigationRail semantic root was not observed'
+  }
   $stage = 'enumerate live NavigationRail semantic children'
   $navigationElements = @(Get-RawViewDescendants -RootElement $navRoot[0])
   $navigationNames = @($navigationElements | ForEach-Object {
