@@ -458,10 +458,25 @@ public static class GuiShellExportSmokeWin32 {
   if ($null -eq $probeDialog) { throw 'launcher refusal dialog was not observed' }
   $stage = 'verify launcher refusal error code'
   $probeElements = @(Get-ControlViewDescendants -RootElement $probeDialog -MaximumElements 2048)
-  $probeNames = @($probeElements | ForEach-Object {
-    try { [string]$_.Current.Name } catch { '' }
-  } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-  if (@($probeNames | Where-Object { $_.Contains('UNSUPPORTED_ARGUMENTS') }).Count -eq 0) {
+  $probeText = [System.Collections.Generic.List[string]]::new()
+  try { [void]$probeText.Add([string]$probeDialog.Current.Name) } catch { }
+  foreach ($element in $probeElements) {
+    try { [void]$probeText.Add([string]$element.Current.Name) } catch { }
+    try { [void]$probeText.Add([string]$element.Current.HelpText) } catch { }
+    try {
+      $valuePattern = $null
+      if ($element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$valuePattern)) {
+        [void]$probeText.Add([string]$valuePattern.Current.Value)
+      }
+    } catch { }
+    try {
+      $textPattern = $null
+      if ($element.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern, [ref]$textPattern)) {
+        [void]$probeText.Add([string]$textPattern.DocumentRange.GetText(4096))
+      }
+    } catch { }
+  }
+  if (($probeText -join "`n").IndexOf('UNSUPPORTED_ARGUMENTS', [StringComparison]::Ordinal) -lt 0) {
     throw 'launcher did not expose the expected unsupported-argument code'
   }
   $probeButton = @($probeElements | Where-Object {
