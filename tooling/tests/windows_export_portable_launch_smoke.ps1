@@ -443,19 +443,22 @@ public static class GuiShellExportSmokeWin32 {
   [DllImport("user32.dll", SetLastError = true)]
   private static extern bool EnumChildWindows(IntPtr parent, EnumChildProc callback, IntPtr parameter);
 
-  [DllImport("user32.dll", EntryPoint = "GetWindowTextLengthW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
-  private static extern int GetWindowTextLengthW(IntPtr window);
+  [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+  private static extern IntPtr SendMessageTimeoutLength(IntPtr window, uint message, IntPtr wParam, IntPtr lParam, uint flags, uint timeoutMilliseconds, out IntPtr result);
 
-  [DllImport("user32.dll", EntryPoint = "GetWindowTextW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
-  private static extern int GetWindowTextW(IntPtr window, StringBuilder text, int maximumCount);
+  [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+  private static extern IntPtr SendMessageTimeoutText(IntPtr window, uint message, IntPtr wParam, StringBuilder text, uint flags, uint timeoutMilliseconds, out IntPtr result);
 
   public static string[] GetChildWindowTexts(IntPtr parent) {
     var texts = new List<string>();
     EnumChildProc callback = delegate(IntPtr window, IntPtr parameter) {
-      int length = GetWindowTextLengthW(window);
+      IntPtr lengthResult;
+      if (SendMessageTimeoutLength(window, 0x000E, IntPtr.Zero, IntPtr.Zero, 0x0002, 1000, out lengthResult) == IntPtr.Zero) return true;
+      long length = lengthResult.ToInt64();
       if (length <= 0 || length > 8192) return true;
-      var text = new StringBuilder(length + 1);
-      GetWindowTextW(window, text, text.Capacity);
+      var text = new StringBuilder((int)length + 1);
+      IntPtr textResult;
+      if (SendMessageTimeoutText(window, 0x000D, new IntPtr(text.Capacity), text, 0x0002, 1000, out textResult) == IntPtr.Zero) return true;
       if (!String.IsNullOrWhiteSpace(text.ToString())) texts.Add(text.ToString());
       return true;
     };
