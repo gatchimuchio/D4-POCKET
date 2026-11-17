@@ -1,6 +1,42 @@
 {
-  "version": 1,
+  "version": 2,
+  "snapshot_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "runtime_ids": ["runtime.fixture"],
+  "runtimes": [
+    {
+      "runtime_id": "runtime.fixture",
+      "adapter_id": "example-local-agent-adapter",
+      "version": "0.1.0",
+      "abi": "unknown",
+      "architecture": "unknown",
+      "os": ["windows"],
+      "status": "unsupported",
+      "capabilities": [
+        {
+          "capability_id": "text_generation",
+          "support": {
+            "status": "unsupported",
+            "reason": "実物Agent接続を確認していないため未対応として扱う"
+          }
+        }
+      ],
+      "permissions": {"status": "not_granted", "requirements": []},
+      "dependencies": {"status": "unknown", "items": []},
+      "scope": {
+        "workspace": {
+          "mode": "required",
+          "boundary_policy": "deny_outside_workspace",
+          "secret_paths": [".env", ".ssh", "secrets/"]
+        },
+        "host": {
+          "platforms": ["windows"],
+          "network_scope": "unsupported",
+          "process_spawn": {"status": "unsupported", "reason": "Launcher未接続"}
+        }
+      },
+      "evidence_source": "INTERNAL_STATE"
+    }
+  ],
   "agents": [
     {
       "runtime_id": "runtime.fixture",
@@ -36,10 +72,32 @@
           "platforms": ["windows"],
           "network_scope": "unsupported",
           "process_spawn": {"status": "unsupported", "reason": "Launcher未接続"}
-        }
+        },
+        "evidence_source": "INTERNAL_STATE"
       }
     }
   ],
+  "tools": [],
+  "hosts": [
+    {
+      "host_id": "gui-shell-local-windows",
+      "display_name": "ローカル windows",
+      "kind": "local",
+      "version": "unknown",
+      "abi": "unknown",
+      "architecture": "x86_64",
+      "os": "windows",
+      "status": "degraded",
+      "connection_state": "local",
+      "trust_state": "local_runtime_only",
+      "permissions": {"status": "not_granted", "requirements": []},
+      "dependencies": {"status": "unknown", "items": []},
+      "scope": {"capabilities": []},
+      "evidence_source": "LIVE_RUNTIME",
+      "authority_strip": true
+    }
+  ],
+  "host_switch_generation": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "evidence_source": "INTERNAL_STATE",
   "authority_strip": true,
   "permission_generated": false

@@ -1623,7 +1623,10 @@ void main() {
     final exportRequest = transport.requests.singleWhere(
       (request) => request['operation'] == 'GUI Shell書出し',
     );
-    final composedManifest = composeRequest['payload']! as Map<String, Object?>;
+    final composePayload = composeRequest['payload']! as Map<String, Object?>;
+    final composedManifest =
+        composePayload['compose_manifest']! as Map<String, Object?>;
+    expect(composePayload['catalog_snapshot_hash'], startsWith('sha256:'));
     final exportPayload = exportRequest['payload']! as Map<String, Object?>;
     expect(composedManifest['runtime_ids'], ['fixture-runtime']);
     expect(composedManifest['agent_ids'], ['fixture-agent']);
@@ -6977,8 +6980,40 @@ class _ComposeExportNavigationTransport implements BrokerTransport {
         'audit_event_id': 'fixture-compose-catalog-audit',
         'error': null,
         'body': {
-          'version': 1,
+          'version': 2,
+          'snapshot_hash':
+              'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           'runtime_ids': ['fixture-runtime'],
+          'runtimes': [
+            {
+              'runtime_id': 'fixture-runtime',
+              'adapter_id': 'fixture-adapter',
+              'version': '1.0.0',
+              'abi': 'unknown',
+              'architecture': 'unknown',
+              'os': ['windows'],
+              'status': 'ready',
+              'capabilities': [],
+              'permissions': {'status': 'not_granted', 'requirements': []},
+              'dependencies': {'status': 'unknown', 'items': []},
+              'scope': {
+                'workspace': {
+                  'mode': 'required',
+                  'boundary_policy': 'deny_outside_workspace',
+                  'secret_paths': ['.env', '.ssh', 'secrets/'],
+                },
+                'host': {
+                  'platforms': ['windows'],
+                  'network_scope': 'loopback_only',
+                  'process_spawn': {
+                    'status': 'unsupported',
+                    'reason': 'fixture only',
+                  },
+                },
+              },
+              'evidence_source': 'INTERNAL_STATE',
+            },
+          ],
           'agents': [
             {
               'runtime_id': 'fixture-runtime',
@@ -6990,9 +7025,44 @@ class _ComposeExportNavigationTransport implements BrokerTransport {
                 'model': 'fixture-model',
                 'status': 'ready',
                 'capabilities': [],
+                'workspace_requirements': {
+                  'mode': 'required',
+                  'boundary_policy': 'deny_outside_workspace',
+                  'secret_paths': ['.env', '.ssh', 'secrets/'],
+                },
+                'host_requirements': {
+                  'platforms': ['windows'],
+                  'network_scope': 'loopback_only',
+                  'process_spawn': {
+                    'status': 'unsupported',
+                    'reason': 'fixture only',
+                  },
+                },
               },
             },
           ],
+          'tools': [],
+          'hosts': [
+            {
+              'host_id': 'gui-shell-local-windows',
+              'display_name': 'Local Windows',
+              'kind': 'local',
+              'version': 'unknown',
+              'abi': 'unknown',
+              'architecture': 'x86_64',
+              'os': 'windows',
+              'status': 'degraded',
+              'connection_state': 'local',
+              'trust_state': 'local_runtime_only',
+              'permissions': {'status': 'not_granted', 'requirements': []},
+              'dependencies': {'status': 'unknown', 'items': []},
+              'scope': {'capabilities': []},
+              'evidence_source': 'LIVE_RUNTIME',
+              'authority_strip': true,
+            },
+          ],
+          'host_switch_generation':
+              'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
           'evidence_source': 'INTERNAL_STATE',
           'authority_strip': true,
           'permission_generated': false,

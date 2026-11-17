@@ -11,9 +11,11 @@ use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
 const VERSION: u64 = 1;
+const CATALOG_VERSION: u64 = 2;
 const OP_COMPOSE: &str = "GUI Shell構成";
 const OP_CATALOG: &str = "GUI Shell構成Catalog";
 const OP_PREVIEW: &str = "GUI Shell構成Preview";
+const MAX_COMPOSE_TOOLS: usize = 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -66,6 +68,214 @@ pub(super) struct McpToolComposition {
     pub(super) tool_count: usize,
 }
 
+fn latest_host_switch_generation(broker: &Broker) -> String {
+    broker
+        .audit_events()
+        .iter()
+        .rev()
+        .find(|event| event.operation == "Host切替" && event.decision == "accepted")
+        .map(|event| crate::audit_hash::sha256_tagged(event.event_id.as_bytes()))
+        .unwrap_or_else(|| crate::audit_hash::sha256_tagged(b"host-context:no-switch"))
+}
+
+/// Manifest選択候補の現在metadataを一度だけ正規化する。
+/// capability宣言、接続、Host metadataはいずれもPermissionや実行Authorityを発行しない。
+fn catalog_snapshot(broker: &mut Broker) -> Result<Value, String> {
+    let runtime_agent_catalog = broker
+        .compose_runtime_agent_catalog()
+        .map_err(|_| "現在のRuntime／Agent Catalogを安全に投影できない".to_string())?;
+    if runtime_agent_catalog.runtime_ids.len() > 64
+        || runtime_agent_catalog.agents.len() > 64
+        || broker.mcp_connections.len() > 64
+        || broker.hosts.len() > 64
+    {
+        return Err("Runtime／Agent／Tool／Host Catalogの件数上限を超過した".to_string());
+    }
+
+    let agents = runtime_agent_catalog
+        .agents
+        .iter()
+        .map(|agent| json!({"runtime_id": agent.runtime_id, "metadata": agent.metadata}))
+        .collect::<Vec<_>>();
+    let runtimes = runtime_agent_catalog
+        .runtime_ids
+        .iter()
+        .map(|runtime_id| {
+            let metadata = runtime_agent_catalog
+                .agents
+                .iter()
+                .find(|agent| agent.runtime_id == *runtime_id)
+                .map(|agent| &agent.metadata);
+            let host_requirements = metadata
+                .and_then(|value| value.get("host_requirements"))
+                .cloned()
+                .unwrap_or_else(|| json!({
+                    "platforms": ["unknown"],
+                    "network_scope": "unknown",
+                    "process_spawn": {"status":"unknown", "reason":"Runtime metadataがない"}
+                }));
+            let workspace_requirements = metadata
+                .and_then(|value| value.get("workspace_requirements"))
+                .cloned()
+                .unwrap_or_else(|| json!({"status":"unknown"}));
+            json!({
+                "runtime_id": runtime_id,
+                "adapter_id": metadata.and_then(|value| value.get("adapter_id")).cloned().unwrap_or(Value::Null),
+                "version": metadata.and_then(|value| value.get("version")).and_then(Value::as_str).unwrap_or("unknown"),
+                "abi": "unknown",
+                "architecture": "unknown",
+                "os": host_requirements.get("platforms").cloned().unwrap_or_else(|| json!(["unknown"])),
+                "status": metadata.and_then(|value| value.get("status")).and_then(Value::as_str).unwrap_or("unknown"),
+                "capabilities": metadata.and_then(|value| value.get("capabilities")).cloned().unwrap_or_else(|| json!([])),
+                "permissions": {"status":"not_granted", "requirements":[]},
+                "dependencies": {"status":"unknown", "items":[]},
+                "scope": {"workspace":workspace_requirements, "host":host_requirements},
+                "evidence_source": metadata.and_then(|value| value.get("evidence_source")).and_then(Value::as_str).unwrap_or(EVIDENCE_SOURCE_INTERNAL_STATE),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let credential_status_by_server = broker
+        .mcp_connections
+        .iter()
+        .map(|(server_id, entry)| {
+            let reference = entry.projection.get("Credential ref");
+            let status = match reference
+                .and_then(|value| value.get("status"))
+                .and_then(Value::as_str)
+            {
+                Some("missing") => "missing",
+                Some("configured") => {
+                    let credential_id = reference
+                        .and_then(|value| value.get("credential_id"))
+                        .and_then(Value::as_str)
+                        .unwrap_or_default();
+                    if !credential_id.is_empty()
+                        && broker.MCP資格情報有効確認(credential_id, server_id)
+                    {
+                        "configured"
+                    } else {
+                        "revoked"
+                    }
+                }
+                _ => "unknown",
+            };
+            (server_id.clone(), status.to_string())
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    let mut tools = Vec::new();
+    for (server_id, entry) in &mut broker.mcp_connections {
+        let connection_status = if entry.quarantined {
+            "quarantined"
+        } else if entry.connection.is_alive() {
+            "connected"
+        } else {
+            return Err("未隔離MCP Serverのprocess状態を確認できない".to_string());
+        };
+        let catalog = entry.connection.catalog();
+        let server = entry.projection.get("Server");
+        let transport = entry
+            .projection
+            .get("Transport")
+            .and_then(|value| value.get("kind"))
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        let credential_status = credential_status_by_server
+            .get(server_id)
+            .map(String::as_str)
+            .unwrap_or("unknown");
+        for tool in &catalog.tools {
+            tools.push(json!({
+                "server_id": server_id,
+                "server_name": server.and_then(|value| value.get("表示名")).and_then(Value::as_str).unwrap_or("unknown"),
+                "server_version": catalog.discovery.server_version.as_deref().unwrap_or("unknown"),
+                "protocol_version": catalog.discovery.protocol_version,
+                "tool_id": tool.tool_id,
+                "name": tool.name,
+                "input_schema_hash": tool.input_schema_hash,
+                "status": connection_status,
+                "authentication_status": credential_status,
+                "abi": "unknown",
+                "os": ["unknown"],
+                "dependencies": {"status":"unknown", "items":[]},
+                "scope": {"transport":transport, "boundary":"current_registered_connection"},
+                "permission_requirement": "separate_owner_confirmation_and_one_shot_permission",
+                "permission_generated": false,
+                "evidence_source": "LIVE_RUNTIME",
+            }));
+            if tools.len() > MAX_COMPOSE_TOOLS {
+                return Err("MCP Tool Catalogの件数上限を超過した".to_string());
+            }
+        }
+    }
+
+    let current_host = super::host_capability::current();
+    let local_host = json!({
+        "host_id": current_host.get("ホストID").cloned().unwrap_or(Value::Null),
+        "display_name": current_host.get("表示名").cloned().unwrap_or(Value::Null),
+        "kind": "local",
+        "version": "unknown",
+        "abi": "unknown",
+        "architecture": std::env::consts::ARCH,
+        "os": current_host.get("プラットフォーム").cloned().unwrap_or_else(|| json!("unknown")),
+        "status": current_host.get("状態").cloned().unwrap_or_else(|| json!("unknown")),
+        "connection_state": "local",
+        "trust_state": "local_runtime_only",
+        "permissions": {"status":"not_granted", "requirements":[]},
+        "dependencies": {"status":"unknown", "items":[]},
+        "scope": {"capabilities":current_host.get("能力").cloned().unwrap_or_else(|| json!([]))},
+        "evidence_source": "LIVE_RUNTIME",
+        "authority_strip": true,
+    });
+    let mut hosts = vec![local_host];
+    hosts.extend(broker.hosts.iter().map(|(host_id, receipt)| {
+        json!({
+            "host_id": host_id,
+            "display_name": receipt.get("表示名").cloned().unwrap_or(Value::Null),
+            "kind": "registered_metadata",
+            "version": "unknown",
+            "abi": "unknown",
+            "architecture": "unknown",
+            "os": receipt.get("Platform").cloned().unwrap_or_else(|| json!("unknown")),
+            "status": "metadata_only",
+            "connection_state": receipt.get("接続状態").cloned().unwrap_or_else(|| json!("unknown")),
+            "trust_state": receipt.get("Trust").and_then(|value| value.get("state")).cloned().unwrap_or_else(|| json!("unknown")),
+            "permissions": {"status":"not_granted", "requirements":[]},
+            "dependencies": {"status":"unknown", "items":[]},
+            "scope": {"boundary":"metadata_only", "runtime_summary":receipt.get("Runtime summary").cloned().unwrap_or(Value::Null)},
+            "evidence_source": EVIDENCE_SOURCE_INTERNAL_STATE,
+            "authority_strip": true,
+        })
+    }));
+
+    let host_switch_generation = latest_host_switch_generation(broker);
+    let content = json!({
+        "version": CATALOG_VERSION,
+        "runtime_ids": runtime_agent_catalog.runtime_ids,
+        "runtimes": runtimes,
+        "agents": agents,
+        "tools": tools,
+        "hosts": hosts,
+        "host_switch_generation": host_switch_generation,
+        "evidence_source": EVIDENCE_SOURCE_INTERNAL_STATE,
+        "authority_strip": true,
+        "permission_generated": false,
+    });
+    let encoded =
+        serde_json::to_vec(&content).map_err(|_| "Compose Catalogを正規化できない".to_string())?;
+    if encoded.len() > 1024 * 1024 {
+        return Err("Compose Catalogが1 MiBの応答上限を超過した".to_string());
+    }
+    let snapshot_hash = crate::audit_hash::sha256_tagged(&encoded);
+    let mut body = content
+        .as_object()
+        .cloned()
+        .ok_or_else(|| "Compose Catalogがobjectではない".to_string())?;
+    body.insert("snapshot_hash".to_string(), Value::String(snapshot_hash));
+    Ok(Value::Object(body))
+}
+
 pub(super) fn catalog(
     broker: &mut Broker,
     request_id: &str,
@@ -82,35 +292,25 @@ pub(super) fn catalog(
             payload_hash,
         );
     }
-    let catalog = match broker.compose_runtime_agent_catalog() {
-        Ok(catalog) => catalog,
-        Err(_) => {
+    let body = match catalog_snapshot(broker) {
+        Ok(body) => body,
+        Err(reason) => {
             return broker.reject_with_payload_hash(
                 request_id,
                 OP_CATALOG,
                 "gui_shell_compose_catalog_unavailable",
-                "現在のRuntime／Agent Catalogを安全に投影できない",
+                &reason,
                 true,
                 payload_hash,
             )
         }
     };
-    if catalog.runtime_ids.len() > 64 || catalog.agents.len() > 64 {
-        return broker.reject_with_payload_hash(
-            request_id,
-            OP_CATALOG,
-            "gui_shell_compose_catalog_limit_exceeded",
-            "現在のRuntime／Agent CatalogがCompose投影上限64件を超えています",
-            true,
-            payload_hash,
-        );
-    }
     let evidence_source = EVIDENCE_SOURCE_INTERNAL_STATE;
     let audit = match broker.append_audit(
         request_id,
         OP_CATALOG,
         "accepted",
-        "現在登録済みRuntimeとAgent metadataをCompose用に投影。metadataは未信頼で、Permission／Trust／Authorityを生成しない",
+            "現在のRuntime／Agent／Tool／Host metadataをCompose候補へ投影。snapshot hashで更新後の変更を拒否し、Permission／Trust／Authorityを生成しない",
         evidence_source,
         payload_hash,
     ) {
@@ -124,11 +324,6 @@ pub(super) fn catalog(
             )
         }
     };
-    let agents = catalog
-        .agents
-        .into_iter()
-        .map(|agent| json!({"runtime_id": agent.runtime_id, "metadata": agent.metadata}))
-        .collect::<Vec<_>>();
     BrokerResponse {
         request_id: request_id.to_string(),
         operation: OP_CATALOG.to_string(),
@@ -137,14 +332,7 @@ pub(super) fn catalog(
         audit_event_id: audit.event_id.clone(),
         error: None,
         health: None,
-        body: Some(json!({
-            "version": VERSION,
-            "runtime_ids": catalog.runtime_ids,
-            "agents": agents,
-            "evidence_source": evidence_source,
-            "authority_strip": true,
-            "permission_generated": false,
-        })),
+        body: Some(body),
         shutdown_requested: broker.shutdown_requested,
     }
 }
@@ -166,6 +354,22 @@ struct PreviewInput {
     build_target: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ComposeRequest {
+    version: u64,
+    catalog_snapshot_hash: String,
+    compose_manifest: Value,
+}
+
+fn valid_snapshot_hash(value: &str) -> bool {
+    value.len() == 71
+        && value.starts_with("sha256:")
+        && value[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 pub(super) fn compose(
     broker: &mut Broker,
     request_id: &str,
@@ -173,7 +377,50 @@ pub(super) fn compose(
     _owner: bool,
     payload_hash: &str,
 ) -> BrokerResponse {
-    let manifest = match parse_manifest(payload) {
+    let request = match serde_json::from_value::<ComposeRequest>(payload.clone()) {
+        Ok(request)
+            if request.version == VERSION
+                && valid_snapshot_hash(&request.catalog_snapshot_hash) =>
+        {
+            request
+        }
+        _ => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_COMPOSE,
+                "gui_shell_compose_invalid",
+                "Compose要求はManifestと現在Catalog snapshot hashを必要とします",
+                true,
+                payload_hash,
+            )
+        }
+    };
+    let current_catalog = match catalog_snapshot(broker) {
+        Ok(catalog) => catalog,
+        Err(reason) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_COMPOSE,
+                "gui_shell_compose_catalog_unavailable",
+                &reason,
+                true,
+                payload_hash,
+            )
+        }
+    };
+    if current_catalog.get("snapshot_hash").and_then(Value::as_str)
+        != Some(request.catalog_snapshot_hash.as_str())
+    {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_COMPOSE,
+            "gui_shell_compose_catalog_stale",
+            "Runtime／Agent／Tool／Hostまたは認証状態が更新されています。現在Catalogを再取得してください",
+            true,
+            payload_hash,
+        );
+    }
+    let manifest = match parse_manifest(&request.compose_manifest) {
         Ok(manifest) => manifest,
         Err(reason) => {
             return broker.reject_with_payload_hash(
@@ -540,11 +787,42 @@ pub(super) fn validate_catalog_selection(
         }
     }
     let mut available_tools = BTreeSet::new();
+    let credential_valid_by_server = broker
+        .mcp_connections
+        .iter()
+        .map(|(server_id, entry)| {
+            let reference = entry.projection.get("Credential ref");
+            let required = reference
+                .and_then(|value| value.get("required"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let credential_id = reference
+                .and_then(|value| value.get("credential_id"))
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let status = reference
+                .and_then(|value| value.get("status"))
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            let valid = !required
+                || (status == "configured"
+                    && !credential_id.is_empty()
+                    && broker.MCP資格情報有効確認(credential_id, server_id));
+            (server_id.clone(), valid)
+        })
+        .collect::<BTreeMap<_, _>>();
     for server_id in &manifest.mcp_connection_ids {
         let entry = broker
             .mcp_connections
             .get_mut(server_id)
             .ok_or_else(|| "選択したMCP接続が現在のBroker Catalogにありません".to_string())?;
+        if !credential_valid_by_server
+            .get(server_id)
+            .copied()
+            .unwrap_or(false)
+        {
+            return Err("選択したMCP接続のCredentialが失効または利用不能です".to_string());
+        }
         if entry.quarantined || !entry.connection.is_alive() {
             return Err("選択したMCP接続が利用可能状態ではありません".to_string());
         }
@@ -900,6 +1178,16 @@ mod tests {
     }
 
     fn call(broker: &mut Broker, payload: Value) -> super::super::protocol::BrokerResponse {
+        let payload = if payload.get("compose_id").is_some() {
+            let snapshot = catalog_snapshot(broker).expect("現在Compose Catalog");
+            json!({
+                "version": VERSION,
+                "catalog_snapshot_hash": snapshot["snapshot_hash"],
+                "compose_manifest": payload,
+            })
+        } else {
+            payload
+        };
         let mut request = BrokerRequestEnvelope::command_envelope_at(
             "compose-test",
             "session-1",
@@ -910,6 +1198,21 @@ mod tests {
         request.payload = Some(payload);
         request.refresh_payload_hash();
         broker.handle(request)
+    }
+
+    fn call_with_snapshot(
+        broker: &mut Broker,
+        manifest: Value,
+        snapshot_hash: &str,
+    ) -> super::super::protocol::BrokerResponse {
+        call(
+            broker,
+            json!({
+                "version": VERSION,
+                "catalog_snapshot_hash": snapshot_hash,
+                "compose_manifest": manifest,
+            }),
+        )
     }
 
     fn preview_payload(current: Value, candidate: Value) -> Value {
@@ -944,6 +1247,18 @@ mod tests {
         assert_eq!(response.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
         let body = response.body.expect("Catalog body");
         assert_eq!(body["runtime_ids"], json!(["fixture-runtime"]));
+        assert_eq!(body["version"], CATALOG_VERSION);
+        assert!(body["snapshot_hash"]
+            .as_str()
+            .is_some_and(valid_snapshot_hash));
+        assert_eq!(body["runtimes"][0]["runtime_id"], "fixture-runtime");
+        assert_eq!(body["runtimes"][0]["abi"], "unknown");
+        assert_eq!(body["runtimes"][0]["permissions"]["status"], "not_granted");
+        assert_eq!(body["runtimes"][0]["dependencies"]["status"], "unknown");
+        assert!(body["hosts"]
+            .as_array()
+            .is_some_and(|hosts| !hosts.is_empty()));
+        assert_eq!(body["tools"], json!([]));
         assert_eq!(body["agents"][0]["runtime_id"], "fixture-runtime");
         assert_eq!(body["agents"][0]["metadata"]["agent_id"], "fixture-agent");
         assert_eq!(body["authority_strip"], true);
@@ -951,6 +1266,30 @@ mod tests {
         assert_eq!(
             call_catalog(&mut broker, json!({"owner": true})).status,
             BrokerStatus::Rejected
+        );
+    }
+
+    #[test]
+    fn ComposeはHost切替後に古いCatalogSnapshotを拒否する() {
+        let mut broker = Broker::new("session-1");
+        let snapshot = catalog_snapshot(&mut broker).expect("切替前Catalog");
+        let stale_hash = snapshot["snapshot_hash"].as_str().unwrap().to_string();
+        broker
+            .append_audit(
+                "host-switch-test",
+                "Host切替",
+                "accepted",
+                "Host表示コンテキストを切替",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
+            .expect("Host切替Audit");
+
+        let response = call_with_snapshot(&mut broker, manifest(), &stale_hash);
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("gui_shell_compose_catalog_stale")
         );
     }
 

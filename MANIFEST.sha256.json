@@ -325,7 +325,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "6ca6a0a6545c798a88164e5978672e49521bbd90896d1f1df8b4aaa417601d17"
+      "sha256": "a0c6dbce18c0d7302a248a69dec1a5c12948ef11c767ed90a3c6bbeeb67e8393"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -393,7 +393,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
-      "sha256": "d177e78a28940e223b6def1f522e7135f148ac1a71d31c6e9f1e456f9f9f63a9"
+      "sha256": "c063fef310eb632f43c932f2eb3582aa1a519abccd98d18dfa80e83b9b2bf12a"
     },
     {
       "path": "apps/desktop_flutter/lib/services/evaluation_client.dart",
@@ -705,7 +705,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/compose_client_test.dart",
-      "sha256": "25d8f8c5dedd5de6d0cc73276f3fb5f54b0c37a7c35dd0deff8ceec12fbd6f4f"
+      "sha256": "b22c23f282d49a63edb582502b8dd3327474f41f208a55e5a106d42dab44674c"
     },
     {
       "path": "apps/desktop_flutter/test/dashboard_broker_health_test.dart",
@@ -825,7 +825,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_compose_test.dart",
-      "sha256": "9c084c3100a67b730c0dc41e7105075606ac027f04e53decd4ab1b990f3d54aa"
+      "sha256": "59cecff48ae3925a9866bd287153739564fd141ed13df0ed2d8ed81ad17ae0be"
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
@@ -845,7 +845,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/support/d4p_receipt_fixtures.dart",
-      "sha256": "3caa26fcdf5a9ed3abff94719f8b3eadb2dfa895fa86522e2d887624602d6f4b"
+      "sha256": "ca9ba23fd425f52eba1c2ca35d1070c9279274eb67b2d691ed7798c44f97c796"
     },
     {
       "path": "apps/desktop_flutter/test/support/real_broker_mcp_probe.dart",
@@ -861,7 +861,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "b95bd96a4f05743d4f3fa6913b5a2c288f9cae6ffc9b440cf38d623af1285ebc"
+      "sha256": "15e60f70de2bed1d7ceda4e0ad9b2f866e7b39b29c5aad8046c731bbe71898dd"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1637,7 +1637,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "13adca3c087c1da34c3ecc4cfd0b52e6cbd42be8f2ba7d864849fcba08bc581c"
+      "sha256": "7cee3012592efe19018834d57c0502e25e550d606423f4509594b65ced5fe854"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1853,7 +1853,7 @@
     },
     {
       "path": "docs/specs/gui-shell-compose.md",
-      "sha256": "838a606c5903010ebebf15a1e9121e8e36062988c28b1423dd155aa77772389f"
+      "sha256": "0877e20c92dedf1deb25e03d6c390c19eebca478c4b6c636bddc4869c5980ad5"
     },
     {
       "path": "docs/specs/gui-shell-export.md",
@@ -2421,7 +2421,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_compose_catalog.valid.json",
-      "sha256": "7f3db6f817460ac18fd1d8e10cf2f80082286e1795efadd6405d1cad0223ab30"
+      "sha256": "14c032c61e8f5e13d9b393777749b07f56fcc0e22fc25d03db253c8ab8e29b13"
     },
     {
       "path": "examples/contracts/gui_shell_compose_receipt.valid.json",
@@ -2929,7 +2929,7 @@
     },
     {
       "path": "examples/contracts/invalid/gui_shell_compose_catalog_authority.invalid.json",
-      "sha256": "adc37f489ce8b12e27d1a036e2e2c488a2e1d457a57fe7bfaae0a60d7651d2b8"
+      "sha256": "46b8c7e85023519f05784d8558f23a4ad9727c898c752eb56ef3b37f199cfab7"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_compose_receipt_authority.invalid.json",
@@ -4077,7 +4077,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/compose_center.rs",
-      "sha256": "019b010743e5176496e03276054821e37db9b72495a15e2ec1ac4cd54570af94"
+      "sha256": "3b910b417d5029f54d757c1470a0ffea892f2a54c9aa41f00f86f4e09f4c526a"
     },
     {
       "path": "native/rust_helper/src/broker/content_access.rs",
@@ -4165,7 +4165,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "fce8fd5b65c0a5a1e1a038c8db93ed238c75da5683690d71bc5cc7094f09d4cb"
+      "sha256": "05a8724b0ca42f2a909f47613ef649b68a35ffb682cfbda0b06093d77e84b59d"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -5261,7 +5261,7 @@
     },
     {
       "path": "specs/gui_shell_compose_catalog.schema.json",
-      "sha256": "b1f7d3db4231f110bd6059c780ba250108a5ed92be6771dafd72e8021c914398"
+      "sha256": "7f31bb411eeca71587c1cc674e45c9853077f73c029d23209724740a67f03faa"
     },
     {
       "path": "specs/gui_shell_compose_receipt.schema.json",

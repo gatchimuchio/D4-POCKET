@@ -14,15 +14,21 @@ void main() {
       mcpConnectionIds: 'mcp.local',
     );
     final transport = _FakeComposeTransport(_composeResponse(manifest));
-    final receipt = await ComposeClient(transport).compose(manifest);
+    final receipt = await ComposeClient(transport).compose(
+      manifest,
+      catalogSnapshotHash: _snapshotHash,
+    );
 
     expect(transport.operation, 'GUI Shell構成');
-    expect(transport.payload?['compose_id'], 'd4-pocket-local');
-    expect(transport.payload?['runtime_ids'], manifest['runtime_ids']);
-    expect(transport.payload?['agent_ids'], manifest['agent_ids']);
-    expect(transport.payload?['tool_ids'], manifest['tool_ids']);
+    expect(transport.payload?['catalog_snapshot_hash'], _snapshotHash);
+    final transportedManifest =
+        transport.payload?['compose_manifest'] as Map<String, Object?>;
+    expect(transportedManifest['compose_id'], 'd4-pocket-local');
+    expect(transportedManifest['runtime_ids'], manifest['runtime_ids']);
+    expect(transportedManifest['agent_ids'], manifest['agent_ids']);
+    expect(transportedManifest['tool_ids'], manifest['tool_ids']);
     expect(
-      transport.payload?['mcp_connection_ids'],
+      transportedManifest['mcp_connection_ids'],
       manifest['mcp_connection_ids'],
     );
     expect(manifest['output_mode'], 'manifest_only');
@@ -48,7 +54,10 @@ void main() {
     });
 
     try {
-      await ComposeClient(transport).compose(const {});
+      await ComposeClient(transport).compose(
+        const {},
+        catalogSnapshotHash: _snapshotHash,
+      );
       fail('Broker拒否をacceptedへ昇格してはいけない');
     } on BrokerClientException catch (error) {
       expect(error.message, contains('gui_shell_compose_invalid'));
@@ -89,7 +98,10 @@ void main() {
       auditMismatch
     ]) {
       await expectLater(
-        ComposeClient(_FakeComposeTransport(response)).compose(manifest),
+        ComposeClient(_FakeComposeTransport(response)).compose(
+          manifest,
+          catalogSnapshotHash: _snapshotHash,
+        ),
         throwsA(isA<BrokerClientException>()),
       );
     }
@@ -274,6 +286,47 @@ void main() {
     }
   });
 
+  test('Compose Catalogはsnapshot参照を保持し失効Tool認証を表示状態に保つ', () async {
+    final snapshot = _catalogResponse(
+      runtimeIds: const ['runtime-a'],
+      agents: [
+        _agentEntry('runtime-a', adapterId: 'adapter-a', agentId: 'agent-a'),
+      ],
+    );
+    final catalog = await ComposeClient(_FakeComposeTransport(snapshot))
+        .refreshRuntimeAgentCatalog();
+    expect(catalog.snapshotHash, _snapshotHash);
+    expect(catalog.hostSwitchGeneration, _hostSwitchGeneration);
+
+    final revoked = _catalogResponse(
+      runtimeIds: const ['runtime-a'],
+      agents: [
+        _agentEntry('runtime-a', adapterId: 'adapter-a', agentId: 'agent-a'),
+      ],
+      tools: [_toolCandidate(authenticationStatus: 'revoked')],
+    );
+    final revokedCatalog = await ComposeClient(_FakeComposeTransport(revoked))
+        .refreshRuntimeAgentCatalog();
+    expect(revokedCatalog.tools.single.authenticationStatus, 'revoked');
+  });
+
+  test('Compose CatalogはLocal Hostのfailed状態を表示可能にする', () async {
+    final response = _catalogResponse(
+      runtimeIds: const ['runtime-a'],
+      agents: [
+        _agentEntry('runtime-a', adapterId: 'adapter-a', agentId: 'agent-a'),
+      ],
+    );
+    final body = response['body']! as Map<String, Object?>;
+    final hosts = body['hosts']! as List<Object?>;
+    (hosts.single! as Map<String, Object?>)['status'] = 'failed';
+
+    final catalog = await ComposeClient(_FakeComposeTransport(response))
+        .refreshRuntimeAgentCatalog();
+
+    expect(catalog.hosts.single.status, 'failed');
+  });
+
   test('構成参照IDは空行と前後空白だけを整理し重複はBroker検証へ残す', () {
     expect(
       composeReferenceIdsFromLines(
@@ -317,22 +370,115 @@ void main() {
   });
 }
 
+const _snapshotHash =
+    'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const _hostSwitchGeneration =
+    'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
 Map<String, Object?> _catalogResponse({
   required List<String> runtimeIds,
   required List<Map<String, Object?>> agents,
+  List<Map<String, Object?>> tools = const [],
+}) {
+  final entriesByRuntime = {
+    for (final entry in agents) entry['runtime_id']! as String: entry,
+  };
+  return {
+    'status': 'accepted',
+    'operation': 'GUI Shell構成Catalog',
+    'evidence_source': 'INTERNAL_STATE',
+    'body': {
+      'version': 2,
+      'snapshot_hash': _snapshotHash,
+      'runtime_ids': runtimeIds,
+      'runtimes': [
+        for (final runtimeId in runtimeIds)
+          _runtimeCandidate(runtimeId, entriesByRuntime[runtimeId]),
+      ],
+      'agents': agents,
+      'tools': tools,
+      'hosts': [_hostCandidate()],
+      'host_switch_generation': _hostSwitchGeneration,
+      'evidence_source': 'INTERNAL_STATE',
+      'authority_strip': true,
+      'permission_generated': false,
+    },
+  };
+}
+
+Map<String, Object?> _runtimeCandidate(
+  String runtimeId,
+  Map<String, Object?>? agentEntry,
+) {
+  final metadata = agentEntry?['metadata'] as Map<String, Object?>?;
+  final host = metadata?['host_requirements'] as Map<String, Object?>? ??
+      const {
+        'platforms': ['unknown'],
+        'network_scope': 'unknown',
+        'process_spawn': {'status': 'unknown', 'reason': 'no metadata'},
+      };
+  final workspace =
+      metadata?['workspace_requirements'] as Map<String, Object?>? ??
+          const {'status': 'unknown'};
+  return {
+    'runtime_id': runtimeId,
+    'adapter_id': metadata?['adapter_id'],
+    'version': metadata?['version'] ?? 'unknown',
+    'abi': 'unknown',
+    'architecture': 'unknown',
+    'os': host['platforms'],
+    'status': metadata?['status'] ?? 'unknown',
+    'capabilities': metadata?['capabilities'] ?? <Object?>[],
+    'permissions': {'status': 'not_granted', 'requirements': <Object?>[]},
+    'dependencies': {'status': 'unknown', 'items': <Object?>[]},
+    'scope': {'workspace': workspace, 'host': host},
+    'evidence_source': metadata?['evidence_source'] ?? 'INTERNAL_STATE',
+  };
+}
+
+Map<String, Object?> _toolCandidate({
+  String authenticationStatus = 'configured',
 }) =>
     {
-      'status': 'accepted',
-      'operation': 'GUI Shell構成Catalog',
-      'evidence_source': 'INTERNAL_STATE',
-      'body': {
-        'version': 1,
-        'runtime_ids': runtimeIds,
-        'agents': agents,
-        'evidence_source': 'INTERNAL_STATE',
-        'authority_strip': true,
-        'permission_generated': false,
+      'server_id': 'server-a',
+      'server_name': 'Test server',
+      'server_version': '1.0',
+      'protocol_version': '2026-07-28',
+      'tool_id': 'tool-a',
+      'name': 'read',
+      'input_schema_hash':
+          'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+      'status': 'connected',
+      'authentication_status': authenticationStatus,
+      'abi': 'unknown',
+      'os': ['unknown'],
+      'dependencies': {'status': 'unknown', 'items': <Object?>[]},
+      'scope': {
+        'transport': 'stdio',
+        'boundary': 'current_registered_connection',
       },
+      'permission_requirement':
+          'separate_owner_confirmation_and_one_shot_permission',
+      'permission_generated': false,
+      'evidence_source': 'LIVE_RUNTIME',
+    };
+
+Map<String, Object?> _hostCandidate() => {
+      'host_id': 'gui-shell-local-windows',
+      'display_name': 'Local Windows',
+      'kind': 'local',
+      'version': 'unknown',
+      'abi': 'unknown',
+      'architecture': 'x86_64',
+      'os': 'windows',
+      'status': 'degraded',
+      'connection_state': 'local',
+      'trust_state': 'local_runtime_only',
+      'permissions': {'status': 'not_granted', 'requirements': <Object?>[]},
+      'dependencies': {'status': 'unknown', 'items': <Object?>[]},
+      'scope': {'capabilities': <Object?>[]},
+      'evidence_source': 'LIVE_RUNTIME',
+      'authority_strip': true,
     };
 
 Map<String, Object?> _agentEntry(

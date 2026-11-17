@@ -1954,7 +1954,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn broker_mcp_credential_to_audited_tool_call_times_out_once_and_quarantines() {
+    fn ComposeはMCPCredential失効後snapshotを拒否し既存Tool経路を検査する() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
         const SECRET: &str = "synthetic-p6-mcp-secret-not-real";
@@ -2224,6 +2224,35 @@ if errorlevel 1 exit /b 45
             "有効呼出しだけが外部MCP childへ一度送信される"
         );
 
+        let mut compose_catalog_request = BrokerRequestEnvelope::command_envelope_at(
+            "compose-catalog-before-mcp-credential-revocation",
+            "session-1",
+            "nonce-compose-catalog-before-mcp-credential-revocation",
+            &BrokerRequestEnvelope::current_issued_at(),
+        );
+        compose_catalog_request.operation = Some(BrokerOperation::GuiShell構成Catalog);
+        compose_catalog_request.payload = Some(json!({}));
+        compose_catalog_request.refresh_payload_hash();
+        let compose_catalog = broker.handle(compose_catalog_request);
+        assert_eq!(
+            compose_catalog.status,
+            BrokerStatus::Accepted,
+            "{compose_catalog:?}"
+        );
+        let compose_catalog_body = compose_catalog.body.expect("現在Compose Catalog");
+        assert_eq!(
+            compose_catalog_body["tools"][0]["authentication_status"],
+            "configured"
+        );
+        let compose_snapshot_hash = compose_catalog_body["snapshot_hash"]
+            .as_str()
+            .expect("Compose snapshot hash")
+            .to_owned();
+        let compose_catalog_json =
+            serde_json::to_string(&compose_catalog_body).expect("Compose Catalogを直列化");
+        assert!(!compose_catalog_json.contains(SECRET));
+        assert!(!compose_catalog_json.contains(&credential_id));
+
         let credential_metadata = add.body.as_ref().expect("登録済みCredential metadata");
         let revoked = broker_test_native_owner_operation(
             &mut broker,
@@ -2238,6 +2267,34 @@ if errorlevel 1 exit /b 45
             }),
         );
         assert_eq!(revoked.status, BrokerStatus::Accepted, "{revoked:?}");
+
+        let mut stale_compose_request = BrokerRequestEnvelope::command_envelope_at(
+            "compose-after-mcp-credential-revocation",
+            "session-1",
+            "nonce-compose-after-mcp-credential-revocation",
+            &BrokerRequestEnvelope::current_issued_at(),
+        );
+        stale_compose_request.operation = Some(BrokerOperation::GuiShell構成);
+        stale_compose_request.payload = Some(json!({
+            "version": 1,
+            "catalog_snapshot_hash": compose_snapshot_hash,
+            "compose_manifest": {}
+        }));
+        stale_compose_request.refresh_payload_hash();
+        let stale_compose = broker.handle(stale_compose_request);
+        assert_eq!(
+            stale_compose.status,
+            BrokerStatus::Rejected,
+            "{stale_compose:?}"
+        );
+        assert_eq!(
+            stale_compose
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("gui_shell_compose_catalog_stale"),
+            "Credential失効後は失効前Catalog snapshotをComposeで再利用できない"
+        );
 
         let after_revocation = broker_test_native_owner_operation(
             &mut broker,

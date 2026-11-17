@@ -1,29 +1,35 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/gui_shell_compose_catalog.schema.json",
-  "title": "GUI Shell構成用Runtime／Agent Catalog投影",
+  "title": "GUI Shell構成用Runtime／Agent／Tool／Host Catalog snapshot",
   "type": "object",
   "required": [
     "version",
+    "snapshot_hash",
     "runtime_ids",
+    "runtimes",
     "agents",
+    "tools",
+    "hosts",
+    "host_switch_generation",
     "evidence_source",
     "authority_strip",
     "permission_generated"
   ],
   "additionalProperties": false,
   "properties": {
-    "version": {"const": 1},
+    "version": {"const": 2},
+    "snapshot_hash": {"$ref": "#/$defs/hash"},
     "runtime_ids": {
       "type": "array",
       "uniqueItems": true,
       "maxItems": 64,
-      "items": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 128,
-        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
-      }
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "runtimes": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {"$ref": "#/$defs/runtime"}
     },
     "agents": {
       "type": "array",
@@ -33,18 +39,156 @@
         "required": ["runtime_id", "metadata"],
         "additionalProperties": false,
         "properties": {
-          "runtime_id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
-          },
+          "runtime_id": {"$ref": "#/$defs/id"},
           "metadata": {"$ref": "agent_adapter.schema.json"}
         }
       }
     },
+    "tools": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {"$ref": "#/$defs/tool"}
+    },
+    "hosts": {
+      "type": "array",
+      "maxItems": 65,
+      "items": {"$ref": "#/$defs/host"}
+    },
+    "host_switch_generation": {"$ref": "#/$defs/hash"},
     "evidence_source": {"const": "INTERNAL_STATE"},
     "authority_strip": {"const": true},
     "permission_generated": {"const": false}
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$(?![\\s\\S])"
+    },
+    "unknownDependencies": {
+      "type": "object",
+      "required": ["status", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {"const": "unknown"},
+        "items": {"type": "array", "maxItems": 0}
+      }
+    },
+    "noPermission": {
+      "type": "object",
+      "required": ["status", "requirements"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {"const": "not_granted"},
+        "requirements": {"type": "array", "maxItems": 0}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "required": [
+        "runtime_id", "adapter_id", "version", "abi", "architecture", "os",
+        "status", "capabilities", "permissions", "dependencies", "scope", "evidence_source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "runtime_id": {"$ref": "#/$defs/id"},
+        "adapter_id": {"type": ["string", "null"], "maxLength": 128},
+        "version": {"type": "string", "minLength": 1, "maxLength": 256},
+        "abi": {"const": "unknown"},
+        "architecture": {"const": "unknown"},
+        "os": {
+          "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true,
+          "items": {"enum": ["windows", "macos", "linux", "android", "ios", "unknown"]}
+        },
+        "status": {"enum": ["ready", "degraded", "unavailable", "unsupported", "unknown"]},
+        "capabilities": {"type": "array", "maxItems": 64},
+        "permissions": {"$ref": "#/$defs/noPermission"},
+        "dependencies": {"$ref": "#/$defs/unknownDependencies"},
+        "scope": {
+          "type": "object",
+          "required": ["workspace", "host"],
+          "additionalProperties": false,
+          "properties": {
+            "workspace": {"type": "object"},
+            "host": {
+              "type": "object",
+              "required": ["platforms", "network_scope", "process_spawn"],
+              "additionalProperties": false,
+              "properties": {
+                "platforms": {"type": "array", "maxItems": 8},
+                "network_scope": {"enum": ["loopback_only", "outbound_allowed", "unsupported", "unknown"]},
+                "process_spawn": {"type": "object"}
+              }
+            }
+          }
+        },
+        "evidence_source": {"enum": ["CONFIG", "INTERNAL_STATE", "LIVE_RUNTIME", "EXTERNAL_EVIDENCE", "FIXTURE"]}
+      }
+    },
+    "tool": {
+      "type": "object",
+      "required": [
+        "server_id", "server_name", "server_version", "protocol_version", "tool_id", "name",
+        "input_schema_hash", "status", "authentication_status", "abi", "os", "dependencies",
+        "scope", "permission_requirement", "permission_generated", "evidence_source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "server_id": {"$ref": "#/$defs/id"},
+        "server_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "server_version": {"type": "string", "minLength": 1, "maxLength": 256},
+        "protocol_version": {"type": "string", "minLength": 1, "maxLength": 32},
+        "tool_id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "input_schema_hash": {"$ref": "#/$defs/hash"},
+        "status": {"enum": ["connected", "quarantined"]},
+        "authentication_status": {"enum": ["missing", "configured", "revoked", "unknown"]},
+        "abi": {"const": "unknown"},
+        "os": {"const": ["unknown"]},
+        "dependencies": {"$ref": "#/$defs/unknownDependencies"},
+        "scope": {
+          "type": "object",
+          "required": ["transport", "boundary"],
+          "additionalProperties": false,
+          "properties": {
+            "transport": {"enum": ["stdio", "unknown"]},
+            "boundary": {"const": "current_registered_connection"}
+          }
+        },
+        "permission_requirement": {"const": "separate_owner_confirmation_and_one_shot_permission"},
+        "permission_generated": {"const": false},
+        "evidence_source": {"const": "LIVE_RUNTIME"}
+      }
+    },
+    "host": {
+      "type": "object",
+      "required": [
+        "host_id", "display_name", "kind", "version", "abi", "architecture", "os", "status",
+        "connection_state", "trust_state", "permissions", "dependencies", "scope", "evidence_source", "authority_strip"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "host_id": {"$ref": "#/$defs/id"},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "kind": {"enum": ["local", "registered_metadata"]},
+        "version": {"const": "unknown"},
+        "abi": {"const": "unknown"},
+        "architecture": {"type": "string", "minLength": 1, "maxLength": 64},
+        "os": {"enum": ["windows", "macos", "linux", "android", "ios", "unknown"]},
+        "status": {"type": "string", "minLength": 1, "maxLength": 64},
+        "connection_state": {"enum": ["local", "pending_review", "unknown"]},
+        "trust_state": {"enum": ["local_runtime_only", "pending_review", "unknown"]},
+        "permissions": {"$ref": "#/$defs/noPermission"},
+        "dependencies": {"$ref": "#/$defs/unknownDependencies"},
+        "scope": {"type": "object"},
+        "evidence_source": {"enum": ["INTERNAL_STATE", "LIVE_RUNTIME"]},
+        "authority_strip": {"const": true}
+      }
+    }
   }
 }

@@ -1,7 +1,12 @@
 {
-  "version": 1,
-  "runtime_ids": ["runtime.fixture"],
+  "version": 2,
+  "snapshot_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "runtime_ids": [],
+  "runtimes": [],
   "agents": [],
+  "tools": [],
+  "hosts": [],
+  "host_switch_generation": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "evidence_source": "INTERNAL_STATE",
   "authority_strip": true,
   "permission_generated": true

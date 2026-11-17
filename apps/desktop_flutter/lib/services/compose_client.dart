@@ -24,10 +24,98 @@ class ComposeRuntimeAgentCatalog {
   const ComposeRuntimeAgentCatalog({
     required this.runtimeIds,
     required this.agents,
+    required this.runtimes,
+    required this.tools,
+    required this.hosts,
+    required this.snapshotHash,
+    required this.hostSwitchGeneration,
   });
 
   final List<String> runtimeIds;
   final List<ComposeAgentCatalogEntry> agents;
+  final List<ComposeRuntimeCatalogEntry> runtimes;
+  final List<ComposeToolCatalogEntry> tools;
+  final List<ComposeHostCatalogEntry> hosts;
+  final String snapshotHash;
+  final String hostSwitchGeneration;
+}
+
+class ComposeRuntimeCatalogEntry {
+  const ComposeRuntimeCatalogEntry({
+    required this.runtimeId,
+    required this.version,
+    required this.abi,
+    required this.architecture,
+    required this.platforms,
+    required this.status,
+    required this.permissionStatus,
+    required this.dependencyStatus,
+    required this.scope,
+  });
+
+  final String runtimeId;
+  final String version;
+  final String abi;
+  final String architecture;
+  final List<String> platforms;
+  final String status;
+  final String permissionStatus;
+  final String dependencyStatus;
+  final Map<String, Object?> scope;
+}
+
+class ComposeToolCatalogEntry {
+  const ComposeToolCatalogEntry({
+    required this.serverId,
+    required this.serverName,
+    required this.serverVersion,
+    required this.protocolVersion,
+    required this.toolId,
+    required this.name,
+    required this.status,
+    required this.authenticationStatus,
+    required this.permissionRequirement,
+    required this.transport,
+  });
+
+  final String serverId;
+  final String serverName;
+  final String serverVersion;
+  final String protocolVersion;
+  final String toolId;
+  final String name;
+  final String status;
+  final String authenticationStatus;
+  final String permissionRequirement;
+  final String transport;
+}
+
+class ComposeHostCatalogEntry {
+  const ComposeHostCatalogEntry({
+    required this.hostId,
+    required this.displayName,
+    required this.kind,
+    required this.version,
+    required this.abi,
+    required this.architecture,
+    required this.platform,
+    required this.status,
+    required this.connectionState,
+    required this.trustState,
+    required this.scope,
+  });
+
+  final String hostId;
+  final String displayName;
+  final String kind;
+  final String version;
+  final String abi;
+  final String architecture;
+  final String platform;
+  final String status;
+  final String connectionState;
+  final String trustState;
+  final Map<String, Object?> scope;
 }
 
 class ComposeClient {
@@ -72,15 +160,22 @@ class ComposeClient {
     final body = _acceptedBody(response, 'GUI Shell構成Catalog');
     const allowedKeys = {
       'version',
+      'snapshot_hash',
       'runtime_ids',
+      'runtimes',
       'agents',
+      'tools',
+      'hosts',
+      'host_switch_generation',
       'evidence_source',
       'authority_strip',
       'permission_generated',
     };
     if (body.keys.any((key) => !allowedKeys.contains(key)) ||
         body.length != allowedKeys.length ||
-        body['version'] != 1 ||
+        body['version'] != 2 ||
+        !_validTaggedHash(body['snapshot_hash']) ||
+        !_validTaggedHash(body['host_switch_generation']) ||
         body['evidence_source'] != 'INTERNAL_STATE' ||
         body['authority_strip'] != true ||
         body['permission_generated'] != false) {
@@ -89,10 +184,17 @@ class ComposeClient {
       );
     }
     final rawRuntimeIds = body['runtime_ids'];
+    final rawRuntimes = body['runtimes'];
     final rawAgents = body['agents'];
+    final rawTools = body['tools'];
+    final rawHosts = body['hosts'];
     if (rawRuntimeIds is! List ||
+        rawRuntimes is! List ||
         rawAgents is! List ||
+        rawTools is! List ||
+        rawHosts is! List ||
         rawRuntimeIds.length > 64 ||
+        rawRuntimes.length > 64 ||
         rawAgents.length > 64) {
       throw const BrokerClientException('Compose Catalogの件数が不正です');
     }
@@ -107,6 +209,23 @@ class ComposeClient {
         );
       }
       runtimeIds.add(value);
+    }
+    final runtimes = <ComposeRuntimeCatalogEntry>[];
+    final runtimeCandidateIds = <String>{};
+    for (final value in rawRuntimes) {
+      final runtime = _parseRuntimeCandidate(value);
+      if (runtime == null || !runtimeCandidateIds.add(runtime.runtimeId)) {
+        throw const BrokerClientException(
+          'Compose CatalogのRuntime version／ABI／OS／scope候補が不正または重複しています',
+        );
+      }
+      runtimes.add(runtime);
+    }
+    if (runtimeCandidateIds.length != runtimeIdSet.length ||
+        !runtimeCandidateIds.containsAll(runtimeIdSet)) {
+      throw const BrokerClientException(
+        'Compose CatalogのRuntime IDとRuntime候補の対応が一致しません',
+      );
     }
     final agents = <ComposeAgentCatalogEntry>[];
     final adapterByAgentId = <String, String>{};
@@ -193,16 +312,70 @@ class ComposeClient {
         networkScope: host['network_scope']! as String,
       ));
     }
+    final tools = <ComposeToolCatalogEntry>[];
+    final toolIdentities = <String>{};
+    final toolNamesByServer = <String, Set<String>>{};
+    if (rawTools.length > 1024) {
+      throw const BrokerClientException('Compose CatalogのTool件数が上限を超過しています');
+    }
+    for (final value in rawTools) {
+      final tool = _parseToolCandidate(value);
+      final identity =
+          tool == null ? '' : '${tool.serverId}\u0000${tool.toolId}';
+      final names = tool == null
+          ? <String>{}
+          : toolNamesByServer.putIfAbsent(tool.serverId, () => <String>{});
+      if (tool == null ||
+          !_validCatalogId(tool.serverId) ||
+          !toolIdentities.add(identity) ||
+          !names.add(tool.name)) {
+        throw const BrokerClientException(
+          'Compose CatalogのTool ID／名前／接続対応が不正または重複しています',
+        );
+      }
+      tools.add(tool);
+    }
+    final hosts = <ComposeHostCatalogEntry>[];
+    final hostIds = <String>{};
+    if (rawHosts.length > 65) {
+      throw const BrokerClientException('Compose CatalogのHost件数が上限を超過しています');
+    }
+    for (final value in rawHosts) {
+      final host = _parseHostCandidate(value);
+      if (host == null || !hostIds.add(host.hostId)) {
+        throw const BrokerClientException(
+          'Compose CatalogのHost候補が不正または重複しています',
+        );
+      }
+      hosts.add(host);
+    }
     return ComposeRuntimeAgentCatalog(
       runtimeIds: List.unmodifiable(runtimeIds),
       agents: List.unmodifiable(agents),
+      runtimes: List.unmodifiable(runtimes),
+      tools: List.unmodifiable(tools),
+      hosts: List.unmodifiable(hosts),
+      snapshotHash: body['snapshot_hash']! as String,
+      hostSwitchGeneration: body['host_switch_generation']! as String,
     );
   }
 
-  Future<Map<String, Object?>> compose(Map<String, Object?> manifest) async {
+  Future<Map<String, Object?>> compose(
+    Map<String, Object?> manifest, {
+    required String catalogSnapshotHash,
+  }) async {
+    if (!_validTaggedHash(catalogSnapshotHash)) {
+      throw const BrokerClientException(
+        '現在Catalogのsnapshot hashがないためComposeを送信できません',
+      );
+    }
     final response = await _transport.request(
       'GUI Shell構成',
-      payload: manifest,
+      payload: {
+        'version': 1,
+        'catalog_snapshot_hash': catalogSnapshotHash,
+        'compose_manifest': manifest,
+      },
     );
     final body = _acceptedAuditedBody(response, 'GUI Shell構成');
     const fields = {
@@ -324,6 +497,274 @@ class ComposeClient {
     return body;
   }
 }
+
+ComposeRuntimeCatalogEntry? _parseRuntimeCandidate(Object? value) {
+  final item = _objectMap(value);
+  if (item == null ||
+      !_hasExactKeys(item, const {
+        'runtime_id',
+        'adapter_id',
+        'version',
+        'abi',
+        'architecture',
+        'os',
+        'status',
+        'capabilities',
+        'permissions',
+        'dependencies',
+        'scope',
+        'evidence_source',
+      })) {
+    return null;
+  }
+  final runtimeId = item['runtime_id'];
+  final adapterId = item['adapter_id'];
+  final version = item['version'];
+  final platforms = item['os'];
+  final capabilities = item['capabilities'];
+  final scope = _objectMap(item['scope']);
+  final permissions = _objectMap(item['permissions']);
+  final dependencies = _objectMap(item['dependencies']);
+  final workspace = _objectMap(scope?['workspace']);
+  final host = _objectMap(scope?['host']);
+  final hostPlatforms = host?['platforms'];
+  final processSpawn = _objectMap(host?['process_spawn']);
+  if (runtimeId is! String ||
+      !_validCatalogId(runtimeId) ||
+      (adapterId != null &&
+          (adapterId is! String || !_validCatalogId(adapterId))) ||
+      version is! String ||
+      version.isEmpty ||
+      version.length > 256 ||
+      item['abi'] != 'unknown' ||
+      item['architecture'] != 'unknown' ||
+      !_validPlatformList(platforms) ||
+      !const {'ready', 'degraded', 'unavailable', 'unsupported', 'unknown'}
+          .contains(item['status']) ||
+      capabilities is! List ||
+      capabilities.length > 64 ||
+      permissions == null ||
+      !_hasExactKeys(permissions, const {'status', 'requirements'}) ||
+      permissions['status'] != 'not_granted' ||
+      permissions['requirements'] is! List ||
+      (permissions['requirements']! as List).isNotEmpty ||
+      dependencies == null ||
+      !_hasExactKeys(dependencies, const {'status', 'items'}) ||
+      dependencies['status'] != 'unknown' ||
+      dependencies['items'] is! List ||
+      (dependencies['items']! as List).isNotEmpty ||
+      scope == null ||
+      !_hasExactKeys(scope, const {'workspace', 'host'}) ||
+      workspace == null ||
+      host == null ||
+      !_hasExactKeys(
+          host, const {'platforms', 'network_scope', 'process_spawn'}) ||
+      !_validPlatformList(hostPlatforms) ||
+      !const {'loopback_only', 'outbound_allowed', 'unsupported', 'unknown'}
+          .contains(host['network_scope']) ||
+      processSpawn == null ||
+      !_hasExactKeys(processSpawn, const {'status', 'reason'}) ||
+      !const {'supported', 'unsupported', 'unknown'}
+          .contains(processSpawn['status']) ||
+      processSpawn['reason'] is! String ||
+      !const {
+        'CONFIG',
+        'INTERNAL_STATE',
+        'LIVE_RUNTIME',
+        'EXTERNAL_EVIDENCE',
+        'FIXTURE',
+      }.contains(item['evidence_source'])) {
+    return null;
+  }
+  return ComposeRuntimeCatalogEntry(
+    runtimeId: runtimeId,
+    version: version,
+    abi: item['abi']! as String,
+    architecture: item['architecture']! as String,
+    platforms: List.unmodifiable((platforms! as List).cast<String>()),
+    status: item['status']! as String,
+    permissionStatus: permissions['status']! as String,
+    dependencyStatus: dependencies['status']! as String,
+    scope: Map.unmodifiable(scope),
+  );
+}
+
+ComposeToolCatalogEntry? _parseToolCandidate(Object? value) {
+  final item = _objectMap(value);
+  if (item == null ||
+      !_hasExactKeys(item, const {
+        'server_id',
+        'server_name',
+        'server_version',
+        'protocol_version',
+        'tool_id',
+        'name',
+        'input_schema_hash',
+        'status',
+        'authentication_status',
+        'abi',
+        'os',
+        'dependencies',
+        'scope',
+        'permission_requirement',
+        'permission_generated',
+        'evidence_source',
+      })) {
+    return null;
+  }
+  final serverId = item['server_id'];
+  final serverName = item['server_name'];
+  final serverVersion = item['server_version'];
+  final protocolVersion = item['protocol_version'];
+  final toolId = item['tool_id'];
+  final name = item['name'];
+  final scope = _objectMap(item['scope']);
+  final dependencies = _objectMap(item['dependencies']);
+  if (serverId is! String ||
+      !_validCatalogId(serverId) ||
+      serverName is! String ||
+      serverName.isEmpty ||
+      serverName.length > 256 ||
+      serverVersion is! String ||
+      serverVersion.isEmpty ||
+      serverVersion.length > 256 ||
+      protocolVersion is! String ||
+      protocolVersion.isEmpty ||
+      protocolVersion.length > 32 ||
+      toolId is! String ||
+      !_validCatalogId(toolId) ||
+      name is! String ||
+      name.isEmpty ||
+      name.length > 256 ||
+      !_validTaggedHash(item['input_schema_hash']) ||
+      !const {'connected', 'quarantined'}.contains(item['status']) ||
+      !const {'missing', 'configured', 'revoked', 'unknown'}
+          .contains(item['authentication_status']) ||
+      item['abi'] != 'unknown' ||
+      !_sameJson(item['os'], const ['unknown']) ||
+      dependencies == null ||
+      !_hasExactKeys(dependencies, const {'status', 'items'}) ||
+      dependencies['status'] != 'unknown' ||
+      dependencies['items'] is! List ||
+      (dependencies['items']! as List).isNotEmpty ||
+      scope == null ||
+      !_hasExactKeys(scope, const {'transport', 'boundary'}) ||
+      !const {'stdio', 'unknown'}.contains(scope['transport']) ||
+      scope['boundary'] != 'current_registered_connection' ||
+      item['permission_requirement'] !=
+          'separate_owner_confirmation_and_one_shot_permission' ||
+      item['permission_generated'] != false ||
+      item['evidence_source'] != 'LIVE_RUNTIME') {
+    return null;
+  }
+  return ComposeToolCatalogEntry(
+    serverId: serverId,
+    serverName: serverName,
+    serverVersion: serverVersion,
+    protocolVersion: protocolVersion,
+    toolId: toolId,
+    name: name,
+    status: item['status']! as String,
+    authenticationStatus: item['authentication_status']! as String,
+    permissionRequirement: item['permission_requirement']! as String,
+    transport: scope['transport']! as String,
+  );
+}
+
+ComposeHostCatalogEntry? _parseHostCandidate(Object? value) {
+  final item = _objectMap(value);
+  if (item == null ||
+      !_hasExactKeys(item, const {
+        'host_id',
+        'display_name',
+        'kind',
+        'version',
+        'abi',
+        'architecture',
+        'os',
+        'status',
+        'connection_state',
+        'trust_state',
+        'permissions',
+        'dependencies',
+        'scope',
+        'evidence_source',
+        'authority_strip',
+      })) {
+    return null;
+  }
+  final hostId = item['host_id'];
+  final displayName = item['display_name'];
+  final architecture = item['architecture'];
+  final permissions = _objectMap(item['permissions']);
+  final dependencies = _objectMap(item['dependencies']);
+  final scope = _objectMap(item['scope']);
+  if (hostId is! String ||
+      !_validCatalogId(hostId) ||
+      displayName is! String ||
+      displayName.isEmpty ||
+      displayName.length > 256 ||
+      !const {'local', 'registered_metadata'}.contains(item['kind']) ||
+      item['version'] != 'unknown' ||
+      item['abi'] != 'unknown' ||
+      architecture is! String ||
+      architecture.isEmpty ||
+      architecture.length > 64 ||
+      !const {'windows', 'macos', 'linux', 'android', 'ios', 'unknown'}
+          .contains(item['os']) ||
+      !const {'ready', 'degraded', 'failed', 'metadata_only', 'unknown'}
+          .contains(item['status']) ||
+      !const {'local', 'pending_review', 'unknown'}
+          .contains(item['connection_state']) ||
+      !const {'local_runtime_only', 'pending_review', 'unknown'}
+          .contains(item['trust_state']) ||
+      permissions == null ||
+      !_hasExactKeys(permissions, const {'status', 'requirements'}) ||
+      permissions['status'] != 'not_granted' ||
+      permissions['requirements'] is! List ||
+      (permissions['requirements']! as List).isNotEmpty ||
+      dependencies == null ||
+      !_hasExactKeys(dependencies, const {'status', 'items'}) ||
+      dependencies['status'] != 'unknown' ||
+      dependencies['items'] is! List ||
+      (dependencies['items']! as List).isNotEmpty ||
+      scope == null ||
+      !const {'INTERNAL_STATE', 'LIVE_RUNTIME'}
+          .contains(item['evidence_source']) ||
+      item['authority_strip'] != true) {
+    return null;
+  }
+  return ComposeHostCatalogEntry(
+    hostId: hostId,
+    displayName: displayName,
+    kind: item['kind']! as String,
+    version: item['version']! as String,
+    abi: item['abi']! as String,
+    architecture: architecture,
+    platform: item['os']! as String,
+    status: item['status']! as String,
+    connectionState: item['connection_state']! as String,
+    trustState: item['trust_state']! as String,
+    scope: Map.unmodifiable(scope),
+  );
+}
+
+bool _validPlatformList(Object? value) =>
+    value is List &&
+    value.isNotEmpty &&
+    value.length <= 8 &&
+    value.toSet().length == value.length &&
+    value.every((item) =>
+        item is String &&
+        const {'windows', 'macos', 'linux', 'android', 'ios', 'unknown'}
+            .contains(item));
+
+bool _validCatalogId(String value) =>
+    value.length <= 256 &&
+    RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$').hasMatch(value);
+
+bool _validTaggedHash(Object? value) =>
+    value is String && RegExp(r'^sha256:[0-9a-f]{64}$').hasMatch(value);
 
 /// 画面の改行入力をManifestの参照識別子へ変換する。
 /// 空行だけを除外し、重複はBrokerの契約検証に残す。

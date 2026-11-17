@@ -185,6 +185,11 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
   bool _composeToolCallInProgress = false;
   List<String> _composeRuntimeIds = const [];
   List<ComposeAgentCatalogEntry> _composeAgentCatalog = const [];
+  List<ComposeRuntimeCatalogEntry> _composeRuntimeCandidates = const [];
+  List<ComposeToolCatalogEntry> _composeToolCandidates = const [];
+  List<ComposeHostCatalogEntry> _composeHostCandidates = const [];
+  String? _composeCatalogSnapshotHash;
+  String? _composeHostSwitchGeneration;
   final Set<String> _selectedComposeRuntimeIds = <String>{};
   final Set<String> _selectedComposeAgentIds = <String>{};
   bool _composeRuntimeAgentCatalogLoaded = false;
@@ -637,6 +642,33 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         ),
         if (_composeRuntimeAgentCatalogMessage != null)
           Text(_composeRuntimeAgentCatalogMessage!),
+        if (_composeRuntimeAgentCatalogLoaded) ...[
+          Text(
+            'Catalog snapshot: ${_composeCatalogSnapshotHash ?? 'unknown'} / Host切替世代: ${_composeHostSwitchGeneration ?? 'unknown'}',
+          ),
+          for (final runtime in _composeRuntimeCandidates)
+            ListTile(
+              key: ValueKey('compose-runtime-detail-${runtime.runtimeId}'),
+              dense: true,
+              contentPadding: const EdgeInsets.only(left: 12),
+              title: Text(
+                  'Runtime ${runtime.runtimeId} / version ${runtime.version}'),
+              subtitle: Text(
+                'ABI: ${runtime.abi} / architecture: ${runtime.architecture} / OS: ${runtime.platforms.join(', ')} / status: ${runtime.status} / Permission: ${runtime.permissionStatus} / dependencies: ${runtime.dependencyStatus} / scope: ${runtime.scope['workspace']}',
+              ),
+            ),
+          for (final host in _composeHostCandidates)
+            ListTile(
+              key: ValueKey('compose-host-detail-${host.hostId}'),
+              dense: true,
+              contentPadding: const EdgeInsets.only(left: 12),
+              title: Text(
+                  'Host ${host.displayName} / ${host.platform} / ${host.kind}'),
+              subtitle: Text(
+                'version: ${host.version} / ABI: ${host.abi} / architecture: ${host.architecture} / state: ${host.status} / connection: ${host.connectionState} / trust: ${host.trustState} / Permission: not_granted',
+              ),
+            ),
+        ],
         if (!_composeRuntimeAgentCatalogLoaded)
           const Text('Catalog未取得です。現在登録を更新してください。')
         else if (_composeRuntimeIds.isEmpty)
@@ -739,6 +771,11 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
       setState(() {
         _composeRuntimeIds = catalog.runtimeIds;
         _composeAgentCatalog = catalog.agents;
+        _composeRuntimeCandidates = catalog.runtimes;
+        _composeToolCandidates = catalog.tools;
+        _composeHostCandidates = catalog.hosts;
+        _composeCatalogSnapshotHash = catalog.snapshotHash;
+        _composeHostSwitchGeneration = catalog.hostSwitchGeneration;
         final availableRuntimeIds = catalog.runtimeIds.toSet();
         _selectedComposeRuntimeIds.removeWhere(
           (runtimeId) => !availableRuntimeIds.contains(runtimeId),
@@ -762,6 +799,11 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
       setState(() {
         _composeRuntimeIds = const [];
         _composeAgentCatalog = const [];
+        _composeRuntimeCandidates = const [];
+        _composeToolCandidates = const [];
+        _composeHostCandidates = const [];
+        _composeCatalogSnapshotHash = null;
+        _composeHostSwitchGeneration = null;
         _selectedComposeRuntimeIds.clear();
         _selectedComposeAgentIds.clear();
         _composeRuntimeAgentCatalogLoaded = false;
@@ -817,7 +859,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                   : null,
               title: Text(connection.displayName),
               subtitle: Text(
-                'Server ID: ${connection.serverId} / ${connection.toolCount} Tool / ${connection.executionState} / Trustは未確立',
+                'Server ID: ${connection.serverId} / ${connection.toolCount} Tool / ${connection.executionState} / Trustは未確立 / Compose snapshotで再照合',
               ),
               controlAffinity: ListTileControlAffinity.leading,
             ),
@@ -832,17 +874,21 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
               key: ValueKey('compose-mcp-tool-${tool.toolId}'),
               contentPadding: const EdgeInsets.only(left: 24),
               value: _selectedComposeToolIds.contains(tool.toolId),
-              onChanged: (selected) {
-                setState(() {
-                  if (selected ?? false) {
-                    _selectedComposeToolIds.add(tool.toolId);
-                  } else {
-                    _selectedComposeToolIds.remove(tool.toolId);
-                  }
-                });
-              },
+              onChanged: _composeToolCandidate(tool.toolId) == null
+                  ? null
+                  : (selected) {
+                      setState(() {
+                        if (selected ?? false) {
+                          _selectedComposeToolIds.add(tool.toolId);
+                        } else {
+                          _selectedComposeToolIds.remove(tool.toolId);
+                        }
+                      });
+                    },
               title: Text(tool.name),
-              subtitle: const Text('Broker Catalogのmetadata。実行権限は付与されません。'),
+              subtitle: Text(
+                'Tool ID: ${tool.toolId} / server version: ${_composeToolCandidate(tool.toolId)?.serverVersion ?? 'unknown'} / protocol: ${_composeToolCandidate(tool.toolId)?.protocolVersion ?? 'unknown'} / auth: ${_composeToolCandidate(tool.toolId)?.authenticationStatus ?? 'unknown'} / 実行権限は付与されません。',
+              ),
               secondary: IconButton(
                 key: ValueKey('compose-tool-run-${tool.toolId}'),
                 tooltip: '現在Compose済みの構成からこのMCP Toolを実行',
@@ -878,11 +924,31 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         continue;
       }
       for (final tool in connection.tools) {
+        final candidates = _composeToolCandidates
+            .where((entry) =>
+                entry.serverId == connection.serverId &&
+                entry.toolId == tool.toolId &&
+                entry.name == tool.name)
+            .toList(growable: false);
+        if (candidates.length != 1 ||
+            candidates.single.status != 'connected' ||
+            candidates.single.authenticationStatus == 'revoked') {
+          continue;
+        }
         tools.putIfAbsent(tool.toolId, () => tool);
       }
     }
     final sorted = tools.keys.toList()..sort();
     return {for (final toolId in sorted) toolId: tools[toolId]!};
+  }
+
+  ComposeToolCatalogEntry? _composeToolCandidate(String toolId) {
+    final matches = _composeToolCandidates
+        .where((entry) =>
+            entry.toolId == toolId &&
+            _selectedComposeMcpConnectionIds.contains(entry.serverId))
+        .toList(growable: false);
+    return matches.length == 1 ? matches.single : null;
   }
 
   bool get _acceptedComposeMatchesDraft =>
@@ -962,8 +1028,18 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
   }
 
   Future<void> _runCompose(ComposeClient client) async {
+    final snapshotHash = _composeCatalogSnapshotHash;
+    if (snapshotHash == null) {
+      _setComposeMessage(
+        'Compose用の現在Broker Catalogがありません。Runtime／Agent Catalogを更新してください。',
+      );
+      return;
+    }
     try {
-      final receipt = await client.compose(_composeManifest());
+      final receipt = await client.compose(
+        _composeManifest(),
+        catalogSnapshotHash: snapshotHash,
+      );
       final manifest = receipt['compose_manifest'];
       _lastAcceptedComposeManifest =
           manifest is Map ? Map<String, Object?>.from(manifest) : null;

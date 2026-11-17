@@ -309,7 +309,10 @@ void main() {
       await _select(tester, 'compose-content-visibility', '伏字を含む表示');
 
       await _tap(tester, 'compose-manifest-button');
-      final compose = transport.lastPayload('GUI Shell構成');
+      final composeRequest = transport.lastPayload('GUI Shell構成');
+      expect(composeRequest['catalog_snapshot_hash'], _composeSnapshotHash);
+      final compose =
+          composeRequest['compose_manifest']! as Map<String, Object?>;
       expect(compose['runtime_ids'], ['runtime.local']);
       expect(compose['agent_ids'], ['agent.codex']);
       expect(compose['tool_ids'], [transport.composeToolId]);
@@ -363,8 +366,7 @@ void main() {
       await tester.ensureVisible(composeToolAction);
       await tester.pumpAndSettle();
       expect(tester.widget<IconButton>(composeToolAction).onPressed, isNotNull);
-      await tester.tap(composeToolAction);
-      await tester.pumpAndSettle();
+      await _tap(tester, 'compose-tool-run-${transport.composeToolId}');
       await _enter(
         tester,
         'compose-tool-action-arguments',
@@ -644,11 +646,14 @@ void main() {
     await _tap(tester, 'compose-runtime-runtime.local.secondary');
     await _tap(tester, 'compose-agent-agent.codex');
     await _tap(tester, 'compose-manifest-button');
-    expect(transport.lastPayload('GUI Shell構成')['runtime_ids'], [
+    final firstCompose =
+        transport.lastPayload('GUI Shell構成')['compose_manifest']!
+            as Map<String, Object?>;
+    expect(firstCompose['runtime_ids'], [
       'runtime.local',
       'runtime.local.secondary',
     ]);
-    expect(transport.lastPayload('GUI Shell構成')['agent_ids'], ['agent.codex']);
+    expect(firstCompose['agent_ids'], ['agent.codex']);
 
     await _tap(tester, 'compose-runtime-runtime.local');
     expect(
@@ -660,10 +665,13 @@ void main() {
       isTrue,
     );
     await _tap(tester, 'compose-manifest-button');
-    expect(transport.lastPayload('GUI Shell構成')['runtime_ids'], [
+    final secondCompose =
+        transport.lastPayload('GUI Shell構成')['compose_manifest']!
+            as Map<String, Object?>;
+    expect(secondCompose['runtime_ids'], [
       'runtime.local.secondary',
     ]);
-    expect(transport.lastPayload('GUI Shell構成')['agent_ids'], ['agent.codex']);
+    expect(secondCompose['agent_ids'], ['agent.codex']);
     expect(tester.takeException(), isNull);
   });
 }
@@ -697,6 +705,109 @@ Future<void> _tap(WidgetTester tester, String key) async {
   await tester.pumpAndSettle();
   expect(tester.takeException(), isNull, reason: '$key実行');
 }
+
+const _composeSnapshotHash =
+    'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const _composeHostSwitchGeneration =
+    'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+Map<String, Object?> _composeAgent(String runtimeId, String model) => {
+      'runtime_id': runtimeId,
+      'metadata': {
+        'adapter_id': 'adapter.codex.fixture',
+        'agent_id': 'agent.codex',
+        'provider': 'fixture-provider',
+        'version': '1.0.0',
+        'model': model,
+        'status': 'ready',
+        'capabilities': [
+          {
+            'capability_id': 'task_execution',
+            'support': {
+              'status': 'supported',
+              'reason': 'fixture compatibility only',
+            },
+          },
+        ],
+        'workspace_requirements': {
+          'mode': 'required',
+          'boundary_policy': 'deny_outside_workspace',
+          'secret_paths': ['.env', '.ssh', 'secrets/'],
+        },
+        'host_requirements': {
+          'platforms': ['windows'],
+          'network_scope': 'loopback_only',
+          'process_spawn': {
+            'status': 'unsupported',
+            'reason': 'fixture only',
+          },
+        },
+      },
+    };
+
+Map<String, Object?> _composeRuntime(String runtimeId, String model) {
+  final metadata =
+      _composeAgent(runtimeId, model)['metadata']! as Map<String, Object?>;
+  return {
+    'runtime_id': runtimeId,
+    'adapter_id': metadata['adapter_id'],
+    'version': metadata['version'],
+    'abi': 'unknown',
+    'architecture': 'unknown',
+    'os': ['windows'],
+    'status': metadata['status'],
+    'capabilities': metadata['capabilities'],
+    'permissions': {'status': 'not_granted', 'requirements': <Object?>[]},
+    'dependencies': {'status': 'unknown', 'items': <Object?>[]},
+    'scope': {
+      'workspace': metadata['workspace_requirements'],
+      'host': metadata['host_requirements'],
+    },
+    'evidence_source': 'INTERNAL_STATE',
+  };
+}
+
+Map<String, Object?> _composeHost() => {
+      'host_id': 'gui-shell-local-windows',
+      'display_name': 'Local Windows',
+      'kind': 'local',
+      'version': 'unknown',
+      'abi': 'unknown',
+      'architecture': 'x86_64',
+      'os': 'windows',
+      'status': 'degraded',
+      'connection_state': 'local',
+      'trust_state': 'local_runtime_only',
+      'permissions': {'status': 'not_granted', 'requirements': <Object?>[]},
+      'dependencies': {'status': 'unknown', 'items': <Object?>[]},
+      'scope': {'capabilities': <Object?>[]},
+      'evidence_source': 'LIVE_RUNTIME',
+      'authority_strip': true,
+    };
+
+Map<String, Object?> _composeTool(String toolId) => {
+      'server_id': 'mcp.local',
+      'server_name': 'Local MCP',
+      'server_version': '1.0.0',
+      'protocol_version': '2026-07-28',
+      'tool_id': toolId,
+      'name': 'echo',
+      'input_schema_hash':
+          'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+      'status': 'connected',
+      'authentication_status': 'missing',
+      'abi': 'unknown',
+      'os': ['unknown'],
+      'dependencies': {'status': 'unknown', 'items': <Object?>[]},
+      'scope': {
+        'transport': 'stdio',
+        'boundary': 'current_registered_connection',
+      },
+      'permission_requirement':
+          'separate_owner_confirmation_and_one_shot_permission',
+      'permission_generated': false,
+      'evidence_source': 'LIVE_RUNTIME',
+    };
 
 class _ComposeScreenTransport implements BrokerTransport {
   _ComposeScreenTransport({
@@ -777,50 +888,20 @@ class _ComposeScreenTransport implements BrokerTransport {
       'プロファイル一覧' => <String, Object?>{'Profiles': <Object?>[]},
       '更新一覧' => <String, Object?>{'更新一覧': <Object?>[]},
       'GUI Shell構成Catalog' => <String, Object?>{
-          'version': 1,
+          'version': 2,
+          'snapshot_hash': _composeSnapshotHash,
           'runtime_ids': ['runtime.local', 'runtime.local.secondary'],
-          'agents': [
-            {
-              'runtime_id': 'runtime.local',
-              'metadata': {
-                'adapter_id': 'adapter.codex.fixture',
-                'agent_id': 'agent.codex',
-                'provider': 'fixture-provider',
-                'version': '1.0.0',
-                'model': 'fixture-model',
-                'status': 'ready',
-                'capabilities': [
-                  {
-                    'capability_id': 'task_execution',
-                    'support': {
-                      'status': 'supported',
-                      'reason': 'fixture compatibility only',
-                    },
-                  },
-                ],
-              },
-            },
-            {
-              'runtime_id': 'runtime.local.secondary',
-              'metadata': {
-                'adapter_id': 'adapter.codex.fixture',
-                'agent_id': 'agent.codex',
-                'provider': 'fixture-provider',
-                'version': '1.0.0',
-                'model': 'fixture-model-b',
-                'status': 'ready',
-                'capabilities': [
-                  {
-                    'capability_id': 'task_execution',
-                    'support': {
-                      'status': 'supported',
-                      'reason': 'fixture compatibility only',
-                    },
-                  },
-                ],
-              },
-            },
+          'runtimes': [
+            _composeRuntime('runtime.local', 'fixture-model'),
+            _composeRuntime('runtime.local.secondary', 'fixture-model-b'),
           ],
+          'agents': [
+            _composeAgent('runtime.local', 'fixture-model'),
+            _composeAgent('runtime.local.secondary', 'fixture-model-b'),
+          ],
+          'tools': [_composeTool(composeToolId)],
+          'hosts': [_composeHost()],
+          'host_switch_generation': _composeHostSwitchGeneration,
           'evidence_source': 'INTERNAL_STATE',
           'authority_strip': true,
           'permission_generated': false,
@@ -841,7 +922,10 @@ class _ComposeScreenTransport implements BrokerTransport {
           'operation': operation,
           'status': 'accepted',
           'compose_manifest': Map<String, Object?>.fromEntries(
-            payload!.entries.toList().reversed,
+            (payload!['compose_manifest']! as Map<String, Object?>)
+                .entries
+                .toList()
+                .reversed,
           ),
           'build_status': 'not_started',
           'app_identity_status': 'not_generated',

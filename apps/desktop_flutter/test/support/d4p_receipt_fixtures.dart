@@ -34,10 +34,13 @@ const _mandatoryModuleIds = <String>[
 ];
 
 Map<String, Object?> composeBrokerResponse(
-  Map<String, Object?> manifest, {
+  Map<String, Object?> payload, {
   String auditId = 'fixture-compose-audit',
 }) {
   const operation = 'GUI Shell構成';
+  final manifest = payload['compose_manifest'] is Map
+      ? Map<String, Object?>.from(payload['compose_manifest']! as Map)
+      : payload;
   return _acceptedBrokerResponse(
     operation,
     auditId,
