@@ -425,6 +425,7 @@ try {
   $evidence.artifact_sha256.product_manifest = "sha256:$manifestHash"
 
   $stage = 'verify the launcher rejects an attempt to enable an excluded module'
+  $stage = 'prepare bounded launcher argument refusal observation'
   Add-Type -AssemblyName UIAutomationClient
   Add-Type -AssemblyName UIAutomationTypes
   if ($null -eq ('GuiShellExportSmokeWin32' -as [type])) {
@@ -437,7 +438,9 @@ public static class GuiShellExportSmokeWin32 {
 }
 "@
   }
+  $stage = 'start launcher unsupported-argument probe'
   $launcherProbe = Start-Process -FilePath $launcherPath -ArgumentList @('--enable-module=shell.setup_doctor') -WorkingDirectory $bundleRoot -PassThru
+  $stage = 'observe launcher refusal dialog'
   $probeDeadline = (Get-Date).AddSeconds(20)
   $probeDialog = $null
   $probeCondition = [System.Windows.Automation.PropertyCondition]::new(
@@ -453,6 +456,7 @@ public static class GuiShellExportSmokeWin32 {
     if ($dialogs.Count -gt 0) { $probeDialog = $dialogs[0] } else { Start-Sleep -Milliseconds 200 }
   }
   if ($null -eq $probeDialog) { throw 'launcher refusal dialog was not observed' }
+  $stage = 'verify launcher refusal error code'
   $probeElements = @(Get-ControlViewDescendants -RootElement $probeDialog -MaximumElements 2048)
   $probeNames = @($probeElements | ForEach-Object {
     try { [string]$_.Current.Name } catch { '' }
@@ -467,10 +471,13 @@ public static class GuiShellExportSmokeWin32 {
     } catch { $false }
   } | Select-Object -First 1)
   if ($probeButton.Count -ne 1) { throw 'launcher refusal dialog OK action was not available' }
+  $stage = 'dismiss launcher refusal dialog'
   $probeButton[0].GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+  $stage = 'verify launcher unsupported-argument exit code'
   if (-not $launcherProbe.WaitForExit(10000) -or $launcherProbe.ExitCode -ne 1) {
     throw 'launcher did not exit with the expected unsupported-argument status'
   }
+  $stage = 'verify rejected launcher spawned no frontend'
   $unexpectedChildren = @(Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $($launcherProbe.Id)" | Where-Object {
     [string]::Compare([string]$_.ExecutablePath, [IO.Path]::GetFullPath($appPath), $true) -eq 0
   })
