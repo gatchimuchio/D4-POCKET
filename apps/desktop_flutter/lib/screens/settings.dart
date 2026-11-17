@@ -99,7 +99,7 @@ class SettingsScreen extends StatelessWidget {
     this.requestApplicationExit,
     this.focusUpdateCenterRequest = 0,
     this.onPrepareAiEditTask,
-    this.onUpdateOperationOutcomeUnknown,
+    this.onBrokerMutationOutcomeUnknown,
   });
 
   final ShellCoreClient client;
@@ -108,7 +108,7 @@ class SettingsScreen extends StatelessWidget {
       requestApplicationExit;
   final int focusUpdateCenterRequest;
   final ValueChanged<AiEditProposalReview>? onPrepareAiEditTask;
-  final VoidCallback? onUpdateOperationOutcomeUnknown;
+  final VoidCallback? onBrokerMutationOutcomeUnknown;
 
   @override
   Widget build(BuildContext context) => _SettingsScreenStateful(
@@ -118,7 +118,7 @@ class SettingsScreen extends StatelessWidget {
         requestApplicationExit: requestApplicationExit,
         focusUpdateCenterRequest: focusUpdateCenterRequest,
         onPrepareAiEditTask: onPrepareAiEditTask,
-        onUpdateOperationOutcomeUnknown: onUpdateOperationOutcomeUnknown,
+        onBrokerMutationOutcomeUnknown: onBrokerMutationOutcomeUnknown,
       );
 }
 
@@ -130,7 +130,7 @@ class _SettingsScreenStateful extends StatefulWidget {
     this.requestApplicationExit,
     this.focusUpdateCenterRequest = 0,
     this.onPrepareAiEditTask,
-    this.onUpdateOperationOutcomeUnknown,
+    this.onBrokerMutationOutcomeUnknown,
   });
 
   final ShellCoreClient client;
@@ -139,7 +139,7 @@ class _SettingsScreenStateful extends StatefulWidget {
       requestApplicationExit;
   final int focusUpdateCenterRequest;
   final ValueChanged<AiEditProposalReview>? onPrepareAiEditTask;
-  final VoidCallback? onUpdateOperationOutcomeUnknown;
+  final VoidCallback? onBrokerMutationOutcomeUnknown;
 
   @override
   State<_SettingsScreenStateful> createState() => _SettingsScreenState();
@@ -225,8 +225,8 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
 
   @override
   void dispose() {
-    if (_updateMutationInProgress) {
-      widget.onUpdateOperationOutcomeUnknown?.call();
+    if (_updateMutationInProgress || _composeToolCallInProgress) {
+      widget.onBrokerMutationOutcomeUnknown?.call();
     }
     _searchController.dispose();
     _profileIdController.dispose();

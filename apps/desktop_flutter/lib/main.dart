@@ -494,7 +494,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         active: selectedIndex == 11,
         focusUpdateCenterRequest: _updateCenterFocusRequest,
         onPrepareAiEditTask: _openAiEditProposal,
-        onUpdateOperationOutcomeUnknown: _reportUpdateOperationOutcomeUnknown,
+        onBrokerMutationOutcomeUnknown: _reportBrokerMutationOutcomeUnknown,
       ),
       if (_dialogueVisited)
         RuntimeDialogueScreen(
@@ -1055,13 +1055,13 @@ class _ShellHomePageState extends State<ShellHomePage> {
     );
   }
 
-  void _reportUpdateOperationOutcomeUnknown() {
+  void _reportBrokerMutationOutcomeUnknown() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            '更新操作中に設定画面のBroker接続が切り替わりました。旧Brokerでの反映結果は不明です。自動再送していません。現在Brokerの更新一覧を再取得し、旧Broker側の状態も確認してください。',
+            'Broker接続先が切り替わりました。切替前のBroker作用の結果は不明です。自動再送していません。現在の画面から状態を再取得し、必要なら旧Brokerの監査と対象状態を確認してください。',
           ),
         ),
       );

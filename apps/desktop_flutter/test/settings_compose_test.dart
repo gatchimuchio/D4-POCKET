@@ -147,6 +147,73 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Broker切替中のCompose MCP Tool結果はunknownを通知し再送しない', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final oldTransport = _ComposeScreenTransport(holdMcpToolCall: true);
+    final newTransport = _ComposeScreenTransport();
+    var unknownOutcomeCount = 0;
+
+    Widget settingsFor(BrokerTransport transport) => MaterialApp(
+          home: Scaffold(
+            body: SettingsScreen(
+              client: ShellCoreClient.mock(transport: transport),
+              onBrokerMutationOutcomeUnknown: () => unknownOutcomeCount++,
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(settingsFor(oldTransport));
+    await tester.pumpAndSettle();
+    await _tap(tester, 'compose-runtime-agent-catalog-refresh');
+    await _tap(tester, 'compose-agent-agent.codex');
+    await _tap(tester, 'compose-mcp-catalog-refresh');
+    await _tap(tester, 'compose-mcp-server-mcp.local');
+    await _tap(tester, 'compose-mcp-tool-${oldTransport.composeToolId}');
+    await _tap(tester, 'compose-manifest-button');
+
+    final toolAction = find.byKey(
+      ValueKey('compose-tool-run-${oldTransport.composeToolId}'),
+    );
+    await tester.ensureVisible(toolAction);
+    await tester.tap(toolAction);
+    await tester.pumpAndSettle();
+    await _enter(tester, 'compose-tool-action-arguments', '{"query":"needle"}');
+    final submit = find.byKey(const ValueKey('compose-tool-action-submit'));
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    for (var frame = 0;
+        frame < 10 && !oldTransport.mcpToolCallRequestStarted.isCompleted;
+        frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(oldTransport.mcpToolCallRequestStarted.isCompleted, isTrue);
+
+    await tester.pumpWidget(settingsFor(newTransport));
+    await tester.pumpAndSettle();
+    expect(unknownOutcomeCount, 1);
+
+    oldTransport.releasePendingMcpToolCall();
+    await tester.pumpAndSettle();
+    expect(
+      oldTransport.requests
+          .where((request) => request['operation'] == 'MCP Tool実行'),
+      hasLength(1),
+    );
+    expect(
+      newTransport.requests
+          .where((request) => request['operation'] == 'MCP Tool実行'),
+      isEmpty,
+    );
+    expect(find.textContaining('Compose構成から既存MCP Toolを実行しました'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Compose画面が選択をManifest、Preview、Module plan、編集提案へつなぐ',
     (tester) async {
@@ -577,14 +644,19 @@ class _ComposeScreenTransport implements BrokerTransport {
   _ComposeScreenTransport({
     this.mcpServerDisplayName = 'Fixture MCP',
     this.holdMcpCatalog = false,
+    this.holdMcpToolCall = false,
   });
 
   final List<Map<String, Object?>> requests = [];
   final String composeToolId = 'tool-${List<String>.filled(142, "a").join()}';
   final String mcpServerDisplayName;
   final bool holdMcpCatalog;
+  final bool holdMcpToolCall;
   final Completer<void> mcpCatalogRequestStarted = Completer<void>();
+  final Completer<void> mcpToolCallRequestStarted = Completer<void>();
   final Completer<Map<String, Object?>> _pendingMcpCatalog =
+      Completer<Map<String, Object?>>();
+  final Completer<Map<String, Object?>> _pendingMcpToolCall =
       Completer<Map<String, Object?>>();
 
   void releasePendingMcpCatalog() {
@@ -592,11 +664,23 @@ class _ComposeScreenTransport implements BrokerTransport {
     _pendingMcpCatalog.complete(_mcpConnectionListBody());
   }
 
+  void releasePendingMcpToolCall() {
+    if (_pendingMcpToolCall.isCompleted) return;
+    _pendingMcpToolCall.complete(_mcpToolCallBody());
+  }
+
   Future<Map<String, Object?>> _waitForMcpCatalog() {
     if (!mcpCatalogRequestStarted.isCompleted) {
       mcpCatalogRequestStarted.complete();
     }
     return _pendingMcpCatalog.future;
+  }
+
+  Future<Map<String, Object?>> _waitForMcpToolCall() {
+    if (!mcpToolCallRequestStarted.isCompleted) {
+      mcpToolCallRequestStarted.complete();
+    }
+    return _pendingMcpToolCall.future;
   }
 
   Map<String, Object?> lastPayload(String operation) => requests
@@ -666,28 +750,8 @@ class _ComposeScreenTransport implements BrokerTransport {
         },
       'MCP接続一覧' =>
         holdMcpCatalog ? await _waitForMcpCatalog() : _mcpConnectionListBody(),
-      'MCP Tool実行' => <String, Object?>{
-          '版': 1,
-          '契約種別': 'MCP Tool実行receipt',
-          'ServerID': 'mcp.local',
-          'ToolID': composeToolId,
-          '名前': 'echo',
-          'arguments_hash': 'sha256:${List<String>.filled(64, 'a').join()}',
-          'result_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
-          'Tool error': false,
-          'content_count': 1,
-          'content_types': ['text'],
-          '接続状態': 'connected',
-          '能力ID': 'mcp.tool.call',
-          '権限ID': 'permission.mcp.tool.call.one_shot',
-          '承認状態': 'native_owner_confirmed',
-          '承認監査ID': 'audit-compose-approval',
-          '復旧ID': 'inspect-mcp-tool-side-effect',
-          '権限生成': 'Broker内一回限りPermissionを消費',
-          '公開範囲': 'hash_only',
-          '証拠種別': 'LIVE_RUNTIME',
-          '監査ID': 'audit-compose-tool-call',
-        },
+      'MCP Tool実行' =>
+        holdMcpToolCall ? await _waitForMcpToolCall() : _mcpToolCallBody(),
       '更新候補取得' => <String, Object?>{
           '状態': 'updated',
           '候補件数': 2,
@@ -803,6 +867,29 @@ class _ComposeScreenTransport implements BrokerTransport {
       'body': body,
     };
   }
+
+  Map<String, Object?> _mcpToolCallBody() => {
+        '版': 1,
+        '契約種別': 'MCP Tool実行receipt',
+        'ServerID': 'mcp.local',
+        'ToolID': composeToolId,
+        '名前': 'echo',
+        'arguments_hash': 'sha256:${List<String>.filled(64, 'a').join()}',
+        'result_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
+        'Tool error': false,
+        'content_count': 1,
+        'content_types': ['text'],
+        '接続状態': 'connected',
+        '能力ID': 'mcp.tool.call',
+        '権限ID': 'permission.mcp.tool.call.one_shot',
+        '承認状態': 'native_owner_confirmed',
+        '承認監査ID': 'audit-compose-approval',
+        '復旧ID': 'inspect-mcp-tool-side-effect',
+        '権限生成': 'Broker内一回限りPermissionを消費',
+        '公開範囲': 'hash_only',
+        '証拠種別': 'LIVE_RUNTIME',
+        '監査ID': 'audit-compose-tool-call',
+      };
 
   Map<String, Object?> _mcpConnectionListBody() => {
         '版': 1,

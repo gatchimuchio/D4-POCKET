@@ -67,7 +67,7 @@ void main() {
                 exitRequests.add(exitType);
                 return ui.AppExitResponse.exit;
               },
-              onUpdateOperationOutcomeUnknown: () => unknownOutcomeCount++,
+              onBrokerMutationOutcomeUnknown: () => unknownOutcomeCount++,
             ),
           ),
         );
