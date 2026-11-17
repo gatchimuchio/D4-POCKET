@@ -293,6 +293,7 @@ $evidence = [ordered]@{
     ui_observation_known_labels = @()
     included_surfaces = @()
     excluded_surfaces_absent = $false
+    graceful_exit_attempted = $false
     graceful_exit = $false
     forced_exit = $false
   }
@@ -308,11 +309,21 @@ $evidence = [ordered]@{
     session_secret_absent_from_responses_and_audit = $false
     audit_sha256 = $null
     audit_bytes = 0
+    audit_validation = [ordered]@{
+      file_observed = $false
+      excluded_event_id_bound = $false
+      excluded_operation_code_bound = $false
+      command_event_id_bound = $false
+      private_marker_absent = $false
+      command_marker_absent = $false
+      session_secret_absent = $false
+    }
   }
   cleanup = [ordered]@{
     endpoint_removed = $false
     runtime_fixture_removed = $false
     launcher_exit_code = $null
+    launcher_forced_exit = $false
   }
   scope = [ordered]@{
     installed_product_verified = $false
@@ -685,101 +696,178 @@ public static class GuiShellExportSmokeWin32 {
 
   $stage = 'verify bounded Audit non-exposure and retain only safe evidence fields'
   if (-not (Test-Path -LiteralPath $auditPath -PathType Leaf)) { throw 'Broker Audit file was not created' }
-  $auditText = Get-Content -LiteralPath $auditPath -Raw -Encoding utf8
-  if ($auditText.Contains($privateMarker) -or $auditText.Contains($commandMarker) -or $auditText.Contains($sessionSecret) -or
-      -not $auditText.Contains([string]$excludedResult.Response.audit_event_id) -or
-      -not $auditText.Contains('optional_module_not_included') -or
-      -not $auditText.Contains([string]$commandResult.Response.audit_event_id)) {
-    throw 'Audit does not bind both outcomes or exposed a private marker / session secret'
-  }
+  $evidence.broker.audit_validation.file_observed = $true
   $auditBytes = [IO.File]::ReadAllBytes($auditPath)
   $evidence.broker.audit_sha256 = 'sha256:' + (Get-Sha256Hex -Bytes $auditBytes)
   $evidence.broker.audit_bytes = $auditBytes.Length
   [Array]::Clear($auditBytes, 0, $auditBytes.Length)
+  $auditText = Get-Content -LiteralPath $auditPath -Raw -Encoding utf8
+  $evidence.broker.audit_validation.excluded_event_id_bound = $auditText.Contains([string]$excludedResult.Response.audit_event_id)
+  $evidence.broker.audit_validation.excluded_operation_code_bound = $auditText.Contains('optional_module_not_included')
+  $evidence.broker.audit_validation.command_event_id_bound = $auditText.Contains([string]$commandResult.Response.audit_event_id)
+  $evidence.broker.audit_validation.private_marker_absent = -not $auditText.Contains($privateMarker)
+  $evidence.broker.audit_validation.command_marker_absent = -not $auditText.Contains($commandMarker)
+  $evidence.broker.audit_validation.session_secret_absent = -not $auditText.Contains($sessionSecret)
+  if (-not $evidence.broker.audit_validation.excluded_event_id_bound -or
+      -not $evidence.broker.audit_validation.excluded_operation_code_bound -or
+      -not $evidence.broker.audit_validation.command_event_id_bound -or
+      -not $evidence.broker.audit_validation.private_marker_absent -or
+      -not $evidence.broker.audit_validation.command_marker_absent -or
+      -not $evidence.broker.audit_validation.session_secret_absent) {
+    throw 'Audit does not bind both outcomes or exposed a private marker / session secret'
+  }
   $evidence.broker.private_marker_absent_from_responses_and_audit = $true
   $evidence.broker.session_secret_absent_from_responses_and_audit = $true
-
-  $stage = 'close the live app using its native tray exit and verify cleanup'
-  $gracefulRequested = Request-FrontendExit -Frontend $frontendProcess
-  $frontendExited = $false
-  if ($gracefulRequested) { $frontendExited = $frontendProcess.WaitForExit(30000) }
-  if (-not $gracefulRequested -or -not $frontendExited) {
-    $evidence.frontend.forced_exit = $true
-    throw 'native tray exit did not close the launched app within the bounded deadline'
-  }
-  $evidence.frontend.graceful_exit = $true
-  $launcherExited = $launcherProcess.WaitForExit(30000)
-  if (-not $launcherExited -or $launcherProcess.ExitCode -ne 0) {
-    throw 'portable Rust launcher did not exit successfully after the frontend'
-  }
-  $evidence.cleanup.launcher_exit_code = [int]$launcherProcess.ExitCode
-  $evidence.cleanup.endpoint_removed = -not (Test-Path -LiteralPath $endpointPath)
-  if (-not $evidence.cleanup.endpoint_removed) { throw 'normal Broker endpoint remained after graceful shutdown' }
-  if ($evidence.frontend.ui_observation_status -ne 'passed') {
-    $stage = 'UI Automation module surface observation was not established after independent Broker and cleanup checks'
-    throw 'UI Automation module surface observation was not established'
-  }
-  $evidence.result = 'passed'
 } catch {
   $runError = $_
   $evidence.failure_stage = $stage
 } finally {
+  if ($null -ne $frontendProcess) {
+    try {
+      $frontendProcess.Refresh()
+      if (-not $frontendProcess.HasExited) {
+        $evidence.frontend.graceful_exit_attempted = $true
+        $gracefulRequested = Request-FrontendExit -Frontend $frontendProcess
+        $frontendExited = $false
+        if ($gracefulRequested) { $frontendExited = $frontendProcess.WaitForExit(30000) }
+        if ($gracefulRequested -and $frontendExited) {
+          $evidence.frontend.graceful_exit = $true
+        } elseif ($null -eq $evidence.failure_stage) {
+          $evidence.failure_stage = 'native tray exit did not close the launched app within the bounded deadline'
+        }
+      } elseif ($null -eq $evidence.failure_stage) {
+        $evidence.failure_stage = 'frontend exited before native tray exit could be verified'
+      }
+    } catch {
+      if ($null -eq $evidence.failure_stage) {
+        $evidence.failure_stage = 'native tray exit request failed'
+      }
+    }
+  }
+  if ($null -ne $launcherProcess -and $evidence.frontend.graceful_exit) {
+    try {
+      if (-not $launcherProcess.WaitForExit(30000) -or $launcherProcess.ExitCode -ne 0) {
+        $cleanupPassed = $false
+        if ($null -eq $evidence.failure_stage) {
+          $evidence.failure_stage = 'portable launcher did not exit successfully after the frontend'
+        }
+      } else {
+        $evidence.cleanup.launcher_exit_code = [int]$launcherProcess.ExitCode
+      }
+    } catch {
+      $cleanupPassed = $false
+      if ($null -eq $evidence.failure_stage) {
+        $evidence.failure_stage = 'portable launcher exit could not be verified'
+      }
+    }
+  }
   if ($null -ne $launcherProbe) {
-    $launcherProbe.Refresh()
-    if (-not $launcherProbe.HasExited) {
-      $stopped = Stop-ExactOwnedProcess -Process $launcherProbe -ExpectedPath (Join-Path $bundleRoot 'gui_shell_desktop_launcher.exe') -ExpectedHash ([string]$evidence.artifact_sha256.launcher).Replace('sha256:', '')
-      if (-not $stopped) { $cleanupPassed = $false }
+    try {
+      $launcherProbe.Refresh()
+      if (-not $launcherProbe.HasExited) {
+        $stopped = Stop-ExactOwnedProcess -Process $launcherProbe -ExpectedPath (Join-Path $bundleRoot 'gui_shell_desktop_launcher.exe') -ExpectedHash ([string]$evidence.artifact_sha256.launcher).Replace('sha256:', '')
+        if (-not $stopped) { $cleanupPassed = $false }
+      }
+    } catch {
+      $cleanupPassed = $false
+      if ($null -eq $evidence.failure_stage) { $evidence.failure_stage = 'launcher refusal probe cleanup failed' }
     }
   }
   if ($null -ne $frontendProcess) {
-    $frontendProcess.Refresh()
-    if (-not $frontendProcess.HasExited) {
-      $stopped = Stop-ExactOwnedProcess -Process $frontendProcess -ExpectedPath (Join-Path $bundleRoot 'app\gui_shell_desktop.exe') -ExpectedHash ([string]$evidence.artifact_sha256.flutter_app).Replace('sha256:', '') -ExpectedParentId $frontendParentId
-      if (-not $stopped) { $cleanupPassed = $false } else { $evidence.frontend.forced_exit = $true }
+    try {
+      $frontendProcess.Refresh()
+      if (-not $frontendProcess.HasExited) {
+        $stopped = Stop-ExactOwnedProcess -Process $frontendProcess -ExpectedPath (Join-Path $bundleRoot 'app\gui_shell_desktop.exe') -ExpectedHash ([string]$evidence.artifact_sha256.flutter_app).Replace('sha256:', '') -ExpectedParentId $frontendParentId
+        if (-not $stopped) {
+          $cleanupPassed = $false
+        } else {
+          $evidence.frontend.forced_exit = $true
+          if ($null -eq $evidence.failure_stage) { $evidence.failure_stage = 'frontend required exact-process forced cleanup' }
+        }
+      }
+    } catch {
+      $cleanupPassed = $false
+      if ($null -eq $evidence.failure_stage) { $evidence.failure_stage = 'frontend process cleanup could not be verified' }
     }
   }
   if ($null -ne $launcherProcess) {
-    $launcherProcess.Refresh()
-    if (-not $launcherProcess.HasExited) {
-      $stopped = Stop-ExactOwnedProcess -Process $launcherProcess -ExpectedPath (Join-Path $bundleRoot 'gui_shell_desktop_launcher.exe') -ExpectedHash ([string]$evidence.artifact_sha256.launcher).Replace('sha256:', '')
-      if (-not $stopped) { $cleanupPassed = $false }
-    }
-    $launcherProcess.Refresh()
-    if ($launcherProcess.HasExited -and $null -eq $evidence.cleanup.launcher_exit_code) {
-      $evidence.cleanup.launcher_exit_code = [int]$launcherProcess.ExitCode
+    try {
+      $launcherProcess.Refresh()
+      if (-not $launcherProcess.HasExited) {
+        $stopped = Stop-ExactOwnedProcess -Process $launcherProcess -ExpectedPath (Join-Path $bundleRoot 'gui_shell_desktop_launcher.exe') -ExpectedHash ([string]$evidence.artifact_sha256.launcher).Replace('sha256:', '')
+        if (-not $stopped) {
+          $cleanupPassed = $false
+        } else {
+          $evidence.cleanup.launcher_forced_exit = $true
+          if ($null -eq $evidence.failure_stage) { $evidence.failure_stage = 'portable launcher required exact-process forced cleanup' }
+        }
+      }
+      $launcherProcess.Refresh()
+      if ($launcherProcess.HasExited -and $null -eq $evidence.cleanup.launcher_exit_code) {
+        $evidence.cleanup.launcher_exit_code = [int]$launcherProcess.ExitCode
+      }
+    } catch {
+      $cleanupPassed = $false
+      if ($null -eq $evidence.failure_stage) { $evidence.failure_stage = 'portable launcher process cleanup could not be verified' }
     }
   }
   if ($null -ne $sessionSecret) { $sessionSecret = $null }
   if ($null -ne $endpoint) { $endpoint.session_secret = $null }
-  if ($null -ne $runtimeStore -and (Test-Path -LiteralPath $runtimeStore)) {
+  if ($null -ne $auditText) { $auditText = $null }
+  if ($null -ne $privateMarker) { $privateMarker = $null }
+  if ($null -ne $commandMarker) { $commandMarker = $null }
+  if ($null -ne $runtimeStore) {
     try {
-      $storeFullPath = [IO.Path]::GetFullPath($runtimeStore)
-      if ($storeFullPath -cne [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "D4Pocket\apps\$($evidence.fixture.app_id)\stores\$($evidence.fixture.audit_store_id)")) -or
-          -not $storeFullPath.StartsWith($localAppDataRoot, [StringComparison]::OrdinalIgnoreCase) -or
-          ($null -ne $launcherProcess -and -not $launcherProcess.HasExited)) {
-        throw 'runtime fixture ownership or stopped-process check failed'
+      if (Test-Path -LiteralPath $runtimeStore) {
+        $storeFullPath = [IO.Path]::GetFullPath($runtimeStore)
+        if ($storeFullPath -cne [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "D4Pocket\apps\$($evidence.fixture.app_id)\stores\$($evidence.fixture.audit_store_id)")) -or
+            -not $storeFullPath.StartsWith($localAppDataRoot, [StringComparison]::OrdinalIgnoreCase) -or
+            ($null -ne $launcherProcess -and -not $launcherProcess.HasExited)) {
+          throw 'runtime fixture ownership or stopped-process check failed'
+        }
+        Remove-Item -LiteralPath $storeFullPath -Recurse -Force
+        $evidence.cleanup.runtime_fixture_removed = -not (Test-Path -LiteralPath $storeFullPath)
+        if (-not $evidence.cleanup.runtime_fixture_removed) { $cleanupPassed = $false }
+      } else {
+        $evidence.cleanup.runtime_fixture_removed = $true
       }
-      Remove-Item -LiteralPath $storeFullPath -Recurse -Force
-      $evidence.cleanup.runtime_fixture_removed = -not (Test-Path -LiteralPath $storeFullPath)
-      if (-not $evidence.cleanup.runtime_fixture_removed) { $cleanupPassed = $false }
     } catch {
       $cleanupPassed = $false
+      if ($null -eq $evidence.failure_stage) { $evidence.failure_stage = 'runtime fixture cleanup failed' }
     }
   } else {
     $evidence.cleanup.runtime_fixture_removed = $true
   }
   if ($null -ne $endpointPath) {
-    $evidence.cleanup.endpoint_removed = -not (Test-Path -LiteralPath $endpointPath)
-    if (-not $evidence.cleanup.endpoint_removed) { $cleanupPassed = $false }
+    try {
+      $evidence.cleanup.endpoint_removed = -not (Test-Path -LiteralPath $endpointPath)
+      if (-not $evidence.cleanup.endpoint_removed) {
+        $cleanupPassed = $false
+        if ($null -eq $evidence.failure_stage) { $evidence.failure_stage = 'normal Broker endpoint remained after shutdown' }
+      }
+    } catch {
+      $cleanupPassed = $false
+      if ($null -eq $evidence.failure_stage) { $evidence.failure_stage = 'normal Broker endpoint cleanup could not be verified' }
+    }
   }
 }
 
+if ($evidence.frontend.ui_observation_status -ne 'passed' -and $null -eq $evidence.failure_stage) {
+  $evidence.failure_stage = 'UI Automation module surface observation was not established after independent Broker and cleanup checks'
+}
 if (-not $cleanupPassed -or
     -not $evidence.cleanup.endpoint_removed -or
     -not $evidence.cleanup.runtime_fixture_removed -or
-    $evidence.frontend.forced_exit) {
+    -not $evidence.frontend.graceful_exit -or
+    $evidence.frontend.forced_exit -or
+    $evidence.cleanup.launcher_forced_exit -or
+    $evidence.cleanup.launcher_exit_code -ne 0) {
   $evidence.result = 'failed'
   if ($null -eq $evidence.failure_stage) { $evidence.failure_stage = 'owned process or fixture cleanup' }
+} elseif ($null -ne $runError -or $evidence.frontend.ui_observation_status -ne 'passed') {
+  $evidence.result = 'failed'
+} else {
+  $evidence.result = 'passed'
 }
 $evidence | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $evidenceFullPath -Encoding utf8
 if ($null -ne $runError -or $evidence.result -ne 'passed') {

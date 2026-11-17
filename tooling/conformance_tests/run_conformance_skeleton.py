@@ -11783,13 +11783,35 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
     )
     if not (ui_observation >= 0 and broker_observation > ui_observation and deferred_ui_gate > broker_observation):
         errors.append("Windows Export UIA failureが独立Broker検査後まで遅延されない")
+    smoke_finally = smoke_source.find("} finally {", broker_observation)
+    tray_exit_in_finally = smoke_source.find(
+        "Request-FrontendExit -Frontend $frontendProcess", smoke_finally
+    )
+    forced_frontend_cleanup = smoke_source.find(
+        "Stop-ExactOwnedProcess -Process $frontendProcess", smoke_finally
+    )
+    if not (
+        smoke_finally > broker_observation
+        and tray_exit_in_finally > smoke_finally
+        and forced_frontend_cleanup > tray_exit_in_finally
+    ):
+        errors.append("Windows Export smokeがAudit失敗後にもtray終了を先行しcleanupを続行しない")
     for token in (
         "$evidence.frontend.ui_observation_status = 'not_established'",
         "$evidence.frontend.ui_observation_failure_stage = $stage",
+        "$evidence.frontend.graceful_exit_attempted = $true",
+        "$evidence.broker.audit_validation.file_observed = $true",
+        "$evidence.broker.audit_validation.excluded_event_id_bound = $auditText.Contains(",
+        "$evidence.broker.audit_validation.excluded_operation_code_bound = $auditText.Contains(",
+        "$evidence.broker.audit_validation.command_event_id_bound = $auditText.Contains(",
+        "$evidence.broker.audit_validation.private_marker_absent = -not $auditText.Contains(",
+        "$evidence.broker.audit_validation.command_marker_absent = -not $auditText.Contains(",
+        "$evidence.broker.audit_validation.session_secret_absent = -not $auditText.Contains(",
         "$launchEvidence.frontend.ui_observation_status -ne 'passed'",
         "- name: portable launch smokeの結果とcleanupを常時要約",
         "if: always() && steps.portable_export_build.outcome != 'success'",
         "EXPORT_BUILD_OUTCOME: ${{ steps.portable_export_build.outcome }}",
+        "Audit validation: excluded event ID",
         "Summary omits request payloads, private markers, session secrets, and raw exception text.",
     ):
         if token not in smoke_source + export_workflow:
