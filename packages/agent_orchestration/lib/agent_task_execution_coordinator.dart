@@ -28,8 +28,10 @@ class AgentTaskExecutionCoordinator {
     BrokerTransport transport, {
     this.platform = AgentRuntimePlatform.other,
     Duration maximumMonitorDuration = const Duration(minutes: 16),
+    int maximumMcpToolFollowups = defaultMaximumMcpToolFollowups,
   }) : _transport = transport,
-       _maximumMonitorDuration = maximumMonitorDuration {
+       _maximumMonitorDuration = maximumMonitorDuration,
+       _maximumMcpToolFollowups = maximumMcpToolFollowups {
     if (maximumMonitorDuration.isNegative) {
       throw ArgumentError.value(
         maximumMonitorDuration,
@@ -37,12 +39,22 @@ class AgentTaskExecutionCoordinator {
         'must not be negative',
       );
     }
+    if (maximumMcpToolFollowups < 0 ||
+        maximumMcpToolFollowups > defaultMaximumMcpToolFollowups) {
+      throw ArgumentError.value(
+        maximumMcpToolFollowups,
+        'maximumMcpToolFollowups',
+        'must be between 0 and $defaultMaximumMcpToolFollowups',
+      );
+    }
   }
 
   static const _maximumRememberedTaskIds = 2048;
+  static const defaultMaximumMcpToolFollowups = 8;
 
   final BrokerTransport _transport;
   final Duration _maximumMonitorDuration;
+  final int _maximumMcpToolFollowups;
   final StreamController<AgentTaskExecutionUpdate> _updates =
       StreamController<AgentTaskExecutionUpdate>.broadcast();
   final AgentRuntimePlatform platform;
@@ -64,6 +76,22 @@ class AgentTaskExecutionCoordinator {
     required AgentTaskRequest request,
     required AgentTaskRecord task,
     required String? expectedInstructionHash,
+    AgentTaskExecutionUpdateHandler? onUpdate,
+    bool allowMcpContinuation = true,
+  }) => _observeStartedTask(
+    request: request,
+    task: task,
+    expectedInstructionHash: expectedInstructionHash,
+    onUpdate: onUpdate,
+    allowMcpContinuation: allowMcpContinuation,
+    remainingMcpToolFollowups: _maximumMcpToolFollowups,
+  );
+
+  Future<void> _observeStartedTask({
+    required AgentTaskRequest request,
+    required AgentTaskRecord task,
+    required String? expectedInstructionHash,
+    required int remainingMcpToolFollowups,
     AgentTaskExecutionUpdateHandler? onUpdate,
     bool allowMcpContinuation = true,
   }) async {
@@ -93,6 +121,7 @@ class AgentTaskExecutionCoordinator {
       request: request,
       initialTask: task,
       allowMcpContinuation: allowMcpContinuation && instructionMatchesPreflight,
+      remainingMcpToolFollowups: remainingMcpToolFollowups,
       initialWarning: instructionMatchesPreflight
           ? null
           : expectedInstructionHash == null
@@ -214,6 +243,7 @@ class AgentTaskExecutionCoordinator {
         final canContinueAfterCompletion =
             current.status == 'completed' &&
             run.allowMcpContinuation &&
+            run.remainingMcpToolFollowups > 0 &&
             run.request.mcpCapabilitySnapshotHash != null;
         final monitorLimitMessage = switch (current.status) {
           'pending' || 'running' =>
@@ -234,6 +264,15 @@ class AgentTaskExecutionCoordinator {
         !run.allowMcpContinuation ||
         run.request.mcpCapabilitySnapshotHash == null ||
         !_isCurrent(run)) {
+      return;
+    }
+    if (run.remainingMcpToolFollowups == 0) {
+      _emit(
+        run,
+        task: current,
+        message:
+            'MCP自動継続の上限（${_maximumMcpToolFollowups}回）に達したため、追加のTool／Task連鎖を開始しません。',
+      );
       return;
     }
 
@@ -266,10 +305,11 @@ class AgentTaskExecutionCoordinator {
         return;
       }
       unawaited(
-        observeStartedTask(
+        _observeStartedTask(
           request: followupRequest,
           task: followup,
           expectedInstructionHash: followupPreflight.instructionHash,
+          remainingMcpToolFollowups: run.remainingMcpToolFollowups - 1,
           allowMcpContinuation: true,
           onUpdate: run.onUpdate,
         ),
@@ -395,6 +435,7 @@ class _TaskRun {
     required this.request,
     required this.initialTask,
     required this.allowMcpContinuation,
+    required this.remainingMcpToolFollowups,
     required this.initialWarning,
     required this.onUpdate,
   });
@@ -402,6 +443,7 @@ class _TaskRun {
   final AgentTaskRequest request;
   final AgentTaskRecord initialTask;
   final bool allowMcpContinuation;
+  final int remainingMcpToolFollowups;
   final String? initialWarning;
   final AgentTaskExecutionUpdateHandler? onUpdate;
   bool active = true;

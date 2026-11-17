@@ -324,6 +324,69 @@ void main() {
     coordinator.dispose();
   });
 
+  test('MCP自動継続は有限回で停止し、上限後の結果からToolを実行しない', () async {
+    final transport = _FakeBrokerTransport([
+      ..._successfulResponses(),
+      _taskStateResponse(
+        taskId: _followupTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'completed',
+        auditEventId: 'audit-followup-at-loop-limit',
+        resultHash: _sourceResultHash,
+        resultContentAvailable: true,
+      ),
+    ]);
+    final coordinator = orchestration.AgentTaskExecutionCoordinator(
+      transport,
+      maximumMonitorDuration: Duration.zero,
+      maximumMcpToolFollowups: 1,
+    );
+    final limitReached = Completer<AgentTaskExecutionUpdate>();
+
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: _sourceTask,
+      expectedInstructionHash: _instructionHash,
+      onUpdate: (update) {
+        if (update.message?.contains('MCP自動継続の上限') ?? false) {
+          if (!limitReached.isCompleted) limitReached.complete(update);
+        }
+      },
+    );
+    final update = await limitReached.future.timeout(
+      const Duration(seconds: 1),
+    );
+
+    expect(update.task?.taskId, _followupTaskId);
+    expect(update.task?.status, 'completed');
+    expect(
+      transport.operations.where((operation) => operation == 'MCP Tool実行'),
+      hasLength(1),
+    );
+    expect(
+      transport.operations.where((operation) => operation == 'AgentTask実行'),
+      hasLength(1),
+    );
+    expect(
+      transport.operations.where((operation) => operation == 'AgentTask結果表示承認'),
+      hasLength(1),
+      reason: '上限後のTask結果を自動で読み出してTool要求を処理してはならない',
+    );
+    expect(
+      () => orchestration.AgentTaskExecutionCoordinator(
+        transport,
+        maximumMcpToolFollowups: orchestration
+                .AgentTaskExecutionCoordinator.defaultMaximumMcpToolFollowups +
+            1,
+      ),
+      throwsArgumentError,
+    );
+    coordinator.dispose();
+  });
+
   test('後続TaskのOwner Approval拒否後はTaskを開始しない', () async {
     final responses = _successfulResponses();
     responses[6] = {
