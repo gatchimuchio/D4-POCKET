@@ -43,6 +43,10 @@ def _build_evidence(bundle: Path) -> dict[str, object]:
             "excluded_optional_module_ids": ["shell.trace_inspector"],
         },
         "artifact_tree_sha256": "d" * 64,
+        "artifact_files": [
+            {"path": relative, "size_bytes": 128, "sha256": "0" * 64}
+            for _role, relative in pipeline.build_windows_installer.WINDOWS_PAYLOAD_COMPONENTS
+        ],
     }
 
 
@@ -60,6 +64,25 @@ class WindowsExportSetupPipelineTests(unittest.TestCase):
             "setup_size_bytes": len(SETUP_BYTES),
             "setup_sha256": hashlib.sha256(SETUP_BYTES).hexdigest(),
             "authenticode": "not_signed_by_this_build_recipe",
+            "setup_architecture": "x86",
+            "setup_authenticode_status": "NotSigned",
+            "setup_signer_thumbprint": None,
+            "payload_components": [
+                {
+                    "role": role,
+                    "path": relative,
+                    "size_bytes": 128,
+                    "sha256": "0" * 64,
+                    "architecture": "x64",
+                    "authenticode_status": "NotSigned",
+                    "signer_thumbprint": None,
+                }
+                for role, relative in pipeline.build_windows_installer.WINDOWS_PAYLOAD_COMPONENTS
+            ],
+            "authenticode_evidence_source": {
+                "evidence_class": "EXTERNAL_EVIDENCE",
+                "tool": "PowerShell Get-AuthenticodeSignature",
+            },
             "product_installed_runtime": "not_exercised",
         }
 
@@ -97,6 +120,17 @@ class WindowsExportSetupPipelineTests(unittest.TestCase):
             self.assertEqual(evidence["source_commit"], SOURCE_COMMIT)
             self.assertEqual(evidence["app_id"], APP_ID)
             self.assertEqual(evidence["audit_store_id"], AUDIT_ID)
+            self.assertEqual(evidence["version"], 2)
+            self.assertEqual(evidence["setup_file"]["architecture"], "x86")
+            self.assertEqual(evidence["setup_file"]["authenticode_status"], "NotSigned")
+            self.assertEqual(
+                {component["architecture"] for component in evidence["payload_components"]},
+                {"x64"},
+            )
+            self.assertEqual(
+                evidence["authenticode_evidence_source"]["evidence_class"],
+                "EXTERNAL_EVIDENCE",
+            )
             self.assertEqual(
                 evidence["setup_file"]["sha256"],
                 hashlib.sha256(SETUP_BYTES).hexdigest(),
@@ -143,6 +177,108 @@ class WindowsExportSetupPipelineTests(unittest.TestCase):
                 ),
             ):
                 with self.assertRaisesRegex(ValueError, "identityまたは証拠範囲"):
+                    pipeline.build_setup_from_export(receipt, manifest, output)
+
+            self.assertFalse(output.exists())
+            self.assertEqual({path.name for path in root.iterdir()}, {"receipt.json", "manifest.json"})
+
+    def test_payload_architecture_mismatch_never_publishes_output(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-setup-pipeline-") as temporary:
+            root = Path(temporary)
+            receipt = root / "receipt.json"
+            manifest = root / "manifest.json"
+            receipt.write_text("fixture", encoding="utf-8")
+            manifest.write_text("fixture", encoding="utf-8")
+            output = root / "new-setup-output"
+
+            def wrong_architecture(bundle: Path, stage: Path, *, iscc_path: Path | None = None):
+                evidence = self.setup_builder(bundle, stage, iscc_path=iscc_path)
+                evidence["payload_components"][0]["architecture"] = "arm64"
+                return evidence
+
+            with (
+                patch.object(pipeline.sys, "platform", "win32"),
+                patch.object(
+                    pipeline.export_windows_product,
+                    "build_portable_bundle",
+                    side_effect=lambda _receipt, _manifest, bundle: _build_evidence(bundle),
+                ),
+                patch.object(
+                    pipeline.build_windows_installer,
+                    "build_windows_installer",
+                    side_effect=wrong_architecture,
+                ),
+            ):
+                with self.assertRaisesRegex(ValueError, "role／path／architecture"):
+                    pipeline.build_setup_from_export(receipt, manifest, output)
+
+            self.assertFalse(output.exists())
+            self.assertEqual({path.name for path in root.iterdir()}, {"receipt.json", "manifest.json"})
+
+    def test_signed_setup_is_not_claimed_as_unsigned_recipe_output(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-setup-pipeline-") as temporary:
+            root = Path(temporary)
+            receipt = root / "receipt.json"
+            manifest = root / "manifest.json"
+            receipt.write_text("fixture", encoding="utf-8")
+            manifest.write_text("fixture", encoding="utf-8")
+            output = root / "new-setup-output"
+
+            def signed_setup(bundle: Path, stage: Path, *, iscc_path: Path | None = None):
+                evidence = self.setup_builder(bundle, stage, iscc_path=iscc_path)
+                evidence["setup_authenticode_status"] = "Valid"
+                evidence["setup_signer_thumbprint"] = "A" * 40
+                return evidence
+
+            with (
+                patch.object(pipeline.sys, "platform", "win32"),
+                patch.object(
+                    pipeline.export_windows_product,
+                    "build_portable_bundle",
+                    side_effect=lambda _receipt, _manifest, bundle: _build_evidence(bundle),
+                ),
+                patch.object(
+                    pipeline.build_windows_installer,
+                    "build_windows_installer",
+                    side_effect=signed_setup,
+                ),
+            ):
+                with self.assertRaisesRegex(ValueError, "署名しないSetup recipe"):
+                    pipeline.build_setup_from_export(receipt, manifest, output)
+
+            self.assertFalse(output.exists())
+            self.assertEqual({path.name for path in root.iterdir()}, {"receipt.json", "manifest.json"})
+
+    def test_payload_hash_mismatch_against_export_inventory_never_publishes_output(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-setup-pipeline-") as temporary:
+            root = Path(temporary)
+            receipt = root / "receipt.json"
+            manifest = root / "manifest.json"
+            receipt.write_text("fixture", encoding="utf-8")
+            manifest.write_text("fixture", encoding="utf-8")
+            output = root / "new-setup-output"
+
+            def mismatched_payload_hash(
+                bundle: Path, stage: Path, *, iscc_path: Path | None = None
+            ):
+                evidence = self.setup_builder(bundle, stage, iscc_path=iscc_path)
+                evidence["payload_components"][0]["sha256"] = "f" * 64
+                return evidence
+
+            with (
+                patch.object(pipeline.sys, "platform", "win32"),
+                patch.object(
+                    pipeline.export_windows_product,
+                    "build_portable_bundle",
+                    side_effect=lambda _receipt, _manifest, bundle: _build_evidence(bundle),
+                ),
+                patch.object(
+                    pipeline.build_windows_installer,
+                    "build_windows_installer",
+                    side_effect=mismatched_payload_hash,
+                ),
+            ):
+                with self.assertRaisesRegex(ValueError, "Export artifact inventoryと一致しない"):
                     pipeline.build_setup_from_export(receipt, manifest, output)
 
             self.assertFalse(output.exists())

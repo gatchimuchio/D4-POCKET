@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import struct
 import subprocess
 import sys
 import tempfile
@@ -28,6 +30,15 @@ def _has_iscc() -> bool:
 
 
 class WindowsBootstrapSetupTests(unittest.TestCase):
+    @staticmethod
+    def pe_bytes(machine: int) -> bytes:
+        content = bytearray(0x80 + 6)
+        content[:2] = b"MZ"
+        struct.pack_into("<I", content, 0x3C, 0x80)
+        content[0x80:0x84] = b"PE\0\0"
+        struct.pack_into("<H", content, 0x84, machine)
+        return bytes(content)
+
     def create_bundle(self, root: Path) -> Path:
         bundle = root / "export bundle with spaces"
         bundle.mkdir()
@@ -109,6 +120,203 @@ class WindowsBootstrapSetupTests(unittest.TestCase):
     def test_ispp_define_rejects_quote_and_newline_injection(self) -> None:
         with self.assertRaisesRegex(ValueError, "不正な文字"):
             setup_builder._ispp_string('C:\\bundle"\n#define Malicious')
+
+    def test_pe_architecture_is_read_from_machine_field(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-pe-header-") as temporary:
+            executable = Path(temporary) / "payload.exe"
+            executable.write_bytes(self.pe_bytes(0x8664))
+
+            self.assertEqual(setup_builder._pe_architecture(executable), "x64")
+
+            executable.write_bytes(self.pe_bytes(0xAA64))
+            self.assertEqual(setup_builder._pe_architecture(executable), "arm64")
+
+    def test_malformed_or_unknown_pe_architecture_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-pe-header-") as temporary:
+            executable = Path(temporary) / "payload.exe"
+            executable.write_bytes(b"X" * 64)
+            with self.assertRaisesRegex(ValueError, "DOS header"):
+                setup_builder._pe_architecture(executable)
+
+            executable.write_bytes(self.pe_bytes(0x01C4))
+            with self.assertRaisesRegex(ValueError, "未対応"):
+                setup_builder._pe_architecture(executable)
+
+    def test_receipt_bound_payload_components_capture_arch_hash_and_signature_state(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-installer-components-") as temporary:
+            bundle = Path(temporary)
+            records = []
+            payload = self.pe_bytes(0x8664)
+            for _role, relative in setup_builder.WINDOWS_PAYLOAD_COMPONENTS:
+                target = bundle.joinpath(*relative.split("/"))
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(payload)
+                records.append(
+                    {
+                        "path": relative,
+                        "size_bytes": len(payload),
+                        "sha256": hashlib.sha256(payload).hexdigest(),
+                    }
+                )
+
+            with patch.object(
+                setup_builder,
+                "_authenticode_info",
+                return_value={"status": "NotSigned", "signer_thumbprint": None},
+            ):
+                components = setup_builder._inspect_payload_components(bundle, records)
+
+        self.assertEqual([component["role"] for component in components], [
+            "flutter_application", "rust_broker", "rust_launcher"
+        ])
+        self.assertTrue(all(component["architecture"] == "x64" for component in components))
+        self.assertTrue(all(component["authenticode_status"] == "NotSigned" for component in components))
+        self.assertTrue(all(component["signer_thumbprint"] is None for component in components))
+
+    def test_payload_component_architecture_and_receipt_hash_must_match(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-installer-components-") as temporary:
+            bundle = Path(temporary)
+            records = []
+            for index, (_role, relative) in enumerate(setup_builder.WINDOWS_PAYLOAD_COMPONENTS):
+                payload = self.pe_bytes(0xAA64 if index == 0 else 0x8664)
+                target = bundle.joinpath(*relative.split("/"))
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(payload)
+                records.append(
+                    {
+                        "path": relative,
+                        "size_bytes": len(payload),
+                        "sha256": hashlib.sha256(payload).hexdigest(),
+                    }
+                )
+
+            with patch.object(
+                setup_builder,
+                "_authenticode_info",
+                return_value={"status": "NotSigned", "signer_thumbprint": None},
+            ):
+                with self.assertRaisesRegex(ValueError, "architectureはx64必須"):
+                    setup_builder._inspect_payload_components(bundle, records)
+
+                records[0]["sha256"] = "0" * 64
+                with self.assertRaisesRegex(ValueError, "hash／sizeと一致しない"):
+                    setup_builder._inspect_payload_components(bundle, records)
+
+    def test_payload_change_during_authenticode_check_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-installer-components-") as temporary:
+            bundle = Path(temporary)
+            records = []
+            payload = self.pe_bytes(0x8664)
+            for _role, relative in setup_builder.WINDOWS_PAYLOAD_COMPONENTS:
+                target = bundle.joinpath(*relative.split("/"))
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(payload)
+                records.append(
+                    {
+                        "path": relative,
+                        "size_bytes": len(payload),
+                        "sha256": hashlib.sha256(payload).hexdigest(),
+                    }
+                )
+            first_component = bundle.joinpath(
+                *setup_builder.WINDOWS_PAYLOAD_COMPONENTS[0][1].split("/")
+            )
+
+            def mutate_during_signature_check(_path: Path) -> dict[str, str | None]:
+                first_component.write_bytes(payload[:-1] + b"X")
+                return {"status": "NotSigned", "signer_thumbprint": None}
+
+            with patch.object(
+                setup_builder,
+                "_authenticode_info",
+                side_effect=mutate_during_signature_check,
+            ):
+                with self.assertRaisesRegex(ValueError, "Authenticode確認中にWindows componentが変化"):
+                    setup_builder._inspect_payload_components(bundle, records)
+
+    def test_invalid_authenticode_state_fails_closed_but_unsigned_is_observable(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-authenticode-") as temporary:
+            executable = Path(temporary) / "payload.exe"
+            executable.write_bytes(self.pe_bytes(0x8664))
+            not_signed = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout='{"status":"NotSigned","signer_thumbprint":null}',
+                stderr="",
+            )
+            with (
+                patch.object(
+                    setup_builder,
+                    "_windows_powershell_path",
+                    return_value=Path(
+                        r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+                    ),
+                ),
+                patch.object(
+                    setup_builder.subprocess, "run", return_value=not_signed
+                ) as run_authenticode,
+            ):
+                self.assertEqual(
+                    setup_builder._authenticode_info(executable),
+                    {"status": "NotSigned", "signer_thumbprint": None},
+                )
+            self.assertEqual(
+                run_authenticode.call_args.kwargs["env"]["PSModulePath"],
+                str(
+                    Path(os.environ.get("SystemRoot", r"C:\Windows"))
+                    / "System32"
+                    / "WindowsPowerShell"
+                    / "v1.0"
+                    / "Modules"
+                ),
+            )
+            self.assertEqual(
+                run_authenticode.call_args.args[0][0],
+                r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            )
+
+            valid_thumbprint = "a" * 40
+            valid = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=json.dumps(
+                    {"status": "Valid", "signer_thumbprint": valid_thumbprint}
+                ),
+                stderr="",
+            )
+            with (
+                patch.object(
+                    setup_builder,
+                    "_windows_powershell_path",
+                    return_value=Path(
+                        r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+                    ),
+                ),
+                patch.object(setup_builder.subprocess, "run", return_value=valid),
+            ):
+                self.assertEqual(
+                    setup_builder._authenticode_info(executable),
+                    {"status": "Valid", "signer_thumbprint": valid_thumbprint.upper()},
+                )
+
+            invalid = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout='{"status":"HashMismatch","signer_thumbprint":"' + "A" * 40 + '"}',
+                stderr="",
+            )
+            with (
+                patch.object(
+                    setup_builder,
+                    "_windows_powershell_path",
+                    return_value=Path(
+                        r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+                    ),
+                ),
+                patch.object(setup_builder.subprocess, "run", return_value=invalid),
+            ):
+                with self.assertRaisesRegex(ValueError, "署名が無効"):
+                    setup_builder._authenticode_info(executable)
 
     def test_setup_snapshot_copies_only_receipt_bound_artifacts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-setup-snapshot-") as temporary:

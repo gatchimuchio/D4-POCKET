@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -39,6 +40,16 @@ EMBEDDED_APP_ID_PATTERN = re.compile(rb"d4-pocket-app-[0-9a-f]{32}")
 EMBEDDED_AUDIT_STORE_ID_PATTERN = re.compile(rb"audit-store-[0-9a-f]{32}")
 MAX_LAUNCHER_BYTES = 128 * 1024 * 1024
 MAX_PRODUCT_MANIFEST_BYTES = 64 * 1024
+WINDOWS_PAYLOAD_COMPONENTS = (
+    ("flutter_application", "app/gui_shell_desktop.exe"),
+    ("rust_broker", "broker/gui_shell_rust_helper.exe"),
+    ("rust_launcher", "gui_shell_desktop_launcher.exe"),
+)
+PE_ARCHITECTURES = {
+    0x014C: "x86",
+    0x8664: "x64",
+    0xAA64: "arm64",
+}
 ISS_SCRIPT = ROOT / "installer" / "windows" / "d4_pocket_bootstrap_setup.iss"
 
 
@@ -83,6 +94,185 @@ def _regular_file(path: Path, label: str, *, max_bytes: int | None = None) -> by
         raise ValueError(f"{label}が通常fileではない、または許容size外である")
     with path.open("rb") as source:
         return source.read()
+
+
+def _hash_regular_file(path: Path, label: str) -> tuple[str, int]:
+    metadata = path.lstat()
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or path.is_symlink()
+        or _is_reparse_point(metadata)
+        or metadata.st_size < 1
+    ):
+        raise ValueError(f"{label}が通常fileではない")
+    digest = hashlib.sha256()
+    byte_count = 0
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+            byte_count += len(chunk)
+    if byte_count != metadata.st_size:
+        raise ValueError(f"{label}の読取中にsizeが変化した")
+    return digest.hexdigest(), byte_count
+
+
+def _pe_architecture(path: Path) -> str:
+    metadata = path.lstat()
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or path.is_symlink()
+        or _is_reparse_point(metadata)
+        or metadata.st_size < 64
+    ):
+        raise ValueError("Windows executableが通常PE fileではない")
+    with path.open("rb") as source:
+        dos_header = source.read(64)
+        if len(dos_header) != 64 or dos_header[:2] != b"MZ":
+            raise ValueError("Windows executableのDOS headerが不正である")
+        pe_offset = struct.unpack_from("<I", dos_header, 0x3C)[0]
+        if pe_offset < 64 or pe_offset > metadata.st_size - 6:
+            raise ValueError("Windows executableのPE offsetがfile範囲外である")
+        source.seek(pe_offset)
+        pe_header = source.read(6)
+    if len(pe_header) != 6 or pe_header[:4] != b"PE\0\0":
+        raise ValueError("Windows executableのPE signatureが不正である")
+    machine = struct.unpack_from("<H", pe_header, 4)[0]
+    try:
+        return PE_ARCHITECTURES[machine]
+    except KeyError as error:
+        raise ValueError("Windows executableのmachine architectureが未対応である") from error
+
+
+def _windows_powershell_path() -> Path:
+    powershell = (
+        Path(os.environ.get("SystemRoot", r"C:\Windows"))
+        / "System32"
+        / "WindowsPowerShell"
+        / "v1.0"
+        / "powershell.exe"
+    )
+    if not powershell.is_file():
+        raise ValueError("Windows標準PowerShell 5.1が見つからない")
+    return powershell
+
+
+def _authenticode_info(path: Path) -> dict[str, str | None]:
+    powershell = _windows_powershell_path()
+    script = (
+        "$ErrorActionPreference = 'Stop'; "
+        "Import-Module Microsoft.PowerShell.Security -ErrorAction Stop; "
+        "$signature = Get-AuthenticodeSignature -LiteralPath $env:D4P_AUTHENTICODE_TARGET; "
+        "$thumbprint = $null; "
+        "if ($null -ne $signature.SignerCertificate) { "
+        "$thumbprint = $signature.SignerCertificate.Thumbprint }; "
+        "$result = [ordered]@{ status = $signature.Status.ToString(); "
+        "signer_thumbprint = $thumbprint }; "
+        "[Console]::Out.Write(($result | ConvertTo-Json -Compress))"
+    )
+    environment = os.environ.copy()
+    environment["D4P_AUTHENTICODE_TARGET"] = str(path)
+    system_modules = (
+        Path(os.environ.get("SystemRoot", r"C:\Windows"))
+        / "System32"
+        / "WindowsPowerShell"
+        / "v1.0"
+        / "Modules"
+    )
+    security_module = (
+        system_modules
+        / "Microsoft.PowerShell.Security"
+        / "Microsoft.PowerShell.Security.psd1"
+    )
+    if not security_module.is_file():
+        raise ValueError("Windows標準Authenticode moduleが見つからない")
+    environment["PSModulePath"] = str(system_modules)
+    try:
+        completed = subprocess.run(
+            [str(powershell), "-NoProfile", "-NonInteractive", "-Command", script],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=environment,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ValueError("Authenticode確認を完了できない") from error
+    if completed.returncode != 0:
+        detail = " ".join(completed.stderr.split())[-1200:]
+        raise ValueError(f"Authenticode確認が失敗した (exit={completed.returncode}): {detail}")
+    try:
+        result = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise ValueError("Authenticode確認結果を読み取れない") from error
+    if not isinstance(result, dict) or set(result) != {"status", "signer_thumbprint"}:
+        raise ValueError("Authenticode確認結果の形式が不正である")
+    status = result.get("status")
+    thumbprint = result.get("signer_thumbprint")
+    if not isinstance(status, str) or status not in {"Valid", "NotSigned"}:
+        raise ValueError("Authenticode署名が無効、または信頼状態を確認できない")
+    if status == "Valid":
+        if not isinstance(thumbprint, str) or not re.fullmatch(r"[0-9A-Fa-f]{40,64}", thumbprint):
+            raise ValueError("有効署名のcertificate thumbprintを確認できない")
+        thumbprint = thumbprint.upper()
+    elif thumbprint is not None:
+        raise ValueError("未署名fileの署名者情報が整合しない")
+    return {"status": status, "signer_thumbprint": thumbprint}
+
+
+def _inspect_payload_components(
+    bundle_dir: Path, artifact_files: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    records: dict[str, dict[str, Any]] = {}
+    for record in artifact_files:
+        if not isinstance(record, dict):
+            raise ValueError("Export Receipt artifact recordが不正である")
+        relative = record.get("path")
+        if not isinstance(relative, str) or relative in records:
+            raise ValueError("Export Receipt artifact pathが不正または重複している")
+        records[relative] = record
+
+    inspected: list[dict[str, Any]] = []
+    for role, relative in WINDOWS_PAYLOAD_COMPONENTS:
+        record = records.get(relative)
+        if record is None:
+            raise ValueError(f"Export Receiptに必須Windows componentがない: {relative}")
+        expected_size = record.get("size_bytes")
+        expected_hash = record.get("sha256")
+        if (
+            type(expected_size) is not int
+            or expected_size < 1
+            or not isinstance(expected_hash, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_hash)
+        ):
+            raise ValueError(f"Export Receipt component recordが不正である: {relative}")
+        source = bundle_dir.joinpath(*PurePosixPath(relative).parts)
+        digest, size = _hash_regular_file(source, f"Windows component {relative}")
+        if size != expected_size or digest != expected_hash:
+            raise ValueError(f"Windows componentがExport Receiptのhash／sizeと一致しない: {relative}")
+        architecture = _pe_architecture(source)
+        if architecture != "x64":
+            raise ValueError(f"Windows product payload architectureはx64必須: {relative}")
+        signature = _authenticode_info(source)
+        verified_hash, verified_size = _hash_regular_file(
+            source, f"Windows component {relative} after Authenticode check"
+        )
+        if verified_hash != digest or verified_size != size:
+            raise ValueError(f"Authenticode確認中にWindows componentが変化した: {relative}")
+        inspected.append(
+            {
+                "role": role,
+                "path": relative,
+                "size_bytes": size,
+                "sha256": digest,
+                "architecture": architecture,
+                "authenticode_status": signature["status"],
+                "signer_thumbprint": signature["signer_thumbprint"],
+            }
+        )
+    return inspected
 
 
 def _outside_source_roots(path: Path, label: str) -> Path:
@@ -282,6 +472,7 @@ def build_windows_installer(
             product_version,
         ):
             raise ValueError("一時snapshotのReceipt／Manifest identityが入力bundleと一致しない")
+        payload_components = _inspect_payload_components(bundle, receipt["artifact_files"])
         wrapper = temporary_root / "D4Pocket-Setup.iss"
         wrapper.write_text(
             "\n".join(
@@ -314,19 +505,37 @@ def build_windows_installer(
     metadata = setup_path.lstat()
     if not stat.S_ISREG(metadata.st_mode) or _is_reparse_point(metadata) or metadata.st_size < 1:
         raise RuntimeError("ISCCの出力Setup.exeを通常fileとして検証できない")
-    digest = hashlib.sha256()
-    with setup_path.open("rb") as setup:
-        for chunk in iter(lambda: setup.read(1024 * 1024), b""):
-            digest.update(chunk)
+    setup_sha256, setup_size_bytes = _hash_regular_file(setup_path, "Windows Setup.exe")
+    setup_architecture = _pe_architecture(setup_path)
+    setup_authenticode = _authenticode_info(setup_path)
+    if setup_authenticode["status"] != "NotSigned":
+        raise ValueError("Setup candidateは署名しないrecipeの出力として不整合である")
+    verified_setup_hash, verified_setup_size = _hash_regular_file(
+        setup_path, "Windows Setup.exe after Authenticode check"
+    )
+    if (
+        setup_size_bytes != metadata.st_size
+        or verified_setup_hash != setup_sha256
+        or verified_setup_size != setup_size_bytes
+    ):
+        raise ValueError("Authenticode確認中にWindows Setup.exeが変化した")
     return {
         "source_commit": source_commit,
         "app_id": app_id,
         "audit_store_id": audit_store_id,
         "product_version": product_version,
         "setup_path": str(setup_path),
-        "setup_size_bytes": metadata.st_size,
-        "setup_sha256": digest.hexdigest(),
+        "setup_size_bytes": setup_size_bytes,
+        "setup_sha256": setup_sha256,
         "authenticode": "not_signed_by_this_build_recipe",
+        "setup_architecture": setup_architecture,
+        "setup_authenticode_status": setup_authenticode["status"],
+        "setup_signer_thumbprint": setup_authenticode["signer_thumbprint"],
+        "payload_components": payload_components,
+        "authenticode_evidence_source": {
+            "evidence_class": "EXTERNAL_EVIDENCE",
+            "tool": "PowerShell Get-AuthenticodeSignature",
+        },
         "product_installed_runtime": "not_exercised",
     }
 

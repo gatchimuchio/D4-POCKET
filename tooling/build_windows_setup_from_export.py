@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -22,6 +23,91 @@ from tooling import build_windows_installer, export_windows_product  # noqa: E40
 
 OUTPUT_EVIDENCE_NAME = "d4_pocket_windows_setup_export.json"
 SETUP_EVIDENCE_TYPE = "d4_pocket_windows_setup_export"
+SETUP_EVIDENCE_VERSION = 2
+
+
+def _validate_installer_artifact_evidence(
+    setup_evidence: dict[str, Any], export_artifact_files: Any
+) -> None:
+    setup_architecture = setup_evidence.get("setup_architecture")
+    if not isinstance(setup_architecture, str) or setup_architecture not in {
+        "x86",
+        "x64",
+        "arm64",
+    }:
+        raise ValueError("Setup executableのarchitecture evidenceが不正である")
+    status = setup_evidence.get("setup_authenticode_status")
+    thumbprint = setup_evidence.get("setup_signer_thumbprint")
+    if status != "NotSigned" or thumbprint is not None:
+        raise ValueError("署名しないSetup recipeと実Authenticode状態が一致しない")
+
+    expected = dict(build_windows_installer.WINDOWS_PAYLOAD_COMPONENTS)
+    if not isinstance(export_artifact_files, list):
+        raise ValueError("Export build evidenceにartifact inventoryがない")
+    export_records: dict[str, dict[str, Any]] = {}
+    for record in export_artifact_files:
+        if not isinstance(record, dict):
+            raise ValueError("Export artifact inventory recordが不正である")
+        path = record.get("path")
+        if not isinstance(path, str) or path in export_records:
+            raise ValueError("Export artifact inventory pathが不正または重複している")
+        export_records[path] = record
+    components = setup_evidence.get("payload_components")
+    if not isinstance(components, list) or len(components) != len(expected):
+        raise ValueError("Windows payload component evidenceの件数が不正である")
+    seen: set[str] = set()
+    for component in components:
+        if not isinstance(component, dict):
+            raise ValueError("Windows payload component evidenceがobjectではない")
+        role = component.get("role")
+        if (
+            not isinstance(role, str)
+            or role not in expected
+            or role in seen
+            or component.get("path") != expected[role]
+            or component.get("architecture") != "x64"
+        ):
+            raise ValueError("Windows payload component role／path／architectureが一致しない")
+        seen.add(role)
+        if type(component.get("size_bytes")) is not int or component["size_bytes"] < 1:
+            raise ValueError("Windows payload component size evidenceが不正である")
+        if not isinstance(component.get("sha256"), str) or not re.fullmatch(
+            r"[0-9a-f]{64}", component["sha256"]
+        ):
+            raise ValueError("Windows payload component hash evidenceが不正である")
+        source_record = export_records.get(expected[role])
+        if (
+            source_record is None
+            or type(source_record.get("size_bytes")) is not int
+            or source_record["size_bytes"] < 1
+            or source_record.get("size_bytes") != component["size_bytes"]
+            or not isinstance(source_record.get("sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", source_record["sha256"])
+            or source_record.get("sha256") != component["sha256"]
+        ):
+            raise ValueError("Windows payload componentがExport artifact inventoryと一致しない")
+        component_status = component.get("authenticode_status")
+        component_thumbprint = component.get("signer_thumbprint")
+        if not isinstance(component_status, str) or component_status not in {
+            "Valid",
+            "NotSigned",
+        }:
+            raise ValueError("Windows payload component Authenticode statusが不正である")
+        if component_status == "Valid":
+            if not isinstance(component_thumbprint, str) or not re.fullmatch(
+                r"[0-9A-F]{40,64}", component_thumbprint
+            ):
+                raise ValueError("Windows payload component signer thumbprintが不正である")
+        elif component_thumbprint is not None:
+            raise ValueError("未署名payload componentに署名者情報がある")
+    if seen != set(expected):
+        raise ValueError("Windows payload component evidenceが不足している")
+
+    if setup_evidence.get("authenticode_evidence_source") != {
+        "evidence_class": "EXTERNAL_EVIDENCE",
+        "tool": "PowerShell Get-AuthenticodeSignature",
+    }:
+        raise ValueError("Authenticode evidence sourceが明示されていない")
 
 
 def _output_target(path: Path) -> Path:
@@ -122,6 +208,9 @@ def build_setup_from_export(
             or setup_evidence.get("product_installed_runtime") != "not_exercised"
         ):
             raise ValueError("Setup evidenceがExport build identityまたは証拠範囲と一致しない")
+        _validate_installer_artifact_evidence(
+            setup_evidence, build_evidence.get("artifact_files")
+        )
 
         source_setup = Path(setup_evidence["setup_path"])
         product_version = setup_evidence.get("product_version")
@@ -159,7 +248,7 @@ def build_setup_from_export(
             resolved_source_setup, published_setup, source_hash
         )
         record = {
-            "version": 1,
+            "version": SETUP_EVIDENCE_VERSION,
             "evidence_type": SETUP_EVIDENCE_TYPE,
             "evidence_source": "INTERNAL_STATE",
             "source_commit": build_evidence["source_commit"],
@@ -177,7 +266,12 @@ def build_setup_from_export(
                 "size_bytes": final_size,
                 "sha256": final_hash,
                 "authenticode": "not_signed_by_this_build_recipe",
+                "architecture": setup_evidence["setup_architecture"],
+                "authenticode_status": setup_evidence["setup_authenticode_status"],
+                "signer_thumbprint": setup_evidence["setup_signer_thumbprint"],
             },
+            "payload_components": setup_evidence["payload_components"],
+            "authenticode_evidence_source": setup_evidence["authenticode_evidence_source"],
             "signed": False,
             "formal_distribution_claimed": False,
             "product_installed_runtime": "not_exercised",

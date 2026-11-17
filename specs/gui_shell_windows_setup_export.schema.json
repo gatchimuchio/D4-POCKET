@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/gui_shell_windows_setup_export.schema.json",
-  "title": "D4 Pocket Windows Setup Export evidence v1",
+  "title": "D4 Pocket Windows Setup Export evidence v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,13 +19,15 @@
     "module_plan",
     "portable_bundle_tree_sha256",
     "setup_file",
+    "payload_components",
+    "authenticode_evidence_source",
     "signed",
     "formal_distribution_claimed",
     "product_installed_runtime",
     "portable_bundle_preserved"
   ],
   "properties": {
-    "version": { "const": 1 },
+    "version": { "const": 2 },
     "evidence_type": { "const": "d4_pocket_windows_setup_export" },
     "evidence_source": { "const": "INTERNAL_STATE" },
     "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
@@ -78,12 +80,69 @@
     "setup_file": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "size_bytes", "sha256", "authenticode"],
+      "required": [
+        "name",
+        "size_bytes",
+        "sha256",
+        "authenticode",
+        "architecture",
+        "authenticode_status",
+        "signer_thumbprint"
+      ],
       "properties": {
         "name": { "type": "string", "pattern": "^D4Pocket-Setup-[0-9][A-Za-z0-9.+_-]{0,63}\\.exe$" },
         "size_bytes": { "type": "integer", "minimum": 1 },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "authenticode": { "const": "not_signed_by_this_build_recipe" }
+        "authenticode": { "const": "not_signed_by_this_build_recipe" },
+        "architecture": { "enum": ["x86", "x64", "arm64"] },
+        "authenticode_status": { "const": "NotSigned" },
+        "signer_thumbprint": { "const": null }
+      }
+    },
+    "payload_components": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "path",
+          "size_bytes",
+          "sha256",
+          "architecture",
+          "authenticode_status",
+          "signer_thumbprint"
+        ],
+        "properties": {
+          "role": { "enum": ["flutter_application", "rust_broker", "rust_launcher"] },
+          "path": { "type": "string", "minLength": 1 },
+          "size_bytes": { "type": "integer", "minimum": 1 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "architecture": { "const": "x64" },
+          "authenticode_status": { "enum": ["Valid", "NotSigned"] },
+          "signer_thumbprint": { "type": ["string", "null"], "pattern": "^[0-9A-F]{40,64}$" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "authenticode_status": { "const": "Valid" } }, "required": ["authenticode_status"] },
+            "then": { "properties": { "signer_thumbprint": { "type": "string", "pattern": "^[0-9A-F]{40,64}$" } } }
+          },
+          {
+            "if": { "properties": { "authenticode_status": { "const": "NotSigned" } }, "required": ["authenticode_status"] },
+            "then": { "properties": { "signer_thumbprint": { "type": "null" } } }
+          }
+        ]
+      }
+    },
+    "authenticode_evidence_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_class", "tool"],
+      "properties": {
+        "evidence_class": { "const": "EXTERNAL_EVIDENCE" },
+        "tool": { "const": "PowerShell Get-AuthenticodeSignature" }
       }
     },
     "signed": { "const": false },
