@@ -99,6 +99,7 @@ class SettingsScreen extends StatelessWidget {
     this.requestApplicationExit,
     this.focusUpdateCenterRequest = 0,
     this.onPrepareAiEditTask,
+    this.onUpdateOperationOutcomeUnknown,
   });
 
   final ShellCoreClient client;
@@ -107,6 +108,7 @@ class SettingsScreen extends StatelessWidget {
       requestApplicationExit;
   final int focusUpdateCenterRequest;
   final ValueChanged<AiEditProposalReview>? onPrepareAiEditTask;
+  final VoidCallback? onUpdateOperationOutcomeUnknown;
 
   @override
   Widget build(BuildContext context) => _SettingsScreenStateful(
@@ -116,6 +118,7 @@ class SettingsScreen extends StatelessWidget {
         requestApplicationExit: requestApplicationExit,
         focusUpdateCenterRequest: focusUpdateCenterRequest,
         onPrepareAiEditTask: onPrepareAiEditTask,
+        onUpdateOperationOutcomeUnknown: onUpdateOperationOutcomeUnknown,
       );
 }
 
@@ -127,6 +130,7 @@ class _SettingsScreenStateful extends StatefulWidget {
     this.requestApplicationExit,
     this.focusUpdateCenterRequest = 0,
     this.onPrepareAiEditTask,
+    this.onUpdateOperationOutcomeUnknown,
   });
 
   final ShellCoreClient client;
@@ -135,6 +139,7 @@ class _SettingsScreenStateful extends StatefulWidget {
       requestApplicationExit;
   final int focusUpdateCenterRequest;
   final ValueChanged<AiEditProposalReview>? onPrepareAiEditTask;
+  final VoidCallback? onUpdateOperationOutcomeUnknown;
 
   @override
   State<_SettingsScreenStateful> createState() => _SettingsScreenState();
@@ -195,6 +200,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
   String? _updateMessage;
   bool _checkingUpdateCatalog = false;
   bool _updateOperationInProgress = false;
+  bool _updateMutationInProgress = false;
   final TextEditingController _composeIdController =
       TextEditingController(text: 'd4-pocket-local');
   final TextEditingController _composeNameController =
@@ -219,6 +225,9 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
 
   @override
   void dispose() {
+    if (_updateMutationInProgress) {
+      widget.onUpdateOperationOutcomeUnknown?.call();
+    }
     _searchController.dispose();
     _profileIdController.dispose();
     _profileNameController.dispose();
@@ -1785,6 +1794,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           TextButton(
             onPressed: canDownload
                 ? () => _runUpdateRequest(
+                      client,
                       () => client.requestDownload(
                         updateId: updateId,
                         candidateHash: candidateHash,
@@ -1797,12 +1807,15 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           TextButton(
             onPressed: canApply || canRepair
                 ? () => _runUpdateRequest(
+                      client,
                       () async {
                         final body = await client.requestApply(
                           updateId: updateId,
                           candidateHash: candidateHash,
                         );
-                        if (body['導入状態'] == 'version_staged') {
+                        if (mounted &&
+                            identical(client, _updateClient) &&
+                            body['導入状態'] == 'version_staged') {
                           setState(() => _stagedUpdateCandidates
                               .add('$updateId|$candidateHash'));
                         }
@@ -1818,6 +1831,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           TextButton(
             onPressed: canRequestActivation && !_updateOperationInProgress
                 ? () => _runUpdateRequest(
+                      client,
                       () => client.requestActivation(
                         updateId: updateId,
                         candidateHash: candidateHash,
@@ -1831,6 +1845,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
             onPressed: _updateOperationInProgress
                 ? null
                 : () => _runUpdateRequest(
+                      client,
                       () => client.defer(
                         updateId: updateId,
                         candidateHash: candidateHash,
@@ -1846,6 +1861,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           if (canRollback)
             TextButton(
               onPressed: () => _runUpdateRequest(
+                client,
                 () => client.requestRollback(
                   updateId: updateId,
                   candidateHash: candidateHash,
@@ -1861,7 +1877,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
 
   Future<void> _fetchUpdateCatalog() async {
     final client = _updateClient;
-    if (client == null || _updateOperationInProgress) return;
+    if (!mounted || client == null || _updateOperationInProgress) return;
     setState(() {
       _checkingUpdateCatalog = true;
       _updateOperationInProgress = true;
@@ -1897,18 +1913,27 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
   }
 
   Future<void> _runUpdateRequest(
+    UpdateClient client,
     Future<Map<String, Object?>> Function() request,
     String success,
   ) async {
-    if (_updateOperationInProgress) return;
+    if (!mounted ||
+        !identical(client, _updateClient) ||
+        _updateOperationInProgress) {
+      return;
+    }
     setState(() => _updateOperationInProgress = true);
+    _updateMutationInProgress = true;
     var initialInstallAccepted = false;
     var handoffToInstalledVersion = false;
     try {
       final body = await request();
+      if (!mounted || !identical(client, _updateClient)) return;
       if (UpdateClient.shouldLaunchInstalledVersionAfterExit(body)) {
         initialInstallAccepted = true;
-        handoffToInstalledVersion = await _completeInitialInstallHandoff();
+        handoffToInstalledVersion =
+            await _completeInitialInstallHandoff(client);
+        if (!mounted || !identical(client, _updateClient)) return;
         if (!handoffToInstalledVersion) {
           _setUpdateMessage(
             'インストール済み版は登録されましたが、画面を終了できませんでした。固定起動項目から起動してください。',
@@ -1931,6 +1956,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           ? 'インストール済み版は登録されましたが、切替のための画面終了に失敗しました。固定起動項目から起動してください。'
           : '更新操作に失敗しました。状態を更新して確認してください。');
     } finally {
+      _updateMutationInProgress = false;
       if (mounted && !handoffToInstalledVersion) {
         setState(() => _updateOperationInProgress = false);
       }
@@ -1938,9 +1964,11 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     if (!handoffToInstalledVersion) _loadUpdates();
   }
 
-  Future<bool> _completeInitialInstallHandoff() async {
+  Future<bool> _completeInitialInstallHandoff(UpdateClient client) async {
     _setUpdateMessage('インストールが完了しました。導入済み版を起動します。');
     await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (!mounted || !identical(client, _updateClient)) return false;
+    _updateMutationInProgress = false;
     final response = await (widget.requestApplicationExit?.call(
           ui.AppExitType.required,
         ) ??
@@ -1949,12 +1977,18 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
   }
 
   Future<void> _requestProductUninstall(UpdateClient client) async {
-    if (_updateOperationInProgress) return;
+    if (!mounted ||
+        !identical(client, _updateClient) ||
+        _updateOperationInProgress) {
+      return;
+    }
     setState(() => _updateOperationInProgress = true);
+    _updateMutationInProgress = true;
     var uninstallAuthorized = false;
     var applicationExitAccepted = false;
     try {
       final body = await client.requestUninstall();
+      if (!mounted || !identical(client, _updateClient)) return;
       if (body['状態'] != 'uninstall_authorized') {
         throw const BrokerClientException('アンインストール許可を確認できません');
       }
@@ -1966,11 +2000,14 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
       _setUpdateMessage(
           'Rust Brokerが削除意図をAuditへ記録しました。画面を終了して固定導入先を削除します。利用者データは保持されます。');
       await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (!mounted || !identical(client, _updateClient)) return;
+      _updateMutationInProgress = false;
       final response = await (widget.requestApplicationExit?.call(
             ui.AppExitType.required,
           ) ??
           ServicesBinding.instance.exitApplication(ui.AppExitType.required));
       applicationExitAccepted = response == ui.AppExitResponse.exit;
+      if (!mounted || !identical(client, _updateClient)) return;
       if (!applicationExitAccepted) {
         try {
           final cancellation = await client.cancelUninstall(
@@ -1993,6 +2030,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           ? '削除許可は記録されましたが、アプリを終了できませんでした。製品fileはまだ削除されていません。再度アンインストールを要求してください。'
           : 'アンインストール要求に失敗しました。Broker接続と製品状態を確認してください。');
     } finally {
+      _updateMutationInProgress = false;
       if (mounted && !applicationExitAccepted) {
         setState(() => _updateOperationInProgress = false);
       }
@@ -2001,10 +2039,16 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
   }
 
   Future<void> _requestProductRepair(UpdateClient client) async {
-    if (_updateOperationInProgress) return;
+    if (!mounted ||
+        !identical(client, _updateClient) ||
+        _updateOperationInProgress) {
+      return;
+    }
     setState(() => _updateOperationInProgress = true);
+    _updateMutationInProgress = true;
     try {
       final body = await client.requestProductRepair();
+      if (!mounted || !identical(client, _updateClient)) return;
       final state = body['状態'];
       if (state != 'product_launch_entries_repaired' && state != 'unchanged') {
         throw const BrokerClientException('起動項目修復の完了状態を確認できません');
@@ -2019,6 +2063,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     } on Object {
       _setUpdateMessage('起動項目を修復できませんでした。既存のfileは上書きしていません。');
     } finally {
+      _updateMutationInProgress = false;
       if (mounted) {
         setState(() => _updateOperationInProgress = false);
       }

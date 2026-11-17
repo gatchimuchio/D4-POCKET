@@ -494,6 +494,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         active: selectedIndex == 11,
         focusUpdateCenterRequest: _updateCenterFocusRequest,
         onPrepareAiEditTask: _openAiEditProposal,
+        onUpdateOperationOutcomeUnknown: _reportUpdateOperationOutcomeUnknown,
       ),
       if (_dialogueVisited)
         RuntimeDialogueScreen(
@@ -1052,6 +1053,19 @@ class _ShellHomePageState extends State<ShellHomePage> {
         content: Text('Broker接続先が切り替わったため、古い検索結果を破棄しました。再度検索してください。'),
       ),
     );
+  }
+
+  void _reportUpdateOperationOutcomeUnknown() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '更新操作中に設定画面のBroker接続が切り替わりました。旧Brokerでの反映結果は不明です。自動再送していません。現在Brokerの更新一覧を再取得し、旧Broker側の状態も確認してください。',
+          ),
+        ),
+      );
+    });
   }
 }
 

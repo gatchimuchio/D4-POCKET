@@ -43,6 +43,69 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Install handoff待機中にBrokerが切り替わったら旧要求からアプリ終了へ進まない', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final activationGate = Completer<void>();
+    final first = _InstallFlowTransport(
+      operationGates: {'更新有効版切替要求': activationGate},
+    );
+    final second = _InstallFlowTransport();
+    final exitRequests = <ui.AppExitType>[];
+    var unknownOutcomeCount = 0;
+
+    Widget screen(_InstallFlowTransport transport) => MaterialApp(
+          home: Scaffold(
+            body: SettingsScreen(
+              client: ShellCoreClient.mock(transport: transport),
+              requestApplicationExit: (exitType) async {
+                exitRequests.add(exitType);
+                return ui.AppExitResponse.exit;
+              },
+              onUpdateOperationOutcomeUnknown: () => unknownOutcomeCount++,
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(screen(first));
+    await tester.pumpAndSettle();
+
+    final stageButton = find.text('未起動版へ展開');
+    await tester.ensureVisible(stageButton);
+    await tester.tap(stageButton);
+    await tester.pumpAndSettle();
+    expect(first.operations, contains('更新適用要求'));
+
+    final installButton = find.widgetWithText(TextButton, 'インストール');
+    await tester.ensureVisible(installButton);
+    await tester.tap(installButton);
+    await tester.pump();
+    expect(first.operations, contains('更新有効版切替要求'));
+
+    activationGate.complete();
+    await tester.pump();
+    await tester.pumpWidget(screen(second));
+    await tester.pumpAndSettle();
+    expect(unknownOutcomeCount, 1);
+
+    await tester.pump(const Duration(milliseconds: 601));
+    await tester.pumpAndSettle();
+
+    expect(exitRequests, isEmpty);
+    expect(second.operations.where((operation) => operation == '更新一覧'),
+        hasLength(1));
+    expect(
+      second.operations.where((operation) => operation == '更新有効版切替要求'),
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('portable初回InstallはBroker登録後に終了を要求し、拒否時は復旧案内する', (
     tester,
   ) async {
@@ -218,7 +281,8 @@ void main() {
     );
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: SettingsScreen(client: ShellCoreClient.mock(transport: transport)),
+        body:
+            SettingsScreen(client: ShellCoreClient.mock(transport: transport)),
       ),
     ));
     await tester.pumpAndSettle();
@@ -247,7 +311,8 @@ void main() {
     );
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: SettingsScreen(client: ShellCoreClient.mock(transport: transport)),
+        body:
+            SettingsScreen(client: ShellCoreClient.mock(transport: transport)),
       ),
     ));
     await tester.pumpAndSettle();
@@ -306,12 +371,14 @@ class _InstallFlowTransport implements BrokerTransport {
   _InstallFlowTransport({
     this.installed = false,
     this.repairGate,
+    this.operationGates = const <String, Completer<void>>{},
     this.rollbackCurrentVersionAvailable = true,
     bool? uninstallAvailable,
   }) : uninstallAvailable = uninstallAvailable ?? installed;
 
   final bool installed;
   final Completer<void>? repairGate;
+  final Map<String, Completer<void>> operationGates;
   final bool rollbackCurrentVersionAvailable;
   final bool uninstallAvailable;
 
@@ -328,6 +395,7 @@ class _InstallFlowTransport implements BrokerTransport {
     Map<String, Object?>? payload,
   }) async {
     operations.add(operation);
+    await operationGates[operation]?.future;
     if (operation == '更新一覧') {
       return {
         'status': 'accepted',
@@ -360,8 +428,7 @@ class _InstallFlowTransport implements BrokerTransport {
           },
           '適用実行': 'available',
           'rollback実行': 'suspended',
-          '製品アンインストール操作':
-              uninstallAvailable ? 'available' : 'suspended',
+          '製品アンインストール操作': uninstallAvailable ? 'available' : 'suspended',
           'rollback状態': {
             '状態': installed && !rollbackCurrentVersionAvailable
                 ? 'unknown'
