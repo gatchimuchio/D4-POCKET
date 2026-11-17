@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "evidence_type": "development_module_build_comparison",
   "evidence_source": "INTERNAL_STATE",
   "product_artifact_claimed": false,
@@ -353,7 +353,7 @@
         "--target", "x86_64-pc-windows-msvc", "--no-default-features",
         "--features", "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations", "--target-dir", "{isolated-target-dir}",
         "--bin", "gui_shell_rust_helper", "--", "-C",
-        "link-arg=/MAP:baseline/rust/gui_shell_rust_helper.exe.map"
+        "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_rust_helper.exe.map"
       ],
       "build_duration_ms": 90000,
       "binary": {
@@ -406,7 +406,7 @@
         "--target", "x86_64-pc-windows-msvc", "--no-default-features",
         "--features", "module_observability,module_trace_inspector", "--target-dir",
         "{isolated-target-dir}", "--bin", "gui_shell_rust_helper", "--", "-C",
-        "link-arg=/MAP:selected/rust/gui_shell_rust_helper.exe.map"
+        "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_rust_helper.exe.map"
       ],
       "build_duration_ms": 60000,
       "binary": {
@@ -463,7 +463,360 @@
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
-    "binary_pruning_verified": false
+    "binary_pruning_verified": false,
+    "pruning_variants": [
+      {
+        "label": "no_optional_modules",
+        "omitted_optional_module_ids": [
+          "shell.setup_doctor",
+          "shell.history",
+          "shell.evaluation_lab",
+          "shell.host_capabilities",
+          "shell.notifications",
+          "shell.observability",
+          "shell.trace_inspector",
+          "shell.host_operations"
+        ],
+        "included_optional_module_ids": [],
+        "run": {
+          "label": "no_optional_modules",
+          "included_optional_module_ids": [],
+          "cargo_feature_arguments": [
+            "--no-default-features"
+          ],
+          "cargo_command": [
+            "cargo",
+            "rustc",
+            "--color",
+            "never",
+            "--manifest-path",
+            "native/rust_helper/Cargo.toml",
+            "--locked",
+            "--offline",
+            "--release",
+            "--target",
+            "x86_64-pc-windows-msvc",
+            "--no-default-features",
+            "--target-dir",
+            "{isolated-target-dir}",
+            "--bin",
+            "gui_shell_rust_helper",
+            "--",
+            "-C",
+            "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_rust_helper.exe.map"
+          ],
+          "build_duration_ms": 60000,
+          "binary": {
+            "path": "no_optional_modules/rust/gui_shell_rust_helper.exe",
+            "size_bytes": 1536,
+            "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          "linker_map": {
+            "path": "no_optional_modules/rust/gui_shell_rust_helper.exe.map",
+            "size_bytes": 96,
+            "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          "symbol_inventory": {
+            "file": {
+              "path": "no_optional_modules/rust/public-symbols.txt",
+              "size_bytes": 12,
+              "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            "symbol_count": 1
+          },
+          "runtime_dependency_tree": {
+            "command": [
+              "cargo",
+              "tree",
+              "--color",
+              "never",
+              "--manifest-path",
+              "native/rust_helper/Cargo.toml",
+              "--locked",
+              "--offline",
+              "--target",
+              "x86_64-pc-windows-msvc",
+              "--edges",
+              "normal",
+              "--prefix",
+              "none",
+              "--no-default-features"
+            ],
+            "entry_count": 12,
+            "tree_file": {
+              "path": "no_optional_modules/rust/cargo-runtime-dependency-tree.txt",
+              "size_bytes": 600,
+              "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          }
+        },
+        "comparison_to_baseline": {
+          "baseline_binary_bytes": 2048,
+          "selected_binary_bytes": 1536,
+          "binary_bytes_reduced": 512,
+          "baseline_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "selected_binary_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "binary_hash_changed": true,
+          "runtime_dependency_tree_identical": true,
+          "removed_symbol_count": 0,
+          "added_symbol_count": 0,
+          "removed_symbols_file": {
+            "path": "no_optional_modules/rust/removed-symbols.txt",
+            "size_bytes": 1,
+            "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+          },
+          "added_symbols_file": {
+            "path": "no_optional_modules/rust/added-symbols.txt",
+            "size_bytes": 1,
+            "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+          }
+        }
+      },
+      {
+        "label": "without_setup_doctor",
+        "omitted_optional_module_ids": [
+          "shell.setup_doctor"
+        ],
+        "included_optional_module_ids": [
+          "shell.history",
+          "shell.evaluation_lab",
+          "shell.host_capabilities",
+          "shell.notifications",
+          "shell.observability",
+          "shell.trace_inspector",
+          "shell.host_operations"
+        ],
+        "run": {
+          "label": "without_setup_doctor",
+          "included_optional_module_ids": [
+            "shell.history",
+            "shell.evaluation_lab",
+            "shell.host_capabilities",
+            "shell.notifications",
+            "shell.observability",
+            "shell.trace_inspector",
+            "shell.host_operations"
+          ],
+          "cargo_feature_arguments": [
+            "--no-default-features",
+            "--features",
+            "module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations"
+          ],
+          "cargo_command": [
+            "cargo",
+            "rustc",
+            "--color",
+            "never",
+            "--manifest-path",
+            "native/rust_helper/Cargo.toml",
+            "--locked",
+            "--offline",
+            "--release",
+            "--target",
+            "x86_64-pc-windows-msvc",
+            "--no-default-features",
+            "--features",
+            "module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations",
+            "--target-dir",
+            "{isolated-target-dir}",
+            "--bin",
+            "gui_shell_rust_helper",
+            "--",
+            "-C",
+            "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_rust_helper.exe.map"
+          ],
+          "build_duration_ms": 60000,
+          "binary": {
+            "path": "without_setup_doctor/rust/gui_shell_rust_helper.exe",
+            "size_bytes": 1536,
+            "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          "linker_map": {
+            "path": "without_setup_doctor/rust/gui_shell_rust_helper.exe.map",
+            "size_bytes": 96,
+            "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          "symbol_inventory": {
+            "file": {
+              "path": "without_setup_doctor/rust/public-symbols.txt",
+              "size_bytes": 12,
+              "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            "symbol_count": 1
+          },
+          "runtime_dependency_tree": {
+            "command": [
+              "cargo",
+              "tree",
+              "--color",
+              "never",
+              "--manifest-path",
+              "native/rust_helper/Cargo.toml",
+              "--locked",
+              "--offline",
+              "--target",
+              "x86_64-pc-windows-msvc",
+              "--edges",
+              "normal",
+              "--prefix",
+              "none",
+              "--no-default-features",
+              "--features",
+              "module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations"
+            ],
+            "entry_count": 12,
+            "tree_file": {
+              "path": "without_setup_doctor/rust/cargo-runtime-dependency-tree.txt",
+              "size_bytes": 600,
+              "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          }
+        },
+        "comparison_to_baseline": {
+          "baseline_binary_bytes": 2048,
+          "selected_binary_bytes": 1536,
+          "binary_bytes_reduced": 512,
+          "baseline_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "selected_binary_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "binary_hash_changed": true,
+          "runtime_dependency_tree_identical": true,
+          "removed_symbol_count": 0,
+          "added_symbol_count": 0,
+          "removed_symbols_file": {
+            "path": "without_setup_doctor/rust/removed-symbols.txt",
+            "size_bytes": 1,
+            "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+          },
+          "added_symbols_file": {
+            "path": "without_setup_doctor/rust/added-symbols.txt",
+            "size_bytes": 1,
+            "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+          }
+        }
+      },
+      {
+        "label": "without_history",
+        "omitted_optional_module_ids": [
+          "shell.history"
+        ],
+        "included_optional_module_ids": [
+          "shell.setup_doctor",
+          "shell.evaluation_lab",
+          "shell.host_capabilities",
+          "shell.notifications",
+          "shell.observability",
+          "shell.trace_inspector",
+          "shell.host_operations"
+        ],
+        "run": {
+          "label": "without_history",
+          "included_optional_module_ids": [
+            "shell.setup_doctor",
+            "shell.evaluation_lab",
+            "shell.host_capabilities",
+            "shell.notifications",
+            "shell.observability",
+            "shell.trace_inspector",
+            "shell.host_operations"
+          ],
+          "cargo_feature_arguments": [
+            "--no-default-features",
+            "--features",
+            "module_setup_doctor,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations"
+          ],
+          "cargo_command": [
+            "cargo",
+            "rustc",
+            "--color",
+            "never",
+            "--manifest-path",
+            "native/rust_helper/Cargo.toml",
+            "--locked",
+            "--offline",
+            "--release",
+            "--target",
+            "x86_64-pc-windows-msvc",
+            "--no-default-features",
+            "--features",
+            "module_setup_doctor,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations",
+            "--target-dir",
+            "{isolated-target-dir}",
+            "--bin",
+            "gui_shell_rust_helper",
+            "--",
+            "-C",
+            "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_rust_helper.exe.map"
+          ],
+          "build_duration_ms": 60000,
+          "binary": {
+            "path": "without_history/rust/gui_shell_rust_helper.exe",
+            "size_bytes": 1536,
+            "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          "linker_map": {
+            "path": "without_history/rust/gui_shell_rust_helper.exe.map",
+            "size_bytes": 96,
+            "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          "symbol_inventory": {
+            "file": {
+              "path": "without_history/rust/public-symbols.txt",
+              "size_bytes": 12,
+              "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            "symbol_count": 1
+          },
+          "runtime_dependency_tree": {
+            "command": [
+              "cargo",
+              "tree",
+              "--color",
+              "never",
+              "--manifest-path",
+              "native/rust_helper/Cargo.toml",
+              "--locked",
+              "--offline",
+              "--target",
+              "x86_64-pc-windows-msvc",
+              "--edges",
+              "normal",
+              "--prefix",
+              "none",
+              "--no-default-features",
+              "--features",
+              "module_setup_doctor,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations"
+            ],
+            "entry_count": 12,
+            "tree_file": {
+              "path": "without_history/rust/cargo-runtime-dependency-tree.txt",
+              "size_bytes": 600,
+              "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          }
+        },
+        "comparison_to_baseline": {
+          "baseline_binary_bytes": 2048,
+          "selected_binary_bytes": 1536,
+          "binary_bytes_reduced": 512,
+          "baseline_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "selected_binary_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "binary_hash_changed": true,
+          "runtime_dependency_tree_identical": true,
+          "removed_symbol_count": 0,
+          "added_symbol_count": 0,
+          "removed_symbols_file": {
+            "path": "without_history/rust/removed-symbols.txt",
+            "size_bytes": 1,
+            "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+          },
+          "added_symbols_file": {
+            "path": "without_history/rust/added-symbols.txt",
+            "size_bytes": 1,
+            "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+          }
+        }
+      }
+    ]
   },
   "binary_pruning_verified": false,
   "semantic_pruning_status": "flutter_aot_and_rust_helper_binary_observed; standalone_runtime_unverified",
@@ -482,5 +835,521 @@
     "runtime_package_tree_identical": true,
     "removed_aot_package_libraries": [],
     "added_aot_package_libraries": []
-  }
+  },
+  "pruning_variants": [
+    {
+      "label": "no_optional_modules",
+      "omitted_optional_module_ids": [
+        "shell.setup_doctor",
+        "shell.history",
+        "shell.evaluation_lab",
+        "shell.host_capabilities",
+        "shell.notifications",
+        "shell.observability",
+        "shell.trace_inspector",
+        "shell.host_operations"
+      ],
+      "included_optional_module_ids": [],
+      "excluded_optional_module_ids": [
+        "shell.setup_doctor",
+        "shell.history",
+        "shell.evaluation_lab",
+        "shell.host_capabilities",
+        "shell.notifications",
+        "shell.observability",
+        "shell.trace_inspector",
+        "shell.host_operations"
+      ],
+      "run": {
+        "label": "no_optional_modules",
+        "dart_define_arguments": {
+          "GUI_SHELL_MODULE_SETUP_DOCTOR": false,
+          "GUI_SHELL_MODULE_HISTORY": false,
+          "GUI_SHELL_MODULE_EVALUATION_LAB": false,
+          "GUI_SHELL_MODULE_HOST_CAPABILITIES": false,
+          "GUI_SHELL_MODULE_NOTIFICATIONS": false,
+          "GUI_SHELL_MODULE_OBSERVABILITY": false,
+          "GUI_SHELL_MODULE_TRACE_INSPECTOR": false,
+          "GUI_SHELL_MODULE_HOST_OPERATIONS": false
+        },
+        "effective_dart_defines": {
+          "GUI_SHELL_MODULE_SETUP_DOCTOR": false,
+          "GUI_SHELL_MODULE_HISTORY": false,
+          "GUI_SHELL_MODULE_EVALUATION_LAB": false,
+          "GUI_SHELL_MODULE_HOST_CAPABILITIES": false,
+          "GUI_SHELL_MODULE_NOTIFICATIONS": false,
+          "GUI_SHELL_MODULE_OBSERVABILITY": false,
+          "GUI_SHELL_MODULE_TRACE_INSPECTOR": false,
+          "GUI_SHELL_MODULE_HOST_OPERATIONS": false
+        },
+        "build_command": [
+          "C:\\tools\\flutter\\bin\\flutter.bat",
+          "--suppress-analytics",
+          "build",
+          "windows",
+          "--release",
+          "--no-pub",
+          "--analyze-size",
+          "--code-size-directory=C:\\Users\\Example\\Temp\\d4-module-comparison\\no_optional_modules\\size-analysis-inputs",
+          "--dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=false",
+          "--dart-define=GUI_SHELL_MODULE_HISTORY=false",
+          "--dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=false",
+          "--dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=false",
+          "--dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=false",
+          "--dart-define=GUI_SHELL_MODULE_OBSERVABILITY=false",
+          "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=false",
+          "--dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=false"
+        ],
+        "build_duration_ms": 10000,
+        "artifact_root": "no_optional_modules/app",
+        "artifact_files": [
+          {
+            "path": "data/app.so",
+            "size_bytes": 700,
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          {
+            "path": "data/flutter_assets/FontManifest.json",
+            "size_bytes": 82,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "path": "gui_shell_desktop.exe",
+            "size_bytes": 100,
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "artifact_total_bytes": 882,
+        "artifact_tree_sha256": "44f7d52e94660946f878c3389d87ea5464ff5108fa3ec3f2f443786bbe646490",
+        "aot_surface_libraries": [],
+        "size_analysis_report": {
+          "path": "no_optional_modules/analysis/report.json",
+          "size_bytes": 123,
+          "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+        },
+        "size_analysis_inputs": [
+          {
+            "path": "no_optional_modules/analysis/inputs/snapshot.windows-x64.json",
+            "size_bytes": 456,
+            "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          {
+            "path": "no_optional_modules/analysis/inputs/trace.windows-x64.json",
+            "size_bytes": 789,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "aot_package_libraries": [
+          "package:flutter/material.dart",
+          "package:gui_shell_ui/runtime_dialogue_client.dart"
+        ],
+        "runtime_dependency_tree": {
+          "source": "dart_pub_deps_json",
+          "command": "dart pub deps --json",
+          "root_package": "gui_shell_desktop",
+          "direct_runtime_dependencies": [
+            "flutter",
+            "gui_shell_ui"
+          ],
+          "runtime_packages": [
+            {
+              "name": "broker_contract",
+              "version": "0.1.0",
+              "source": "path",
+              "dependencies": []
+            },
+            {
+              "name": "flutter",
+              "version": "0.0.0",
+              "source": "sdk",
+              "dependencies": []
+            },
+            {
+              "name": "gui_shell_ui",
+              "version": "0.1.0",
+              "source": "path",
+              "dependencies": [
+                "broker_contract",
+                "flutter"
+              ]
+            }
+          ],
+          "runtime_package_count": 3,
+          "runtime_tree_sha256": "328e1a12e45a422762fdc73670367590cf9e34f86193ab9e4ee48dbd2714ab45"
+        }
+      },
+      "comparison_to_baseline": {
+        "baseline_total_bytes": 1182,
+        "selected_total_bytes": 882,
+        "total_bytes_reduced": 300,
+        "baseline_app_code_bytes": 1000,
+        "selected_app_code_bytes": 700,
+        "app_code_bytes_reduced": 300,
+        "baseline_app_code_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "selected_app_code_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "changed_artifact_paths": [
+          "data/app.so"
+        ],
+        "non_aot_changed_artifact_paths": [],
+        "non_aot_artifacts_identical": true
+      },
+      "resource_inventory_comparison_to_baseline": {
+        "baseline_resource_bytes": 82,
+        "selected_resource_bytes": 82,
+        "changed_resource_paths": [],
+        "resource_inventory_identical": true
+      },
+      "package_dependency_comparison_to_baseline": {
+        "baseline_runtime_tree_sha256": "328e1a12e45a422762fdc73670367590cf9e34f86193ab9e4ee48dbd2714ab45",
+        "selected_runtime_tree_sha256": "328e1a12e45a422762fdc73670367590cf9e34f86193ab9e4ee48dbd2714ab45",
+        "runtime_package_tree_identical": true,
+        "removed_aot_package_libraries": [],
+        "added_aot_package_libraries": []
+      }
+    },
+    {
+      "label": "without_setup_doctor",
+      "omitted_optional_module_ids": [
+        "shell.setup_doctor"
+      ],
+      "included_optional_module_ids": [
+        "shell.history",
+        "shell.evaluation_lab",
+        "shell.host_capabilities",
+        "shell.notifications",
+        "shell.observability",
+        "shell.trace_inspector",
+        "shell.host_operations"
+      ],
+      "excluded_optional_module_ids": [
+        "shell.setup_doctor"
+      ],
+      "run": {
+        "label": "without_setup_doctor",
+        "dart_define_arguments": {
+          "GUI_SHELL_MODULE_SETUP_DOCTOR": false,
+          "GUI_SHELL_MODULE_HISTORY": true,
+          "GUI_SHELL_MODULE_EVALUATION_LAB": true,
+          "GUI_SHELL_MODULE_HOST_CAPABILITIES": true,
+          "GUI_SHELL_MODULE_NOTIFICATIONS": true,
+          "GUI_SHELL_MODULE_OBSERVABILITY": true,
+          "GUI_SHELL_MODULE_TRACE_INSPECTOR": true,
+          "GUI_SHELL_MODULE_HOST_OPERATIONS": true
+        },
+        "effective_dart_defines": {
+          "GUI_SHELL_MODULE_SETUP_DOCTOR": false,
+          "GUI_SHELL_MODULE_HISTORY": true,
+          "GUI_SHELL_MODULE_EVALUATION_LAB": true,
+          "GUI_SHELL_MODULE_HOST_CAPABILITIES": true,
+          "GUI_SHELL_MODULE_NOTIFICATIONS": true,
+          "GUI_SHELL_MODULE_OBSERVABILITY": true,
+          "GUI_SHELL_MODULE_TRACE_INSPECTOR": true,
+          "GUI_SHELL_MODULE_HOST_OPERATIONS": true
+        },
+        "build_command": [
+          "C:\\tools\\flutter\\bin\\flutter.bat",
+          "--suppress-analytics",
+          "build",
+          "windows",
+          "--release",
+          "--no-pub",
+          "--analyze-size",
+          "--code-size-directory=C:\\Users\\Example\\Temp\\d4-module-comparison\\without_setup_doctor\\size-analysis-inputs",
+          "--dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=false",
+          "--dart-define=GUI_SHELL_MODULE_HISTORY=true",
+          "--dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=true",
+          "--dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=true",
+          "--dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=true",
+          "--dart-define=GUI_SHELL_MODULE_OBSERVABILITY=true",
+          "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true",
+          "--dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=true"
+        ],
+        "build_duration_ms": 10000,
+        "artifact_root": "without_setup_doctor/app",
+        "artifact_files": [
+          {
+            "path": "data/app.so",
+            "size_bytes": 700,
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          {
+            "path": "data/flutter_assets/FontManifest.json",
+            "size_bytes": 82,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "path": "gui_shell_desktop.exe",
+            "size_bytes": 100,
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "artifact_total_bytes": 882,
+        "artifact_tree_sha256": "44f7d52e94660946f878c3389d87ea5464ff5108fa3ec3f2f443786bbe646490",
+        "aot_surface_libraries": [
+          "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
+          "apps/desktop_flutter/lib/screens/history_screen.dart",
+          "apps/desktop_flutter/lib/screens/host_capability_center.dart",
+          "apps/desktop_flutter/lib/screens/host_operation_center.dart",
+          "apps/desktop_flutter/lib/screens/notifications.dart",
+          "apps/desktop_flutter/lib/screens/observability_center.dart",
+          "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+        ],
+        "size_analysis_report": {
+          "path": "without_setup_doctor/analysis/report.json",
+          "size_bytes": 123,
+          "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+        },
+        "size_analysis_inputs": [
+          {
+            "path": "without_setup_doctor/analysis/inputs/snapshot.windows-x64.json",
+            "size_bytes": 456,
+            "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          {
+            "path": "without_setup_doctor/analysis/inputs/trace.windows-x64.json",
+            "size_bytes": 789,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "aot_package_libraries": [
+          "package:flutter/material.dart",
+          "package:gui_shell_ui/runtime_dialogue_client.dart"
+        ],
+        "runtime_dependency_tree": {
+          "source": "dart_pub_deps_json",
+          "command": "dart pub deps --json",
+          "root_package": "gui_shell_desktop",
+          "direct_runtime_dependencies": [
+            "flutter",
+            "gui_shell_ui"
+          ],
+          "runtime_packages": [
+            {
+              "name": "broker_contract",
+              "version": "0.1.0",
+              "source": "path",
+              "dependencies": []
+            },
+            {
+              "name": "flutter",
+              "version": "0.0.0",
+              "source": "sdk",
+              "dependencies": []
+            },
+            {
+              "name": "gui_shell_ui",
+              "version": "0.1.0",
+              "source": "path",
+              "dependencies": [
+                "broker_contract",
+                "flutter"
+              ]
+            }
+          ],
+          "runtime_package_count": 3,
+          "runtime_tree_sha256": "328e1a12e45a422762fdc73670367590cf9e34f86193ab9e4ee48dbd2714ab45"
+        }
+      },
+      "comparison_to_baseline": {
+        "baseline_total_bytes": 1182,
+        "selected_total_bytes": 882,
+        "total_bytes_reduced": 300,
+        "baseline_app_code_bytes": 1000,
+        "selected_app_code_bytes": 700,
+        "app_code_bytes_reduced": 300,
+        "baseline_app_code_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "selected_app_code_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "changed_artifact_paths": [
+          "data/app.so"
+        ],
+        "non_aot_changed_artifact_paths": [],
+        "non_aot_artifacts_identical": true
+      },
+      "resource_inventory_comparison_to_baseline": {
+        "baseline_resource_bytes": 82,
+        "selected_resource_bytes": 82,
+        "changed_resource_paths": [],
+        "resource_inventory_identical": true
+      },
+      "package_dependency_comparison_to_baseline": {
+        "baseline_runtime_tree_sha256": "328e1a12e45a422762fdc73670367590cf9e34f86193ab9e4ee48dbd2714ab45",
+        "selected_runtime_tree_sha256": "328e1a12e45a422762fdc73670367590cf9e34f86193ab9e4ee48dbd2714ab45",
+        "runtime_package_tree_identical": true,
+        "removed_aot_package_libraries": [],
+        "added_aot_package_libraries": []
+      }
+    },
+    {
+      "label": "without_history",
+      "omitted_optional_module_ids": [
+        "shell.history"
+      ],
+      "included_optional_module_ids": [
+        "shell.setup_doctor",
+        "shell.evaluation_lab",
+        "shell.host_capabilities",
+        "shell.notifications",
+        "shell.observability",
+        "shell.trace_inspector",
+        "shell.host_operations"
+      ],
+      "excluded_optional_module_ids": [
+        "shell.history"
+      ],
+      "run": {
+        "label": "without_history",
+        "dart_define_arguments": {
+          "GUI_SHELL_MODULE_SETUP_DOCTOR": true,
+          "GUI_SHELL_MODULE_HISTORY": false,
+          "GUI_SHELL_MODULE_EVALUATION_LAB": true,
+          "GUI_SHELL_MODULE_HOST_CAPABILITIES": true,
+          "GUI_SHELL_MODULE_NOTIFICATIONS": true,
+          "GUI_SHELL_MODULE_OBSERVABILITY": true,
+          "GUI_SHELL_MODULE_TRACE_INSPECTOR": true,
+          "GUI_SHELL_MODULE_HOST_OPERATIONS": true
+        },
+        "effective_dart_defines": {
+          "GUI_SHELL_MODULE_SETUP_DOCTOR": true,
+          "GUI_SHELL_MODULE_HISTORY": false,
+          "GUI_SHELL_MODULE_EVALUATION_LAB": true,
+          "GUI_SHELL_MODULE_HOST_CAPABILITIES": true,
+          "GUI_SHELL_MODULE_NOTIFICATIONS": true,
+          "GUI_SHELL_MODULE_OBSERVABILITY": true,
+          "GUI_SHELL_MODULE_TRACE_INSPECTOR": true,
+          "GUI_SHELL_MODULE_HOST_OPERATIONS": true
+        },
+        "build_command": [
+          "C:\\tools\\flutter\\bin\\flutter.bat",
+          "--suppress-analytics",
+          "build",
+          "windows",
+          "--release",
+          "--no-pub",
+          "--analyze-size",
+          "--code-size-directory=C:\\Users\\Example\\Temp\\d4-module-comparison\\without_history\\size-analysis-inputs",
+          "--dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=true",
+          "--dart-define=GUI_SHELL_MODULE_HISTORY=false",
+          "--dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=true",
+          "--dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=true",
+          "--dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=true",
+          "--dart-define=GUI_SHELL_MODULE_OBSERVABILITY=true",
+          "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true",
+          "--dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=true"
+        ],
+        "build_duration_ms": 10000,
+        "artifact_root": "without_history/app",
+        "artifact_files": [
+          {
+            "path": "data/app.so",
+            "size_bytes": 700,
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          {
+            "path": "data/flutter_assets/FontManifest.json",
+            "size_bytes": 82,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "path": "gui_shell_desktop.exe",
+            "size_bytes": 100,
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "artifact_total_bytes": 882,
+        "artifact_tree_sha256": "44f7d52e94660946f878c3389d87ea5464ff5108fa3ec3f2f443786bbe646490",
+        "aot_surface_libraries": [
+          "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
+          "apps/desktop_flutter/lib/screens/host_capability_center.dart",
+          "apps/desktop_flutter/lib/screens/host_operation_center.dart",
+          "apps/desktop_flutter/lib/screens/notifications.dart",
+          "apps/desktop_flutter/lib/screens/observability_center.dart",
+          "apps/desktop_flutter/lib/screens/setup_doctor.dart",
+          "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+        ],
+        "size_analysis_report": {
+          "path": "without_history/analysis/report.json",
+          "size_bytes": 123,
+          "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+        },
+        "size_analysis_inputs": [
+          {
+            "path": "without_history/analysis/inputs/snapshot.windows-x64.json",
+            "size_bytes": 456,
+            "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          {
+            "path": "without_history/analysis/inputs/trace.windows-x64.json",
+            "size_bytes": 789,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "aot_package_libraries": [
+          "package:flutter/material.dart",
+          "package:gui_shell_ui/runtime_dialogue_client.dart"
+        ],
+        "runtime_dependency_tree": {
+          "source": "dart_pub_deps_json",
+          "command": "dart pub deps --json",
+          "root_package": "gui_shell_desktop",
+          "direct_runtime_dependencies": [
+            "flutter",
+            "gui_shell_ui"
+          ],
+          "runtime_packages": [
+            {
+              "name": "broker_contract",
+              "version": "0.1.0",
+              "source": "path",
+              "dependencies": []
+            },
+            {
+              "name": "flutter",
+              "version": "0.0.0",
+              "source": "sdk",
+              "dependencies": []
+            },
+            {
+              "name": "gui_shell_ui",
+              "version": "0.1.0",
+              "source": "path",
+              "dependencies": [
+                "broker_contract",
+                "flutter"
+              ]
+            }
+          ],
+          "runtime_package_count": 3,
+          "runtime_tree_sha256": "328e1a12e45a422762fdc73670367590cf9e34f86193ab9e4ee48dbd2714ab45"
+        }
+      },
+      "comparison_to_baseline": {
+        "baseline_total_bytes": 1182,
+        "selected_total_bytes": 882,
+        "total_bytes_reduced": 300,
+        "baseline_app_code_bytes": 1000,
+        "selected_app_code_bytes": 700,
+        "app_code_bytes_reduced": 300,
+        "baseline_app_code_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "selected_app_code_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "changed_artifact_paths": [
+          "data/app.so"
+        ],
+        "non_aot_changed_artifact_paths": [],
+        "non_aot_artifacts_identical": true
+      },
+      "resource_inventory_comparison_to_baseline": {
+        "baseline_resource_bytes": 82,
+        "selected_resource_bytes": 82,
+        "changed_resource_paths": [],
+        "resource_inventory_identical": true
+      },
+      "package_dependency_comparison_to_baseline": {
+        "baseline_runtime_tree_sha256": "328e1a12e45a422762fdc73670367590cf9e34f86193ab9e4ee48dbd2714ab45",
+        "selected_runtime_tree_sha256": "328e1a12e45a422762fdc73670367590cf9e34f86193ab9e4ee48dbd2714ab45",
+        "runtime_package_tree_identical": true,
+        "removed_aot_package_libraries": [],
+        "added_aot_package_libraries": []
+      }
+    }
+  ]
 }

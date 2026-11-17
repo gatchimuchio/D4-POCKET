@@ -2461,7 +2461,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_module_comparison_evidence.valid.json",
-      "sha256": "9f39c60289d599abbd43dab8e426480774ce5891e5b26291f28fa84dd955dc5b"
+      "sha256": "36c117361530ec2b7779be55e8ec332772780fd8a38478d0c946afe1695890ec"
     },
     {
       "path": "examples/contracts/gui_shell_preview.valid.json",
@@ -5305,7 +5305,7 @@
     },
     {
       "path": "specs/gui_shell_module_comparison_evidence.schema.json",
-      "sha256": "57c568a34fdf1387ec3cbf0c1a66e8b32f5384766691bc522c8eb76fe553cf32"
+      "sha256": "ea38981dd63292616e24e0734543f41e684c4462f7d5688968cc28d7a443105b"
     },
     {
       "path": "specs/gui_shell_preview.schema.json",
@@ -5709,7 +5709,7 @@
     },
     {
       "path": "tooling/build_module_pruned_windows.py",
-      "sha256": "513acfc49ef868c141aa4d2cdca9dcaeb1a8f45b15ca11def8b3582a0da0bd25"
+      "sha256": "d170fc4b76b123f8fba9cd04cc9f5fa9f8d0b73879319add60b9c902d2be2968"
     },
     {
       "path": "tooling/build_windows_installer.py",
@@ -5737,7 +5737,7 @@
     },
     {
       "path": "tooling/compare_module_builds_windows.py",
-      "sha256": "6ee75ef2f319d60873e443c5262b903afc3270ea058b2aa4f9bb61ef0281abbd"
+      "sha256": "f6d19e952b4a7ba5d442afda8bb5bbe68cd3cbf01461d6c00222e3c9f6c5a71f"
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
@@ -5981,7 +5981,7 @@
     },
     {
       "path": "tooling/tests/test_compare_module_builds_windows.py",
-      "sha256": "aadb81131d30065ad579d2581b2f026d7aef9e2cf0721b4628eec9c17a7b02c4"
+      "sha256": "f6699282b9be85277bb74da37d6606dd11d500c78f2589d36ef77fa528082fa0"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",

@@ -247,15 +247,40 @@ def resolve_module_plan(
     if plan.get("mandatory_module_ids") != catalog["required_module_ids"]:
         raise ValueError("ModulePlanが必須画面を欠落または変更している")
 
-    optional_modules = catalog["optional_modules"]
-    optional_ids = [module["module_id"] for module in optional_modules]
-    optional_set = set(optional_ids)
     requested = _string_list(
         plan.get("requested_optional_module_ids"), "requested_optional_module_ids"
     )
+    selection_mode = plan.get("selection_mode")
+    if selection_mode not in {"all_optional", "explicit_optional"}:
+        raise ValueError("ModulePlanの選択方式が未対応である")
+    resolved = resolve_module_plan_for_optional_ids(
+        requested, catalog, selection_mode=selection_mode
+    )
+    included = _string_list(plan.get("included_module_ids"), "included_module_ids")
+    excluded = _string_list(
+        plan.get("excluded_optional_module_ids"), "excluded_optional_module_ids"
+    )
+    if set(included) != set(resolved.included_module_ids):
+        raise ValueError("ModulePlanの包含一覧が必須Moduleと依存閉包に一致しない")
+    if set(excluded) != set(resolved.excluded_optional_ids):
+        raise ValueError("ModulePlanの除外一覧が選択結果に一致しない")
+    return resolved
+
+
+def resolve_module_plan_for_optional_ids(
+    requested_optional_module_ids: list[str] | tuple[str, ...],
+    catalog: dict[str, Any] | None = None,
+    *,
+    selection_mode: str = "explicit_optional",
+) -> ResolvedModulePlan:
+    """任意Module選択を共通の依存閉包へ正規化する。authorityを扱わない。"""
+    catalog = _validate_catalog(catalog) if catalog is not None else _load_catalog()
+    requested = _string_list(list(requested_optional_module_ids), "requested_optional_module_ids")
+    optional_modules = catalog["optional_modules"]
+    optional_ids = [module["module_id"] for module in optional_modules]
+    optional_set = set(optional_ids)
     if not set(requested).issubset(optional_set):
         raise ValueError("ModulePlanが未知の任意Moduleを要求している")
-    selection_mode = plan.get("selection_mode")
     if selection_mode not in {"all_optional", "explicit_optional"}:
         raise ValueError("ModulePlanの選択方式が未対応である")
     if selection_mode == "all_optional" and set(requested) != optional_set:
@@ -282,20 +307,6 @@ def resolve_module_plan(
 
     for module_id in requested:
         include(module_id)
-
-    expected_included = (
-        set(EXPECTED_CORE_IDS)
-        | set(EXPECTED_REQUIRED_IDS)
-        | included_optional
-    )
-    included = _string_list(plan.get("included_module_ids"), "included_module_ids")
-    excluded = _string_list(
-        plan.get("excluded_optional_module_ids"), "excluded_optional_module_ids"
-    )
-    if set(included) != expected_included:
-        raise ValueError("ModulePlanの包含一覧が必須Moduleと依存閉包に一致しない")
-    if set(excluded) != optional_set - included_optional:
-        raise ValueError("ModulePlanの除外一覧が選択結果に一致しない")
 
     ordered_included = tuple(
         [*EXPECTED_CORE_IDS, *EXPECTED_REQUIRED_IDS]

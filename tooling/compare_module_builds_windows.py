@@ -1,4 +1,4 @@
-"""同一commitにおける全画面／選択画面のWindows AOT比較補助。"""
+"""同一commitにおけるFlutter AOTとRust helperのWindows Release比較補助。"""
 
 from __future__ import annotations
 
@@ -35,6 +35,7 @@ from tooling.build_module_pruned_windows import (
     _parse_json_bytes,
     cargo_feature_arguments,
     dart_defines,
+    resolve_module_plan_for_optional_ids,
     resolve_module_plan,
 )
 from tooling.build_environment import build_child_environment
@@ -42,6 +43,7 @@ from tooling.flutter_workspace import safe_flutter_temp_parent
 
 
 COMPARISON_SCHEMA = ROOT / "specs" / "gui_shell_module_comparison_evidence.schema.json"
+COMPARISON_EVIDENCE_VERSION = 4
 ANALYSIS_SENTINEL = "A summary of your Windows bundle analysis can be found at:"
 MAX_RECEIPT_BYTES = 1_000_000
 MAX_ANALYSIS_BYTES = 50_000_000
@@ -376,7 +378,7 @@ def validate_comparison_evidence(
     receipt: dict[str, Any] | None = None,
     catalog: dict[str, Any] | None = None,
 ) -> list[str]:
-    """Schemaに加え、2 buildの選択・file記録・比較値の相互整合を検査する。"""
+    """Schemaと全構成の選択・file記録・比較値の相互整合を検査する。"""
     from tooling.schema_check.check_schemas import validate_instance
 
     errors = validate_instance(evidence, schema)
@@ -385,6 +387,37 @@ def validate_comparison_evidence(
 
     baseline = evidence["baseline"]
     selected = evidence["selected"]
+    active_catalog = catalog if catalog is not None else _load_catalog()
+    expected_variants = _pruning_variant_plans(active_catalog)
+    variants = evidence["pruning_variants"]
+    if len(variants) != len(expected_variants):
+        errors.append("比較variant数がModule Catalogから導出した必要数と一致しない")
+    for (expected_label, expected_plan, expected_omitted), variant in zip(
+        expected_variants, variants
+    ):
+        if variant["label"] != expected_label:
+            errors.append("比較variant labelが固定Module Catalog順と一致しない")
+        if variant["omitted_optional_module_ids"] != list(expected_omitted):
+            errors.append(f"{expected_label}の除外Module一覧が必要条件と一致しない")
+        if variant["included_optional_module_ids"] != list(
+            expected_plan.included_optional_ids
+        ):
+            errors.append(f"{expected_label}の包含Module一覧が依存閉包と一致しない")
+        if variant["excluded_optional_module_ids"] != list(
+            expected_plan.excluded_optional_ids
+        ):
+            errors.append(f"{expected_label}の除外Module一覧が依存閉包と一致しない")
+        expected_defines = dart_defines(expected_plan, active_catalog)
+        run = variant["run"]
+        if run["label"] != expected_label:
+            errors.append(f"{expected_label}のFlutter run labelが一致しない")
+        if run["artifact_root"] != f"{expected_label}/app":
+            errors.append(f"{expected_label}のFlutter artifact rootが一致しない")
+        if run["effective_dart_defines"] != expected_defines:
+            errors.append(f"{expected_label}のFlutter defineがModulePlanと一致しない")
+        if run["dart_define_arguments"] != expected_defines:
+            errors.append(f"{expected_label}のFlutter command defineがModulePlanと一致しない")
+
     expected_baseline_defines = all_optional_defines()
     if baseline["effective_dart_defines"] != expected_baseline_defines:
         errors.append("baselineがFlutterの全任意画面既定有効状態と一致しない")
@@ -395,7 +428,6 @@ def validate_comparison_evidence(
     if all(selected["effective_dart_defines"].values()):
         errors.append("選択buildが任意Moduleを一つも除外していない")
 
-    active_catalog = catalog if catalog is not None else _load_catalog()
     try:
         all_surfaces = sorted(
             surface
@@ -415,6 +447,18 @@ def validate_comparison_evidence(
             errors.append("baselineのFlutter AOT reportに全Catalog surface libraryが存在しない")
         if selected["aot_surface_libraries"] != expected_selected_surfaces:
             errors.append("選択buildのFlutter AOT report libraryがModule選択と一致しない")
+        for variant in variants:
+            run = variant["run"]
+            expected_variant_surfaces = sorted(
+                surface
+                for module in active_catalog["optional_modules"]
+                if run["effective_dart_defines"].get(
+                    "GUI_SHELL_MODULE_" + MODULE_DEFINE_NAMES.get(module["module_id"], "")
+                )
+                for surface in module["source_surfaces"]
+            )
+            if run["aot_surface_libraries"] != expected_variant_surfaces:
+                errors.append(f"{variant['label']}のFlutter AOT surfaceがModulePlanと一致しない")
     except (KeyError, TypeError, ValueError) as exc:
         errors.append(f"Flutter AOT surface library記録を照合できない: {exc}")
 
@@ -445,12 +489,17 @@ def validate_comparison_evidence(
             errors.append(f"{run['label']}の共通Windows Release build条件が不足している")
         return common, directories
 
+    all_runs = [baseline, selected, *(variant["run"] for variant in variants)]
     baseline_common, baseline_dirs = common_build_arguments(baseline)
-    selected_common, selected_dirs = common_build_arguments(selected)
-    if baseline_common != selected_common:
-        errors.append("baselineと選択buildの共通command条件が一致しない")
-    if baseline_dirs and selected_dirs and baseline_dirs[0] == selected_dirs[0]:
-        errors.append("2 buildが同じsize-analysis入力directoryを再利用している")
+    all_profile_dirs = [baseline_dirs[0]] if baseline_dirs else []
+    for run in all_runs[1:]:
+        run_common, run_dirs = common_build_arguments(run)
+        if baseline_common != run_common:
+            errors.append(f"{run['label']}の共通command条件がbaselineと一致しない")
+        if run_dirs:
+            all_profile_dirs.extend(run_dirs)
+    if len(all_profile_dirs) != len(set(all_profile_dirs)):
+        errors.append("複数buildが同じsize-analysis入力directoryを再利用している")
     expected_selected_args = [
         f"--dart-define={name}={str(value).lower()}"
         for name, value in selected["effective_dart_defines"].items()
@@ -463,7 +512,7 @@ def validate_comparison_evidence(
     if any(item.startswith("--dart-define=") for item in baseline["build_command"]):
         errors.append("all-enabled baselineはDart defineなしでbuildしなければならない")
 
-    for run in (baseline, selected):
+    for run in all_runs:
         files = run["artifact_files"]
         by_path = {item["path"]: item for item in files}
         if len(by_path) != len(files):
@@ -531,7 +580,10 @@ def validate_comparison_evidence(
         ):
             errors.append(f"{run['label']} AOT package libraryが一意・整列されていない")
 
-    if baseline["runtime_dependency_tree"] != selected["runtime_dependency_tree"]:
+    if any(
+        baseline["runtime_dependency_tree"] != run["runtime_dependency_tree"]
+        for run in all_runs[1:]
+    ):
         errors.append("同一sourceのModule選択間でruntime dependency treeが変化した")
 
     try:
@@ -552,6 +604,21 @@ def validate_comparison_evidence(
         expected_dependencies = package_dependency_comparison(baseline, selected)
         if evidence["package_dependency_comparison"] != expected_dependencies:
             errors.append("package dependency比較がrun記録から再計算した値と一致しない")
+        for variant in variants:
+            run = variant["run"]
+            label = variant["label"]
+            if variant["comparison_to_baseline"] != comparison_summary(
+                baseline["artifact_files"], run["artifact_files"]
+            ):
+                errors.append(f"{label} Flutter比較summaryをartifact recordから再計算できない")
+            if variant["resource_inventory_comparison_to_baseline"] != resource_inventory_comparison(
+                baseline["artifact_files"], run["artifact_files"]
+            ):
+                errors.append(f"{label} resource比較がartifact recordと一致しない")
+            if variant["package_dependency_comparison_to_baseline"] != package_dependency_comparison(
+                baseline, run
+            ):
+                errors.append(f"{label} package依存比較がrun記録と一致しない")
     except (KeyError, TypeError, ValueError) as exc:
         errors.append(f"resource／dependency比較を再計算できない: {exc}")
 
@@ -616,7 +683,42 @@ def validate_rust_binary_comparison(
             selected_plan, target_platform="windows"
         ):
             errors.append("Rust selected Cargo feature argumentsがExport Planと一致しない")
-    for label, run in (("baseline", baseline), ("selected", selected)):
+
+    expected_variants = _pruning_variant_plans(active_catalog)
+    variants = comparison["pruning_variants"]
+    if len(variants) != len(expected_variants):
+        errors.append("Rust比較variant数がModule Catalogから導出した必要数と一致しない")
+    variant_runs: list[dict[str, Any]] = []
+    for (expected_label, expected_plan, expected_omitted), variant in zip(
+        expected_variants, variants
+    ):
+        if variant["label"] != expected_label:
+            errors.append("Rust比較variant labelが固定Module Catalog順と一致しない")
+        if variant["omitted_optional_module_ids"] != list(expected_omitted):
+            errors.append(f"Rust {expected_label}の除外Module一覧が必要条件と一致しない")
+        if variant["included_optional_module_ids"] != list(
+            expected_plan.included_optional_ids
+        ):
+            errors.append(f"Rust {expected_label}の包含Module一覧が依存閉包と一致しない")
+        run = variant["run"]
+        expected_features = cargo_feature_arguments(
+            expected_plan, target_platform="windows"
+        )
+        if run["label"] != expected_label:
+            errors.append(f"Rust {expected_label} run labelが一致しない")
+        if run["included_optional_module_ids"] != list(
+            expected_plan.included_optional_ids
+        ):
+            errors.append(f"Rust {expected_label} runがModule依存閉包と一致しない")
+        if run["cargo_feature_arguments"] != expected_features:
+            errors.append(f"Rust {expected_label} Cargo featuresがModulePlanと一致しない")
+        variant_runs.append(run)
+
+    for label, run in (
+        ("baseline", baseline),
+        ("selected", selected),
+        *[(variant["label"], run) for variant, run in zip(variants, variant_runs)],
+    ):
         feature_arguments = run["cargo_feature_arguments"]
         for command_name, command in (
             ("build", run["cargo_command"]),
@@ -626,28 +728,34 @@ def validate_rust_binary_comparison(
                 errors.append(
                     f"Rust {label} {command_name} commandが記録済みfeature選択と一致しない"
                 )
-    expected_reduction = (
-        baseline["binary"]["size_bytes"] - selected["binary"]["size_bytes"]
-    )
-    if summary["baseline_binary_bytes"] != baseline["binary"]["size_bytes"]:
-        errors.append("Rust baseline binary byte数がartifact記録と一致しない")
-    if summary["selected_binary_bytes"] != selected["binary"]["size_bytes"]:
-        errors.append("Rust selected binary byte数がartifact記録と一致しない")
-    if summary["binary_bytes_reduced"] != expected_reduction:
-        errors.append("Rust binary byte削減量をartifact記録から再計算できない")
-    expected_hash_changed = baseline["binary"]["sha256"] != selected["binary"]["sha256"]
-    if summary["baseline_binary_sha256"] != baseline["binary"]["sha256"]:
-        errors.append("Rust baseline binary SHA-256がartifact記録と一致しない")
-    if summary["selected_binary_sha256"] != selected["binary"]["sha256"]:
-        errors.append("Rust selected binary SHA-256がartifact記録と一致しない")
-    if summary["binary_hash_changed"] is not expected_hash_changed:
-        errors.append("Rust binary hash changed状態がartifact記録と一致しない")
-    expected_tree_identical = (
-        baseline["runtime_dependency_tree"]["tree_file"]["sha256"]
-        == selected["runtime_dependency_tree"]["tree_file"]["sha256"]
-    )
-    if summary["runtime_dependency_tree_identical"] is not expected_tree_identical:
-        errors.append("Rust runtime dependency tree比較が保存tree hashと一致しない")
+
+    def validate_pair(label: str, run: dict[str, Any], pair: dict[str, Any]) -> None:
+        expected_reduction = baseline["binary"]["size_bytes"] - run["binary"]["size_bytes"]
+        if pair["baseline_binary_bytes"] != baseline["binary"]["size_bytes"]:
+            errors.append(f"Rust {label} baseline byte数がartifact記録と一致しない")
+        if pair["selected_binary_bytes"] != run["binary"]["size_bytes"]:
+            errors.append(f"Rust {label} variant byte数がartifact記録と一致しない")
+        if pair["binary_bytes_reduced"] != expected_reduction:
+            errors.append(f"Rust {label} byte削減量をartifact記録から再計算できない")
+        expected_hash_changed = baseline["binary"]["sha256"] != run["binary"]["sha256"]
+        if pair["baseline_binary_sha256"] != baseline["binary"]["sha256"]:
+            errors.append(f"Rust {label} baseline SHA-256がartifact記録と一致しない")
+        if pair["selected_binary_sha256"] != run["binary"]["sha256"]:
+            errors.append(f"Rust {label} variant SHA-256がartifact記録と一致しない")
+        if pair["binary_hash_changed"] is not expected_hash_changed:
+            errors.append(f"Rust {label} hash変更状態がartifact記録と一致しない")
+        expected_tree_identical = (
+            baseline["runtime_dependency_tree"]["tree_file"]["sha256"]
+            == run["runtime_dependency_tree"]["tree_file"]["sha256"]
+        )
+        if pair["runtime_dependency_tree_identical"] is not expected_tree_identical:
+            errors.append(f"Rust {label}依存tree比較が保存tree hashと一致しない")
+
+    validate_pair("selected", selected, summary)
+    for variant in variants:
+        validate_pair(
+            variant["label"], variant["run"], variant["comparison_to_baseline"]
+        )
     return errors
 
 
@@ -854,6 +962,62 @@ def _full_optional_plan(catalog: dict[str, Any]) -> ResolvedModulePlan:
     )
 
 
+def _pruning_variant_plans(
+    catalog: dict[str, Any],
+) -> list[tuple[str, ResolvedModulePlan, tuple[str, ...]]]:
+    """Return deterministic one-module removals plus the all-optional-free plan."""
+    optional_ids = tuple(module["module_id"] for module in catalog["optional_modules"])
+    full_ids = set(optional_ids)
+    variants: list[tuple[str, ResolvedModulePlan, tuple[str, ...]]] = []
+    seen: set[tuple[str, ...]] = {optional_ids}
+
+    if optional_ids:
+        plan = resolve_module_plan_for_optional_ids((), catalog)
+        if plan.included_optional_ids not in seen:
+            variants.append(("no_optional_modules", plan, optional_ids))
+            seen.add(plan.included_optional_ids)
+
+    if len(optional_ids) < 2:
+        candidates = [optional_ids[:index] + optional_ids[index + 1 :] for index in range(len(optional_ids))]
+        target_count = len({
+            resolve_module_plan_for_optional_ids(candidate, catalog).included_optional_ids
+            for candidate in [optional_ids, *candidates, ()]
+        }) - 1
+    else:
+        candidates = [
+            tuple(module_id for module_id in optional_ids if module_id != omitted_id)
+            for omitted_id in optional_ids
+        ]
+        target_count = 3
+
+    for requested in candidates:
+        plan = resolve_module_plan_for_optional_ids(requested, catalog)
+        included = plan.included_optional_ids
+        if included in seen:
+            continue
+        omitted = tuple(module_id for module_id in optional_ids if module_id not in set(included))
+        if len(omitted) == len(optional_ids):
+            label = "no_optional_modules"
+        elif len(omitted) == 1:
+            label = "without_" + omitted[0].removeprefix("shell.").replace(".", "_")
+        else:
+            label = "without_optional_" + "_".join(
+                module_id.removeprefix("shell.").replace(".", "_") for module_id in omitted
+            )
+        variants.append((label, plan, omitted))
+        seen.add(included)
+        if len(variants) >= target_count:
+            break
+
+    if len(optional_ids) >= 2 and len(variants) != 3:
+        raise ValueError("Module Catalogから独立した除外比較構成を3件作れない")
+    if len(optional_ids) < 2 and len(variants) != target_count:
+        raise ValueError("少数Moduleの全構成を比較planへ展開できない")
+    if any(set(plan.included_optional_ids) | set(omitted) != full_ids for _, plan, omitted in variants):
+        raise ValueError("Module比較variantがOptional Module全集合を分割していない")
+    return variants
+
+
 def _cargo_feature_tree(
     *,
     cargo: str,
@@ -890,12 +1054,13 @@ def _capture_rust_helper_run(
     cargo: str,
     environment: dict[str, str],
     target: str,
+    target_dir: Path,
+    shared_linker_map_path: Path,
     evidence_root: Path,
     expected_commit: str,
 ) -> dict[str, Any]:
     run_root = evidence_root / label / "rust"
     run_root.mkdir(parents=True, exist_ok=False)
-    target_parent = Path(safe_flutter_temp_parent(ROOT)).resolve(strict=True)
     feature_arguments = cargo_feature_arguments(plan, target_platform="windows")
     _cargo_tree_command, dependency_tree = _cargo_feature_tree(
         cargo=cargo,
@@ -908,44 +1073,43 @@ def _capture_rust_helper_run(
 
     linker_map_path = run_root / f"{RUST_HELPER_BINARY}.map"
     started = time.perf_counter()
-    with tempfile.TemporaryDirectory(prefix="d4p-module-rust-target-", dir=target_parent) as temp:
-        target_dir = Path(temp) / "target"
-        command = [
-            cargo,
-            "rustc",
-            "--color",
-            "never",
-            "--manifest-path",
-            RUST_HELPER_MANIFEST,
-            "--locked",
-            "--offline",
-            "--release",
-            "--target",
-            target,
-            *feature_arguments,
-            "--target-dir",
-            str(target_dir),
-            "--bin",
-            "gui_shell_rust_helper",
-            "--",
-            "-C",
-            f"link-arg=/MAP:{linker_map_path}",
-        ]
-        _cargo_process_output(command, environment, label=f"{label} Rust helper Release build")
-        _clean_source_commit(expected_commit)
-        binary_source = target_dir / target / "release" / RUST_HELPER_BINARY
-        binary_path = run_root / RUST_HELPER_BINARY
-        if not binary_source.is_file():
-            raise ValueError(f"{label} Rust helper Release binaryが生成されない")
-        shutil.copy2(binary_source, binary_path)
-        if not linker_map_path.is_file():
-            raise ValueError(f"{label} Rust helper linker mapが生成されない")
-        binary = _native_binary_record(binary_path, evidence_root)
-        map_record = _file_record(linker_map_path, evidence_root)
-        symbols = _parse_linker_map_symbols(linker_map_path.read_bytes())
-        symbol_path = run_root / "public-symbols.txt"
-        symbol_path.write_text("".join(f"{symbol}\n" for symbol in symbols), encoding="utf-8", newline="\n")
-        symbol_record = _file_record(symbol_path, evidence_root)
+    command = [
+        cargo,
+        "rustc",
+        "--color",
+        "never",
+        "--manifest-path",
+        RUST_HELPER_MANIFEST,
+        "--locked",
+        "--offline",
+        "--release",
+        "--target",
+        target,
+        *feature_arguments,
+        "--target-dir",
+        str(target_dir),
+        "--bin",
+        "gui_shell_rust_helper",
+        "--",
+        "-C",
+        f"link-arg=/MAP:{shared_linker_map_path}",
+    ]
+    _cargo_process_output(command, environment, label=f"{label} Rust helper Release build")
+    _clean_source_commit(expected_commit)
+    binary_source = target_dir / target / "release" / RUST_HELPER_BINARY
+    binary_path = run_root / RUST_HELPER_BINARY
+    if not binary_source.is_file():
+        raise ValueError(f"{label} Rust helper Release binaryが生成されない")
+    shutil.copy2(binary_source, binary_path)
+    if not shared_linker_map_path.is_file():
+        raise ValueError(f"{label} Rust helper linker mapが生成されない")
+    shutil.copy2(shared_linker_map_path, linker_map_path)
+    binary = _native_binary_record(binary_path, evidence_root)
+    map_record = _file_record(linker_map_path, evidence_root)
+    symbols = _parse_linker_map_symbols(linker_map_path.read_bytes())
+    symbol_path = run_root / "public-symbols.txt"
+    symbol_path.write_text("".join(f"{symbol}\n" for symbol in symbols), encoding="utf-8", newline="\n")
+    symbol_record = _file_record(symbol_path, evidence_root)
 
     duration_ms = round((time.perf_counter() - started) * 1000)
     tree_record = _file_record(tree_path, evidence_root)
@@ -969,7 +1133,7 @@ def _capture_rust_helper_run(
         "gui_shell_rust_helper",
         "--",
         "-C",
-        f"link-arg=/MAP:{label}/rust/{RUST_HELPER_BINARY}.map",
+        f"link-arg=/MAP:{{comparison-temporary-directory}}/{RUST_HELPER_BINARY}.map",
     ]
     return {
         "label": label,
@@ -1006,50 +1170,17 @@ def _capture_rust_helper_run(
     }
 
 
-def _native_binary_comparison(
-    *,
-    plan: ResolvedModulePlan,
-    catalog: dict[str, Any],
+def _native_pair_comparison(
+    baseline: dict[str, Any],
+    selected: dict[str, Any],
     evidence_root: Path,
-    source_commit: str,
+    *,
+    removed_path: Path,
+    added_path: Path,
 ) -> dict[str, Any]:
-    inherited_environment = dict(os.environ)
-    cargo_home = inherited_environment.get("CARGO_HOME") or str(Path.home() / ".cargo")
-    environment = build_child_environment(
-        {"CARGO_HOME": cargo_home, "CARGO_TERM_COLOR": "never"},
-        inherited=inherited_environment,
-    )
-    cargo, _rustc, toolchain_json = _rust_toolchain(environment)
-    toolchain = json.loads(toolchain_json)
-    baseline = _capture_rust_helper_run(
-        label="baseline",
-        plan=_full_optional_plan(catalog),
-        cargo=cargo,
-        environment=environment,
-        target=toolchain["target"],
-        evidence_root=evidence_root,
-        expected_commit=source_commit,
-    )
-    _clean_source_commit(source_commit)
-    selected = _capture_rust_helper_run(
-        label="selected",
-        plan=plan,
-        cargo=cargo,
-        environment=environment,
-        target=toolchain["target"],
-        evidence_root=evidence_root,
-        expected_commit=source_commit,
-    )
-    _clean_source_commit(source_commit)
-    _cargo_after, _rustc_after, final_toolchain_json = _rust_toolchain(environment)
-    if final_toolchain_json != toolchain_json:
-        raise ValueError("Full／selected Rust helper build中にToolchain identityが変化した")
-
-    symbols = symbol_set_comparison(baseline.pop("_symbols"), selected.pop("_symbols"))
-    baseline_tree = baseline.pop("_dependency_tree")
-    selected_tree = selected.pop("_dependency_tree")
-    removed_path = evidence_root / "removed-rust-symbols.txt"
-    added_path = evidence_root / "added-rust-symbols.txt"
+    symbols = symbol_set_comparison(baseline["_symbols"], selected["_symbols"])
+    baseline_tree = baseline["_dependency_tree"]
+    selected_tree = selected["_dependency_tree"]
     removed_path.write_text(
         "".join(f"{symbol}\n" for symbol in symbols["removed_symbols"]),
         encoding="utf-8",
@@ -1060,7 +1191,7 @@ def _native_binary_comparison(
         encoding="utf-8",
         newline="\n",
     )
-    comparison = {
+    return {
         "baseline_binary_bytes": baseline["binary"]["size_bytes"],
         "selected_binary_bytes": selected["binary"]["size_bytes"],
         "binary_bytes_reduced": baseline["binary"]["size_bytes"]
@@ -1078,6 +1209,103 @@ def _native_binary_comparison(
         "removed_symbols_file": _file_record(removed_path, evidence_root),
         "added_symbols_file": _file_record(added_path, evidence_root),
     }
+
+
+def _native_binary_comparison(
+    *,
+    plan: ResolvedModulePlan,
+    pruning_plans: list[tuple[str, ResolvedModulePlan, tuple[str, ...]]],
+    catalog: dict[str, Any],
+    evidence_root: Path,
+    source_commit: str,
+) -> dict[str, Any]:
+    inherited_environment = dict(os.environ)
+    cargo_home = inherited_environment.get("CARGO_HOME") or str(Path.home() / ".cargo")
+    environment = build_child_environment(
+        {"CARGO_HOME": cargo_home, "CARGO_TERM_COLOR": "never"},
+        inherited=inherited_environment,
+    )
+    cargo, _rustc, toolchain_json = _rust_toolchain(environment)
+    toolchain = json.loads(toolchain_json)
+    target_parent = Path(safe_flutter_temp_parent(ROOT)).resolve(strict=True)
+    with tempfile.TemporaryDirectory(
+        prefix="d4p-module-rust-target-", dir=target_parent
+    ) as temp:
+        target_dir = Path(temp) / "target"
+        shared_linker_map_path = Path(temp) / f"{RUST_HELPER_BINARY}.map"
+        baseline = _capture_rust_helper_run(
+            label="baseline",
+            plan=_full_optional_plan(catalog),
+            cargo=cargo,
+            environment=environment,
+            target=toolchain["target"],
+            target_dir=target_dir,
+            shared_linker_map_path=shared_linker_map_path,
+            evidence_root=evidence_root,
+            expected_commit=source_commit,
+        )
+        _clean_source_commit(source_commit)
+        selected = _capture_rust_helper_run(
+            label="selected",
+            plan=plan,
+            cargo=cargo,
+            environment=environment,
+            target=toolchain["target"],
+            target_dir=target_dir,
+            shared_linker_map_path=shared_linker_map_path,
+            evidence_root=evidence_root,
+            expected_commit=source_commit,
+        )
+        _clean_source_commit(source_commit)
+        variant_runs: list[dict[str, Any]] = []
+        for label, variant_plan, omitted in pruning_plans:
+            run = _capture_rust_helper_run(
+                label=label,
+                plan=variant_plan,
+                cargo=cargo,
+                environment=environment,
+                target=toolchain["target"],
+                target_dir=target_dir,
+                shared_linker_map_path=shared_linker_map_path,
+                evidence_root=evidence_root,
+                expected_commit=source_commit,
+            )
+            _clean_source_commit(source_commit)
+            pair = _native_pair_comparison(
+                baseline,
+                run,
+                evidence_root,
+                removed_path=evidence_root / label / "rust" / "removed-symbols.txt",
+                added_path=evidence_root / label / "rust" / "added-symbols.txt",
+            )
+            run.pop("_symbols")
+            run.pop("_dependency_tree")
+            variant_runs.append(
+                {
+                    "label": label,
+                    "omitted_optional_module_ids": list(omitted),
+                    "included_optional_module_ids": list(
+                        variant_plan.included_optional_ids
+                    ),
+                    "run": run,
+                    "comparison_to_baseline": pair,
+                }
+            )
+    _cargo_after, _rustc_after, final_toolchain_json = _rust_toolchain(environment)
+    if final_toolchain_json != toolchain_json:
+        raise ValueError("複数Rust helper構成build中にToolchain identityが変化した")
+
+    comparison = _native_pair_comparison(
+        baseline,
+        selected,
+        evidence_root,
+        removed_path=evidence_root / "removed-rust-symbols.txt",
+        added_path=evidence_root / "added-rust-symbols.txt",
+    )
+    baseline.pop("_symbols")
+    baseline.pop("_dependency_tree")
+    selected.pop("_symbols")
+    selected.pop("_dependency_tree")
     return {
         "build_target": toolchain["target"],
         "always_included_module_ids": [*EXPECTED_CORE_IDS, *EXPECTED_REQUIRED_IDS],
@@ -1087,6 +1315,7 @@ def _native_binary_comparison(
         "baseline": baseline,
         "selected": selected,
         "comparison": comparison,
+        "pruning_variants": variant_runs,
         "binary_pruning_verified": False,
     }
 
@@ -1280,6 +1509,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
     executable = _flutter_executable()
     versions = _flutter_versions(executable)
     dart_executable = _dart_executable(executable, versions["dart"])
+    pruning_plans = _pruning_variant_plans(catalog)
     output_dir.mkdir(parents=True, exist_ok=False)
     baseline = _capture_run(
         label="baseline",
@@ -1303,17 +1533,54 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         dart_executable=dart_executable,
     )
     _clean_source_commit(source_commit)
+    pruning_variants: list[dict[str, Any]] = []
+    for label, variant_plan, omitted in pruning_plans:
+        variant_defines = dart_defines(variant_plan, catalog)
+        run = _capture_run(
+            label=label,
+            output_root=output_dir,
+            command_defines=variant_defines,
+            effective_defines=variant_defines,
+            executable=executable,
+            evidence_root=output_dir,
+            catalog=catalog,
+            dart_executable=dart_executable,
+        )
+        _clean_source_commit(source_commit)
+        pruning_variants.append(
+            {
+                "label": label,
+                "omitted_optional_module_ids": list(omitted),
+                "included_optional_module_ids": list(
+                    variant_plan.included_optional_ids
+                ),
+                "excluded_optional_module_ids": list(
+                    variant_plan.excluded_optional_ids
+                ),
+                "run": run,
+                "comparison_to_baseline": comparison_summary(
+                    baseline["artifact_files"], run["artifact_files"]
+                ),
+                "resource_inventory_comparison_to_baseline": resource_inventory_comparison(
+                    baseline["artifact_files"], run["artifact_files"]
+                ),
+                "package_dependency_comparison_to_baseline": package_dependency_comparison(
+                    baseline, run
+                ),
+            }
+        )
     if _flutter_versions(executable) != versions:
         raise ValueError("比較build中にFlutter toolchain versionが変化した")
     rust_comparison = _native_binary_comparison(
         plan=plan,
+        pruning_plans=pruning_plans,
         catalog=catalog,
         evidence_root=output_dir,
         source_commit=source_commit,
     )
     summary = comparison_summary(baseline["artifact_files"], selected["artifact_files"])
     evidence = {
-        "version": 3,
+        "version": COMPARISON_EVIDENCE_VERSION,
         "evidence_type": "development_module_build_comparison",
         "evidence_source": "INTERNAL_STATE",
         "product_artifact_claimed": False,
@@ -1337,6 +1604,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         "baseline_selection": "all_optional_default_enabled",
         "baseline": baseline,
         "selected": selected,
+        "pruning_variants": pruning_variants,
         "comparison": summary,
         "rust_binary_comparison": rust_comparison,
         "resource_inventory_comparison": resource_inventory_comparison(
@@ -1363,7 +1631,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="同一commitの全任意画面baselineと選択画面のWindows Release AOTを比較するDeveloper専用tool。"
+        description="同一commitの全Optional、Receipt選択、個別除外、OptionalなしをWindows Releaseで測定するDeveloper専用tool。"
     )
     parser.add_argument("--receipt", type=Path, required=True, help="画面選択としてのみ使う未信頼Export Receipt JSON")
     parser.add_argument("--artifact-dir", type=Path, required=True, help="まだ存在しないRepository外の出力directory")

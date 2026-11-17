@@ -6,9 +6,17 @@ import unittest
 from pathlib import Path
 
 from tooling.build_environment import build_child_environment
+from tooling.build_module_pruned_windows import (
+    EXPECTED_CORE_IDS,
+    EXPECTED_REQUIRED_IDS,
+    _load_catalog,
+    resolve_module_plan_for_optional_ids,
+)
 from tooling.compare_module_builds_windows import (
+    COMPARISON_EVIDENCE_VERSION,
     _aot_package_libraries,
     _parse_linker_map_symbols,
+    _pruning_variant_plans,
     _runtime_dependency_tree_from_json,
     package_dependency_comparison,
     resource_inventory_comparison,
@@ -22,6 +30,55 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ModuleComparisonMeasurementTests(unittest.TestCase):
+    def test_evidence_producer_version_matches_schema(self) -> None:
+        schema = json.loads(
+            (ROOT / "specs/gui_shell_module_comparison_evidence.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            COMPARISON_EVIDENCE_VERSION,
+            schema["properties"]["version"]["const"],
+        )
+
+    def test_pruning_variants_cover_required_distinct_optional_configurations(self) -> None:
+        catalog = _load_catalog()
+        variants = _pruning_variant_plans(catalog)
+        optional_ids = {module["module_id"] for module in catalog["optional_modules"]}
+
+        self.assertEqual(
+            [label for label, _plan, _omitted in variants],
+            ["no_optional_modules", "without_setup_doctor", "without_history"],
+        )
+        configurations = [
+            tuple(module["module_id"] for module in catalog["optional_modules"]),
+            *(plan.included_optional_ids for _label, plan, _omitted in variants),
+        ]
+        self.assertEqual(len(configurations), len(set(configurations)))
+        for _label, plan, omitted in variants:
+            self.assertEqual(set(plan.included_optional_ids) | set(omitted), optional_ids)
+            self.assertFalse(set(plan.included_optional_ids) & set(omitted))
+            self.assertEqual(
+                plan.included_module_ids[: len(EXPECTED_CORE_IDS)], EXPECTED_CORE_IDS
+            )
+            self.assertEqual(
+                plan.included_module_ids[
+                    len(EXPECTED_CORE_IDS) : len(EXPECTED_CORE_IDS) + len(EXPECTED_REQUIRED_IDS)
+                ],
+                EXPECTED_REQUIRED_IDS,
+            )
+        self.assertEqual(variants[0][1].included_optional_ids, ())
+
+    def test_optional_plan_resolver_applies_dependency_closure_and_rejects_unknown_ids(self) -> None:
+        catalog = _load_catalog()
+        plan = resolve_module_plan_for_optional_ids(["shell.trace_inspector"], catalog)
+        self.assertEqual(
+            plan.included_optional_ids,
+            ("shell.observability", "shell.trace_inspector"),
+        )
+        self.assertEqual(plan.excluded_optional_ids[0], "shell.setup_doctor")
+        with self.assertRaisesRegex(ValueError, "未知の任意Module"):
+            resolve_module_plan_for_optional_ids(["shell.unknown"], catalog)
+
     def test_build_environment_filters_credentials_and_applies_case_insensitive_overrides(self) -> None:
         environment = build_child_environment(
             {"PATH": "approved-path", "CARGO_HOME": "C:\\cargo"},
@@ -302,6 +359,32 @@ Static symbols
                 self.assertTrue(
                     any("always_included_module_ids" in error for error in errors)
                 )
+
+    def test_schema_validation_requires_distinct_measured_pruning_variants(self) -> None:
+        schema = json.loads(
+            (ROOT / "specs/gui_shell_module_comparison_evidence.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        example_path = ROOT / "examples/contracts/gui_shell_module_comparison_evidence.valid.json"
+        evidence = json.loads(example_path.read_text(encoding="utf-8"))
+
+        missing = copy.deepcopy(evidence)
+        missing["pruning_variants"].pop()
+        self.assertTrue(validate_comparison_evidence(missing, schema))
+
+        tampered = copy.deepcopy(evidence)
+        tampered["pruning_variants"][0]["included_optional_module_ids"].append(
+            "shell.setup_doctor"
+        )
+        errors = validate_comparison_evidence(tampered, schema)
+        self.assertTrue(any("包含Module一覧" in error for error in errors))
+
+        mismatched_native = copy.deepcopy(evidence)
+        mismatched_native["rust_binary_comparison"]["pruning_variants"][0]["run"][
+            "included_optional_module_ids"
+        ].append("shell.setup_doctor")
+        errors = validate_comparison_evidence(mismatched_native, schema)
+        self.assertTrue(any("Rust no_optional_modules" in error for error in errors))
 
 
 if __name__ == "__main__":
