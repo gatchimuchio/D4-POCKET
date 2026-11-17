@@ -677,7 +677,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_mcp_task_controller_test.dart",
-      "sha256": "2a9902fdf802dfb11db2b2aac976cbb10f32aed015cc3539082afaffa67eb40d"
+      "sha256": "16c840b7d3d7926d9e3942ad8e5eb3a22baed1a37617bea0111e0f5548dfdcdb"
     },
     {
       "path": "apps/desktop_flutter/test/agent_task_client_test.dart",
@@ -1637,7 +1637,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "54083cca2c9eec4ec928223cc64da2c49e405cf663dd417ed2bb6849c2baf7fd"
+      "sha256": "ee31232f71d042199f3d6110066302edf66b28947e1ab9eedf45b90adfebb3cf"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4597,7 +4597,7 @@
     },
     {
       "path": "packages/agent_orchestration/lib/agent_mcp_task_controller.dart",
-      "sha256": "905c9efe7a14af5e04b07750d5d15dfb9fa67e350238fcddb5afa1a0fccc113d"
+      "sha256": "06330314c195ed83d1617483ccb0680b9dcadb8cf1599d4fe7839f3dda936f73"
     },
     {
       "path": "packages/agent_orchestration/lib/agent_orchestration.dart",

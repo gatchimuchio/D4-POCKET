@@ -153,6 +153,36 @@ void main() {
     expect(followupInspection['payload'], isNot(contains('approval_id')));
   });
 
+  test('未完了の非同期表示observerはMCP継続を停止しない', () async {
+    final transport = _FakeBrokerTransport(_successfulResponses());
+    final observerCompletion = Completer<void>();
+    final controller = AgentMcpTaskController(
+      tasks: AgentTaskClient(transport),
+      mcp: McpConnectionClient(transport),
+    );
+
+    final outcome = await controller
+        .continueAfter(
+          sourceRequest: _sourceRequest,
+          sourceTask: _sourceTask,
+          isCurrent: () => true,
+          onUpdate: (_) => observerCompletion.future,
+        )
+        .timeout(const Duration(seconds: 2));
+
+    expect(outcome.kind, AgentMcpTaskOutcomeKind.followupStarted);
+    expect(transport.operations, [
+      'AgentTask結果表示承認',
+      'AgentTask結果取得',
+      'MCP接続一覧',
+      'MCP Tool実行',
+      'Agent作業要求検査',
+      'AgentTaskWorkspacePermissionGrant',
+      'AgentTaskOwnerApprovalGrant',
+      'AgentTask実行',
+    ]);
+  });
+
   test('Agent Task継続は画面observerから独立してBroker経路を続行する', () async {
     final transport = _FakeBrokerTransport(_successfulResponses());
     final coordinator = AgentTaskExecutionCoordinator(transport);

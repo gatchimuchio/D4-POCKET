@@ -177,8 +177,12 @@ class AgentMcpTaskController {
     }
     _requireCurrent(isCurrent);
 
-    Future<void> emit(AgentMcpTaskUpdate update) async {
-      await onUpdate(update);
+    Future<void> emit(AgentMcpTaskUpdate update) {
+      unawaited(
+        Future<void>.sync(() => onUpdate(update)).catchError((Object _) {}),
+      );
+      // UI progress observers cannot gate the Broker execution path.
+      return Future<void>.value();
     }
 
     await emit(
