@@ -7,9 +7,9 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 名前のとおり目指すのは、異なる能力やRuntimeを必要に応じて取り出し、安全に組み合わせられる**エージェントのための四次元ポケット**。特定のLLMやBLUE-TANUKI専用のフロントエンドではありません。
 
-[現行工程・進捗 v5](docs/QE_2026-11-14/進捗.md) · [v5採用記録](docs/QE_2026-11-14/採用記録.md) · [v5施工指示書](docs/QE_2026-11-14/03_D4Pocket_CODEX_v5_JA.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
+[現行仕様 v8](docs/QE_2026-11-16/01_D4Pocket_SPEC_v8_LLM_JA.md) · [現行工程 v8](docs/QE_2026-11-16/02_D4Pocket_PLAN_v8_LLM_JA.md) · [現行施工指示 v8](docs/QE_2026-11-16/03_D4Pocket_CODEX_v8_LLM_JA.md) · [現行進捗 v8](docs/QE_2026-11-16/進捗.md) · [v8採用記録](docs/QE_2026-11-16/採用記録.md) · [v5工程履歴](docs/QE_2026-11-14/進捗.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
 
-> **開発中 — 製品リリース未宣言。** 現行正本は[2026-11-14統合製品3点 v5](docs/QE_2026-11-14/採用記録.md)です。E0は着工に必要な4出力に限定し、製品A〜J全躯体の実Source一巡→全Consumer接続→全数監査→統合QC→OS別QAの順に施工します。W00〜W08は受入座標で施工順の待機列ではありません。W00=SCOPED_PASS、W01=CLOSED（Windows normal Release／Codex CLI限定）、W02=OPEN。旧局所PASSはv5の別OS・別候補の受入れへ自動転記しません。Linux nativeを含む五OSは必須製品対象。一般使用者は各OS対応インストーラーを取得・導入してサービス利用できる体験を目標とし、Windows所有実機で完成品を最終確認、他OSは宣言標準仮想環境で検証します。OS別installed製品QAは未成立。`release_ready=false`、18件中16件のRelease Blocker未解決、正式Q0〜Q7=DEFERREDです。過去の範囲は[v4進捗](docs/QE_2026-11-13/進捗.md)、[v3進捗](docs/QE_2026-11-09/進捗.md)と[rev5履歴](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
+> **開発中 — 製品リリース未宣言。** 現行正本は[2026-11-16採用のv8三点セット](docs/QE_2026-11-16/採用記録.md)です。現在の工程はE0=`CLOSED`、E1=`IN_PROGRESS`、E2/E3=`OPEN`、E4/E5=`NOT_RUN`、E6=`NOT_STARTED`。E1のA〜J本番Source初回一巡と五OSのinstalled製品QAは未完です。Windows、macOS、Linux、Android、iOSはすべて必須対象で、Linux nativeも未受入れ範囲が残っています。Release Registryは18件中16件が未解決で、`release_ready=false`です。以下の2026-11-10時点の表は限定証拠の履歴であり、v8の現行状態を置き換えません。
 
 ## D4 Pocketが変えようとしていること
 
@@ -23,11 +23,11 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 核心は、**LLMを開発・統合の第一級コンシューマとして扱いながら、決して権限源にはしない**ことです。LLM出力、記憶、Tool結果、Adapter metadata、GUI stateだけでPermissionを生成・昇格させません。
 
-## 現在の到達点
+## 過去の限定証拠（2026-11-10時点）
 
-2026年11月10日時点で照合した、対象と環境を限定した実装・検査の状態です。各証拠は実行時の対象ソースcommitへ結合し、現在のmainを再試験した結果へ付け替えません。**工程のCLOSEDは正式な製品出荷の意味ではありません。**
+以下は2026年11月10日時点で照合した、対象と環境を限定した実装・検査の状態です。各証拠は実行時の対象ソースcommitへ結合し、現在のmainを再試験した結果へ付け替えません。**工程のCLOSEDは正式な製品出荷の意味ではありません。**
 
-| 対象 | 現行の状態 | 成立していない範囲 |
+| 対象 | 当時の状態 | 当時成立していない範囲 |
 |---|---|---|
 | **Windowsデスクトップ版** | W01/G1をWindows normal Release／Codex CLI限定でCLOSED。Windowsの`task_execution=supported`を確認 | W02/G2、正式installed lifecycle、他Runtimeとの統合、正式Release、owner GO。Linuxの能力状態は下記のLinux欄を参照 |
 | **Agent比較／引継ぎ** | P2複数Agent比較、P3 Agent引継ぎのProduct Build受入CLOSED | すべての実Agent・実環境での一般保証 |
