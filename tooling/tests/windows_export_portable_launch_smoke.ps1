@@ -287,6 +287,10 @@ $evidence = [ordered]@{
     launcher_started = $false
     direct_child_verified = $false
     main_window_observed = $false
+    ui_observation_status = 'not_run'
+    ui_observation_failure_stage = $null
+    ui_observation_raw_node_count = 0
+    ui_observation_known_labels = @()
     included_surfaces = @()
     excluded_surfaces_absent = $false
     graceful_exit = $false
@@ -528,64 +532,81 @@ public static class GuiShellExportSmokeWin32 {
   $evidence.frontend.launcher_sha256 = "sha256:$launcherHash"
 
   $stage = 'observe Flutter top-level window through UI Automation'
-  $window = $null
-  $uiDeadline = (Get-Date).AddSeconds(90)
-  $condition = [System.Windows.Automation.PropertyCondition]::new(
-    [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
-    [int]$frontendProcess.Id
-  )
-  while ((Get-Date) -lt $uiDeadline -and $null -eq $window) {
-    $frontendProcess.Refresh()
-    if ($frontendProcess.HasExited) { throw 'Flutter child exited before UI observation' }
-    $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
-      [System.Windows.Automation.TreeScope]::Children, $condition
+  $elements = @()
+  $observedKnownNavigationLabels = @()
+  try {
+    $window = $null
+    $uiDeadline = (Get-Date).AddSeconds(90)
+    $condition = [System.Windows.Automation.PropertyCondition]::new(
+      [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+      [int]$frontendProcess.Id
     )
-    if ($windows.Count -gt 0) { $window = $windows[0] } else { Start-Sleep -Milliseconds 250 }
-  }
-  if ($null -eq $window) {
-    throw 'Flutter main window was not observed through UI Automation'
-  }
-  $evidence.frontend.main_window_observed = $true
-  $stage = 'verify Flutter native main-window handle'
-  if ($frontendProcess.MainWindowHandle -eq [IntPtr]::Zero) {
-    throw 'Flutter process has no native main-window handle'
-  }
-  $stage = 'enumerate live app UI Automation controls'
-  $elements = @(Get-RawViewDescendants -RootElement $window)
-  $stage = 'locate live NavigationRail semantic root'
-  $navRoot = @($elements | Where-Object {
-    try {
-      $_.Current.Name -eq 'ナビゲーション' -or $_.Current.AutomationId -eq 'gui_shell.surface.navigation_rail'
-    } catch { $false }
-  } | Select-Object -First 1)
-  if ($navRoot.Count -ne 1) {
-    $knownNavigationLabels = @('観測', '追跡', '診断', '履歴', '評価ラボ', 'ホスト能力', '通知', 'Host操作')
-    $observedKnownNavigationLabels = @($elements | ForEach-Object {
+    while ((Get-Date) -lt $uiDeadline -and $null -eq $window) {
+      $frontendProcess.Refresh()
+      if ($frontendProcess.HasExited) { throw 'Flutter child exited before UI observation' }
+      $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+        [System.Windows.Automation.TreeScope]::Children, $condition
+      )
+      if ($windows.Count -gt 0) { $window = $windows[0] } else { Start-Sleep -Milliseconds 250 }
+    }
+    if ($null -eq $window) {
+      throw 'Flutter main window was not observed through UI Automation'
+    }
+    $evidence.frontend.main_window_observed = $true
+    $stage = 'verify Flutter native main-window handle'
+    if ($frontendProcess.MainWindowHandle -eq [IntPtr]::Zero) {
+      throw 'Flutter process has no native main-window handle'
+    }
+    $stage = 'enumerate live app UI Automation controls'
+    $elements = @(Get-RawViewDescendants -RootElement $window)
+    $evidence.frontend.ui_observation_raw_node_count = $elements.Count
+    $stage = 'locate live NavigationRail semantic root'
+    $navRoot = @($elements | Where-Object {
+      try {
+        $_.Current.Name -eq 'ナビゲーション' -or $_.Current.AutomationId -eq 'gui_shell.surface.navigation_rail'
+      } catch { $false }
+    } | Select-Object -First 1)
+    if ($navRoot.Count -ne 1) {
+      $knownNavigationLabels = @('観測', '追跡', '診断', '履歴', '評価ラボ', 'ホスト能力', '通知', 'Host操作')
+      $observedKnownNavigationLabels = @($elements | ForEach-Object {
+        try { [string]$_.Current.Name } catch { '' }
+      } | Where-Object { $knownNavigationLabels -ccontains $_ } | Sort-Object -Unique)
+      $evidence.frontend.ui_observation_known_labels = $observedKnownNavigationLabels
+      $railIdentifierCount = @($elements | Where-Object {
+        try { $_.Current.AutomationId -eq 'gui_shell.surface.navigation_rail' } catch { $false }
+      }).Count
+      $stage = "locate live NavigationRail semantic root (raw_nodes=$($elements.Count); known_labels=$($observedKnownNavigationLabels -join ','); rail_identifier_count=$railIdentifierCount)"
+      throw 'NavigationRail semantic root was not observed'
+    }
+    $stage = 'enumerate live NavigationRail semantic children'
+    $navigationElements = @(Get-RawViewDescendants -RootElement $navRoot[0])
+    $navigationNames = @($navigationElements | ForEach-Object {
       try { [string]$_.Current.Name } catch { '' }
-    } | Where-Object { $knownNavigationLabels -ccontains $_ } | Sort-Object -Unique)
-    $railIdentifierCount = @($elements | Where-Object {
-      try { $_.Current.AutomationId -eq 'gui_shell.surface.navigation_rail' } catch { $false }
-    }).Count
-    $stage = "locate live NavigationRail semantic root (raw_nodes=$($elements.Count); known_labels=$($observedKnownNavigationLabels -join ','); rail_identifier_count=$railIdentifierCount)"
-    throw 'NavigationRail semantic root was not observed'
+    } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $includedSurfaces = @('観測', '追跡')
+    foreach ($surface in $includedSurfaces) {
+      $stage = "verify selected module surface: $surface"
+      if ($navigationNames -cnotcontains $surface) { throw "selected module surface missing from live NavigationRail: $surface" }
+    }
+    $excludedSurfaces = @('診断', '履歴', '評価ラボ', 'ホスト能力', '通知', 'Host操作')
+    foreach ($surface in $excludedSurfaces) {
+      $stage = "verify excluded module surface absent: $surface"
+      if ($navigationNames -ccontains $surface) { throw "excluded module surface remains in live NavigationRail: $surface" }
+    }
+    $evidence.frontend.included_surfaces = $includedSurfaces
+    $evidence.frontend.excluded_surfaces_absent = $true
+    $evidence.frontend.ui_observation_known_labels = @($navigationNames | Where-Object {
+      @('観測', '追跡', '診断', '履歴', '評価ラボ', 'ホスト能力', '通知', 'Host操作') -ccontains $_
+    } | Sort-Object -Unique)
+    $evidence.frontend.ui_observation_status = 'passed'
+  } catch {
+    $evidence.frontend.ui_observation_status = 'not_established'
+    $evidence.frontend.ui_observation_failure_stage = $stage
+    $evidence.frontend.ui_observation_raw_node_count = $elements.Count
+    if ($observedKnownNavigationLabels.Count -gt 0) {
+      $evidence.frontend.ui_observation_known_labels = $observedKnownNavigationLabels
+    }
   }
-  $stage = 'enumerate live NavigationRail semantic children'
-  $navigationElements = @(Get-RawViewDescendants -RootElement $navRoot[0])
-  $navigationNames = @($navigationElements | ForEach-Object {
-    try { [string]$_.Current.Name } catch { '' }
-  } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-  $includedSurfaces = @('観測', '追跡')
-  foreach ($surface in $includedSurfaces) {
-    $stage = "verify selected module surface: $surface"
-    if ($navigationNames -cnotcontains $surface) { throw "selected module surface missing from live NavigationRail: $surface" }
-  }
-  $excludedSurfaces = @('診断', '履歴', '評価ラボ', 'ホスト能力', '通知', 'Host操作')
-  foreach ($surface in $excludedSurfaces) {
-    $stage = "verify excluded module surface absent: $surface"
-    if ($navigationNames -ccontains $surface) { throw "excluded module surface remains in live NavigationRail: $surface" }
-  }
-  $evidence.frontend.included_surfaces = $includedSurfaces
-  $evidence.frontend.excluded_surfaces_absent = $true
 
   $stage = 'read and validate the normal authenticated Broker endpoint'
   $endpointDeadline = (Get-Date).AddSeconds(20)
@@ -694,6 +715,10 @@ public static class GuiShellExportSmokeWin32 {
   $evidence.cleanup.launcher_exit_code = [int]$launcherProcess.ExitCode
   $evidence.cleanup.endpoint_removed = -not (Test-Path -LiteralPath $endpointPath)
   if (-not $evidence.cleanup.endpoint_removed) { throw 'normal Broker endpoint remained after graceful shutdown' }
+  if ($evidence.frontend.ui_observation_status -ne 'passed') {
+    $stage = 'UI Automation module surface observation was not established after independent Broker and cleanup checks'
+    throw 'UI Automation module surface observation was not established'
+  }
   $evidence.result = 'passed'
 } catch {
   $runError = $_

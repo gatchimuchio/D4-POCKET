@@ -11764,6 +11764,36 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
     evidence = load_contract_fixture("gui_shell_windows_export_build.valid.json")
     schema = load_schema("gui_shell_windows_export_build.schema.json")
     errors: list[str] = []
+    smoke_source = (
+        ROOT / "tooling" / "tests" / "windows_export_portable_launch_smoke.ps1"
+    ).read_text(encoding="utf-8")
+    export_workflow = (
+        ROOT / ".github" / "workflows" / "windows-manual-export-build.yml"
+    ).read_text(encoding="utf-8")
+    ui_observation = smoke_source.find(
+        "$stage = 'observe Flutter top-level window through UI Automation'"
+    )
+    broker_observation = smoke_source.find(
+        "$stage = 'read and validate the normal authenticated Broker endpoint'",
+        ui_observation,
+    )
+    deferred_ui_gate = smoke_source.find(
+        "UI Automation module surface observation was not established after independent Broker and cleanup checks",
+        broker_observation,
+    )
+    if not (ui_observation >= 0 and broker_observation > ui_observation and deferred_ui_gate > broker_observation):
+        errors.append("Windows Export UIA failureが独立Broker検査後まで遅延されない")
+    for token in (
+        "$evidence.frontend.ui_observation_status = 'not_established'",
+        "$evidence.frontend.ui_observation_failure_stage = $stage",
+        "$launchEvidence.frontend.ui_observation_status -ne 'passed'",
+        "- name: portable launch smokeの結果とcleanupを常時要約",
+        "if: always() && steps.portable_export_build.outcome != 'success'",
+        "EXPORT_BUILD_OUTCOME: ${{ steps.portable_export_build.outcome }}",
+        "Summary omits request payloads, private markers, session secrets, and raw exception text.",
+    ):
+        if token not in smoke_source + export_workflow:
+            errors.append(f"Windows Export smokeの失敗証拠／UIA独立検査規則が欠けている: {token}")
     launcher_source = (
         ROOT / "native" / "rust_helper" / "src" / "desktop_launcher.rs"
     ).read_text(encoding="utf-8")

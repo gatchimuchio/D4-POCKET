@@ -93,6 +93,7 @@ jobs:
           & "$flutterRoot\bin\flutter.bat" --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: fixtureから未署名Windows Release bundleを構築・検証
+        id: portable_export_build
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
@@ -169,6 +170,7 @@ jobs:
           $launchEvidence = Get-Content -LiteralPath $launchEvidencePath -Raw -Encoding utf8 | ConvertFrom-Json
           if ($launchEvidence.result -ne 'passed' -or
               $launchEvidence.evidence_class -ne 'LIVE_RUNTIME' -or
+              $launchEvidence.frontend.ui_observation_status -ne 'passed' -or
               $launchEvidence.source_commit -ne $env:GITHUB_SHA -or
               $launchEvidence.broker.excluded_operation_status -ne 'rejected' -or
               $launchEvidence.broker.excluded_operation_code -ne 'optional_module_not_included' -or
@@ -229,6 +231,52 @@ jobs:
               Remove-Item -LiteralPath $resolved -Recurse -Force
             }
           }
+      - name: portable launch smokeの結果とcleanupを常時要約
+        if: always() && steps.portable_export_build.outcome != 'success'
+        env:
+          EXPORT_BUILD_OUTCOME: ${{ steps.portable_export_build.outcome }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidencePath = Join-Path $env:RUNNER_TEMP 'd4-pocket-export-launch-smoke.json'
+          if (-not (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
+            $lines = @(
+              '### Windows Export portable launch smoke'
+              '- Result: `NOT_ESTABLISHED`; evidence JSON was not produced before the build/export step stopped.'
+            )
+            $lines | Write-Output
+            $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            exit 0
+          }
+          try {
+            $evidence = Get-Content -LiteralPath $evidencePath -Raw -Encoding utf8 | ConvertFrom-Json -ErrorAction Stop
+          } catch {
+            '### Windows Export portable launch smoke' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            '- Result: `NOT_ESTABLISHED`; evidence JSON could not be parsed.' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            throw 'portable launch evidence JSON is invalid'
+          }
+          if ($evidence.evidence_type -ne 'd4_pocket_windows_portable_launch_smoke' -or
+              $evidence.source_commit -ne $env:GITHUB_SHA) {
+            throw 'portable launch evidence type or source identity is invalid'
+          }
+          $uiStatus = if ($null -eq $evidence.frontend.ui_observation_status) { 'NOT_ESTABLISHED' } else { [string]$evidence.frontend.ui_observation_status }
+          $uiStage = if ([string]::IsNullOrWhiteSpace([string]$evidence.frontend.ui_observation_failure_stage)) { 'none' } else { [string]$evidence.frontend.ui_observation_failure_stage }
+          $uiLabels = @($evidence.frontend.ui_observation_known_labels) -join ', '
+          if ([string]::IsNullOrWhiteSpace($uiLabels)) { $uiLabels = 'none' }
+          $auditHash = if ([string]$evidence.broker.audit_sha256 -match '^sha256:[0-9a-f]{64}$') { [string]$evidence.broker.audit_sha256 } else { 'not_observed' }
+          $failureStage = if ([string]::IsNullOrWhiteSpace([string]$evidence.failure_stage)) { 'none' } else { [string]$evidence.failure_stage }
+          $lines = @(
+            '### Windows Export portable launch smoke'
+            "- Export-build step outcome: ``$env:EXPORT_BUILD_OUTCOME``."
+            "- Result: ``$($evidence.result)`` / ``$($evidence.evidence_class)``; source ``$($evidence.source_commit)``; runner ``$($evidence.runner_image)``."
+            "- UI Automation: ``$uiStatus``; stage ``$uiStage``; raw nodes ``$($evidence.frontend.ui_observation_raw_node_count)``; known labels ``$uiLabels``."
+            "- Authenticated Broker: excluded operation ``$($evidence.broker.excluded_operation_status)`` / ``$($evidence.broker.excluded_operation_code)`` (Audit ``$($evidence.broker.excluded_operation_audit_id)``); generic command ``$($evidence.broker.generic_command_status)`` / ``$($evidence.broker.generic_command_code)`` (Audit ``$($evidence.broker.generic_command_audit_id)``)."
+            "- Exit/cleanup: graceful ``$($evidence.frontend.graceful_exit)``; forced ``$($evidence.frontend.forced_exit)``; endpoint removed ``$($evidence.cleanup.endpoint_removed)``; runtime fixture removed ``$($evidence.cleanup.runtime_fixture_removed)``."
+            "- Audit: SHA-256 ``$auditHash``; bytes ``$($evidence.broker.audit_bytes)``; final failure stage ``$failureStage``."
+            '- Summary omits request payloads, private markers, session secrets, and raw exception text.'
+          )
+          $lines | Write-Output
+          $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
       - name: source working treeがcleanなことを確認
         shell: pwsh
         run: |
