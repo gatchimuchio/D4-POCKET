@@ -77,7 +77,7 @@ void main() {
 
     expect(find.text('D4 Pocket Host操作面'), findsNothing);
     expect(find.textContaining('Broker接続先が切り替わったため'), findsOneWidget);
-    expect(oldTransport.operations, ['Host一覧', '作業領域一覧']);
+    expect(oldTransport.operations, ['health', 'Host一覧', '作業領域一覧']);
     expect(tester.takeException(), isNull);
   });
 }
@@ -114,6 +114,38 @@ class _BrokerSearchTransport implements BrokerTransport {
     Map<String, Object?>? payload,
   }) async {
     operations.add(operation);
+    if (operation == 'health') {
+      return {
+        'request_id': 'search-health-${operations.length}',
+        'operation': 'health',
+        'status': 'suspended',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'audit-search-health-${operations.length}',
+        'error': {
+          'code': 'broker_persistence_unavailable',
+          'message': 'この検索fixtureでは永続化状態を確認できません。',
+          'recoverable': true,
+          'audit_event_required': true,
+          'fail_closed': true,
+        },
+        'health': {
+          'broker_id': 'gui-shell-rust-broker',
+          'status': 'suspend',
+          'boundary_role': 'rust_security_broker_candidate',
+          'authority_cutover_status': 'not_active',
+          'command_dispatch_enabled': false,
+          'audit_append_enabled': true,
+          'audit_persistence': 'in_memory_skeleton',
+          'replay_persistence': 'in_memory_session_only',
+          'session_persistence': 'in_memory_session_only',
+          'persistence_required': true,
+          'persistence_ready': false,
+          'evidence_source': 'INTERNAL_STATE',
+        },
+        'body': null,
+        'shutdown_requested': false,
+      };
+    }
     if (operation == 'Host一覧') {
       final pending = _pendingHost;
       if (pending != null) {
