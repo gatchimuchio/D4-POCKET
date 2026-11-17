@@ -527,7 +527,7 @@ public static class GuiShellExportSmokeWin32 {
   $evidence.frontend.image_sha256 = "sha256:$appHash"
   $evidence.frontend.launcher_sha256 = "sha256:$launcherHash"
 
-  $stage = 'observe bounded UI Automation surfaces from the launched app'
+  $stage = 'observe Flutter top-level window through UI Automation'
   $window = $null
   $uiDeadline = (Get-Date).AddSeconds(90)
   $condition = [System.Windows.Automation.PropertyCondition]::new(
@@ -542,27 +542,36 @@ public static class GuiShellExportSmokeWin32 {
     )
     if ($windows.Count -gt 0) { $window = $windows[0] } else { Start-Sleep -Milliseconds 250 }
   }
-  if ($null -eq $window -or $frontendProcess.MainWindowHandle -eq [IntPtr]::Zero) {
+  if ($null -eq $window) {
     throw 'Flutter main window was not observed through UI Automation'
   }
   $evidence.frontend.main_window_observed = $true
+  $stage = 'verify Flutter native main-window handle'
+  if ($frontendProcess.MainWindowHandle -eq [IntPtr]::Zero) {
+    throw 'Flutter process has no native main-window handle'
+  }
+  $stage = 'enumerate live app UI Automation controls'
   $elements = @(Get-ControlViewDescendants -RootElement $window)
+  $stage = 'locate live NavigationRail semantic root'
   $navRoot = @($elements | Where-Object {
     try {
       $_.Current.Name -eq 'ナビゲーション' -or $_.Current.AutomationId -eq 'gui_shell.surface.navigation_rail'
     } catch { $false }
   } | Select-Object -First 1)
   if ($navRoot.Count -ne 1) { throw 'NavigationRail semantic root was not observed' }
+  $stage = 'enumerate live NavigationRail semantic children'
   $navigationElements = @(Get-ControlViewDescendants -RootElement $navRoot[0])
   $navigationNames = @($navigationElements | ForEach-Object {
     try { [string]$_.Current.Name } catch { '' }
   } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
   $includedSurfaces = @('観測', '追跡')
   foreach ($surface in $includedSurfaces) {
+    $stage = "verify selected module surface: $surface"
     if ($navigationNames -cnotcontains $surface) { throw "selected module surface missing from live NavigationRail: $surface" }
   }
   $excludedSurfaces = @('診断', '履歴', '評価ラボ', 'ホスト能力', '通知', 'Host操作')
   foreach ($surface in $excludedSurfaces) {
+    $stage = "verify excluded module surface absent: $surface"
     if ($navigationNames -ccontains $surface) { throw "excluded module surface remains in live NavigationRail: $surface" }
   }
   $evidence.frontend.included_surfaces = $includedSurfaces
