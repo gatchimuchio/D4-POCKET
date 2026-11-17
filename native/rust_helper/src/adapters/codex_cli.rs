@@ -398,6 +398,7 @@ impl CodexCliAdapter {
             &self.workspace,
             self.workspace_identity,
             &context,
+            deadline,
         ) {
             Ok(scratch) => scratch,
             Err(error) => {
@@ -416,7 +417,7 @@ impl CodexCliAdapter {
                 if let Some(test_api) = self.test_responses_api.as_ref() {
                     report_r2_e2e_task_failure(test_api, "temporary_environment_bind", &error);
                 }
-                let _ = scratch.cleanup();
+                let _ = scratch.cleanup_after_task_quiesced();
                 return failed(error);
             }
         };
@@ -452,14 +453,19 @@ impl CodexCliAdapter {
             deadline,
             mcp_enabled,
         );
-        let tool_exit_code = result.as_ref().ok().map(|_| 0);
+        let run = result;
+        let tool_exit_code = run.result.as_ref().ok().map(|_| 0);
         #[cfg(feature = "r2-e2e")]
         if let Some(test_api) = self.test_responses_api.as_ref() {
-            if let Err(error) = result.as_ref() {
+            if let Err(error) = run.result.as_ref() {
                 report_r2_e2e_task_failure(test_api, "codex_task_execution", error);
             }
         }
-        let cleanup_result = scratch.cleanup();
+        let cleanup_result = if run.process_stopped {
+            scratch.cleanup_after_task_quiesced()
+        } else {
+            Err(対話失敗::通信失敗)
+        };
         #[cfg(feature = "r2-e2e")]
         if let Some(test_api) = self.test_responses_api.as_ref() {
             if let Err(error) = cleanup_result.as_ref() {
@@ -468,7 +474,7 @@ impl CodexCliAdapter {
         }
         let cleanup_completed = cleanup_result.is_ok();
         let result = match cleanup_result {
-            Ok(()) => result,
+            Ok(()) => run.result,
             Err(error) => Err(error),
         };
         AgentTaskAdapterExecution {
@@ -1110,7 +1116,11 @@ fn discard_unactivated_task_scratch(
     record_id: &str,
 ) {
     if scratch_dir.remove_open_dir_all().is_ok() {
-        let _ = context.journal.complete(record_id);
+        if context.journal.complete(record_id).is_err() {
+            let _ = context.journal.mark_task_finished(record_id);
+        }
+    } else {
+        let _ = context.journal.mark_task_finished(record_id);
     }
 }
 
@@ -1119,6 +1129,7 @@ fn activate_task_scratch_directory(
     scratch_identity: crate::broker::workspace_root::DirectoryIdentity,
     context: &crate::broker::agent_task_scratch::AgentTaskScratchContext,
     record_id: &str,
+    deadline: Instant,
 ) -> Result<Dir, 対話失敗> {
     if context
         .journal
@@ -1126,7 +1137,11 @@ fn activate_task_scratch_directory(
         .is_err()
     {
         discard_unactivated_task_scratch(scratch_dir, context, record_id);
-        return Err(対話失敗::通信失敗);
+        return Err(if Instant::now() >= deadline {
+            対話失敗::期限超過
+        } else {
+            対話失敗::通信失敗
+        });
     }
     Ok(scratch_dir)
 }
@@ -1136,7 +1151,11 @@ impl WorkspaceTaskScratch {
         workspace: &Path,
         expected: crate::broker::workspace_root::DirectoryIdentity,
         context: &crate::broker::agent_task_scratch::AgentTaskScratchContext,
+        deadline: Instant,
     ) -> Result<Self, 対話失敗> {
+        if Instant::now() >= deadline {
+            return Err(対話失敗::期限超過);
+        }
         if context.root_identity != expected {
             return Err(対話失敗::作業領域不在);
         }
@@ -1160,20 +1179,25 @@ impl WorkspaceTaskScratch {
             let name = format!(".d4p-tmp-{}", hex::encode(nonce));
             let record_id = context
                 .journal
-                .reserve(
+                .reserve_with_deadline(
                     &context.task_id,
                     &context.runtime_id,
                     &context.workspace_id,
                     &context.recovery_binding_hash,
                     expected,
                     &name,
+                    deadline,
                 )
                 .map_err(|_| 対話失敗::通信失敗)?;
             match workspace_dir.create_dir(&name) {
                 Ok(()) => {
-                    let scratch_dir = workspace_dir
-                        .open_dir_nofollow(&name)
-                        .map_err(|_| 対話失敗::通信失敗)?;
+                    let scratch_dir = match workspace_dir.open_dir_nofollow(&name) {
+                        Ok(scratch_dir) => scratch_dir,
+                        Err(_) => {
+                            let _ = context.journal.mark_task_finished(&record_id);
+                            return Err(対話失敗::通信失敗);
+                        }
+                    };
                     let metadata = match scratch_dir.dir_metadata() {
                         Ok(metadata) => metadata,
                         Err(_) => {
@@ -1190,6 +1214,7 @@ impl WorkspaceTaskScratch {
                         scratch_identity,
                         context,
                         &record_id,
+                        deadline,
                     )?;
                     return Ok(Self {
                         _workspace_guard: workspace_guard,
@@ -1201,13 +1226,16 @@ impl WorkspaceTaskScratch {
                     });
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                    context
-                        .journal
-                        .complete(&record_id)
-                        .map_err(|_| 対話失敗::通信失敗)?;
+                    if context.journal.complete(&record_id).is_err() {
+                        let _ = context.journal.mark_task_finished(&record_id);
+                        return Err(対話失敗::通信失敗);
+                    }
                     continue;
                 }
-                Err(_) => return Err(対話失敗::通信失敗),
+                Err(_) => {
+                    let _ = context.journal.mark_task_finished(&record_id);
+                    return Err(対話失敗::通信失敗);
+                }
             }
         }
         Err(対話失敗::通信失敗)
@@ -1217,7 +1245,10 @@ impl WorkspaceTaskScratch {
         &self.path
     }
 
-    fn cleanup(&mut self) -> Result<(), 対話失敗> {
+    fn cleanup_after_task_quiesced(&mut self) -> Result<(), 対話失敗> {
+        self.journal
+            .mark_task_finished(&self.record_id)
+            .map_err(|_| 対話失敗::通信失敗)?;
         self.scratch_dir
             .take()
             .ok_or(対話失敗::通信失敗)?
@@ -1226,16 +1257,6 @@ impl WorkspaceTaskScratch {
         self.journal
             .complete(&self.record_id)
             .map_err(|_| 対話失敗::通信失敗)
-    }
-}
-
-impl Drop for WorkspaceTaskScratch {
-    fn drop(&mut self) {
-        if let Some(dir) = self.scratch_dir.take() {
-            if dir.remove_open_dir_all().is_ok() {
-                let _ = self.journal.complete(&self.record_id);
-            }
-        }
     }
 }
 
@@ -1592,6 +1613,27 @@ fn escape_codex_glob_literal(path: &str) -> String {
     escaped
 }
 
+struct AgentTaskRunOutcome {
+    result: Result<String, 対話失敗>,
+    process_stopped: bool,
+}
+
+impl AgentTaskRunOutcome {
+    fn stopped(result: Result<String, 対話失敗>) -> Self {
+        Self {
+            result,
+            process_stopped: true,
+        }
+    }
+
+    fn unconfirmed(result: Result<String, 対話失敗>) -> Self {
+        Self {
+            result,
+            process_stopped: false,
+        }
+    }
+}
+
 fn run_agent_task(
     executable: &Path,
     workspace: &Path,
@@ -1605,15 +1647,15 @@ fn run_agent_task(
     deadline: Instant,
     mcp_enabled: bool,
     #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
-) -> Result<String, 対話失敗> {
+) -> AgentTaskRunOutcome {
     if Instant::now() >= deadline {
-        return Err(対話失敗::期限超過);
+        return AgentTaskRunOutcome::stopped(Err(対話失敗::期限超過));
     }
     if cancel.load(Ordering::SeqCst) {
-        return Err(対話失敗::取消);
+        return AgentTaskRunOutcome::stopped(Err(対話失敗::取消));
     }
     #[cfg(any(test, feature = "r2-e2e"))]
-    let mut child = spawn_codex_task(
+    let child_result = spawn_codex_task(
         executable,
         workspace,
         expected_workspace,
@@ -1625,9 +1667,9 @@ fn run_agent_task(
         secret_paths,
         mcp_enabled,
         test_responses_api,
-    )?;
+    );
     #[cfg(not(any(test, feature = "r2-e2e")))]
-    let mut child = spawn_codex_task(
+    let child_result = spawn_codex_task(
         executable,
         workspace,
         expected_workspace,
@@ -1638,56 +1680,66 @@ fn run_agent_task(
         Some(scratch),
         secret_paths,
         mcp_enabled,
-    )?;
-    let stdout = child.child.stdout.take().ok_or(対話失敗::通信失敗)?;
-    let stderr = child.child.stderr.take().ok_or(対話失敗::通信失敗)?;
+    );
+    let mut child = match child_result {
+        Ok(child) => child,
+        Err(error) => return AgentTaskRunOutcome::unconfirmed(Err(error)),
+    };
+    let Some(stdout) = child.child.stdout.take() else {
+        return AgentTaskRunOutcome::unconfirmed(Err(対話失敗::通信失敗));
+    };
+    let Some(stderr) = child.child.stderr.take() else {
+        return AgentTaskRunOutcome::unconfirmed(Err(対話失敗::通信失敗));
+    };
     let stdout_reader = thread::spawn(move || bounded_read(stdout));
     let stderr_reader = thread::spawn(move || bounded_read(stderr));
 
     let status = loop {
         if Instant::now() >= deadline {
             if child.terminate_tree().is_err() {
-                return Err(対話失敗::通信失敗);
+                return AgentTaskRunOutcome::unconfirmed(Err(対話失敗::通信失敗));
             }
             let _ = stdout_reader.join();
             let _ = stderr_reader.join();
-            return Err(対話失敗::期限超過);
+            return AgentTaskRunOutcome::stopped(Err(対話失敗::期限超過));
         }
         if cancel.load(Ordering::SeqCst) {
             if child.terminate_tree().is_err() {
-                return Err(対話失敗::通信失敗);
+                return AgentTaskRunOutcome::unconfirmed(Err(対話失敗::通信失敗));
             }
             let _ = stdout_reader.join();
             let _ = stderr_reader.join();
-            return Err(対話失敗::取消);
+            return AgentTaskRunOutcome::stopped(Err(対話失敗::取消));
         }
         match child.try_wait() {
             Ok(Some(status)) => {
                 if child.stop_descendants().is_err() {
-                    return Err(対話失敗::通信失敗);
+                    return AgentTaskRunOutcome::unconfirmed(Err(対話失敗::通信失敗));
                 }
                 break status;
             }
             Ok(None) => thread::sleep(Duration::from_millis(10)),
             Err(_) => {
                 if child.terminate_tree().is_err() {
-                    return Err(対話失敗::通信失敗);
+                    return AgentTaskRunOutcome::unconfirmed(Err(対話失敗::通信失敗));
                 }
                 let _ = stdout_reader.join();
                 let _ = stderr_reader.join();
-                return Err(対話失敗::通信失敗);
+                return AgentTaskRunOutcome::stopped(Err(対話失敗::通信失敗));
             }
         }
     };
 
-    let stdout = stdout_reader
-        .join()
-        .map_err(|_| 対話失敗::通信失敗)?
-        .map_err(|_| 対話失敗::応答不正)?;
-    let _stderr = stderr_reader
-        .join()
-        .map_err(|_| 対話失敗::通信失敗)?
-        .map_err(|_| 対話失敗::応答不正)?;
+    let stdout = match stdout_reader.join() {
+        Ok(Ok(stdout)) => stdout,
+        Ok(Err(_)) => return AgentTaskRunOutcome::stopped(Err(対話失敗::応答不正)),
+        Err(_) => return AgentTaskRunOutcome::stopped(Err(対話失敗::通信失敗)),
+    };
+    let _stderr = match stderr_reader.join() {
+        Ok(Ok(stderr)) => stderr,
+        Ok(Err(_)) => return AgentTaskRunOutcome::stopped(Err(対話失敗::応答不正)),
+        Err(_) => return AgentTaskRunOutcome::stopped(Err(対話失敗::通信失敗)),
+    };
     if !status.success() {
         #[cfg(any(test, feature = "r2-e2e"))]
         if let Some(test_api) = test_responses_api {
@@ -1699,7 +1751,7 @@ fn run_agent_task(
                 loopback_test_safe_failure_summary(status.code(), &stdout, &_stderr)
             );
         }
-        return Err(対話失敗::通信失敗);
+        return AgentTaskRunOutcome::stopped(Err(対話失敗::通信失敗));
     }
     let parsed = parse_jsonl_with_mcp(&stdout);
     #[cfg(any(test, feature = "r2-e2e"))]
@@ -1712,11 +1764,14 @@ fn run_agent_task(
             loopback_test_safe_failure_summary(status.code(), &stdout, &_stderr)
         );
     }
-    let (message, _, proposal) = parsed?;
+    let (message, _, proposal) = match parsed {
+        Ok(parsed) => parsed,
+        Err(error) => return AgentTaskRunOutcome::stopped(Err(error)),
+    };
     if let Some(proposal) = proposal {
-        return Ok(proposal);
+        return AgentTaskRunOutcome::stopped(Ok(proposal));
     }
-    Ok(message)
+    AgentTaskRunOutcome::stopped(Ok(message))
 }
 
 #[cfg(any(test, feature = "r2-e2e"))]
@@ -3473,7 +3528,13 @@ exit 0
         let secrets = ["private/secret.txt".to_owned()];
         let mut context = scratch_context(identity);
         context.secret_paths = secrets.to_vec();
-        let mut scratch = WorkspaceTaskScratch::create(&workspace, identity, &context).unwrap();
+        let mut scratch = WorkspaceTaskScratch::create(
+            &workspace,
+            identity,
+            &context,
+            Instant::now() + Duration::from_secs(60),
+        )
+        .unwrap();
 
         std::fs::hard_link(
             private.join("secret.txt"),
@@ -3497,7 +3558,7 @@ exit 0
             ),
             Err(対話失敗::作業領域不在)
         ));
-        scratch.cleanup().unwrap();
+        scratch.cleanup_after_task_quiesced().unwrap();
         assert!(!context.journal.has_pending_workspace("workspace-fixture"));
     }
 
@@ -3673,7 +3734,45 @@ exit 0
     }
 
     #[test]
-    fn workspace_task_tempは登録Workspace内に作成され明示cleanupされる() {
+    fn 期限切れtaskはworkspace_scratchを生成しない() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-agent-task-scratch-expired-{}-{nonce}",
+            std::process::id()
+        ));
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("Workspace試験root");
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .expect("Workspaceを固定")
+            .identity;
+        let context = scratch_context(identity);
+
+        assert!(matches!(
+            WorkspaceTaskScratch::create(
+                &workspace,
+                identity,
+                &context,
+                Instant::now() - Duration::from_secs(1),
+            ),
+            Err(対話失敗::期限超過)
+        ));
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
+        assert_eq!(
+            std::fs::read_dir(&workspace)
+                .expect("Workspaceを列挙")
+                .count(),
+            0
+        );
+        std::fs::remove_dir_all(root).expect("試験rootを削除");
+    }
+
+    #[test]
+    fn scratch_workspace_task_tempは登録Workspace内に作成され明示cleanupされる() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
         let nonce = SystemTime::now()
@@ -3691,12 +3790,19 @@ exit 0
             .identity;
 
         let context = scratch_context(identity);
-        let mut scratch = WorkspaceTaskScratch::create(&workspace, identity, &context)
-            .expect("Workspace内scratchを作成");
+        let mut scratch = WorkspaceTaskScratch::create(
+            &workspace,
+            identity,
+            &context,
+            Instant::now() + Duration::from_secs(60),
+        )
+        .expect("Workspace内scratchを作成");
         let scratch_path = scratch.path().to_path_buf();
         assert_eq!(scratch_path.parent(), Some(workspace.as_path()));
         fs::write(scratch_path.join("fixture.tmp"), b"bounded").expect("scratch内file");
-        scratch.cleanup().expect("scratchを明示削除");
+        scratch
+            .cleanup_after_task_quiesced()
+            .expect("scratchを明示削除");
         assert!(!scratch_path.exists());
         assert!(!context.journal.has_pending_workspace("workspace-fixture"));
         drop(scratch);
@@ -3724,13 +3830,14 @@ exit 0
         let name = format!(".d4p-tmp-{}", "8".repeat(32));
         let record_id = context
             .journal
-            .reserve(
+            .reserve_with_deadline(
                 &context.task_id,
                 &context.runtime_id,
                 &context.workspace_id,
                 &context.recovery_binding_hash,
                 identity,
                 &name,
+                Instant::now() + Duration::from_secs(60),
             )
             .expect("scratch回復予約");
         let workspace_dir = Dir::open_ambient_dir(&workspace, cap_std::ambient_authority())
@@ -3754,6 +3861,7 @@ exit 0
                 },
                 &context,
                 &record_id,
+                Instant::now() + Duration::from_secs(60),
             ),
             Err(対話失敗::通信失敗)
         ));
@@ -3783,8 +3891,13 @@ exit 0
             .expect("Workspaceを固定")
             .identity;
         let context = scratch_context(identity);
-        let mut scratch = WorkspaceTaskScratch::create(&workspace, identity, &context)
-            .expect("Task scratchを作成");
+        let mut scratch = WorkspaceTaskScratch::create(
+            &workspace,
+            identity,
+            &context,
+            Instant::now() + Duration::from_secs(60),
+        )
+        .expect("Task scratchを作成");
         let scratch_path = scratch.path().to_path_buf();
         let locked_file_path = scratch_path.join("locked.tmp");
         fs::write(&locked_file_path, b"cleanup failure fixture").expect("fileを作成");
@@ -3794,7 +3907,10 @@ exit 0
             .open(&locked_file_path)
             .expect("delete shareを拒否するfile handle");
 
-        assert!(matches!(scratch.cleanup(), Err(対話失敗::通信失敗)));
+        assert!(matches!(
+            scratch.cleanup_after_task_quiesced(),
+            Err(対話失敗::通信失敗)
+        ));
         assert!(scratch_path.exists(), "削除失敗を成功として扱わない");
         assert!(
             context.journal.has_pending_workspace("workspace-fixture"),
@@ -3824,7 +3940,7 @@ exit 0
 
     #[cfg(windows)]
     #[test]
-    fn workspace_task_tempはdrop時にもcleanupする() {
+    fn scratch_workspace_task_tempはdrop時に未確認のTaskをRecoveryへ残す() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
         let nonce = SystemTime::now()
@@ -3841,13 +3957,38 @@ exit 0
             .expect("Workspaceを固定")
             .identity;
         let context = scratch_context(identity);
-        let scratch = WorkspaceTaskScratch::create(&workspace, identity, &context)
-            .expect("Workspace内scratchを作成");
+        let scratch = WorkspaceTaskScratch::create(
+            &workspace,
+            identity,
+            &context,
+            Instant::now() + Duration::from_secs(60),
+        )
+        .expect("Workspace内scratchを作成");
         let scratch_path = scratch.path().to_path_buf();
+        let record_id = scratch.record_id.clone();
         fs::write(scratch_path.join("fixture.tmp"), b"bounded").expect("scratch内file");
         drop(scratch);
+        assert!(scratch_path.exists(), "未確認のTaskをDropだけで消さない");
+        assert!(context.journal.has_pending_workspace("workspace-fixture"));
+        context
+            .journal
+            .mark_task_finished(&record_id)
+            .expect("process停止確認後にRecovery可能にする");
+        let workspace_dir = Dir::open_ambient_dir(&workspace, cap_std::ambient_authority())
+            .expect("Recovery用Workspace directoryを開く");
+        assert_eq!(
+            context.journal.recover_workspace(
+                &context.runtime_id,
+                &context.workspace_id,
+                &context.recovery_binding_hash,
+                &workspace_dir,
+                identity,
+            ),
+            vec![crate::broker::agent_task_scratch::RecoveryOutcome::Removed]
+        );
         assert!(!scratch_path.exists());
         assert!(!context.journal.has_pending_workspace("workspace-fixture"));
+        drop(workspace_dir);
         std::fs::remove_dir_all(root).expect("試験rootを削除");
     }
 
@@ -4139,7 +4280,7 @@ exit 0
 
     #[cfg(any(windows, target_os = "linux"))]
     #[test]
-    fn 偽CodexCLIはAdapterのTask成功・期限超過cleanup・子孫停止を通る() {
+    fn 偽CodexCLIのtask_scratchは成功・期限超過cleanup・子孫停止を通る() {
         let root = codex_cli_fixture::FixtureTempDirectory::create();
         let fixture_directory = root.path().join("fixture");
         let workspace = root.path().join("workspace");

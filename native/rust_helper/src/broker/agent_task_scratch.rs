@@ -2,6 +2,7 @@
 //! 記録にはWorkspace内の直接子名とdirectory identityだけを保持し、本文・資格・絶対pathを保持しない。
 
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use cap_fs_ext::DirExt;
 use cap_std::fs::Dir;
@@ -52,6 +53,7 @@ pub(crate) struct AgentTaskScratchJournal {
 struct JournalInner {
     store: Option<BrokerPersistentStore>,
     state: Mutex<JournalState>,
+    active_deadlines: Mutex<std::collections::BTreeMap<String, Instant>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,6 +65,7 @@ pub(crate) enum RecoveryOutcome {
     IdentityMismatchPreserved,
     RegistrationMismatchPreserved,
     UnsafePathPreserved,
+    TaskLifecycleUnconfirmedPreserved,
     JournalUpdateFailed,
 }
 
@@ -111,6 +114,7 @@ impl AgentTaskScratchJournal {
             inner: Arc::new(JournalInner {
                 store: Some(store),
                 state: Mutex::new(state),
+                active_deadlines: Mutex::new(std::collections::BTreeMap::new()),
             }),
         })
     }
@@ -124,11 +128,12 @@ impl AgentTaskScratchJournal {
                     version: 1,
                     entries: Vec::new(),
                 }),
+                active_deadlines: Mutex::new(std::collections::BTreeMap::new()),
             }),
         }
     }
 
-    pub(crate) fn reserve(
+    pub(crate) fn reserve_with_deadline(
         &self,
         task_id: &str,
         runtime_id: &str,
@@ -136,6 +141,7 @@ impl AgentTaskScratchJournal {
         recovery_binding_hash: &str,
         root_identity: DirectoryIdentity,
         scratch_name: &str,
+        deadline: Instant,
     ) -> Result<String, &'static str> {
         if !identifier(task_id)
             || !identifier(runtime_id)
@@ -147,12 +153,20 @@ impl AgentTaskScratchJournal {
         {
             return Err("Agent Task scratch回復記録のscopeが不正");
         }
+        if Instant::now() >= deadline {
+            return Err("Agent Task期限切れ後にscratchを開始できない");
+        }
         let record_id = random_record_id()?;
         let mut state = self
             .inner
             .state
             .lock()
             .map_err(|_| "Agent Task scratch回復記録が利用不能")?;
+        let mut active_deadlines = self
+            .inner
+            .active_deadlines
+            .lock()
+            .map_err(|_| "Agent Task scratch実行状態が利用不能")?;
         if state.entries.len() >= MAX_RECORDS {
             return Err("Agent Task scratch回復記録の上限に到達");
         }
@@ -169,11 +183,34 @@ impl AgentTaskScratchJournal {
             scratch_file_id: None,
             state: ScratchState::Reserved,
         });
+        active_deadlines.insert(record_id.clone(), deadline);
         if let Err(error) = self.persist(&state) {
             state.entries.retain(|entry| entry.record_id != record_id);
+            active_deadlines.remove(&record_id);
             return Err(error);
         }
         Ok(record_id)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn reserve(
+        &self,
+        task_id: &str,
+        runtime_id: &str,
+        workspace_id: &str,
+        recovery_binding_hash: &str,
+        root_identity: DirectoryIdentity,
+        scratch_name: &str,
+    ) -> Result<String, &'static str> {
+        self.reserve_with_deadline(
+            task_id,
+            runtime_id,
+            workspace_id,
+            recovery_binding_hash,
+            root_identity,
+            scratch_name,
+            Instant::now() + std::time::Duration::from_secs(900),
+        )
     }
 
     pub(crate) fn activate(
@@ -189,6 +226,17 @@ impl AgentTaskScratchJournal {
             .state
             .lock()
             .map_err(|_| "Agent Task scratch回復記録が利用不能")?;
+        let active_deadlines = self
+            .inner
+            .active_deadlines
+            .lock()
+            .map_err(|_| "Agent Task scratch実行状態が利用不能")?;
+        let deadline = active_deadlines
+            .get(record_id)
+            .ok_or("Agent Task scratch実行状態が不在")?;
+        if Instant::now() >= *deadline {
+            return Err("Agent Task期限切れ後にscratchを有効化できない");
+        }
         let previous = state.clone();
         let record = state
             .entries
@@ -214,6 +262,11 @@ impl AgentTaskScratchJournal {
             .state
             .lock()
             .map_err(|_| "Agent Task scratch回復記録が利用不能")?;
+        let mut active_deadlines = self
+            .inner
+            .active_deadlines
+            .lock()
+            .map_err(|_| "Agent Task scratch実行状態が利用不能")?;
         let old_len = state.entries.len();
         let previous = state.entries.clone();
         state.entries.retain(|entry| entry.record_id != record_id);
@@ -223,6 +276,32 @@ impl AgentTaskScratchJournal {
         if let Err(error) = self.persist(&state) {
             state.entries = previous;
             return Err(error);
+        }
+        active_deadlines.remove(record_id);
+        Ok(())
+    }
+
+    /// Taskのprocess停止を呼出側が確認した後に限り、同一Broker内のRecoveryを許可する。
+    pub(crate) fn mark_task_finished(&self, record_id: &str) -> Result<(), &'static str> {
+        let state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| "Agent Task scratch回復記録が利用不能")?;
+        if !state
+            .entries
+            .iter()
+            .any(|entry| entry.record_id == record_id)
+        {
+            return Err("Agent Task scratch回復記録が不在");
+        }
+        let mut active_deadlines = self
+            .inner
+            .active_deadlines
+            .lock()
+            .map_err(|_| "Agent Task scratch実行状態が利用不能")?;
+        if active_deadlines.remove(record_id).is_none() {
+            return Err("Agent Task scratch実行状態が不在");
         }
         Ok(())
     }
@@ -257,6 +336,13 @@ impl AgentTaskScratchJournal {
             .filter(|entry| entry.workspace_id == workspace_id)
             .cloned()
             .collect::<Vec<_>>();
+        let active_ids = match self.inner.active_deadlines.lock() {
+            Ok(active) => active
+                .keys()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>(),
+            Err(_) => return vec![RecoveryOutcome::TaskLifecycleUnconfirmedPreserved],
+        };
         let mut outcomes = Vec::with_capacity(candidates.len());
         for record in candidates {
             if record.runtime_id != runtime_id {
@@ -272,6 +358,10 @@ impl AgentTaskScratchJournal {
             }
             if !valid_scratch_name(&record.scratch_name) {
                 outcomes.push(RecoveryOutcome::UnsafePathPreserved);
+                continue;
+            }
+            if active_ids.contains(&record.record_id) {
+                outcomes.push(RecoveryOutcome::TaskLifecycleUnconfirmedPreserved);
                 continue;
             }
             let child = match root.open_dir_nofollow(&record.scratch_name) {
@@ -424,7 +514,7 @@ mod tests {
     use cap_std::ambient_authority;
     use std::{
         fs,
-        time::{SystemTime, UNIX_EPOCH},
+        time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     };
 
     struct Fixture {
@@ -471,13 +561,14 @@ mod tests {
 
         fn reserve(&self, journal: &AgentTaskScratchJournal, name: &str) -> String {
             journal
-                .reserve(
+                .reserve_with_deadline(
                     "task-1",
                     "runtime-1",
                     "workspace-1",
                     &format!("sha256:{}", "a".repeat(64)),
                     self.root_identity,
                     name,
+                    Instant::now() + Duration::from_secs(60),
                 )
                 .expect("reserve")
         }
@@ -573,6 +664,94 @@ mod tests {
     }
 
     #[test]
+    fn 同一brokerのrecoveryはtask実行状態が未確定のscratchを保持する() {
+        let fixture = Fixture::new();
+        let journal = AgentTaskScratchJournal::in_memory();
+        let name = scratch_name('9');
+        let record_id = fixture.create_active(&journal, &name);
+        let binding = format!("sha256:{}", "a".repeat(64));
+
+        let outcomes = journal.recover_workspace(
+            "runtime-1",
+            "workspace-1",
+            &binding,
+            &fixture.open_workspace(),
+            fixture.root_identity,
+        );
+        assert_eq!(
+            outcomes,
+            vec![RecoveryOutcome::TaskLifecycleUnconfirmedPreserved]
+        );
+        assert!(fixture.workspace_path.join(&name).exists());
+
+        journal
+            .mark_task_finished(&record_id)
+            .expect("process停止確認後にRecoveryを許可");
+        let outcomes = journal.recover_workspace(
+            "runtime-1",
+            "workspace-1",
+            &binding,
+            &fixture.open_workspace(),
+            fixture.root_identity,
+        );
+        assert_eq!(outcomes, vec![RecoveryOutcome::Removed]);
+        assert!(!fixture.workspace_path.join(name).exists());
+        assert!(!journal.has_pending_workspace("workspace-1"));
+    }
+
+    #[test]
+    fn 期限切れtaskはscratch予約を開始できない() {
+        let fixture = Fixture::new();
+        let journal = AgentTaskScratchJournal::in_memory();
+        let deadline = Instant::now() - Duration::from_secs(1);
+        assert!(journal
+            .reserve_with_deadline(
+                "task-expired",
+                "runtime-1",
+                "workspace-1",
+                &format!("sha256:{}", "a".repeat(64)),
+                fixture.root_identity,
+                &scratch_name('a'),
+                deadline,
+            )
+            .is_err());
+        assert!(!journal.has_pending_workspace("workspace-1"));
+    }
+
+    #[test]
+    fn 有効化時に期限切れならscratchをactiveへ遷移させない() {
+        let fixture = Fixture::new();
+        let journal = AgentTaskScratchJournal::in_memory();
+        let name = scratch_name('b');
+        let deadline = Instant::now() + Duration::from_millis(100);
+        let record_id = journal
+            .reserve_with_deadline(
+                "task-expiring",
+                "runtime-1",
+                "workspace-1",
+                &format!("sha256:{}", "a".repeat(64)),
+                fixture.root_identity,
+                &name,
+                deadline,
+            )
+            .expect("期限内にscratch予約");
+        std::thread::sleep(Duration::from_millis(120));
+        assert!(journal
+            .activate(
+                &record_id,
+                DirectoryIdentity {
+                    device: fixture.root_identity.device,
+                    file_id: fixture.root_identity.file_id + 1,
+                },
+            )
+            .is_err());
+        assert_eq!(
+            journal.inner.state.lock().expect("state lock").entries[0].state,
+            ScratchState::Reserved
+        );
+    }
+
+    #[test]
     fn recovery_binding不一致は既存scratchを削除せず保留する() {
         let fixture = Fixture::new();
         let journal = AgentTaskScratchJournal::in_memory();
@@ -599,11 +778,14 @@ mod tests {
         let fixture = Fixture::new();
         let journal = AgentTaskScratchJournal::in_memory();
         let name = scratch_name('3');
-        fixture.reserve(&journal, &name);
+        let record_id = fixture.reserve(&journal, &name);
         fixture
             .open_workspace()
             .create_dir(&name)
             .expect("未確認の予約先を作成");
+        journal
+            .mark_task_finished(&record_id)
+            .expect("予約処理終了を記録");
 
         let outcomes = journal.recover_workspace(
             "runtime-1",
@@ -645,12 +827,15 @@ mod tests {
         let fixture = Fixture::new();
         let journal = AgentTaskScratchJournal::in_memory();
         let name = scratch_name('7');
-        fixture.create_active(&journal, &name);
+        let record_id = fixture.create_active(&journal, &name);
         let replacement = fixture.workspace_path.join("replacement-holder");
         let preserved = fixture.workspace_path.join("preserved-original");
         fs::create_dir(&replacement).expect("置換用フォルダーを作成");
         fs::rename(fixture.workspace_path.join(&name), &preserved).expect("記録対象を退避");
         fs::rename(&replacement, fixture.workspace_path.join(&name)).expect("記録名を再利用");
+        journal
+            .mark_task_finished(&record_id)
+            .expect("process停止確認後に実体差分を照合");
 
         let outcomes = journal.recover_workspace(
             "runtime-1",
@@ -692,7 +877,10 @@ mod tests {
         let fixture = Fixture::new();
         let journal = AgentTaskScratchJournal::in_memory();
         let name = scratch_name('6');
-        fixture.reserve(&journal, &name);
+        let record_id = fixture.reserve(&journal, &name);
+        journal
+            .mark_task_finished(&record_id)
+            .expect("予約処理終了を記録");
         let outcomes = journal.recover_workspace(
             "runtime-1",
             "workspace-1",
