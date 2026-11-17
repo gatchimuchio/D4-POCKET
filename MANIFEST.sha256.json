@@ -281,7 +281,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
-      "sha256": "10a8953b73f1010369cda241c8f223cde2cfcb415166ce15ba56a07b9ba02a54"
+      "sha256": "00db6c39900df30de6746f1668ea535427f910a6367241f092be95d57fad0cb2"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mobile_agent_task_inbox.dart",
@@ -337,7 +337,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trust_center.dart",
-      "sha256": "5592ce86bc0604a0d430f5cab219ad00fc3e641fd63fb6a486e4aa08c2153751"
+      "sha256": "b1e8cd996c3f5e864c1f20a8e4e3a8571d692febdf519026951ff781526bcb30"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/workspace_diff_panel.dart",
@@ -685,7 +685,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/approval_permission_visibility_test.dart",
-      "sha256": "27c8f48541f831447cd0e369572edb3e9a2d83574ba2f2b93b41aa8383f33a3d"
+      "sha256": "d5da91b79dd2a72b32405929d519d8dfdf6c89731270d1fdab22a0f377d3b464"
     },
     {
       "path": "apps/desktop_flutter/test/authenticated_loopback_broker_transport_test.dart",
@@ -749,7 +749,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/mcp_connection_center_test.dart",
-      "sha256": "304487fc4d8eb992d391002f63a9228b25ea94419480010f32c5b030ee222e37"
+      "sha256": "df60589033f2d77c4fd7ff717afff31bac7755886b4fa77a41ff77dc608cc3fb"
     },
     {
       "path": "apps/desktop_flutter/test/mobile_agent_task_inbox_test.dart",
@@ -853,7 +853,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "1cbb9569b9cb505ab7c7d3cdb05418c5f46a525987ca434aba1f4c8ae3f75f78"
+      "sha256": "b95bd96a4f05743d4f3fa6913b5a2c288f9cae6ffc9b440cf38d623af1285ebc"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1629,7 +1629,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "a6c9cc2d5840324276fa4971dd63b2d9dbd86e3bc81f1fba79e06562257cc07b"
+      "sha256": "caac1ab2b6750ef49a7db3757874a8bf4fcfdee4fdffbf4f809c779fad0a06a6"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",

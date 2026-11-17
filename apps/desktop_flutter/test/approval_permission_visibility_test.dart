@@ -4,6 +4,7 @@ import 'package:gui_shell_desktop/screens/approval_center.dart';
 import 'package:gui_shell_desktop/screens/dashboard.dart';
 import 'package:gui_shell_desktop/screens/permission_center.dart';
 import 'package:gui_shell_desktop/screens/shared.dart';
+import 'package:gui_shell_desktop/screens/trust_center.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 
 void main() {
@@ -106,4 +107,67 @@ void main() {
     expect(find.text('保留中の承認なし'), findsNothing);
     expect(find.textContaining('local-approval-redacted'), findsNothing);
   });
+
+  testWidgets('TrustCenterは非Broker trust fixtureを現在状態として表示しない', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: TrustCenter(client: _client())),
+      ),
+    );
+
+    expect(find.text('信頼状態はBroker未確認'), findsOneWidget);
+    expect(find.textContaining('workspace_trust'), findsNothing);
+    expect(find.textContaining('runtime_trust'), findsNothing);
+  });
+
+  testWidgets('TrustCenterはBroker由来SnapshotのTrust recordを表示する', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: TrustCenter(client: _client(broker: true))),
+      ),
+    );
+
+    expect(find.text('信頼センター'), findsOneWidget);
+    expect(find.text('workspace_trust'), findsOneWidget);
+    expect(find.text('runtime_trust'), findsWidgets);
+  });
+
+  testWidgets('PermissionとApprovalはそれぞれのBroker inventoryだけを表示する',
+      (tester) async {
+    final client = _client(
+      broker: true,
+      permissionKnown: true,
+      approvalKnown: true,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: PermissionCenter(client: client)),
+      ),
+    );
+    expect(find.text('permission.fs.write.workspace'), findsOneWidget);
+    expect(find.text('approval-1'), findsNothing);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ApprovalCenter(client: client)),
+      ),
+    );
+    expect(find.textContaining('filesystem.write'), findsOneWidget);
+    expect(find.text('permission.fs.write.workspace'), findsNothing);
+    expect(find.textContaining('[redacted]'), findsOneWidget);
+  });
+}
+
+ShellCoreClient _client({
+  bool broker = false,
+  bool permissionKnown = false,
+  bool approvalKnown = false,
+}) {
+  final snapshot = ShellCoreClient.mock().getSnapshot().copyWith(
+        snapshotSource: broker ? 'broker' : 'mock',
+        permissionInventoryKnown: permissionKnown,
+        pendingApprovalsInventoryKnown: approvalKnown,
+      );
+  return ShellCoreClient.mock(snapshot: snapshot);
 }

@@ -1808,7 +1808,8 @@ void main() {
     );
 
     expect(find.text('信頼センター'), findsOneWidget);
-    expect(find.textContaining('workspace_trust'), findsOneWidget);
+    expect(find.text('信頼状態はBroker未確認'), findsOneWidget);
+    expect(find.textContaining('workspace_trust'), findsNothing);
     expect(find.textContaining('Shell Coreの能力'), findsOneWidget);
 
     await tester.pumpWidget(

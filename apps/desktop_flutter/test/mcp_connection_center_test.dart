@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/foundation.dart';
@@ -15,6 +16,7 @@ class _McpTransport implements BrokerTransport {
   final operations = <String>[];
   final payloads = <Map<String, Object?>?>[];
   bool connected = true;
+  Completer<void>? holdNextConnectionList;
   bool toolError = false;
   String toolConnectionState = 'connected';
   final credentialMetadata = <Map<String, Object?>>[
@@ -205,6 +207,9 @@ class _McpTransport implements BrokerTransport {
       };
     }
     if (operation == 'MCP接続一覧') {
+      final hold = holdNextConnectionList;
+      holdNextConnectionList = null;
+      if (hold != null) await hold.future;
       final connections = connected
           ? [_receipt(evidence: listedEvidence)]
           : <Map<String, Object?>>[];
@@ -825,6 +830,53 @@ void main() {
       'ServerID': 'mcp-fixture',
     });
     expect(find.text('Brokerが保持するMCP接続はありません。'), findsOneWidget);
+  });
+
+  testWidgets('MCP Broker切替時に旧接続と遅延一覧応答を破棄する', (tester) async {
+    final oldResponse = Completer<void>();
+    final oldTransport = _McpTransport()
+      ..displayName = '旧BrokerのMCP'
+      ..holdNextConnectionList = oldResponse;
+    final currentTransport = _McpTransport()..displayName = '現在BrokerのMCP';
+    var transport = oldTransport;
+    late StateSetter updateTransport;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              updateTransport = setState;
+              return McpConnectionCenterPanel(transport: transport);
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('mcp-load-connections')));
+    await tester.tap(find.byKey(const ValueKey('mcp-load-connections')));
+    await tester.pump();
+    expect(oldTransport.operations, ['MCP接続一覧']);
+
+    updateTransport(() => transport = currentTransport);
+    await tester.pump();
+    expect(find.text('旧BrokerのMCP'), findsNothing);
+
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('mcp-load-connections')));
+    await tester.tap(find.byKey(const ValueKey('mcp-load-connections')));
+    await tester.pumpAndSettle();
+    expect(currentTransport.operations, ['MCP接続一覧']);
+    expect(find.text('現在BrokerのMCP'), findsOneWidget);
+
+    oldResponse.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('旧BrokerのMCP'), findsNothing);
+    expect(find.text('現在BrokerのMCP'), findsOneWidget);
+    expect(oldTransport.operations, ['MCP接続一覧']);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Desktop panelは入力全表示の確認後だけTool要求を送り結果本文を表示しない', (tester) async {

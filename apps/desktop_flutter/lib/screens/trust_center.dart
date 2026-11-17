@@ -10,31 +10,50 @@ class TrustCenter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trust = client.getSnapshot().trustRecords;
+    final snapshot = client.getSnapshot();
+    final brokerObserved = snapshot.snapshotSource == 'broker';
+    final trust = snapshot.trustRecords;
     return ShellPage(
       title: '信頼センター',
       children: [
-        DataTable(
-          columns: const [
-            DataColumn(label: Text('範囲')),
-            DataColumn(label: Text('状態')),
-            DataColumn(label: Text('出所')),
-            DataColumn(label: Text('有効期限')),
-            DataColumn(label: Text('遮断された操作')),
-          ],
-          rows: [
-            for (final item in trust)
-              DataRow(
-                cells: [
-                  DataCell(Text(item.scope)),
-                  DataCell(StatusPill(label: '信頼', value: item.state)),
-                  DataCell(Text(item.source)),
-                  DataCell(Text(item.expiresAt ?? 'なし')),
-                  DataCell(Text(item.blockedOperations.join(', '))),
-                ],
-              ),
-          ],
-        ),
+        if (!brokerObserved)
+          const EmptyStatePanel(
+            title: '信頼状態はBroker未確認',
+            meaning:
+                '現在のBrokerから受理したSnapshotではないため、fixture／診断用Trust recordを実際の信頼状態として表示しません。',
+            phaseBBlocked: false,
+            nextAction: '現在のBroker Snapshotを取得するまで、信頼状態はunknownとして扱います。',
+          )
+        else if (trust.isEmpty)
+          const EmptyStatePanel(
+            title: 'Broker SnapshotにTrust recordなし',
+            meaning:
+                '現在のBroker Snapshotに表示可能なTrust recordがありません。信頼状態の成功や権限を推測しません。',
+            phaseBBlocked: false,
+            nextAction: 'Brokerが信頼recordを返すまで、Agent／Runtimeをtrustedとして扱いません。',
+          )
+        else
+          DataTable(
+            columns: const [
+              DataColumn(label: Text('範囲')),
+              DataColumn(label: Text('状態')),
+              DataColumn(label: Text('出所')),
+              DataColumn(label: Text('有効期限')),
+              DataColumn(label: Text('遮断された操作')),
+            ],
+            rows: [
+              for (final item in trust)
+                DataRow(
+                  cells: [
+                    DataCell(Text(item.scope)),
+                    DataCell(StatusPill(label: '信頼', value: item.state)),
+                    DataCell(Text(item.source)),
+                    DataCell(Text(item.expiresAt ?? 'なし')),
+                    DataCell(Text(item.blockedOperations.join(', '))),
+                  ],
+                ),
+            ],
+          ),
         const SectionList(
           title: '変更境界',
           rows: [

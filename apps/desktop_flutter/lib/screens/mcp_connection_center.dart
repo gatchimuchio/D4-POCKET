@@ -27,7 +27,8 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   final _workspaceController = TextEditingController();
   final _argumentsController = TextEditingController();
   final _credentialEnvironmentController = TextEditingController();
-  late final McpConnectionClient? _client;
+  McpConnectionClient? _client;
+  int _transportGeneration = 0;
   List<McpConnectionSummary>? _connections;
   List<McpCredentialSummary>? _credentials;
   String? _credentialTargetServerId;
@@ -35,6 +36,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   String? _revokingCredentialId;
   bool _loading = false;
   bool _connecting = false;
+  bool _registeringCredential = false;
   String? _disconnectingServerId;
   String? _callingToolServerId;
   String? _message;
@@ -45,6 +47,44 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     final transport = widget.transport;
     _client = transport == null ? null : McpConnectionClient(transport);
   }
+
+  @override
+  void didUpdateWidget(covariant McpConnectionCenterPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.transport, widget.transport)) return;
+
+    final previousMutationMayBePending = _registeringCredential ||
+        _connecting ||
+        _revokingCredentialId != null ||
+        _disconnectingServerId != null ||
+        _callingToolServerId != null;
+    _transportGeneration++;
+    final transport = widget.transport;
+    _client = transport == null ? null : McpConnectionClient(transport);
+    _connections = null;
+    _credentials = null;
+    _credentialTargetServerId = null;
+    _selectedCredentialId = null;
+    _serverIdController.clear();
+    _executableController.clear();
+    _workspaceController.clear();
+    _argumentsController.clear();
+    _credentialEnvironmentController.clear();
+    _loading = false;
+    _connecting = false;
+    _registeringCredential = false;
+    _disconnectingServerId = null;
+    _callingToolServerId = null;
+    _revokingCredentialId = null;
+    _message = previousMutationMayBePending
+        ? 'Broker切替前のMCP作用結果は不明です。旧Brokerの状態とAuditを確認してください。新Brokerへの引継ぎや自動再送はしていません。'
+        : null;
+  }
+
+  bool _isCurrentClient(McpConnectionClient client, int generation) =>
+      mounted &&
+      generation == _transportGeneration &&
+      identical(_client, client);
 
   @override
   void dispose() {
@@ -73,6 +113,10 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             ),
             const SizedBox(height: 4),
             const Text('Broker接続がないため一覧を取得できません。'),
+            if (_message != null) ...[
+              const SizedBox(height: 8),
+              Text(_message!),
+            ],
           ],
         ),
       );
@@ -442,26 +486,34 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   }
 
   Future<void> _load(McpConnectionClient client) async {
+    final generation = _transportGeneration;
+    if (!_isCurrentClient(client, generation)) return;
     setState(() {
       _loading = true;
       _message = null;
     });
     try {
       final connections = await client.list();
-      if (mounted) setState(() => _connections = connections);
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _connections = connections);
+      }
     } on Object {
-      if (mounted) {
+      if (_isCurrentClient(client, generation)) {
         setState(() {
           _connections = null;
           _message = 'MCP接続一覧を取得できません。Broker状態とAuditを確認してください。';
         });
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   Future<void> _registerNativeCredential(McpConnectionClient client) async {
+    final generation = _transportGeneration;
+    if (!_isCurrentClient(client, generation)) return;
     final target = _serverIdController.text;
     final random = Random.secure();
     // 非秘密の新規record識別子。保存先・権限・Owner資格ではない。
@@ -470,6 +522,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         .join();
     setState(() {
       _loading = true;
+      _registeringCredential = true;
       _message = 'native秘密入力と別個Owner確認を待っています。';
     });
     try {
@@ -480,8 +533,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         await client.registerMacNativeCredential(
             credentialId: id, targetServerId: target);
       }
+      if (!_isCurrentClient(client, generation)) return;
       final entries = await client.listCredentials(targetServerId: target);
-      if (mounted) {
+      if (_isCurrentClient(client, generation)) {
         setState(() {
           _credentials = entries;
           _credentialTargetServerId = target;
@@ -492,17 +546,24 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         });
       }
     } on Object {
-      if (mounted) {
+      if (_isCurrentClient(client, generation)) {
         setState(() {
           _message = '資格情報登録は未成立です。取消・拒否・期限または保管状態を確認してください。自動再送しません。';
         });
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (_isCurrentClient(client, generation)) {
+        setState(() {
+          _loading = false;
+          _registeringCredential = false;
+        });
+      }
     }
   }
 
   Future<void> _loadCredentials(McpConnectionClient client) async {
+    final generation = _transportGeneration;
+    if (!_isCurrentClient(client, generation)) return;
     final targetServerId = _serverIdController.text;
     setState(() {
       _loading = true;
@@ -516,7 +577,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
       final credentials = await client.listCredentials(
         targetServerId: targetServerId,
       );
-      if (mounted) {
+      if (_isCurrentClient(client, generation)) {
         setState(() {
           _credentials = credentials;
           _credentialTargetServerId = targetServerId;
@@ -526,7 +587,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         });
       }
     } on Object {
-      if (mounted) {
+      if (_isCurrentClient(client, generation)) {
         setState(() {
           _credentials = null;
           _credentialTargetServerId = null;
@@ -534,11 +595,15 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         });
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   Future<void> _connect(McpConnectionClient client) async {
+    final generation = _transportGeneration;
+    if (!_isCurrentClient(client, generation)) return;
     setState(() {
       _connecting = true;
       _message = null;
@@ -565,7 +630,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                 ? _credentialEnvironmentController.text
                 : null,
       );
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _connections = [
           ...?_connections
@@ -580,21 +645,25 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         try {
           final credentials =
               await client.listCredentials(targetServerId: connection.serverId);
-          if (mounted) setState(() => _credentials = credentials);
+          if (_isCurrentClient(client, generation)) {
+            setState(() => _credentials = credentials);
+          }
         } on Object {
-          if (mounted) {
+          if (_isCurrentClient(client, generation)) {
             setState(() => _message =
                 '接続receiptは受理済みですが、資格情報の使用時刻を再取得できません。Broker状態とAuditを確認してください。');
           }
         }
       }
     } on Object {
-      if (mounted) {
+      if (_isCurrentClient(client, generation)) {
         setState(() =>
             _message = 'MCP接続は確定していません。native Owner確認とBroker状態を確認してください。');
       }
     } finally {
-      if (mounted) setState(() => _connecting = false);
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _connecting = false);
+      }
     }
   }
 
@@ -602,26 +671,30 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     McpConnectionClient client,
     McpCredentialSummary credential,
   ) async {
+    final generation = _transportGeneration;
+    if (!_isCurrentClient(client, generation)) return;
     setState(() {
       _revokingCredentialId = credential.credentialId;
       _message = null;
     });
     try {
       await client.revokeCredential(credential: credential);
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       await _loadCredentials(client);
-      if (mounted) {
+      if (_isCurrentClient(client, generation)) {
         setState(() => _message = defaultTargetPlatform == TargetPlatform.linux
             ? 'Credentialを論理失効しました。以後の使用を拒否し、Secret Service itemは保持します。'
             : 'Credentialを論理失効しました。以後のMCP注入を拒否し、保管データは別の物理削除操作まで保持します。');
       }
     } on Object {
-      if (mounted) {
+      if (_isCurrentClient(client, generation)) {
         setState(() => _message =
             'Credential失効は確定していません。native Owner確認とBroker Audit状態を確認してください。');
       }
     } finally {
-      if (mounted) setState(() => _revokingCredentialId = null);
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _revokingCredentialId = null);
+      }
     }
   }
 
@@ -630,6 +703,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     McpConnectionSummary connection,
     McpToolSummary tool,
   ) async {
+    final generation = _transportGeneration;
+    if (!_isCurrentClient(client, generation)) return;
+
     Future<T?> showToolStep<T>(WidgetBuilder builder) async {
       final navigator = Navigator.of(context, rootNavigator: true);
       final route = DialogRoute<T>(
@@ -644,7 +720,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
       final result = await navigator.push(route);
       // popの通知では入力widgetがまだ残る。OS確認へ進む前にroute終了を待つ。
       await route.completed;
-      return result;
+      return _isCurrentClient(client, generation) ? result : null;
     }
 
     final controller = TextEditingController(text: '{}');
@@ -684,24 +760,30 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
           ],
         ),
       );
-      if (raw == null || !mounted) return;
+      if (raw == null || !_isCurrentClient(client, generation)) return;
 
       final Object? decoded;
       try {
         decoded = jsonDecode(raw);
       } on FormatException {
-        setState(() =>
-            _message = 'argumentsは正しいJSON objectで入力してください。Toolは送信していません。');
+        if (_isCurrentClient(client, generation)) {
+          setState(() =>
+              _message = 'argumentsは正しいJSON objectで入力してください。Toolは送信していません。');
+        }
         return;
       }
       if (decoded is! Map || decoded.keys.any((key) => key is! String)) {
-        setState(
-            () => _message = 'argumentsはJSON objectで入力してください。Toolは送信していません。');
+        if (_isCurrentClient(client, generation)) {
+          setState(
+              () => _message = 'argumentsはJSON objectで入力してください。Toolは送信していません。');
+        }
         return;
       }
       final arguments = Map<String, Object?>.from(decoded);
       if (utf8.encode(jsonEncode(arguments)).length > 32 * 1024) {
-        setState(() => _message = 'argumentsが32 KiBを超えています。Toolは送信していません。');
+        if (_isCurrentClient(client, generation)) {
+          setState(() => _message = 'argumentsが32 KiBを超えています。Toolは送信していません。');
+        }
         return;
       }
       final preview = const JsonEncoder.withIndent('  ').convert(arguments);
@@ -750,7 +832,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
           ],
         ),
       );
-      if (confirmed != true || !mounted) return;
+      if (confirmed != true || !_isCurrentClient(client, generation)) return;
 
       setState(() {
         _callingToolServerId = connection.serverId;
@@ -762,7 +844,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
           tool: tool,
           arguments: arguments,
         );
-        if (!mounted) return;
+        if (!_isCurrentClient(client, generation)) return;
         setState(() {
           final executionState =
               receipt.connectionState == 'connected' ? 'ready' : 'quarantined';
@@ -784,7 +866,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               'Tool応答receiptを受理しました。本文は返却されていません。result hash: ${receipt.resultHash} ・ content: ${receipt.contentTypes.join(', ')} ・ Audit: ${receipt.auditId}${receipt.toolError ? ' ・ Tool側error=true' : ''}${executionState == 'quarantined' ? ' ・ 接続隔離中' : ''}';
         });
       } on Object {
-        if (mounted) {
+        if (_isCurrentClient(client, generation)) {
           setState(() {
             _connections = _connections
                 ?.map((item) => item.serverId == connection.serverId
@@ -805,7 +887,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
           });
         }
       } finally {
-        if (mounted) setState(() => _callingToolServerId = null);
+        if (_isCurrentClient(client, generation)) {
+          setState(() => _callingToolServerId = null);
+        }
       }
     } finally {
       controller.dispose();
@@ -816,13 +900,15 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     McpConnectionClient client,
     McpConnectionSummary connection,
   ) async {
+    final generation = _transportGeneration;
+    if (!_isCurrentClient(client, generation)) return;
     setState(() {
       _disconnectingServerId = connection.serverId;
       _message = null;
     });
     try {
       await client.disconnect(connection.serverId);
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _connections = _connections
             ?.where((item) => item.serverId != connection.serverId)
@@ -832,21 +918,27 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
       });
       try {
         final connections = await client.list();
-        if (mounted) setState(() => _connections = connections);
+        if (_isCurrentClient(client, generation)) {
+          setState(() => _connections = connections);
+        }
       } on Object {
-        if (mounted) {
+        if (_isCurrentClient(client, generation)) {
           setState(() => _message =
               '切断receiptは受理され、接続記録は解消されました。一覧を再取得できないため更新して確認してください。');
         }
       } finally {
-        if (mounted) setState(() => _loading = false);
+        if (_isCurrentClient(client, generation)) {
+          setState(() => _loading = false);
+        }
       }
     } on Object {
-      if (mounted) {
+      if (_isCurrentClient(client, generation)) {
         setState(() => _message = '切断は確定していません。Owner確認とBrokerの現在状態を確認してください。');
       }
     } finally {
-      if (mounted) setState(() => _disconnectingServerId = null);
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _disconnectingServerId = null);
+      }
     }
   }
 }
