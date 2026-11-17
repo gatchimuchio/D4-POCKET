@@ -331,6 +331,7 @@ $auditPath = $null
 $sessionSecret = $null
 $runError = $null
 $cleanupPassed = $true
+$launcherRefusalObservation = 'not_available'
 $stage = 'read bundle receipt and manifest'
 
 try {
@@ -533,15 +534,8 @@ public static class GuiShellExportSmokeWin32 {
   try { $nativeDialogTexts = @([GuiShellExportSmokeWin32]::GetChildWindowTexts($dialogHandle)) }
   catch { $nativeHelperErrorType = $_.Exception.GetType().Name }
   foreach ($text in $nativeDialogTexts) { [void]$probeText.Add([string]$text) }
+  $launcherRefusalObservation = "handle_present=$($dialogHandle -ne [IntPtr]::Zero); child_windows=$([GuiShellExportSmokeWin32]::LastChildWindowCount); text_messages_succeeded=$([GuiShellExportSmokeWin32]::LastSuccessfulTextMessageCount); nonempty_texts=$([GuiShellExportSmokeWin32]::LastNonemptyTextCount); timed_out_messages=$([GuiShellExportSmokeWin32]::LastTimedOutMessageCount); helper_error_type=$nativeHelperErrorType; uia_elements=$($probeElements.Count)"
   if (($probeText -join "`n").IndexOf('UNSUPPORTED_ARGUMENTS', [StringComparison]::Ordinal) -lt 0) {
-    Write-Output ("Launcher refusal code observation: handle_present={0}; child_windows={1}; text_messages_succeeded={2}; nonempty_texts={3}; timed_out_messages={4}; helper_error_type={5}; uia_elements={6}" -f
-      ($dialogHandle -ne [IntPtr]::Zero),
-      [GuiShellExportSmokeWin32]::LastChildWindowCount,
-      [GuiShellExportSmokeWin32]::LastSuccessfulTextMessageCount,
-      [GuiShellExportSmokeWin32]::LastNonemptyTextCount,
-      [GuiShellExportSmokeWin32]::LastTimedOutMessageCount,
-      $nativeHelperErrorType,
-      $probeElements.Count)
     throw 'launcher did not expose the expected unsupported-argument code'
   }
   $probeButton = @($probeElements | Where-Object {
@@ -814,5 +808,7 @@ if (-not $cleanupPassed -or
 }
 $evidence | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $evidenceFullPath -Encoding utf8
 if ($null -ne $runError -or $evidence.result -ne 'passed') {
-  throw "Windows Export portable launch smoke failed at stage: $($evidence.failure_stage)"
+  $failureType = if ($null -ne $runError) { $runError.Exception.GetType().Name } else { 'cleanup' }
+  $failureContext = if ($evidence.failure_stage -eq 'verify launcher refusal error code') { "; $launcherRefusalObservation" } else { '' }
+  throw "Windows Export portable launch smoke failed at stage: $($evidence.failure_stage) (failure_type=$failureType$failureContext)"
 }
