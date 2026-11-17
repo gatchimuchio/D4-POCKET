@@ -1629,7 +1629,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "d32c7ddadc1bf52bdbbbbee5efcf3727ae9e20ae6ed7e14c588e36aaa5d658a2"
+      "sha256": "956bc82aa4fd20cb479755c32e68f946ab805a6ad68b6b48dd10c38952f45117"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5897,7 +5897,7 @@
     },
     {
       "path": "tooling/release_gate_check.py",
-      "sha256": "9341ca287f7e1f4431f5811ed38f8e11b47232fb4d23867211de398ffe99c73f"
+      "sha256": "62c162599d5d920f87e5f0de4c04a9f517fd4c6aeb5e0ad78d59085066fcbfcc"
     },
     {
       "path": "tooling/release_runtime_assertions.py",

@@ -198,6 +198,17 @@ def blocker_scope_errors(blocker: dict) -> list[str]:
     return errors
 
 
+def owner_go_contract_errors(blocker: dict) -> list[str]:
+    if blocker.get("name") != "owner_go":
+        return []
+    errors: list[str] = []
+    if blocker.get("status_source") != "manual":
+        errors.append("owner_goはOwner本人の明示判断が必要なためstatus_source=manualでなければならない")
+    if blocker.get("evidence_result") is not None:
+        errors.append("owner_goに自動解決用evidence_resultを設定してはならない")
+    return errors
+
+
 def registry_errors() -> list[str]:
     try:
         registry = json.loads(RELEASE_BLOCKERS_REGISTRY.read_text(encoding="utf-8"))
@@ -234,6 +245,7 @@ def registry_errors() -> list[str]:
                 errors.append(f"リリース阻止事項の登録項目 {index} にfieldがない: {', '.join(missing)}")
         errors.extend(blocker_cause_category_errors(blocker))
         errors.extend(blocker_scope_errors(blocker))
+        errors.extend(owner_go_contract_errors(blocker))
         name = blocker.get("name")
         if not isinstance(name, str) or not name:
             errors.append(f"リリース阻止事項の登録項目 {index} のnameが無効")
@@ -343,6 +355,13 @@ def _windows_evidence_results_by_name(blockers: list) -> dict[str, object]:
 
 def effective_release_blocker(blocker: dict, windows_results: dict[str, object]) -> dict:
     effective = dict(blocker)
+    if blocker.get("name") == "owner_go":
+        effective["effective_status_source"] = "manual"
+        if blocker.get("status_source") != "manual" or blocker.get("evidence_result") is not None:
+            effective["status"] = "unresolved"
+            effective["reason"] = "Owner本人の明示Release GOが必要です。Windows evidenceでは解決できません。"
+            effective["required_action"] = "Owner本人の明示Release GOをmanual statusで記録してください。"
+        return effective
     if blocker.get("status_source") != WINDOWS_EVIDENCE_STATUS_SOURCE:
         effective["effective_status_source"] = blocker.get("status_source", "manual")
         return effective
