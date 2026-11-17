@@ -6036,6 +6036,10 @@
       "sha256": "c5e7879d362b42b3856bf3626543594e6e33213f0bcc3d69d4109164c84469eb"
     },
     {
+      "path": "tooling/tests/test_release_readiness_statuses.py",
+      "sha256": "0a96cddd9cc75a064622cbe0cb74602a866b5e621cacf86d6cc68bf3389369bc"
+    },
+    {
       "path": "tooling/tests/test_windows_bootstrap_setup.py",
       "sha256": "64185fd3b63ce29c926ed9252b1ee8222d0d84ab0da944f7b730306d431aed54"
     },
