@@ -353,11 +353,11 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart",
-      "sha256": "c6702261d7fc767e26fb3997fd53bfe8417893b3a57dac1aa90f829f3253b46c"
+      "sha256": "e36611e1458d1aae91508da0287a4de2944e1d604ba460d047ac4d6db2bfca37"
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_connection_client.dart",
-      "sha256": "58f5f7307cdf0689e9c251266311174f1989a3ad206d7beebff73c14c823038a"
+      "sha256": "78fa48801f03281f21bba2044b372d97f6bceb18c25ce71b741d5197a1674fc2"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_coordination.dart",
@@ -661,11 +661,11 @@
     },
     {
       "path": "apps/desktop_flutter/test/a2a_artifact_handoff_test.dart",
-      "sha256": "426fca7c4a2b6a81de8fe629e4ae49fc37bc8413acdaf85a60874c7d58eb00f3"
+      "sha256": "c15569f399612b01fff33ec223f757ef7c3c9a0c966447f0f3948e8b49211956"
     },
     {
       "path": "apps/desktop_flutter/test/a2a_connection_center_test.dart",
-      "sha256": "8edda31bd0f2918303ff546578cedcb2f947199429ce274640cfe10f66b18b25"
+      "sha256": "818d90e7002bfb8b097fb6072bc5ad5fc305eba8969b8d36ea323a73c34e59c8"
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
@@ -1633,7 +1633,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "39ae120b2475dcf241a3a8f968ac77c22027d682528d668d07886c2a17ba0cfe"
+      "sha256": "e460ad7329d628c808ee0e5159d4647426298470bb8dd2477f9c48b61525882a"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4001,7 +4001,7 @@
     },
     {
       "path": "native/rust_helper/src/a2a.rs",
-      "sha256": "8b2bdd8abf0b08a2cc65e0b71827a444dca03121196ac256c91b4b472ac15399"
+      "sha256": "fd411e8b51bee1f7795aa0f517808055a90c49c1b7c91f0355f42dad24e1d74d"
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
@@ -4685,7 +4685,7 @@
     },
     {
       "path": "packages/broker_contract/lib/broker_request_envelope.dart",
-      "sha256": "1bf2d94df33d8c857e67c94a8f8cae244fc7566ac0dec96e6fa0c9ce7d1e6a1b"
+      "sha256": "c1ba6216f78e3865893b0e09801fd49dba56ffebf3df53e0433930852a599ce7"
     },
     {
       "path": "packages/broker_contract/lib/broker_transport.dart",

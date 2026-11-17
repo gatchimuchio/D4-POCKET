@@ -29,6 +29,15 @@ String brokerPayloadHash(Map<String, Object?>? payload) {
   return _sha256Tagged(utf8.encode(canonicalJson));
 }
 
+/// Returns a Rust-compatible tagged hash for a canonical JSON value.
+///
+/// This binds serialized content only; it does not authenticate the value or
+/// grant Permission, Approval, or authority.
+String brokerJsonValueHash(Object? value) {
+  final canonicalJson = jsonEncode(_canonicalizeJsonValue(value));
+  return _sha256Tagged(utf8.encode(canonicalJson));
+}
+
 Object? _canonicalizeJsonValue(Object? value) {
   if (value is Map) {
     final sorted = SplayTreeMap<String, Object?>();

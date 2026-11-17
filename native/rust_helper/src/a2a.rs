@@ -2569,6 +2569,16 @@ mod tests {
             selected["selected_artifact"]["content_hash"],
             sha256_tagged(&serde_json::to_vec(&vec![text]).unwrap())
         );
+        let cross_language_parts = vec!["A2A \"成果\"/日本語\nline\t😀"];
+        let cross_language_json = serde_json::to_vec(&cross_language_parts).unwrap();
+        assert_eq!(
+            cross_language_json,
+            r#"["A2A \"成果\"/日本語\nline\t😀"]"#.as_bytes()
+        );
+        assert_eq!(
+            sha256_tagged(&cross_language_json),
+            "sha256:16f54887eb22fbfc4ccc30b421ec5a05009378ae9680783f5f212e74e6c51a5f"
+        );
         assert_eq!(selected["selected_artifact"]["byte_length"], text.len());
         assert!(!selected["selected_artifact"]
             .to_string()

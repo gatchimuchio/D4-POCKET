@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:broker_contract/broker_request_envelope.dart'
+    show brokerJsonValueHash;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +12,14 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
 void main() {
+  test('Rustと共有するA2A Artifact parts hashのJSON表現を固定する', () {
+    const parts = ['A2A "成果"/日本語\nline\t😀'];
+    expect(
+      brokerJsonValueHash(parts),
+      'sha256:16f54887eb22fbfc4ccc30b421ec5a05009378ae9680783f5f212e74e6c51a5f',
+    );
+  });
+
   test('A2A v1.0 streaming capabilityを読み取る', () async {
     final receipt = _receipt(streaming: true);
     final summary = await A2aConnectionClient(_A2aTransport([
@@ -312,8 +322,9 @@ void main() {
 
   test('GetTaskは選択Artifactだけをfresh requestで全文表示し本文をmetadata結果へ漏らさない', () async {
     const artifactId = 'artifact-output-1';
+    const visibleText = 'private result body';
     final artifactHash = 'sha256:${List<String>.filled(64, 'a').join()}';
-    final contentHash = 'sha256:${List<String>.filled(64, 'd').join()}';
+    final contentHash = brokerJsonValueHash(const [visibleText]);
     final metadata = await A2aConnectionClient(_A2aTransport([
       _taskGetResponse(
         'audit-a2a-artifacts',
@@ -338,7 +349,6 @@ void main() {
     expect(metadata.artifacts.single.textOnly, isTrue);
     expect(metadata.selectedArtifact, isNull);
 
-    const visibleText = 'private result body';
     final transport = _A2aTransport([
       _taskGetArtifactResponse(
         'audit-a2a-artifact-full',
@@ -380,6 +390,32 @@ void main() {
         agentId: 'fixture-agent',
         interfaceUri: 'http://127.0.0.1:9080/rpc',
         taskId: 'remote-task-42',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+  });
+
+  test('GetTaskは選択Artifact partsとcontent_hashの不一致を拒否する', () async {
+    const artifactId = 'artifact-output-1';
+    const originalText = 'original result';
+    const changedText = 'changed result';
+    final artifactHash = 'sha256:${List<String>.filled(64, 'a').join()}';
+    final response = _taskGetArtifactResponse(
+      'audit-a2a-artifact-content-hash-mismatch',
+      taskId: 'remote-task-42',
+      artifactId: artifactId,
+      artifactHash: artifactHash,
+      contentHash: brokerJsonValueHash(const [originalText]),
+      parts: const [changedText],
+    );
+
+    await expectLater(
+      A2aConnectionClient(_A2aTransport([response])).getTask(
+        agentId: 'fixture-agent',
+        interfaceUri: 'http://127.0.0.1:9080/rpc',
+        taskId: 'remote-task-42',
+        artifactId: artifactId,
+        artifactHash: artifactHash,
       ),
       throwsA(isA<BrokerClientException>()),
     );
@@ -724,7 +760,7 @@ void main() {
       const visibleText = 'untrusted-artifact-visible-only';
       A2aTaskQueryResult? transferredArtifact;
       final artifactHash = 'sha256:${List<String>.filled(64, 'a').join()}';
-      final contentHash = 'sha256:${List<String>.filled(64, 'b').join()}';
+      final contentHash = brokerJsonValueHash(const [visibleText]);
       final receipt = _receipt();
       final transport = _A2aTransport([
         _response('A2A接続一覧', 'audit-empty', _listBody(const []),

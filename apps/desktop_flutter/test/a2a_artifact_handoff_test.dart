@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:broker_contract/broker_request_envelope.dart'
+    show brokerJsonValueHash;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/models/generated_contracts.dart';
 import 'package:gui_shell_desktop/services/a2a_artifact_handoff.dart';
@@ -15,8 +17,6 @@ const _taskResultHash =
     'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
 const _artifactHash =
     'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
-const _contentHash =
-    'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 const _targetSession = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const _targetRuntime = 'codex-target';
 const _targetWorkspace = 'workspace-target';
@@ -29,6 +29,7 @@ A2aTaskQueryResult _source({
   int historyCount = 0,
   List<String> parts = const [_artifactText],
   int? declaredByteLength,
+  String? contentHashOverride,
   String interfaceHash = _interfaceHash,
   String resultHash = _taskResultHash,
   String auditEventId = 'audit-a2a-artifact-retrieval',
@@ -62,7 +63,7 @@ A2aTaskQueryResult _source({
     selectedArtifact: A2aSelectedArtifact(
       artifactId: 'artifact-1',
       artifactHash: _artifactHash,
-      contentHash: _contentHash,
+      contentHash: contentHashOverride ?? brokerJsonValueHash(parts),
       byteLength: byteLength,
       parts: parts,
     ),
@@ -224,6 +225,7 @@ void main() {
       _source(manifestPartCount: 2),
       _source(manifestTextBytes: 1),
       _source(parts: const ['unsafe\u202e text']),
+      _source(contentHashOverride: 'sha256:${'e' * 64}'),
       _source(textOnly: false),
     ];
 

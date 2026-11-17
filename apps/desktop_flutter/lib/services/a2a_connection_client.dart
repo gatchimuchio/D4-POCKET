@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:broker_contract/broker_request_envelope.dart'
+    show brokerJsonValueHash;
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
@@ -910,7 +912,8 @@ class A2aConnectionClient {
           matchingManifest.length != 1 ||
           !matchingManifest.single.textOnly ||
           matchingManifest.single.textBytes != value['byte_length'] ||
-          matchingManifest.single.partCount != parts.length) {
+          matchingManifest.single.partCount != parts.length ||
+          brokerJsonValueHash(parts.cast<String>()) != value['content_hash']) {
         throw const BrokerClientException('A2A Artifact全文projectionが不正です');
       }
       selected = A2aSelectedArtifact(
