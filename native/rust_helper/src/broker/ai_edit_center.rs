@@ -108,6 +108,11 @@ pub(super) fn propose(
 fn parse_proposal(value: &Value) -> Result<EditProposal, String> {
     let proposal: EditProposal = serde_json::from_value(value.clone())
         .map_err(|_| "GUI Shell編集提案の構造が不正または禁止fieldがある".to_string())?;
+    let duplicate_target_path = proposal
+        .target_paths
+        .iter()
+        .enumerate()
+        .any(|(index, path)| proposal.target_paths[..index].contains(path));
     if proposal.version != VERSION
         || !valid_identifier(&proposal.edit_id)
         || !["composition", "ui", "contract"].contains(&proposal.scope.as_str())
@@ -115,6 +120,11 @@ fn parse_proposal(value: &Value) -> Result<EditProposal, String> {
         || proposal.instruction.chars().count() > 2000
         || proposal.target_paths.is_empty()
         || proposal.target_paths.len() > 32
+        || duplicate_target_path
+        || proposal
+            .target_paths
+            .iter()
+            .any(|path| path.chars().count() > 200)
         || proposal.expected_changes.is_empty()
         || proposal.expected_changes.len() > 32
     {
@@ -264,6 +274,26 @@ mod tests {
         let mut secret_path = proposal();
         secret_path["target_paths"] = json!(["docs/credential-notes.md"]);
         let raw = owner_request_json(&mut broker, secret_path);
+        assert_eq!(broker.owner要求処理(&raw).status, BrokerStatus::Rejected);
+    }
+
+    #[test]
+    fn 編集提案は重複と長さ超過の対象pathを拒否する() {
+        let mut broker = Broker::new("session-1");
+
+        let mut duplicate_paths = proposal();
+        duplicate_paths["target_paths"] = json!([
+            "apps/desktop_flutter/lib/screens/settings.dart",
+            "apps/desktop_flutter/lib/screens/settings.dart"
+        ]);
+        let raw = owner_request_json(&mut broker, duplicate_paths);
+        assert_eq!(broker.owner要求処理(&raw).status, BrokerStatus::Rejected);
+
+        let too_long_path = format!("apps/desktop_flutter/{}", "a".repeat(180));
+        assert_eq!(too_long_path.chars().count(), 201);
+        let mut oversized_path = proposal();
+        oversized_path["target_paths"] = json!([too_long_path]);
+        let raw = owner_request_json(&mut broker, oversized_path);
         assert_eq!(broker.owner要求処理(&raw).status, BrokerStatus::Rejected);
     }
 }
