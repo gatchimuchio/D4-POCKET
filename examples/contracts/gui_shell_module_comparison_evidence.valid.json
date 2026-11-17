@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "evidence_type": "development_module_build_comparison",
   "evidence_source": "INTERNAL_STATE",
   "product_artifact_claimed": false,
@@ -11,7 +11,7 @@
   "worktree_clean": true,
   "target_platform": "windows",
   "build_mode": "release",
-  "build_scope": "desktop_flutter_ui_only",
+  "build_scope": "desktop_flutter_and_rust_helper",
   "same_source_commit": true,
   "same_toolchain": true,
   "toolchain": {
@@ -301,8 +301,172 @@
     "non_aot_changed_artifact_paths": [],
     "non_aot_artifacts_identical": true
   },
+  "rust_binary_comparison": {
+    "build_target": "x86_64-pc-windows-msvc",
+    "always_included_module_ids": [
+      "core.security_broker",
+      "core.cryptography",
+      "core.audit_finality",
+      "core.credentials",
+      "core.os_controls",
+      "core.permission_enforcement",
+      "core.approval_enforcement",
+      "core.content_exposure",
+      "shell.dashboard",
+      "shell.runtime_operation",
+      "shell.agent_operation",
+      "shell.authority",
+      "shell.approval",
+      "shell.audit",
+      "shell.recovery",
+      "shell.problems",
+      "shell.evidence",
+      "shell.settings"
+    ],
+    "same_source_commit": true,
+    "same_toolchain": true,
+    "toolchain": {
+      "cargo": "cargo 1.95.0",
+      "rustc": "rustc 1.95.0",
+      "target": "x86_64-pc-windows-msvc"
+    },
+    "baseline": {
+      "label": "baseline",
+      "included_optional_module_ids": [
+        "shell.setup_doctor",
+        "shell.history",
+        "shell.evaluation_lab",
+        "shell.host_capabilities",
+        "shell.notifications",
+        "shell.observability",
+        "shell.trace_inspector",
+        "shell.host_operations"
+      ],
+      "cargo_feature_arguments": [
+        "--no-default-features",
+        "--features",
+        "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations"
+      ],
+      "cargo_command": [
+        "cargo", "rustc", "--color", "never", "--manifest-path",
+        "native/rust_helper/Cargo.toml", "--locked", "--offline", "--release",
+        "--target", "x86_64-pc-windows-msvc", "--no-default-features",
+        "--features", "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations", "--target-dir", "{isolated-target-dir}",
+        "--bin", "gui_shell_rust_helper", "--", "-C",
+        "link-arg=/MAP:baseline/rust/gui_shell_rust_helper.exe.map"
+      ],
+      "build_duration_ms": 90000,
+      "binary": {
+        "path": "baseline/rust/gui_shell_rust_helper.exe",
+        "size_bytes": 2048,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "linker_map": {
+        "path": "baseline/rust/gui_shell_rust_helper.exe.map",
+        "size_bytes": 128,
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "symbol_inventory": {
+        "file": {
+          "path": "baseline/rust/public-symbols.txt",
+          "size_bytes": 12,
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "symbol_count": 1
+      },
+      "runtime_dependency_tree": {
+        "command": [
+          "cargo", "tree", "--color", "never", "--manifest-path",
+          "native/rust_helper/Cargo.toml", "--locked", "--offline", "--target",
+          "x86_64-pc-windows-msvc", "--edges", "normal", "--prefix", "none",
+          "--no-default-features", "--features", "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations"
+        ],
+        "entry_count": 12,
+        "tree_file": {
+          "path": "baseline/rust/cargo-runtime-dependency-tree.txt",
+          "size_bytes": 600,
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      }
+    },
+    "selected": {
+      "label": "selected",
+      "included_optional_module_ids": [
+        "shell.observability",
+        "shell.trace_inspector"
+      ],
+      "cargo_feature_arguments": [
+        "--no-default-features",
+        "--features",
+        "module_observability,module_trace_inspector"
+      ],
+      "cargo_command": [
+        "cargo", "rustc", "--color", "never", "--manifest-path",
+        "native/rust_helper/Cargo.toml", "--locked", "--offline", "--release",
+        "--target", "x86_64-pc-windows-msvc", "--no-default-features",
+        "--features", "module_observability,module_trace_inspector", "--target-dir",
+        "{isolated-target-dir}", "--bin", "gui_shell_rust_helper", "--", "-C",
+        "link-arg=/MAP:selected/rust/gui_shell_rust_helper.exe.map"
+      ],
+      "build_duration_ms": 60000,
+      "binary": {
+        "path": "selected/rust/gui_shell_rust_helper.exe",
+        "size_bytes": 1536,
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "linker_map": {
+        "path": "selected/rust/gui_shell_rust_helper.exe.map",
+        "size_bytes": 96,
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "symbol_inventory": {
+        "file": {
+          "path": "selected/rust/public-symbols.txt",
+          "size_bytes": 12,
+          "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "symbol_count": 1
+      },
+      "runtime_dependency_tree": {
+        "command": [
+          "cargo", "tree", "--color", "never", "--manifest-path",
+          "native/rust_helper/Cargo.toml", "--locked", "--offline", "--target",
+          "x86_64-pc-windows-msvc", "--edges", "normal", "--prefix", "none",
+          "--no-default-features", "--features", "module_observability,module_trace_inspector"
+        ],
+        "entry_count": 12,
+        "tree_file": {
+          "path": "selected/rust/cargo-runtime-dependency-tree.txt",
+          "size_bytes": 600,
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      }
+    },
+    "comparison": {
+      "baseline_binary_bytes": 2048,
+      "selected_binary_bytes": 1536,
+      "binary_bytes_reduced": 512,
+      "baseline_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "selected_binary_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "binary_hash_changed": true,
+      "runtime_dependency_tree_identical": true,
+      "removed_symbol_count": 1,
+      "added_symbol_count": 0,
+      "removed_symbols_file": {
+        "path": "removed-rust-symbols.txt",
+        "size_bytes": 8,
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "added_symbols_file": {
+        "path": "added-rust-symbols.txt",
+        "size_bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "binary_pruning_verified": false
+  },
   "binary_pruning_verified": false,
-  "semantic_pruning_status": "flutter_aot_report_surface_libraries_match_selection; runtime_unverified",
+  "semantic_pruning_status": "flutter_aot_and_rust_helper_binary_observed; standalone_runtime_unverified",
   "cold_start_status": "not_measured",
   "resource_comparison_status": "not_measured",
   "signed": false,

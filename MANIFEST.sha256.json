@@ -2461,7 +2461,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_module_comparison_evidence.valid.json",
-      "sha256": "9e680c3444bf7df7dd6c5a28ddb2cd75f2a27a3c3fa3ed305caf5ea46d0c9477"
+      "sha256": "9f39c60289d599abbd43dab8e426480774ce5891e5b26291f28fa84dd955dc5b"
     },
     {
       "path": "examples/contracts/gui_shell_preview.valid.json",
@@ -5305,7 +5305,7 @@
     },
     {
       "path": "specs/gui_shell_module_comparison_evidence.schema.json",
-      "sha256": "6b52e61945361f6ee2d4b89e234b66c1e8aecfc4135032a2c0edd12c36ec778d"
+      "sha256": "57c568a34fdf1387ec3cbf0c1a66e8b32f5384766691bc522c8eb76fe553cf32"
     },
     {
       "path": "specs/gui_shell_preview.schema.json",
@@ -5733,11 +5733,11 @@
     },
     {
       "path": "tooling/compare_module_builds_windows.py",
-      "sha256": "5f8083b5e20dc26aac8bb0a0249e341cc1ab90f9d47462bd53bbf0485a9d44f8"
+      "sha256": "876aa64c991e40df2efb96b90fbb5708388680aaa6157c08b4bbe6313f3e30b3"
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "a651e909583dc3b558429abc8351b8f9e5fbcf53372f78d268f4eca8b5cef0b5"
+      "sha256": "048b48f5bf0865d11c1d617ee90da4fa4877a780f2793113b55096709273f659"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5789,7 +5789,7 @@
     },
     {
       "path": "tooling/export_windows_product.py",
-      "sha256": "2d148129da8e9430fb497a867f921ddb8242281906fb46f3d56bd89dd6351ed4"
+      "sha256": "fede64dffcaceaec39ce629c830f754c51d90590663f5c27e747335191e9a84d"
     },
     {
       "path": "tooling/failure_injection_validation.py",
@@ -5977,7 +5977,7 @@
     },
     {
       "path": "tooling/tests/test_compare_module_builds_windows.py",
-      "sha256": "adebe759ad22281ba2a7f9e45ffe3df18b0de5eccf9214c91d3548a12cebb7b7"
+      "sha256": "e9fa50f69db3336110c065c1aff81cf409e82bc11afed84bf9fb31c6631e2cdf"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",

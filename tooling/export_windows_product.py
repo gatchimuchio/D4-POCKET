@@ -30,6 +30,7 @@ from tooling.build_module_pruned_windows import (
     dart_defines,
     resolve_module_plan,
 )
+from tooling.build_environment import build_child_environment as _build_child_environment
 from tooling.compare_module_builds_windows import (
     AOT_REPORT_ROOT as WINDOWS_AOT_REPORT_ROOT,
     _aot_surface_libraries as _windows_aot_surface_libraries,
@@ -98,48 +99,6 @@ SENSITIVE_ARTIFACT_NAMES = {
     "secrets.json",
     "token.json",
 }
-BUILD_ENVIRONMENT_ALLOWLIST = {
-    "APPDATA",
-    "COMSPEC",
-    "FLUTTER_ROOT",
-    "HOMEDRIVE",
-    "HOMEPATH",
-    "INCLUDE",
-    "LIB",
-    "LIBPATH",
-    "LOCALAPPDATA",
-    "NUMBER_OF_PROCESSORS",
-    "OS",
-    "PATH",
-    "PATHEXT",
-    "PROCESSOR_ARCHITECTURE",
-    "PROCESSOR_IDENTIFIER",
-    "PROCESSOR_LEVEL",
-    "PROCESSOR_REVISION",
-    "PROGRAMDATA",
-    "PROGRAMFILES",
-    "PROGRAMFILES(X86)",
-    "PUBLIC",
-    "SYSTEMDRIVE",
-    "SYSTEMROOT",
-    "TEMP",
-    "TMP",
-    "UCRTVERSION",
-    "UNIVERSALCRTSDKDIR",
-    "USERPROFILE",
-    "VCINSTALLDIR",
-    "VCTOOLSINSTALLDIR",
-    "VISUALSTUDIOVERSION",
-    "VSCMD_ARG_HOST_ARCH",
-    "VSCMD_ARG_TGT_ARCH",
-    "VSCMD_VER",
-    "WINDIR",
-    "WINDOWSSDKDIR",
-    "WINDOWSSDKVERSION",
-    "RUSTUP_HOME",
-}
-
-
 def _sha256(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
@@ -195,23 +154,6 @@ def _read_regular_file(path: Path, maximum_bytes: int, label: str) -> bytes:
     if len(raw) > maximum_bytes:
         raise ValueError(f"{label}がsize上限を超えている")
     return raw
-
-
-def _build_child_environment(
-    overrides: dict[str, str], *, inherited: dict[str, str] | None = None
-) -> dict[str, str]:
-    source = os.environ if inherited is None else inherited
-    result = {
-        name: value
-        for name, value in source.items()
-        if name.upper() in BUILD_ENVIRONMENT_ALLOWLIST
-    }
-    for name, value in overrides.items():
-        for existing in tuple(result):
-            if existing.upper() == name.upper():
-                del result[existing]
-        result[name] = value
-    return result
 
 
 def _cargo_target_directory(

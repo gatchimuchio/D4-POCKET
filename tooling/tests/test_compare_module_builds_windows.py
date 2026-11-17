@@ -5,11 +5,14 @@ import json
 import unittest
 from pathlib import Path
 
+from tooling.build_environment import build_child_environment
 from tooling.compare_module_builds_windows import (
     _aot_package_libraries,
+    _parse_linker_map_symbols,
     _runtime_dependency_tree_from_json,
     package_dependency_comparison,
     resource_inventory_comparison,
+    symbol_set_comparison,
     validate_comparison_evidence,
 )
 
@@ -18,6 +21,46 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ModuleComparisonMeasurementTests(unittest.TestCase):
+    def test_build_environment_filters_credentials_and_applies_case_insensitive_overrides(self) -> None:
+        environment = build_child_environment(
+            {"PATH": "approved-path", "CARGO_HOME": "C:\\cargo"},
+            inherited={
+                "path": "untrusted-old-path",
+                "GITHUB_TOKEN": "must-not-pass",
+                "USERPROFILE": "C:\\Users\\tester",
+                "CARGO_HOME": "must-not-pass-through",
+            },
+        )
+        self.assertEqual(environment["PATH"], "approved-path")
+        self.assertEqual(environment["CARGO_HOME"], "C:\\cargo")
+        self.assertEqual(environment["USERPROFILE"], "C:\\Users\\tester")
+        self.assertNotIn("path", environment)
+        self.assertNotIn("GITHUB_TOKEN", environment)
+
+    def test_linker_map_extracts_unique_public_symbols_only(self) -> None:
+        raw = b"""Start Length Name Class
+Address Publics by Value Rva+Base Lib:Object
+ 0001:00000000 ?task_entry@@YAXXZ 0000000140001000 f helper.obj
+ 0001:00000010 ?broker_call@@YAXXZ 0000000140001010 f helper.obj
+ 0001:00000010 ?broker_call@@YAXXZ 0000000140001010 f helper.obj
+Static symbols
+ 0001:00000020 local_symbol 0000000140001020 f helper.obj
+"""
+        self.assertEqual(
+            _parse_linker_map_symbols(raw),
+            ["?broker_call@@YAXXZ", "?task_entry@@YAXXZ"],
+        )
+
+    def test_linker_map_without_public_symbols_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Public symbolを採取できない"):
+            _parse_linker_map_symbols(b"Start Length Name Class\nStatic symbols\n")
+
+    def test_symbol_comparison_reports_removed_and_added_names(self) -> None:
+        self.assertEqual(
+            symbol_set_comparison(["core", "optional_old"], ["core", "optional_new"]),
+            {"removed_symbols": ["optional_old"], "added_symbols": ["optional_new"]},
+        )
+
     def test_resource_comparison_uses_packaged_flutter_asset_files(self) -> None:
         baseline = [
             {"path": "data/app.so", "size_bytes": 100, "sha256": "a" * 64},
@@ -201,6 +244,52 @@ class ModuleComparisonMeasurementTests(unittest.TestCase):
         ] = "tampered"
         errors = validate_comparison_evidence(tampered, schema)
         self.assertTrue(any("dependency tree hash" in error for error in errors))
+
+    def test_schema_validation_rejects_native_binary_metric_tampering(self) -> None:
+        evidence = json.loads(
+            (ROOT / "examples/contracts/gui_shell_module_comparison_evidence.valid.json")
+            .read_text(encoding="utf-8")
+        )
+        schema = json.loads(
+            (ROOT / "specs/gui_shell_module_comparison_evidence.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        evidence["rust_binary_comparison"]["comparison"]["binary_bytes_reduced"] = 0
+        errors = validate_comparison_evidence(evidence, schema)
+        self.assertTrue(any("byte削減量" in error for error in errors))
+
+    def test_schema_validation_rejects_native_command_feature_mismatch(self) -> None:
+        evidence = json.loads(
+            (ROOT / "examples/contracts/gui_shell_module_comparison_evidence.valid.json")
+            .read_text(encoding="utf-8")
+        )
+        schema = json.loads(
+            (ROOT / "specs/gui_shell_module_comparison_evidence.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        evidence["rust_binary_comparison"]["selected"]["cargo_command"] = [
+            "module_history" if item == "module_observability,module_trace_inspector" else item
+            for item in evidence["rust_binary_comparison"]["selected"]["cargo_command"]
+        ]
+        errors = validate_comparison_evidence(evidence, schema)
+        self.assertTrue(any("build command" in error for error in errors))
+
+    def test_schema_validation_rejects_removed_security_core_or_required_module(self) -> None:
+        schema = json.loads(
+            (ROOT / "specs/gui_shell_module_comparison_evidence.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        example_path = ROOT / "examples/contracts/gui_shell_module_comparison_evidence.valid.json"
+        for module_id in ("core.security_broker", "shell.settings"):
+            with self.subTest(module_id=module_id):
+                evidence = json.loads(example_path.read_text(encoding="utf-8"))
+                evidence["rust_binary_comparison"]["always_included_module_ids"].remove(
+                    module_id
+                )
+                errors = validate_comparison_evidence(evidence, schema)
+                self.assertTrue(
+                    any("always_included_module_ids" in error for error in errors)
+                )
 
 
 if __name__ == "__main__":

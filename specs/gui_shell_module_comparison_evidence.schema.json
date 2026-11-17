@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/gui_shell_module_comparison_evidence.schema.json",
-  "title": "開発用GUI Shell画面Module比較build証拠 v2",
+  "title": "開発用GUI Shell画面Module比較build証拠 v3",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -30,6 +30,7 @@
     "baseline",
     "selected",
     "comparison",
+    "rust_binary_comparison",
     "resource_inventory_comparison",
     "package_dependency_comparison",
     "binary_pruning_verified",
@@ -39,7 +40,7 @@
     "signed"
   ],
   "properties": {
-    "version": { "const": 2 },
+    "version": { "const": 3 },
     "evidence_type": { "const": "development_module_build_comparison" },
     "evidence_source": { "const": "INTERNAL_STATE" },
     "product_artifact_claimed": { "const": false },
@@ -51,7 +52,7 @@
     "worktree_clean": { "const": true },
     "target_platform": { "const": "windows" },
     "build_mode": { "const": "release" },
-    "build_scope": { "const": "desktop_flutter_ui_only" },
+    "build_scope": { "const": "desktop_flutter_and_rust_helper" },
     "same_source_commit": { "const": true },
     "same_toolchain": { "const": true },
     "toolchain": {
@@ -150,6 +151,9 @@
         "non_aot_artifacts_identical": { "type": "boolean" }
       }
     },
+    "rust_binary_comparison": {
+      "$ref": "#/$defs/rust_binary_comparison"
+    },
     "resource_inventory_comparison": {
       "type": "object",
       "additionalProperties": false,
@@ -198,13 +202,197 @@
     },
     "binary_pruning_verified": { "const": false },
     "semantic_pruning_status": {
-      "const": "flutter_aot_report_surface_libraries_match_selection; runtime_unverified"
+      "const": "flutter_aot_and_rust_helper_binary_observed; standalone_runtime_unverified"
     },
     "cold_start_status": { "const": "not_measured" },
     "resource_comparison_status": { "const": "not_measured" },
     "signed": { "const": false }
   },
   "$defs": {
+    "rust_symbol_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "symbol_count"],
+      "properties": {
+        "file": { "$ref": "#/$defs/symbol_list_file" },
+        "symbol_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "symbol_list_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "size_bytes", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relative_artifact_path" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "rust_runtime_dependency_tree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "entry_count", "tree_file"],
+      "properties": {
+        "command": {
+          "type": "array",
+          "minItems": 8,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "entry_count": { "type": "integer", "minimum": 1 },
+        "tree_file": { "$ref": "#/$defs/analysis_file" }
+      }
+    },
+    "rust_helper_run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "included_optional_module_ids",
+        "cargo_feature_arguments",
+        "cargo_command",
+        "build_duration_ms",
+        "binary",
+        "linker_map",
+        "symbol_inventory",
+        "runtime_dependency_tree"
+      ],
+      "properties": {
+        "label": { "enum": ["baseline", "selected"] },
+        "included_optional_module_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/optional_module_id" }
+        },
+        "cargo_feature_arguments": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "cargo_command": {
+          "type": "array",
+          "minItems": 12,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "build_duration_ms": { "type": "integer", "minimum": 0 },
+        "binary": { "$ref": "#/$defs/analysis_file" },
+        "linker_map": { "$ref": "#/$defs/analysis_file" },
+        "symbol_inventory": { "$ref": "#/$defs/rust_symbol_file" },
+        "runtime_dependency_tree": {
+          "$ref": "#/$defs/rust_runtime_dependency_tree"
+        }
+      }
+    },
+    "rust_binary_comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "build_target",
+        "always_included_module_ids",
+        "same_source_commit",
+        "same_toolchain",
+        "toolchain",
+        "baseline",
+        "selected",
+        "comparison",
+        "binary_pruning_verified"
+      ],
+      "properties": {
+        "build_target": { "const": "x86_64-pc-windows-msvc" },
+        "always_included_module_ids": {
+          "const": [
+            "core.security_broker",
+            "core.cryptography",
+            "core.audit_finality",
+            "core.credentials",
+            "core.os_controls",
+            "core.permission_enforcement",
+            "core.approval_enforcement",
+            "core.content_exposure",
+            "shell.dashboard",
+            "shell.runtime_operation",
+            "shell.agent_operation",
+            "shell.authority",
+            "shell.approval",
+            "shell.audit",
+            "shell.recovery",
+            "shell.problems",
+            "shell.evidence",
+            "shell.settings"
+          ]
+        },
+        "same_source_commit": { "const": true },
+        "same_toolchain": { "const": true },
+        "toolchain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cargo", "rustc", "target"],
+          "properties": {
+            "cargo": { "type": "string", "minLength": 1 },
+            "rustc": { "type": "string", "minLength": 1 },
+            "target": { "const": "x86_64-pc-windows-msvc" }
+          }
+        },
+        "baseline": {
+          "allOf": [
+            { "$ref": "#/$defs/rust_helper_run" },
+            {
+              "properties": {
+                "label": { "const": "baseline" },
+                "included_optional_module_ids": {
+                  "const": [
+                    "shell.setup_doctor",
+                    "shell.history",
+                    "shell.evaluation_lab",
+                    "shell.host_capabilities",
+                    "shell.notifications",
+                    "shell.observability",
+                    "shell.trace_inspector",
+                    "shell.host_operations"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "selected": {
+          "allOf": [
+            { "$ref": "#/$defs/rust_helper_run" },
+            { "properties": { "label": { "const": "selected" } } }
+          ]
+        },
+        "comparison": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "baseline_binary_bytes",
+            "selected_binary_bytes",
+            "binary_bytes_reduced",
+            "baseline_binary_sha256",
+            "selected_binary_sha256",
+            "binary_hash_changed",
+            "runtime_dependency_tree_identical",
+            "removed_symbol_count",
+            "added_symbol_count",
+            "removed_symbols_file",
+            "added_symbols_file"
+          ],
+          "properties": {
+            "baseline_binary_bytes": { "type": "integer", "minimum": 1 },
+            "selected_binary_bytes": { "type": "integer", "minimum": 1 },
+            "binary_bytes_reduced": { "type": "integer" },
+            "baseline_binary_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "selected_binary_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "binary_hash_changed": { "type": "boolean" },
+            "runtime_dependency_tree_identical": { "type": "boolean" },
+            "removed_symbol_count": { "type": "integer", "minimum": 0 },
+            "added_symbol_count": { "type": "integer", "minimum": 0 },
+            "removed_symbols_file": { "$ref": "#/$defs/symbol_list_file" },
+            "added_symbols_file": { "$ref": "#/$defs/symbol_list_file" }
+          }
+        },
+        "binary_pruning_verified": { "const": false }
+      }
+    },
     "optional_module_id": {
       "enum": [
         "shell.setup_doctor",

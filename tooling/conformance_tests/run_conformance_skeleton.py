@@ -102,6 +102,7 @@ from tooling.build_module_pruned_windows import (
     EXPECTED_REQUIRED_IDS,
     _validate_catalog,
     _flutter_candidates,
+    cargo_feature_arguments,
     dart_defines,
     resolve_module_plan,
 )
@@ -11458,6 +11459,21 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
         f"--dart-define={name}=false" for name in none_defines
     ]
     none_evidence["selected"]["aot_surface_libraries"] = []
+    none_native_selection = none_evidence["rust_binary_comparison"]["selected"]
+    none_native_selection["included_optional_module_ids"] = []
+    none_native_selection["cargo_feature_arguments"] = cargo_feature_arguments(
+        resolve_module_plan(none_receipt, catalog), target_platform="windows"
+    )
+    none_native_selection["cargo_command"] = [
+        argument
+        for argument in none_native_selection["cargo_command"]
+        if argument not in {"--features", "module_observability,module_trace_inspector"}
+    ]
+    none_native_selection["runtime_dependency_tree"]["command"] = [
+        argument
+        for argument in none_native_selection["runtime_dependency_tree"]["command"]
+        if argument not in {"--features", "module_observability,module_trace_inspector"}
+    ]
     if validate_comparison_evidence(
         none_evidence, schema, receipt=none_receipt, catalog=catalog
     ):

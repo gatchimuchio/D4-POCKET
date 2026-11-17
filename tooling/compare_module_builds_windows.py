@@ -6,10 +6,12 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
@@ -20,17 +22,23 @@ if str(ROOT) not in sys.path:
 
 from tooling.build_module_pruned_windows import (
     BUILD_OUTPUT,
+    EXPECTED_CORE_IDS,
     EXPECTED_OPTIONAL_IDS,
+    EXPECTED_REQUIRED_IDS,
     MODULE_DEFINE_NAMES,
+    ResolvedModulePlan,
     _artifact_files,
     _flutter_executable,
     _flutter_versions,
     _git_value,
     _load_catalog,
     _parse_json_bytes,
+    cargo_feature_arguments,
     dart_defines,
     resolve_module_plan,
 )
+from tooling.build_environment import build_child_environment
+from tooling.flutter_workspace import safe_flutter_temp_parent
 
 
 COMPARISON_SCHEMA = ROOT / "specs" / "gui_shell_module_comparison_evidence.schema.json"
@@ -41,6 +49,12 @@ APP_CODE_PATH = "data/app.so"
 APP_EXECUTABLE = "gui_shell_desktop.exe"
 AOT_REPORT_ROOT = "app.so (Dart AOT)"
 DART_PACKAGE_ROOT = ("package:gui_shell_desktop", "package:gui_shell_desktop")
+RUST_HELPER_BINARY = "gui_shell_rust_helper.exe"
+RUST_HELPER_MANIFEST = "native/rust_helper/Cargo.toml"
+MAX_NATIVE_BINARY_BYTES = 512_000_000
+MAP_SYMBOL_LINE = re.compile(
+    r"^\s*[0-9a-fA-F]+:[0-9a-fA-F]+\s+(\S+)\s+[0-9a-fA-F]+(?:\s|$)"
+)
 
 
 def _safe_console_text(value: str, encoding: str | None = None) -> str:
@@ -541,9 +555,11 @@ def validate_comparison_evidence(
     except (KeyError, TypeError, ValueError) as exc:
         errors.append(f"resource／dependency比較を再計算できない: {exc}")
 
+    native_plan: ResolvedModulePlan | None = None
     if receipt is not None:
         try:
             plan = resolve_module_plan(receipt, active_catalog)
+            native_plan = plan
             expected_selected_defines = dart_defines(plan, active_catalog)
             if evidence["selected"]["effective_dart_defines"] != expected_selected_defines:
                 errors.append("選択buildがReceiptのModulePlan・依存閉包と一致しない")
@@ -557,7 +573,91 @@ def validate_comparison_evidence(
                 errors.append("証拠の選択modeがReceiptと一致しない")
         except (OSError, ValueError, KeyError, TypeError) as exc:
             errors.append(f"Receiptとbuild証拠の対応検査に失敗した: {exc}")
+    errors.extend(
+        validate_rust_binary_comparison(
+            evidence["rust_binary_comparison"],
+            selected_plan=native_plan,
+            catalog=active_catalog,
+        )
+    )
     return errors
+
+
+def validate_rust_binary_comparison(
+    comparison: dict[str, Any],
+    *,
+    selected_plan: ResolvedModulePlan | None = None,
+    catalog: dict[str, Any] | None = None,
+) -> list[str]:
+    errors: list[str] = []
+    active_catalog = catalog if catalog is not None else _load_catalog()
+    if comparison["always_included_module_ids"] != [
+        *EXPECTED_CORE_IDS,
+        *EXPECTED_REQUIRED_IDS,
+    ]:
+        errors.append("Rust binary比較でSecurity Core／Required Moduleが維持されていない")
+    baseline = comparison["baseline"]
+    selected = comparison["selected"]
+    summary = comparison["comparison"]
+    full_plan = _full_optional_plan(active_catalog)
+    expected_baseline_arguments = cargo_feature_arguments(
+        full_plan, target_platform="windows"
+    )
+    if baseline["included_optional_module_ids"] != list(full_plan.included_optional_ids):
+        errors.append("Rust baselineが全Optional Moduleを含んでいない")
+    if baseline["cargo_feature_arguments"] != expected_baseline_arguments:
+        errors.append("Rust baseline Cargo feature argumentsが全Optional Moduleと一致しない")
+    if selected_plan is not None:
+        if selected["included_optional_module_ids"] != list(
+            selected_plan.included_optional_ids
+        ):
+            errors.append("Rust selected Module一覧が検証済みExport Planと一致しない")
+        if selected["cargo_feature_arguments"] != cargo_feature_arguments(
+            selected_plan, target_platform="windows"
+        ):
+            errors.append("Rust selected Cargo feature argumentsがExport Planと一致しない")
+    for label, run in (("baseline", baseline), ("selected", selected)):
+        feature_arguments = run["cargo_feature_arguments"]
+        for command_name, command in (
+            ("build", run["cargo_command"]),
+            ("dependency tree", run["runtime_dependency_tree"]["command"]),
+        ):
+            if not _contains_argument_sequence(command, feature_arguments):
+                errors.append(
+                    f"Rust {label} {command_name} commandが記録済みfeature選択と一致しない"
+                )
+    expected_reduction = (
+        baseline["binary"]["size_bytes"] - selected["binary"]["size_bytes"]
+    )
+    if summary["baseline_binary_bytes"] != baseline["binary"]["size_bytes"]:
+        errors.append("Rust baseline binary byte数がartifact記録と一致しない")
+    if summary["selected_binary_bytes"] != selected["binary"]["size_bytes"]:
+        errors.append("Rust selected binary byte数がartifact記録と一致しない")
+    if summary["binary_bytes_reduced"] != expected_reduction:
+        errors.append("Rust binary byte削減量をartifact記録から再計算できない")
+    expected_hash_changed = baseline["binary"]["sha256"] != selected["binary"]["sha256"]
+    if summary["baseline_binary_sha256"] != baseline["binary"]["sha256"]:
+        errors.append("Rust baseline binary SHA-256がartifact記録と一致しない")
+    if summary["selected_binary_sha256"] != selected["binary"]["sha256"]:
+        errors.append("Rust selected binary SHA-256がartifact記録と一致しない")
+    if summary["binary_hash_changed"] is not expected_hash_changed:
+        errors.append("Rust binary hash changed状態がartifact記録と一致しない")
+    expected_tree_identical = (
+        baseline["runtime_dependency_tree"]["tree_file"]["sha256"]
+        == selected["runtime_dependency_tree"]["tree_file"]["sha256"]
+    )
+    if summary["runtime_dependency_tree_identical"] is not expected_tree_identical:
+        errors.append("Rust runtime dependency tree比較が保存tree hashと一致しない")
+    return errors
+
+
+def _contains_argument_sequence(arguments: list[str], expected: list[str]) -> bool:
+    if not expected or len(expected) > len(arguments):
+        return False
+    return any(
+        arguments[index : index + len(expected)] == expected
+        for index in range(len(arguments) - len(expected) + 1)
+    )
 
 
 def _reject_link_or_reparse(path: Path, label: str) -> os.stat_result:
@@ -598,6 +698,394 @@ def _file_record(path: Path, evidence_root: Path) -> dict[str, Any]:
     raw = path.read_bytes()
     relative = path.relative_to(evidence_root).as_posix()
     return {"path": relative, "size_bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+
+
+def _native_binary_record(path: Path, evidence_root: Path) -> dict[str, Any]:
+    metadata = _reject_link_or_reparse(path, "Rust helper binary")
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_size < 1:
+        raise ValueError("Rust helper binaryが空または通常fileではない")
+    if metadata.st_size > MAX_NATIVE_BINARY_BYTES:
+        raise ValueError("Rust helper binaryが512 MB上限を超えている")
+    try:
+        path.resolve(strict=True).relative_to(evidence_root.resolve(strict=True))
+    except (OSError, ValueError) as exc:
+        raise ValueError("Rust helper binaryが証拠directoryの外にある") from exc
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return {
+        "path": path.relative_to(evidence_root).as_posix(),
+        "size_bytes": metadata.st_size,
+        "sha256": digest.hexdigest(),
+    }
+
+
+def _parse_linker_map_symbols(raw: bytes) -> list[str]:
+    """MSVC/LLD mapのPublics by Value領域からsymbol名を抽出する。"""
+    text = raw.decode("utf-8-sig", errors="replace")
+    in_public_symbols = False
+    symbols: set[str] = set()
+    for line in text.splitlines():
+        if "publics by value" in line.casefold():
+            in_public_symbols = True
+            continue
+        if in_public_symbols and line.strip().casefold().startswith("static symbols"):
+            break
+        if not in_public_symbols:
+            continue
+        match = MAP_SYMBOL_LINE.match(line)
+        if match:
+            symbols.add(match.group(1))
+    if not symbols:
+        raise ValueError("Rust helper linker mapからPublic symbolを採取できない")
+    return sorted(symbols)
+
+
+def symbol_set_comparison(
+    baseline_symbols: list[str], selected_symbols: list[str]
+) -> dict[str, list[str]]:
+    baseline = set(baseline_symbols)
+    selected = set(selected_symbols)
+    return {
+        "removed_symbols": sorted(baseline - selected),
+        "added_symbols": sorted(selected - baseline),
+    }
+
+
+def _redact_local_paths(value: str) -> str:
+    candidates = {
+        str(ROOT.resolve()): "{repository}",
+        str(ROOT.resolve()).replace("\\", "/"): "{repository}",
+        str(Path.home()): "{user-profile}",
+        str(Path.home()).replace("\\", "/"): "{user-profile}",
+    }
+    for path, replacement in sorted(candidates.items(), key=lambda item: len(item[0]), reverse=True):
+        if path:
+            value = re.sub(re.escape(path), replacement, value, flags=re.IGNORECASE)
+    return value
+
+
+def _cargo_process_output(
+    command: list[str], environment: dict[str, str], *, label: str, timeout: int = 1800
+) -> str:
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=environment,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raw_output = exc.stdout if exc.stdout is not None else exc.output
+        if isinstance(raw_output, bytes):
+            partial_output = raw_output.decode("utf-8", errors="replace")
+        else:
+            partial_output = raw_output or ""
+        detail = "\n".join(_redact_local_paths(partial_output).splitlines()[-20:])
+        raise ValueError(
+            f"{label}が{timeout}秒でtimeoutした" + (f":\n{detail}" if detail else "")
+        ) from exc
+    output = _redact_local_paths(completed.stdout or "")
+    if completed.returncode != 0:
+        detail = "\n".join(output.splitlines()[-20:])
+        raise ValueError(
+            f"{label}がexit={completed.returncode}で失敗した"
+            + (f":\n{detail}" if detail else "")
+        )
+    return output
+
+
+def _rust_toolchain(environment: dict[str, str]) -> tuple[str, str, str]:
+    path = environment.get("PATH")
+    cargo = shutil.which("cargo", path=path)
+    rustc = shutil.which("rustc", path=path)
+    if cargo is None or rustc is None:
+        raise ValueError("隔離Build環境でCargo／Rust compilerを解決できない")
+    cargo_version_output = _cargo_process_output(
+        [cargo, "--version"], environment, label="Cargo version"
+    )
+    rustc_output = _cargo_process_output(
+        [rustc, "-vV"], environment, label="rustc toolchain identity"
+    )
+    cargo_version = cargo_version_output.strip().splitlines()[0]
+    rustc_version = next(
+        (line.strip() for line in rustc_output.splitlines() if line.startswith("rustc ")), ""
+    )
+    target = next(
+        (line.split(":", 1)[1].strip() for line in rustc_output.splitlines() if line.startswith("host:")),
+        "",
+    )
+    if not cargo_version or not rustc_version or target != "x86_64-pc-windows-msvc":
+        raise ValueError("Windows x64 MSVC Cargo／Rust toolchainを確定できない")
+    return cargo, rustc, json.dumps(
+        {"cargo": cargo_version, "rustc": rustc_version, "target": target},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _full_optional_plan(catalog: dict[str, Any]) -> ResolvedModulePlan:
+    optional_ids = tuple(module["module_id"] for module in catalog["optional_modules"])
+    if optional_ids != EXPECTED_OPTIONAL_IDS:
+        raise ValueError("Full Rust比較のOptional Module集合が固定Catalogと一致しない")
+    return ResolvedModulePlan(
+        selection_mode="all_optional",
+        requested_optional_ids=optional_ids,
+        included_optional_ids=optional_ids,
+        included_module_ids=(
+            *EXPECTED_CORE_IDS,
+            *EXPECTED_REQUIRED_IDS,
+            *optional_ids,
+        ),
+        excluded_optional_ids=(),
+    )
+
+
+def _cargo_feature_tree(
+    *,
+    cargo: str,
+    environment: dict[str, str],
+    target: str,
+    feature_arguments: list[str],
+) -> tuple[list[str], str]:
+    command = [
+        cargo,
+        "tree",
+        "--color",
+        "never",
+        "--manifest-path",
+        RUST_HELPER_MANIFEST,
+        "--locked",
+        "--offline",
+        "--target",
+        target,
+        "--edges",
+        "normal",
+        "--prefix",
+        "none",
+        *feature_arguments,
+    ]
+    output = _cargo_process_output(command, environment, label="Cargo runtime dependency tree")
+    normalized = "\n".join(line.rstrip() for line in output.splitlines()).strip() + "\n"
+    return command, normalized
+
+
+def _capture_rust_helper_run(
+    *,
+    label: str,
+    plan: ResolvedModulePlan,
+    cargo: str,
+    environment: dict[str, str],
+    target: str,
+    evidence_root: Path,
+    expected_commit: str,
+) -> dict[str, Any]:
+    run_root = evidence_root / label / "rust"
+    run_root.mkdir(parents=True, exist_ok=False)
+    target_parent = Path(safe_flutter_temp_parent(ROOT)).resolve(strict=True)
+    feature_arguments = cargo_feature_arguments(plan, target_platform="windows")
+    _cargo_tree_command, dependency_tree = _cargo_feature_tree(
+        cargo=cargo,
+        environment=environment,
+        target=target,
+        feature_arguments=feature_arguments,
+    )
+    tree_path = run_root / "cargo-runtime-dependency-tree.txt"
+    tree_path.write_text(dependency_tree, encoding="utf-8", newline="\n")
+
+    linker_map_path = run_root / f"{RUST_HELPER_BINARY}.map"
+    started = time.perf_counter()
+    with tempfile.TemporaryDirectory(prefix="d4p-module-rust-target-", dir=target_parent) as temp:
+        target_dir = Path(temp) / "target"
+        command = [
+            cargo,
+            "rustc",
+            "--color",
+            "never",
+            "--manifest-path",
+            RUST_HELPER_MANIFEST,
+            "--locked",
+            "--offline",
+            "--release",
+            "--target",
+            target,
+            *feature_arguments,
+            "--target-dir",
+            str(target_dir),
+            "--bin",
+            "gui_shell_rust_helper",
+            "--",
+            "-C",
+            f"link-arg=/MAP:{linker_map_path}",
+        ]
+        _cargo_process_output(command, environment, label=f"{label} Rust helper Release build")
+        _clean_source_commit(expected_commit)
+        binary_source = target_dir / target / "release" / RUST_HELPER_BINARY
+        binary_path = run_root / RUST_HELPER_BINARY
+        if not binary_source.is_file():
+            raise ValueError(f"{label} Rust helper Release binaryが生成されない")
+        shutil.copy2(binary_source, binary_path)
+        if not linker_map_path.is_file():
+            raise ValueError(f"{label} Rust helper linker mapが生成されない")
+        binary = _native_binary_record(binary_path, evidence_root)
+        map_record = _file_record(linker_map_path, evidence_root)
+        symbols = _parse_linker_map_symbols(linker_map_path.read_bytes())
+        symbol_path = run_root / "public-symbols.txt"
+        symbol_path.write_text("".join(f"{symbol}\n" for symbol in symbols), encoding="utf-8", newline="\n")
+        symbol_record = _file_record(symbol_path, evidence_root)
+
+    duration_ms = round((time.perf_counter() - started) * 1000)
+    tree_record = _file_record(tree_path, evidence_root)
+    tree_entries = [line.strip() for line in dependency_tree.splitlines() if line.strip()]
+    command_template = [
+        "cargo",
+        "rustc",
+        "--color",
+        "never",
+        "--manifest-path",
+        RUST_HELPER_MANIFEST,
+        "--locked",
+        "--offline",
+        "--release",
+        "--target",
+        target,
+        *feature_arguments,
+        "--target-dir",
+        "{isolated-target-dir}",
+        "--bin",
+        "gui_shell_rust_helper",
+        "--",
+        "-C",
+        f"link-arg=/MAP:{label}/rust/{RUST_HELPER_BINARY}.map",
+    ]
+    return {
+        "label": label,
+        "included_optional_module_ids": list(plan.included_optional_ids),
+        "cargo_feature_arguments": feature_arguments,
+        "cargo_command": command_template,
+        "build_duration_ms": duration_ms,
+        "binary": binary,
+        "linker_map": map_record,
+        "symbol_inventory": {
+            **symbol_record,
+            "symbol_count": len(symbols),
+        },
+        "runtime_dependency_tree": {
+            "command": [
+                "cargo",
+                "tree",
+                "--color",
+                "never",
+                "--manifest-path",
+                RUST_HELPER_MANIFEST,
+                "--locked",
+                "--offline",
+                "--target",
+                target,
+                "--edges",
+                "normal",
+                "--prefix",
+                "none",
+                *feature_arguments,
+            ],
+            "entry_count": len(tree_entries),
+            "tree_file": tree_record,
+        },
+        "_symbols": symbols,
+        "_dependency_tree": dependency_tree,
+    }
+
+
+def _native_binary_comparison(
+    *,
+    plan: ResolvedModulePlan,
+    catalog: dict[str, Any],
+    evidence_root: Path,
+    source_commit: str,
+) -> dict[str, Any]:
+    inherited_environment = dict(os.environ)
+    cargo_home = inherited_environment.get("CARGO_HOME") or str(Path.home() / ".cargo")
+    environment = build_child_environment(
+        {"CARGO_HOME": cargo_home, "CARGO_TERM_COLOR": "never"},
+        inherited=inherited_environment,
+    )
+    cargo, _rustc, toolchain_json = _rust_toolchain(environment)
+    toolchain = json.loads(toolchain_json)
+    baseline = _capture_rust_helper_run(
+        label="baseline",
+        plan=_full_optional_plan(catalog),
+        cargo=cargo,
+        environment=environment,
+        target=toolchain["target"],
+        evidence_root=evidence_root,
+        expected_commit=source_commit,
+    )
+    _clean_source_commit(source_commit)
+    selected = _capture_rust_helper_run(
+        label="selected",
+        plan=plan,
+        cargo=cargo,
+        environment=environment,
+        target=toolchain["target"],
+        evidence_root=evidence_root,
+        expected_commit=source_commit,
+    )
+    _clean_source_commit(source_commit)
+    _cargo_after, _rustc_after, final_toolchain_json = _rust_toolchain(environment)
+    if final_toolchain_json != toolchain_json:
+        raise ValueError("Full／selected Rust helper build中にToolchain identityが変化した")
+
+    symbols = symbol_set_comparison(baseline.pop("_symbols"), selected.pop("_symbols"))
+    baseline_tree = baseline.pop("_dependency_tree")
+    selected_tree = selected.pop("_dependency_tree")
+    removed_path = evidence_root / "removed-rust-symbols.txt"
+    added_path = evidence_root / "added-rust-symbols.txt"
+    removed_path.write_text(
+        "".join(f"{symbol}\n" for symbol in symbols["removed_symbols"]),
+        encoding="utf-8",
+        newline="\n",
+    )
+    added_path.write_text(
+        "".join(f"{symbol}\n" for symbol in symbols["added_symbols"]),
+        encoding="utf-8",
+        newline="\n",
+    )
+    comparison = {
+        "baseline_binary_bytes": baseline["binary"]["size_bytes"],
+        "selected_binary_bytes": selected["binary"]["size_bytes"],
+        "binary_bytes_reduced": baseline["binary"]["size_bytes"]
+        - selected["binary"]["size_bytes"],
+        "baseline_binary_sha256": baseline["binary"]["sha256"],
+        "selected_binary_sha256": selected["binary"]["sha256"],
+        "binary_hash_changed": baseline["binary"]["sha256"]
+        != selected["binary"]["sha256"],
+        "runtime_dependency_tree_identical": hashlib.sha256(
+            baseline_tree.encode("utf-8")
+        ).hexdigest()
+        == hashlib.sha256(selected_tree.encode("utf-8")).hexdigest(),
+        "removed_symbol_count": len(symbols["removed_symbols"]),
+        "added_symbol_count": len(symbols["added_symbols"]),
+        "removed_symbols_file": _file_record(removed_path, evidence_root),
+        "added_symbols_file": _file_record(added_path, evidence_root),
+    }
+    return {
+        "build_target": toolchain["target"],
+        "always_included_module_ids": [*EXPECTED_CORE_IDS, *EXPECTED_REQUIRED_IDS],
+        "same_source_commit": True,
+        "same_toolchain": True,
+        "toolchain": toolchain,
+        "baseline": baseline,
+        "selected": selected,
+        "comparison": comparison,
+        "binary_pruning_verified": False,
+    }
 
 
 def _analysis_report_path(output: str) -> Path:
@@ -814,9 +1302,15 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
     _clean_source_commit(source_commit)
     if _flutter_versions(executable) != versions:
         raise ValueError("比較build中にFlutter toolchain versionが変化した")
+    rust_comparison = _native_binary_comparison(
+        plan=plan,
+        catalog=catalog,
+        evidence_root=output_dir,
+        source_commit=source_commit,
+    )
     summary = comparison_summary(baseline["artifact_files"], selected["artifact_files"])
     evidence = {
-        "version": 2,
+        "version": 3,
         "evidence_type": "development_module_build_comparison",
         "evidence_source": "INTERNAL_STATE",
         "product_artifact_claimed": False,
@@ -828,7 +1322,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         "worktree_clean": True,
         "target_platform": "windows",
         "build_mode": "release",
-        "build_scope": "desktop_flutter_ui_only",
+        "build_scope": "desktop_flutter_and_rust_helper",
         "same_source_commit": True,
         "same_toolchain": True,
         "toolchain": versions,
@@ -841,6 +1335,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         "baseline": baseline,
         "selected": selected,
         "comparison": summary,
+        "rust_binary_comparison": rust_comparison,
         "resource_inventory_comparison": resource_inventory_comparison(
             baseline["artifact_files"], selected["artifact_files"]
         ),
@@ -848,7 +1343,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
             baseline, selected
         ),
         "binary_pruning_verified": False,
-        "semantic_pruning_status": "flutter_aot_report_surface_libraries_match_selection; runtime_unverified",
+        "semantic_pruning_status": "flutter_aot_and_rust_helper_binary_observed; standalone_runtime_unverified",
         "cold_start_status": "not_measured",
         "resource_comparison_status": "not_measured",
         "signed": False,
@@ -892,6 +1387,12 @@ def main() -> int:
         "runtime_package_tree_identical": evidence[
             "package_dependency_comparison"
         ]["runtime_package_tree_identical"],
+        "rust_helper_binary_bytes_reduced": evidence["rust_binary_comparison"][
+            "comparison"
+        ]["binary_bytes_reduced"],
+        "rust_helper_removed_symbol_count": evidence["rust_binary_comparison"][
+            "comparison"
+        ]["removed_symbol_count"],
         "binary_pruning_verified": False,
         "cold_start_status": "not_measured",
         "resource_comparison_status": "not_measured",
