@@ -59,8 +59,8 @@ jobs:
             "- Source commit: ``$head`` (verified against `GITHUB_SHA` and `origin/main`)."
             "- Runner: ``$env:ImageOS/$env:ImageVersion``."
             '- Input scope: checked-in synthetic Receipt and Manifest fixtures; no Broker or Owner authority was exercised.'
-            '- Result scope: Windows Release bundle construction only; no artifact is uploaded.'
-            '- This run does not establish Owner authorization, installed-product behavior, launch, signing, installer, update/rollback, binary pruning, or release readiness.'
+            '- Result scope: Windows Release fixture bundle construction plus a separate portable launch/UI/Broker smoke; no artifact is uploaded.'
+            '- The launch smoke does not establish Owner authorization, installed-product behavior, signing, installer, update/rollback, full binary pruning, or release readiness.'
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
       - name: 固定RustとFlutter toolchainを用意
         shell: pwsh
@@ -128,6 +128,12 @@ jobs:
             --manifest-file $manifestPath `
             --output-dir $bundle
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($name in @(
+              'GH_TOKEN', 'GITHUB_TOKEN', 'GIT_CONFIG_COUNT', 'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0',
+              'ACTIONS_RUNTIME_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN'
+            )) {
+            Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
+          }
           $evidencePath = Join-Path $bundle 'd4_pocket_build_receipt.json'
           if (-not (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
             throw 'validated build evidence is missing'
@@ -147,6 +153,35 @@ jobs:
               $evidence.credential_artifact_scan.findings -ne 0 -or
               $evidence.artifact_tree_sha256 -notmatch '^[0-9a-f]{64}$') {
             throw 'bounded artifact scan or inventory evidence is invalid'
+          }
+          $launchEvidencePath = Join-Path $env:RUNNER_TEMP 'd4-pocket-export-launch-smoke.json'
+          if (Test-Path -LiteralPath $launchEvidencePath) {
+            throw 'portable launch evidence path already exists; refusing overwrite'
+          }
+          & pwsh -NoLogo -NoProfile -File tooling/tests/windows_export_portable_launch_smoke.ps1 `
+            -BundlePath $bundle `
+            -EvidencePath $launchEvidencePath `
+            -SourceCommit $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path -LiteralPath $launchEvidencePath -PathType Leaf)) {
+            throw 'portable launch evidence was not produced'
+          }
+          $launchEvidence = Get-Content -LiteralPath $launchEvidencePath -Raw -Encoding utf8 | ConvertFrom-Json
+          if ($launchEvidence.result -ne 'passed' -or
+              $launchEvidence.evidence_class -ne 'LIVE_RUNTIME' -or
+              $launchEvidence.source_commit -ne $env:GITHUB_SHA -or
+              $launchEvidence.broker.excluded_operation_status -ne 'rejected' -or
+              $launchEvidence.broker.excluded_operation_code -ne 'optional_module_not_included' -or
+              $launchEvidence.broker.generic_command_status -ne 'suspended' -or
+              $launchEvidence.broker.generic_command_code -ne 'broker_command_dispatch_disabled' -or
+              $launchEvidence.frontend.launcher_argument_rejected -ne $true -or
+              $launchEvidence.frontend.unexpected_frontend_spawned -ne $false -or
+              $launchEvidence.frontend.graceful_exit -ne $true -or
+              $launchEvidence.cleanup.endpoint_removed -ne $true -or
+              $launchEvidence.cleanup.runtime_fixture_removed -ne $true -or
+              $launchEvidence.scope.installed_product_verified -ne $false -or
+              $launchEvidence.scope.binary_pruning_verified -ne $false) {
+            throw 'portable launch evidence status, authority boundary, or cleanup is invalid'
           }
           $portableZip = Join-Path $env:RUNNER_TEMP 'D4-Pocket-portable-fixture.zip'
           if (Test-Path -LiteralPath $portableZip) {
@@ -169,20 +204,22 @@ jobs:
           if ($zipHash -ne $zipSummary.archive_sha256) {
             throw 'portable ZIP SHA-256 does not match the packager receipt'
           }
-          Remove-Item -LiteralPath Env:GIT_CONFIG_COUNT -ErrorAction SilentlyContinue
-          Remove-Item -LiteralPath Env:GIT_CONFIG_KEY_0 -ErrorAction SilentlyContinue
-          Remove-Item -LiteralPath Env:GIT_CONFIG_VALUE_0 -ErrorAction SilentlyContinue
           @(
             "- Rust: ``$env:GUI_SHELL_EXPORT_RUSTC_VERSION`` / ``$env:GUI_SHELL_EXPORT_CARGO_VERSION``."
             "- Flutter commit: ``$env:GUI_SHELL_EXPORT_FLUTTER_COMMIT``; framework: ``$($evidence.toolchain.flutter)``; Dart: ``$($evidence.toolchain.dart)``."
             "- Export build: ``passed``; evidence source: ``INTERNAL_STATE``; fixture input only."
             "- Artifact inventory: ``$($evidence.artifact_files.Count)`` files, ``$($evidence.artifact_total_bytes)`` bytes, tree SHA-256 ``$($evidence.artifact_tree_sha256)``."
+            "- Separate launch smoke: ``$($launchEvidence.result)`` / ``$($launchEvidence.evidence_class)`` on ``$($launchEvidence.runner_image)``; launcher PID ``$($launchEvidence.frontend.launcher_pid)``, Flutter child PID ``$($launchEvidence.frontend.process_id)``; selected UI labels ``$($launchEvidence.frontend.included_surfaces -join ', ')``; excluded UI labels absent: ``$($launchEvidence.frontend.excluded_surfaces_absent)``."
+            "- Launcher argument refusal: ``$($launchEvidence.frontend.launcher_argument_rejected)`` / ``$($launchEvidence.frontend.launcher_argument_error_code)``; unexpected Flutter child: ``$($launchEvidence.frontend.unexpected_frontend_spawned)``."
+            "- Authenticated Broker: excluded Setup Doctor request ``$($launchEvidence.broker.excluded_operation_status)`` / ``$($launchEvidence.broker.excluded_operation_code)``; generic command ``$($launchEvidence.broker.generic_command_status)`` / ``$($launchEvidence.broker.generic_command_code)``; both have Audit IDs and no private marker or session secret exposure."
+            "- Native tray exit and runtime fixture cleanup: endpoint removed ``$($launchEvidence.cleanup.endpoint_removed)``; isolated runtime store removed ``$($launchEvidence.cleanup.runtime_fixture_removed)``; Audit SHA-256 ``$($launchEvidence.broker.audit_sha256)`` (``$($launchEvidence.broker.audit_bytes)`` bytes)."
             "- Portable ZIP: ``passed``; entries: ``$($zipSummary.file_count)``; compressed bytes: ``$($zipSummary.archive_bytes)``; SHA-256: ``$zipHash``."
             '- Credential scan: zero findings for the implemented known-pattern set only; not proof of general credential absence.'
-            '- Signed: no; standalone app verified: no; installer: not started; launch: not verified; distribution claimed: no.'
-            '- The ZIP, bundle, and staged fixture Manifest remain only in the ephemeral runner workspace and are removed with the job; no artifact upload occurs.'
+            '- Build receipt remains ``standalone_app_verified=false``, ``launch_status=not_verified``, ``binary_pruning_verified=false``; the separate smoke is not an installed-product, full pruning, Owner-authorization, signing, or distribution claim.'
+            '- Signed: no; installer: not started; formal distribution claimed: no.'
+            '- The separate smoke evidence, ZIP, bundle, and staged fixture Manifest remain only in the ephemeral runner workspace and are removed with the job; no artifact upload occurs.'
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          foreach ($path in @($portableZip, $bundle, $manifestPath)) {
+          foreach ($path in @($portableZip, $bundle, $manifestPath, $launchEvidencePath)) {
             $resolved = [IO.Path]::GetFullPath($path)
             $runnerRoot = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\') + '\'
             if (-not $resolved.StartsWith($runnerRoot, [StringComparison]::OrdinalIgnoreCase)) {

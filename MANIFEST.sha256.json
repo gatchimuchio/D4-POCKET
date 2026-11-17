@@ -101,7 +101,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-export-build.yml",
-      "sha256": "652109cc5b3a8ee04f88a39112d803e344946b0c8ad5b1bb49caa64ee9d165f2"
+      "sha256": "bdce30844cd83e985e0d3681846ad4b84550003be0d8593b7e624b15218f4b2b"
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
@@ -6046,6 +6046,10 @@
     {
       "path": "tooling/tests/test_windows_export_setup_pipeline.py",
       "sha256": "681dd40a749de4d1326ed8c00afff6c28347632c31962c137165352732cede06"
+    },
+    {
+      "path": "tooling/tests/windows_export_portable_launch_smoke.ps1",
+      "sha256": "bc2303123e268dab1073f5a9a9aa28485cceaa589ead8db31b9644a42aed5fcf"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
