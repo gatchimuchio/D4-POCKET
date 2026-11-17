@@ -436,6 +436,10 @@ using System.Runtime.InteropServices;
 using System.Text;
 public static class GuiShellExportSmokeWin32 {
   private delegate bool EnumChildProc(IntPtr window, IntPtr parameter);
+  public static int LastChildWindowCount;
+  public static int LastSuccessfulTextMessageCount;
+  public static int LastNonemptyTextCount;
+  public static int LastTimedOutMessageCount;
 
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
@@ -451,15 +455,31 @@ public static class GuiShellExportSmokeWin32 {
 
   public static string[] GetChildWindowTexts(IntPtr parent) {
     var texts = new List<string>();
+    LastChildWindowCount = 0;
+    LastSuccessfulTextMessageCount = 0;
+    LastNonemptyTextCount = 0;
+    LastTimedOutMessageCount = 0;
     EnumChildProc callback = delegate(IntPtr window, IntPtr parameter) {
+      LastChildWindowCount++;
       IntPtr lengthResult;
-      if (SendMessageTimeoutLength(window, 0x000E, IntPtr.Zero, IntPtr.Zero, 0x0002, 1000, out lengthResult) == IntPtr.Zero) return true;
+      if (SendMessageTimeoutLength(window, 0x000E, IntPtr.Zero, IntPtr.Zero, 0x0002, 1000, out lengthResult) == IntPtr.Zero) {
+        LastTimedOutMessageCount++;
+        return true;
+      }
+      LastSuccessfulTextMessageCount++;
       long length = lengthResult.ToInt64();
       if (length <= 0 || length > 8192) return true;
       var text = new StringBuilder((int)length + 1);
       IntPtr textResult;
-      if (SendMessageTimeoutText(window, 0x000D, new IntPtr(text.Capacity), text, 0x0002, 1000, out textResult) == IntPtr.Zero) return true;
-      if (!String.IsNullOrWhiteSpace(text.ToString())) texts.Add(text.ToString());
+      if (SendMessageTimeoutText(window, 0x000D, new IntPtr(text.Capacity), text, 0x0002, 1000, out textResult) == IntPtr.Zero) {
+        LastTimedOutMessageCount++;
+        return true;
+      }
+      LastSuccessfulTextMessageCount++;
+      if (!String.IsNullOrWhiteSpace(text.ToString())) {
+        LastNonemptyTextCount++;
+        texts.Add(text.ToString());
+      }
       return true;
     };
     EnumChildWindows(parent, callback, IntPtr.Zero);
@@ -507,11 +527,21 @@ public static class GuiShellExportSmokeWin32 {
       }
     } catch { }
   }
-  $nativeDialogTexts = [GuiShellExportSmokeWin32]::GetChildWindowTexts(
-    [IntPtr]$probeDialog.Current.NativeWindowHandle
-  )
+  $dialogHandle = [IntPtr]$probeDialog.Current.NativeWindowHandle
+  $nativeDialogTexts = @()
+  $nativeHelperErrorType = 'none'
+  try { $nativeDialogTexts = @([GuiShellExportSmokeWin32]::GetChildWindowTexts($dialogHandle)) }
+  catch { $nativeHelperErrorType = $_.Exception.GetType().Name }
   foreach ($text in $nativeDialogTexts) { [void]$probeText.Add([string]$text) }
   if (($probeText -join "`n").IndexOf('UNSUPPORTED_ARGUMENTS', [StringComparison]::Ordinal) -lt 0) {
+    Write-Output ("Launcher refusal code observation: handle_present={0}; child_windows={1}; text_messages_succeeded={2}; nonempty_texts={3}; timed_out_messages={4}; helper_error_type={5}; uia_elements={6}" -f
+      ($dialogHandle -ne [IntPtr]::Zero),
+      [GuiShellExportSmokeWin32]::LastChildWindowCount,
+      [GuiShellExportSmokeWin32]::LastSuccessfulTextMessageCount,
+      [GuiShellExportSmokeWin32]::LastNonemptyTextCount,
+      [GuiShellExportSmokeWin32]::LastTimedOutMessageCount,
+      $nativeHelperErrorType,
+      $probeElements.Count)
     throw 'launcher did not expose the expected unsupported-argument code'
   }
   $probeButton = @($probeElements | Where-Object {
