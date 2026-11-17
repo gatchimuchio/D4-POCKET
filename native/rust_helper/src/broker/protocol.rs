@@ -11952,6 +11952,72 @@ mod 端末統治試験 {
 
     #[test]
     #[allow(non_snake_case)]
+    fn MINIDORA公開APIは対話対応Task未対応をBrokerCatalogへ投影する() {
+        let mut e = 環境生成();
+        let catalog = e
+            .broker
+            .compose_runtime_agent_catalog()
+            .expect("Broker Runtime／Agent Catalog");
+        assert_eq!(catalog.runtime_ids, vec!["local"]);
+        assert_eq!(catalog.agents.len(), 1);
+        assert_eq!(catalog.agents[0].runtime_id, "local");
+        let metadata = &catalog.agents[0].metadata;
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../../specs/agent_adapter.schema.json"))
+                .unwrap();
+        let validator = jsonschema::options()
+            .with_draft(jsonschema::Draft::Draft202012)
+            .build(&schema)
+            .expect("AgentAdapter Schema");
+        assert!(
+            validator.is_valid(metadata),
+            "AgentAdapter Schema違反: {metadata}"
+        );
+        assert_eq!(metadata["adapter_id"], "minidora-product-http");
+        assert_eq!(metadata["provider"], "MINIDORA");
+        assert_eq!(metadata["version"], "MINIDORA-PRODUCT-API-v1");
+        assert_eq!(metadata["model"], "unknown");
+        assert_eq!(metadata["status"], "unsupported");
+        assert_eq!(metadata["provider_health"]["status"], "unknown");
+        assert_eq!(metadata["workspace_requirements"]["mode"], "required");
+        assert_eq!(metadata["authentication"]["method"], "unknown");
+        assert_eq!(metadata["authentication"]["secret_value_present"], false);
+        assert_eq!(
+            metadata["host_requirements"]["network_scope"],
+            "loopback_only"
+        );
+        assert_eq!(
+            metadata["host_requirements"]["process_spawn"]["status"],
+            "unsupported"
+        );
+        let capabilities = metadata["capabilities"].as_array().unwrap();
+        assert_eq!(capabilities.len(), 2);
+        assert_eq!(capabilities[0]["capability_id"], "dialogue");
+        assert_eq!(capabilities[0]["support"]["status"], "supported");
+        assert_eq!(capabilities[1]["capability_id"], "task_execution");
+        assert_eq!(capabilities[1]["support"]["status"], "unsupported");
+        assert!(!e.broker.対話.AgentTask能力対応("local"));
+
+        let invitation = 制御(
+            &mut e.broker,
+            "端末招待",
+            json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"}),
+        )
+        .body
+        .unwrap();
+        let credential = 通信(&mut e.broker, &invitation, "端末結合", json!({}))
+            .body
+            .unwrap();
+        let listed = 通信(&mut e.broker, &credential, "Agent一覧", json!({}));
+        assert_eq!(listed.status, BrokerStatus::Accepted, "{listed:?}");
+        assert_eq!(listed.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+        let projected = &listed.body.as_ref().unwrap()["Agent"];
+        assert_eq!(projected.as_array().map(Vec::len), Some(1));
+        assert_eq!(projected[0], *metadata);
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
     fn Mobileの読み取り投影は既存Broker統治経路だけを通りowner作用を拒否する() {
         let mut e = 環境生成();
         let task_fixture = json!({

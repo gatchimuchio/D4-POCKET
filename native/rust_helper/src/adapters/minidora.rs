@@ -280,6 +280,82 @@ impl 実行系Adapter for MinidoraAdapter {
     fn 観測対象(&self) -> Option<SocketAddr> {
         Some(self.接続先)
     }
+    fn agent_metadata(&self) -> Option<Value> {
+        Some(json!({
+            "adapter_id": "minidora-product-http",
+            "agent_id": "minidora",
+            "provider": "MINIDORA",
+            "provider_id": "minidora_product_api",
+            "version": "MINIDORA-PRODUCT-API-v1",
+            "model": "unknown",
+            "status": "unsupported",
+            "capabilities": [
+                {
+                    "capability_id": "dialogue",
+                    "support": {
+                        "status": "supported",
+                        "reason": "公開APIのPOST /api/chatと対話sessionのHash照合を固定Adapterで利用"
+                    }
+                },
+                {
+                    "capability_id": "task_execution",
+                    "support": {
+                        "status": "unsupported",
+                        "reason": "公開API v1に独立AgentTask endpointがない"
+                    }
+                }
+            ],
+            "workspace_requirements": {
+                "mode": "required",
+                "boundary_policy": "deny_outside_workspace",
+                "secret_paths": [".env", ".ssh", "secrets/"]
+            },
+            "provider_health": {
+                "status": "unknown",
+                "reason": "Catalog投影はHealth endpointへ接続せず、利用可能性を観測しない"
+            },
+            "automatic_fallback": false,
+            "tool_support": {
+                "status": "unsupported",
+                "reason": "公開APIにTool呼出契約がない"
+            },
+            "mcp_support": {
+                "status": "unsupported",
+                "reason": "公開APIにMCP接続契約がない"
+            },
+            "session_support": {
+                "status": "supported",
+                "reason": "chat要求のsession_idを応答とtraceへ照合する"
+            },
+            "cancellation_support": {
+                "status": "unknown",
+                "reason": "HTTP待機は中断可能だが、MINIDORA側の処理停止は観測していない"
+            },
+            "usage_metrics_support": {
+                "status": "unknown",
+                "reason": "公開APIからの実測metrics取得を確認していない"
+            },
+            "cost_metrics_support": {
+                "status": "unknown",
+                "reason": "公開APIからの実測cost取得を確認していない"
+            },
+            "authentication": {
+                "method": "unknown",
+                "status": "unknown",
+                "secret_value_present": false
+            },
+            "host_requirements": {
+                "platforms": [std::env::consts::OS],
+                "network_scope": "loopback_only",
+                "process_spawn": {
+                    "status": "unsupported",
+                    "reason": "Runtime起動はAdapterの責任範囲外"
+                }
+            },
+            "evidence_source": "INTERNAL_STATE",
+            "evidence_reason": "Brokerは公開HTTP契約の対話だけを接続し、Task能力とprovider healthは未対応／未観測のまま投影する"
+        }))
+    }
     fn 応答(
         &self,
         要求: &対話要求,
