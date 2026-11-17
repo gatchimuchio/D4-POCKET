@@ -373,6 +373,7 @@ class ShellCoreClient {
       Map<String, Object?>.from(bodyValue),
       limit: limit,
       beforeEventId: beforeEventId,
+      readRequestAuditEventId: auditEventId,
     );
   }
 
@@ -1035,7 +1036,11 @@ AuditInspectionPage _validatedAuditInspectionPage(
   Map<String, Object?> value, {
   required int limit,
   required String? beforeEventId,
+  required String readRequestAuditEventId,
 }) {
+  if (!_isSafeAuditIdentifier(readRequestAuditEventId)) {
+    throw const BrokerClientException('監査読取要求のBroker receiptを確認できません');
+  }
   const fields = <String>{
     'version',
     'integrity_status',
@@ -1157,6 +1162,7 @@ AuditInspectionPage _validatedAuditInspectionPage(
     throw const BrokerClientException('Broker監査一覧のpage境界が不正です');
   }
   return AuditInspectionPage(
+    readRequestAuditEventId: readRequestAuditEventId,
     verifiedEventCount: count,
     snapshotHeadEventId: head as String?,
     hasOlderEvents: hasOlder,

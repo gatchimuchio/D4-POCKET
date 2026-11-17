@@ -168,7 +168,8 @@ class _AuditViewerState extends State<AuditViewer> {
           SectionList(
             title: '監査読取Grant',
             rows: [
-              '状態: ${brokerPage != null ? '認証済みBroker Sessionのread-only Grant確認済み' : 'Broker応答の検証後に確認'}',
+              '状態: ${brokerPage != null ? '認証Broker Sessionで限定read-only要求を受理済み' : 'Broker応答の検証後に確認'}',
+              '要求受理のBroker Audit ID: ${brokerPage?.readRequestAuditEventId ?? '未取得'}',
               '対象: Brokerが検証した永続Audit Chainのbounded page（1要求最大200件）',
               'Owner Approval／Permission／Authorityの発行・変更: なし',
               '個別Grant対応: ${brokerPage != null ? 'Audit pageには投影されません' : '未取得'}',

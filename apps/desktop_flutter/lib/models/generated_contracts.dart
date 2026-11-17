@@ -235,6 +235,7 @@ class AuditRecord {
 
 class AuditInspectionPage {
   const AuditInspectionPage({
+    required this.readRequestAuditEventId,
     required this.verifiedEventCount,
     required this.snapshotHeadEventId,
     required this.hasOlderEvents,
@@ -242,6 +243,7 @@ class AuditInspectionPage {
     required this.events,
   });
 
+  final String readRequestAuditEventId;
   final int verifiedEventCount;
   final String? snapshotHeadEventId;
   final bool hasOlderEvents;

@@ -635,9 +635,10 @@ void main() {
     expect(find.text('監査鎖状態: 検証済み'), findsOneWidget);
     expect(find.text('ハッシュ鎖状態: 検証済み'), findsOneWidget);
     expect(
-      find.text('状態: 認証済みBroker Sessionのread-only Grant確認済み'),
+      find.text('状態: 認証Broker Sessionで限定read-only要求を受理済み'),
       findsOneWidget,
     );
+    expect(find.text('要求受理のBroker Audit ID: broker-audit-2'), findsOneWidget);
     expect(
       find.text('Owner Approval／Permission／Authorityの発行・変更: なし'),
       findsOneWidget,
@@ -684,6 +685,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('broker-audit-1'), findsNothing);
+    expect(find.text('要求受理のBroker Audit ID: 未取得'), findsOneWidget);
     expect(find.text('Broker監査一覧は表示できません'), findsOneWidget);
     expect(find.textContaining('PRIVATE_BROKER_ERROR_DETAIL'), findsNothing);
   });
