@@ -160,8 +160,15 @@ function Invoke-AuthenticatedRequest {
 
 function Request-FrontendExit {
   param([Parameter(Mandatory = $true)][System.Diagnostics.Process]$Frontend)
+  $result = [ordered]@{
+    callback_posted = $false
+    exit_item_observed = $false
+    exit_item_invoked = $false
+  }
   $Frontend.Refresh()
-  if ($Frontend.HasExited -or $Frontend.MainWindowHandle -eq [IntPtr]::Zero) { return $false }
+  if ($Frontend.HasExited -or $Frontend.MainWindowHandle -eq [IntPtr]::Zero) {
+    return [pscustomobject]$result
+  }
   Add-Type -AssemblyName UIAutomationClient
   Add-Type -AssemblyName UIAutomationTypes
   if (-not [GuiShellExportSmokeWin32]::PostMessage(
@@ -169,8 +176,9 @@ function Request-FrontendExit {
       [uint32]0x8029,
       [IntPtr]::Zero,
       [IntPtr]0x0205)) {
-    return $false
+    return [pscustomobject]$result
   }
+  $result.callback_posted = $true
   $desktop = [System.Windows.Automation.AutomationElement]::RootElement
   $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
   $deadline = (Get-Date).AddSeconds(12)
@@ -196,9 +204,11 @@ function Request-FrontendExit {
             $item.Current.ControlType -eq [System.Windows.Automation.ControlType]::MenuItem -and
             $item.Current.Name -eq '終了' -and
             $item.Current.IsEnabled) {
+          $result.exit_item_observed = $true
           $pattern = $item.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
           $pattern.Invoke()
-          return $true
+          $result.exit_item_invoked = $true
+          return [pscustomobject]$result
         }
       } catch {
         # A menu node may disappear during invocation or traversal.
@@ -217,7 +227,7 @@ function Request-FrontendExit {
     }
     Start-Sleep -Milliseconds 200
   }
-  return $false
+  return [pscustomobject]$result
 }
 
 function Stop-ExactOwnedProcess {
@@ -293,6 +303,9 @@ $evidence = [ordered]@{
     ui_observation_known_labels = @()
     included_surfaces = @()
     excluded_surfaces_absent = $false
+    tray_exit_callback_posted = $false
+    tray_exit_item_observed = $false
+    tray_exit_item_invoked = $false
     graceful_exit_attempted = $false
     graceful_exit = $false
     forced_exit = $false
@@ -517,7 +530,7 @@ public static class GuiShellExportSmokeWin32 {
     throw 'fixture runtime store already exists or escaped the runner LocalAppData root'
   }
   $endpointPath = Join-Path $runtimeStore 'broker_session.json'
-  $auditPath = Join-Path $runtimeStore 'audit.jsonl'
+  $auditPath = Join-Path (Join-Path $runtimeStore 'store') 'audit.jsonl'
 
   $stage = 'launch exact portable Rust launcher and observe its Flutter child'
   $launcherProcess = Start-Process -FilePath $launcherPath -WorkingDirectory $bundleRoot -PassThru
@@ -727,7 +740,11 @@ public static class GuiShellExportSmokeWin32 {
       $frontendProcess.Refresh()
       if (-not $frontendProcess.HasExited) {
         $evidence.frontend.graceful_exit_attempted = $true
-        $gracefulRequested = Request-FrontendExit -Frontend $frontendProcess
+        $trayExit = Request-FrontendExit -Frontend $frontendProcess
+        $evidence.frontend.tray_exit_callback_posted = [bool]$trayExit.callback_posted
+        $evidence.frontend.tray_exit_item_observed = [bool]$trayExit.exit_item_observed
+        $evidence.frontend.tray_exit_item_invoked = [bool]$trayExit.exit_item_invoked
+        $gracefulRequested = [bool]$trayExit.exit_item_invoked
         $frontendExited = $false
         if ($gracefulRequested) { $frontendExited = $frontendProcess.WaitForExit(30000) }
         if ($gracefulRequested -and $frontendExited) {
