@@ -331,7 +331,7 @@ $auditPath = $null
 $sessionSecret = $null
 $runError = $null
 $cleanupPassed = $true
-$stage = 'validate build receipt and bundle identity'
+$stage = 'read bundle receipt and manifest'
 
 try {
   $receiptPath = Join-Path $bundleRoot 'd4_pocket_build_receipt.json'
@@ -344,6 +344,7 @@ try {
   }
   $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding utf8 | ConvertFrom-Json -ErrorAction Stop
   $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding utf8 | ConvertFrom-Json -ErrorAction Stop
+  $stage = 'validate fixture build receipt state'
   if ($receipt.evidence_type -ne 'd4_pocket_windows_export_build' -or
       $receipt.source_commit -cne $SourceCommit -or
       $receipt.evidence_source -ne 'INTERNAL_STATE' -or
@@ -354,12 +355,13 @@ try {
       $receipt.binary_pruning_verified -ne $false -or
       $receipt.formal_distribution_claimed -ne $false -or
       $receipt.signed -ne $false -or
-      $receipt.credential_inherited -ne $false -or
-      $receipt.permission_inherited -ne $false -or
-      $receipt.approval_inherited -ne $false -or
-      $receipt.audit_chain_inherited -ne $false) {
+      $receipt.authority_boundary.credential_inherited -ne $false -or
+      $receipt.authority_boundary.permission_inherited -ne $false -or
+      $receipt.authority_boundary.approval_inherited -ne $false -or
+      $receipt.authority_boundary.audit_chain_inherited -ne $false) {
     throw 'build receipt scope is not the expected fixture-only unsigned state'
   }
+  $stage = 'validate fixture Manifest identity and authority strip'
   $appId = [string]$manifest.manifest.app_identity.app_id
   $auditStoreId = [string]$manifest.manifest.audit_store.store_id
   if ($appId -cne [string]$receipt.app_id -or
@@ -387,6 +389,7 @@ try {
     'shell.setup_doctor', 'shell.history', 'shell.evaluation_lab', 'shell.host_capabilities',
     'shell.notifications', 'shell.observability', 'shell.trace_inspector', 'shell.host_operations'
   )
+  $stage = 'validate selected and excluded modules'
   $includedIds = @($receipt.module_plan.included_module_ids | ForEach-Object { [string]$_ })
   $excludedIds = @($receipt.module_plan.excluded_optional_module_ids | ForEach-Object { [string]$_ })
   foreach ($moduleId in @($coreIds + $requiredIds)) {
@@ -402,6 +405,7 @@ try {
     throw 'fixture module plan does not select Observability/Trace Inspector and exclude the other six optional modules'
   }
 
+  $stage = 'verify receipt-bound artifact hashes'
   $launcherRecord = Get-ArtifactRecord -Receipt $receipt -RelativePath 'gui_shell_desktop_launcher.exe'
   $appRecord = Get-ArtifactRecord -Receipt $receipt -RelativePath 'app/gui_shell_desktop.exe'
   $helperRecord = Get-ArtifactRecord -Receipt $receipt -RelativePath 'broker/gui_shell_rust_helper.exe'

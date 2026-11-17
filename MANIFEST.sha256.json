@@ -6049,7 +6049,7 @@
     },
     {
       "path": "tooling/tests/windows_export_portable_launch_smoke.ps1",
-      "sha256": "bc2303123e268dab1073f5a9a9aa28485cceaa589ead8db31b9644a42aed5fcf"
+      "sha256": "80a3a4a6dadbe018dbc06e8ba6949fbbbe4c4384c008b32aea91d251af642691"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
