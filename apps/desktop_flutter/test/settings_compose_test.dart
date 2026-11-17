@@ -214,6 +214,64 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Broker切替中のAI Edit提案はunknownを通知し旧応答を投影・再送しない', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final oldTransport = _ComposeScreenTransport(holdAiEditProposal: true);
+    final newTransport = _ComposeScreenTransport();
+    var unknownOutcomeCount = 0;
+
+    Widget settingsFor(BrokerTransport transport) => MaterialApp(
+          home: Scaffold(
+            body: SettingsScreen(
+              client: ShellCoreClient.mock(transport: transport),
+              onBrokerMutationOutcomeUnknown: () => unknownOutcomeCount++,
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(settingsFor(oldTransport));
+    await tester.pumpAndSettle();
+    await _enter(
+      tester,
+      'compose-ai-edit-expected-changes',
+      'Previewで対象platformを表示する',
+    );
+    final proposalButton = find.byKey(const ValueKey('compose-ai-edit-button'));
+    await tester.ensureVisible(proposalButton);
+    await tester.tap(proposalButton);
+    await tester.pump();
+    await oldTransport.aiEditProposalRequestStarted.future.timeout(
+      const Duration(seconds: 2),
+    );
+
+    await tester.pumpWidget(settingsFor(newTransport));
+    await tester.pumpAndSettle();
+    expect(unknownOutcomeCount, 1);
+
+    oldTransport.releasePendingAiEditProposal();
+    await tester.pumpAndSettle();
+    expect(
+      oldTransport.requests
+          .where((request) => request['operation'] == 'GUI Shell編集提案'),
+      hasLength(1),
+    );
+    expect(
+      newTransport.requests
+          .where((request) => request['operation'] == 'GUI Shell編集提案'),
+      isEmpty,
+    );
+    expect(find.byKey(const ValueKey('compose-ai-edit-review-button')),
+        findsNothing);
+    expect(find.textContaining('編集提案を審査待ちで記録しました'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Compose画面が選択をManifest、Preview、Module plan、編集提案へつなぐ',
     (tester) async {
@@ -645,6 +703,7 @@ class _ComposeScreenTransport implements BrokerTransport {
     this.mcpServerDisplayName = 'Fixture MCP',
     this.holdMcpCatalog = false,
     this.holdMcpToolCall = false,
+    this.holdAiEditProposal = false,
   });
 
   final List<Map<String, Object?>> requests = [];
@@ -652,11 +711,15 @@ class _ComposeScreenTransport implements BrokerTransport {
   final String mcpServerDisplayName;
   final bool holdMcpCatalog;
   final bool holdMcpToolCall;
+  final bool holdAiEditProposal;
   final Completer<void> mcpCatalogRequestStarted = Completer<void>();
   final Completer<void> mcpToolCallRequestStarted = Completer<void>();
+  final Completer<void> aiEditProposalRequestStarted = Completer<void>();
   final Completer<Map<String, Object?>> _pendingMcpCatalog =
       Completer<Map<String, Object?>>();
   final Completer<Map<String, Object?>> _pendingMcpToolCall =
+      Completer<Map<String, Object?>>();
+  final Completer<Map<String, Object?>> _pendingAiEditProposal =
       Completer<Map<String, Object?>>();
 
   void releasePendingMcpCatalog() {
@@ -667,6 +730,13 @@ class _ComposeScreenTransport implements BrokerTransport {
   void releasePendingMcpToolCall() {
     if (_pendingMcpToolCall.isCompleted) return;
     _pendingMcpToolCall.complete(_mcpToolCallBody());
+  }
+
+  void releasePendingAiEditProposal() {
+    if (_pendingAiEditProposal.isCompleted) return;
+    _pendingAiEditProposal.complete(
+      _aiEditProposalBody(lastPayload('GUI Shell編集提案')),
+    );
   }
 
   Future<Map<String, Object?>> _waitForMcpCatalog() {
@@ -681,6 +751,13 @@ class _ComposeScreenTransport implements BrokerTransport {
       mcpToolCallRequestStarted.complete();
     }
     return _pendingMcpToolCall.future;
+  }
+
+  Future<Map<String, Object?>> _waitForAiEditProposal() {
+    if (!aiEditProposalRequestStarted.isCompleted) {
+      aiEditProposalRequestStarted.complete();
+    }
+    return _pendingAiEditProposal.future;
   }
 
   Map<String, Object?> lastPayload(String operation) => requests
@@ -752,6 +829,9 @@ class _ComposeScreenTransport implements BrokerTransport {
         holdMcpCatalog ? await _waitForMcpCatalog() : _mcpConnectionListBody(),
       'MCP Tool実行' =>
         holdMcpToolCall ? await _waitForMcpToolCall() : _mcpToolCallBody(),
+      'GUI Shell編集提案' => holdAiEditProposal
+          ? await _waitForAiEditProposal()
+          : _aiEditProposalBody(payload!),
       '更新候補取得' => <String, Object?>{
           '状態': 'updated',
           '候補件数': 2,
@@ -827,26 +907,6 @@ class _ComposeScreenTransport implements BrokerTransport {
           'evidence_source': 'INTERNAL_STATE',
           'audit_id': 'broker-audit-compose',
         },
-      'GUI Shell編集提案' => <String, Object?>{
-          'version': 1,
-          'operation': operation,
-          'status': 'accepted',
-          'edit_id': payload!['edit_id'],
-          'scope': payload['scope'],
-          'target_paths': payload['target_paths'],
-          'expected_change_count':
-              (payload['expected_changes']! as List).length,
-          'execution_mode': 'proposal_only',
-          'review_required': true,
-          'apply_status': 'not_started',
-          'files_written': false,
-          'permission_generated': false,
-          'approval_state': 'owner_review_required',
-          'authority_strip': true,
-          'evidence_source': 'INTERNAL_STATE',
-          'instruction_hash': brokerPayloadHash(payload),
-          'audit_id': 'audit-compose-ai-edit',
-        },
       _ => <String, Object?>{},
     };
     return {
@@ -889,6 +949,26 @@ class _ComposeScreenTransport implements BrokerTransport {
         '公開範囲': 'hash_only',
         '証拠種別': 'LIVE_RUNTIME',
         '監査ID': 'audit-compose-tool-call',
+      };
+
+  Map<String, Object?> _aiEditProposalBody(Map<String, Object?> payload) => {
+        'version': 1,
+        'operation': 'GUI Shell編集提案',
+        'status': 'accepted',
+        'edit_id': payload['edit_id'],
+        'scope': payload['scope'],
+        'target_paths': payload['target_paths'],
+        'expected_change_count': (payload['expected_changes']! as List).length,
+        'execution_mode': 'proposal_only',
+        'review_required': true,
+        'apply_status': 'not_started',
+        'files_written': false,
+        'permission_generated': false,
+        'approval_state': 'owner_review_required',
+        'authority_strip': true,
+        'evidence_source': 'INTERNAL_STATE',
+        'instruction_hash': brokerPayloadHash(payload),
+        'audit_id': 'audit-compose-ai-edit',
       };
 
   Map<String, Object?> _mcpConnectionListBody() => {

@@ -225,7 +225,9 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
 
   @override
   void dispose() {
-    if (_updateMutationInProgress || _composeToolCallInProgress) {
+    if (_updateMutationInProgress ||
+        _composeToolCallInProgress ||
+        _aiEditInProgress) {
       widget.onBrokerMutationOutcomeUnknown?.call();
     }
     _searchController.dispose();
