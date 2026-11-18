@@ -199,7 +199,10 @@ void main() {
       isEmpty,
       reason: 'Preview中はnative Owner確認とTool作用を開始しない',
     );
-    await _tap(tester, 'compose-tool-preview-owner-confirm');
+    await tester.tap(
+      find.byKey(const ValueKey('compose-tool-preview-owner-confirm')),
+    );
+    await tester.pump();
     for (var frame = 0;
         frame < 10 && !oldTransport.mcpToolCallRequestStarted.isCompleted;
         frame++) {
