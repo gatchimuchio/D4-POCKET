@@ -825,7 +825,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_compose_test.dart",
-      "sha256": "0f0c070414984bce3a64702fbe1a91f03ab3e5059b1fdcb0e253ca4cd1f74145"
+      "sha256": "4d7d63f9fe06c7b085b0082dd47c9cb662bdba590b37a83aafe115e24af7f8d8"
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
@@ -1637,7 +1637,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "68b3f9336252af296523a64a2043eeb750fff26bd0388c26a7aa051a098b3849"
+      "sha256": "1015ed28b93cbe2d9f48a75aa592f43fe7bc42fdfea05c6de639bd0cc7f14a4b"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3140,6 +3140,14 @@
       "sha256": "4c7bd22c190a66c63d67eb84fcfb78f94cbc360a93b2314d774ebc8250b3ea2a"
     },
     {
+      "path": "examples/contracts/invalid/mcp_tool_action_preview_receipt_permission.invalid.json",
+      "sha256": "ff3cecd389ac783ef097860fa7f891364f480a774232ea8b9928ddaaf296347d"
+    },
+    {
+      "path": "examples/contracts/invalid/mcp_tool_action_preview_secret.invalid.json",
+      "sha256": "a85e3fb1e70a0227eb55a3e05c80c0ca879dee7e83e2cec2cfbd0bfc469c8c15"
+    },
+    {
       "path": "examples/contracts/invalid/mcp_tool_call_authority.invalid.json",
       "sha256": "280339e1262a358ea9a71871f28076812cb2af9e29f232dc5dd1312b99908dc2"
     },
@@ -3566,6 +3574,14 @@
     {
       "path": "examples/contracts/mcp_disconnect_receipt.valid.json",
       "sha256": "b3ad1f200848e7897772ad33d2260b0f5117940996a8542c368952c8efbd0966"
+    },
+    {
+      "path": "examples/contracts/mcp_tool_action_preview.valid.json",
+      "sha256": "6755a82226fadaf05578dae32cae3b7b961a362feb3f720b1465f208534182e6"
+    },
+    {
+      "path": "examples/contracts/mcp_tool_action_preview_receipt.valid.json",
+      "sha256": "0d0eca7890bc8e590c0947e3ebd00bc43190fabaf85777dceb59ab5256fea5d5"
     },
     {
       "path": "examples/contracts/mcp_tool_call.valid.json",
@@ -5414,6 +5430,14 @@
     {
       "path": "specs/mcp_disconnect_receipt.schema.json",
       "sha256": "54f7e7c594e5577c2bdd72ba7ca3d6977b127ffe7fc21d84b514ae84885e2407"
+    },
+    {
+      "path": "specs/mcp_tool_action_preview.schema.json",
+      "sha256": "1e24dc549ce377d0ecc4cc1a799820b40b143aee4d8c86b4b051972c5ced2018"
+    },
+    {
+      "path": "specs/mcp_tool_action_preview_receipt.schema.json",
+      "sha256": "db33a3ea837c18c6a29b1cb6f60f13da178f45143850cfbcfb0120ace0c3a383"
     },
     {
       "path": "specs/mcp_tool_call.schema.json",

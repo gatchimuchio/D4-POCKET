@@ -225,7 +225,7 @@ void main() {
     );
     expect(find.textContaining('Compose構成から既存MCP Toolを実行しました'), findsNothing);
     expect(tester.takeException(), isNull);
-  });
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
 
   testWidgets('Compose Tool Preview拒否時はnative Owner確認とTool実行へ進まない', (
     tester,
@@ -273,7 +273,7 @@ void main() {
         findsNothing);
     expect(find.textContaining('Previewに失敗'), findsOneWidget);
     expect(tester.takeException(), isNull);
-  });
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
 
   testWidgets('Broker切替中のAI Edit提案はunknownを通知し旧応答を投影・再送しない', (
     tester,
@@ -536,6 +536,7 @@ void main() {
       ]);
       expect(tester.takeException(), isNull);
     },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );
 
   testWidgets('AI Editは内容確認後にだけ未信頼Task下書きをAgent Centerへ渡す', (
