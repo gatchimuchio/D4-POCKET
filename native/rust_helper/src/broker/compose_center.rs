@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
 const VERSION: u64 = 1;
-const CATALOG_VERSION: u64 = 2;
+const CATALOG_VERSION: u64 = 3;
 const OP_COMPOSE: &str = "GUI Shell構成";
 const OP_CATALOG: &str = "GUI Shell構成Catalog";
 const OP_PREVIEW: &str = "GUI Shell構成Preview";
@@ -119,7 +119,11 @@ fn catalog_snapshot(broker: &mut Broker) -> Result<Value, String> {
     let agents = runtime_agent_catalog
         .agents
         .iter()
-        .map(|agent| json!({"runtime_id": agent.runtime_id, "metadata": agent.metadata}))
+        .map(|agent| json!({
+            "runtime_id": agent.runtime_id,
+            "metadata": agent.metadata,
+            "dependencies": {"status":"partial", "items":[{"kind":"runtime", "id":agent.runtime_id}]}
+        }))
         .collect::<Vec<_>>();
     let runtimes = runtime_agent_catalog
         .runtime_ids
@@ -152,7 +156,11 @@ fn catalog_snapshot(broker: &mut Broker) -> Result<Value, String> {
                 "status": metadata.and_then(|value| value.get("status")).and_then(Value::as_str).unwrap_or("unknown"),
                 "capabilities": metadata.and_then(|value| value.get("capabilities")).cloned().unwrap_or_else(|| json!([])),
                 "permissions": {"status":"not_granted", "requirements":[]},
-                "dependencies": {"status":"unknown", "items":[]},
+                "dependencies": metadata
+                    .and_then(|value| value.get("adapter_id"))
+                    .and_then(Value::as_str)
+                    .map(|adapter_id| json!({"status":"partial", "items":[{"kind":"adapter", "id":adapter_id}]}))
+                    .unwrap_or_else(|| json!({"status":"unknown", "items":[]})),
                 "scope": {"workspace":workspace_requirements, "host":host_requirements},
                 "evidence_source": metadata.and_then(|value| value.get("evidence_source")).and_then(Value::as_str).unwrap_or(EVIDENCE_SOURCE_INTERNAL_STATE),
             })
@@ -222,7 +230,7 @@ fn catalog_snapshot(broker: &mut Broker) -> Result<Value, String> {
                 "authentication_status": credential_status,
                 "abi": "unknown",
                 "os": ["unknown"],
-                "dependencies": {"status":"unknown", "items":[]},
+                "dependencies": {"status":"partial", "items":[{"kind":"mcp_server", "id":server_id}]},
                 "scope": {"transport":transport, "boundary":"current_registered_connection"},
                 "permission_requirement": "separate_owner_confirmation_and_one_shot_permission",
                 "permission_generated": false,
@@ -286,6 +294,7 @@ fn catalog_snapshot(broker: &mut Broker) -> Result<Value, String> {
         "authority_strip": true,
         "permission_generated": false,
     });
+    validate_dependency_catalog(&content)?;
     let encoded =
         serde_json::to_vec(&content).map_err(|_| "Compose Catalogを正規化できない".to_string())?;
     if encoded.len() > 1024 * 1024 {
@@ -298,6 +307,224 @@ fn catalog_snapshot(broker: &mut Broker) -> Result<Value, String> {
         .ok_or_else(|| "Compose Catalogがobjectではない".to_string())?;
     body.insert("snapshot_hash".to_string(), Value::String(snapshot_hash));
     Ok(Value::Object(body))
+}
+
+fn dependency_node_key(kind: &str, id: &str) -> String {
+    format!("{kind}\0{id}")
+}
+
+fn valid_catalog_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 256
+        && value.as_bytes()[0].is_ascii_alphanumeric()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b':'))
+}
+
+fn validate_dependency_edges(
+    nodes: &BTreeSet<String>,
+    edges: &BTreeSet<(String, String)>,
+) -> Result<(), String> {
+    let mut indegree = nodes
+        .iter()
+        .map(|node| (node.clone(), 0usize))
+        .collect::<BTreeMap<_, _>>();
+    let mut outgoing = BTreeMap::<String, Vec<String>>::new();
+    for (source, target) in edges {
+        if !nodes.contains(source) || !nodes.contains(target) {
+            return Err("Compose Catalogの依存先が現在の候補Catalogにありません".to_string());
+        }
+        *indegree
+            .get_mut(target)
+            .ok_or_else(|| "Compose Catalogの依存先がありません".to_string())? += 1;
+        outgoing
+            .entry(source.clone())
+            .or_default()
+            .push(target.clone());
+    }
+    let mut ready = indegree
+        .iter()
+        .filter_map(|(node, degree)| (*degree == 0).then_some(node.clone()))
+        .collect::<Vec<_>>();
+    let mut visited = 0usize;
+    while let Some(node) = ready.pop() {
+        visited += 1;
+        for dependency in outgoing.get(&node).into_iter().flatten() {
+            let degree = indegree
+                .get_mut(dependency)
+                .ok_or_else(|| "Compose Catalogの依存先がありません".to_string())?;
+            *degree -= 1;
+            if *degree == 0 {
+                ready.push(dependency.clone());
+            }
+        }
+    }
+    if visited != nodes.len() {
+        return Err("Compose Catalogの依存関係に循環があります".to_string());
+    }
+    Ok(())
+}
+
+fn validate_dependency_catalog(catalog: &Value) -> Result<(), String> {
+    let runtimes = catalog
+        .get("runtimes")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "Compose CatalogのRuntime一覧が不正です".to_string())?;
+    let agents = catalog
+        .get("agents")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "Compose CatalogのAgent一覧が不正です".to_string())?;
+    let tools = catalog
+        .get("tools")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "Compose CatalogのTool一覧が不正です".to_string())?;
+    let hosts = catalog
+        .get("hosts")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "Compose CatalogのHost一覧が不正です".to_string())?;
+
+    let mut nodes = BTreeSet::new();
+    let mut edges = BTreeSet::new();
+    let mut runtime_ids = BTreeSet::new();
+    let mut adapter_ids = BTreeSet::new();
+    for runtime in runtimes {
+        let runtime_id = runtime
+            .get("runtime_id")
+            .and_then(Value::as_str)
+            .filter(|value| valid_catalog_id(value))
+            .ok_or_else(|| "Compose CatalogのRuntime依存元IDが不正です".to_string())?;
+        if !runtime_ids.insert(runtime_id.to_string())
+            || !nodes.insert(dependency_node_key("runtime", runtime_id))
+        {
+            return Err("Compose CatalogのRuntime依存元が重複しています".to_string());
+        }
+    }
+    for agent in agents {
+        let runtime_id = agent
+            .get("runtime_id")
+            .and_then(Value::as_str)
+            .filter(|value| valid_catalog_id(value))
+            .ok_or_else(|| "Compose CatalogのAgent依存元IDが不正です".to_string())?;
+        let adapter_id = agent
+            .get("metadata")
+            .and_then(|metadata| metadata.get("adapter_id"))
+            .and_then(Value::as_str)
+            .filter(|value| valid_catalog_id(value))
+            .ok_or_else(|| "Compose CatalogのAgent Adapter依存IDが不正です".to_string())?;
+        if !runtime_ids.contains(runtime_id) {
+            return Err("Compose CatalogのAgentが存在しないRuntimeを参照しています".to_string());
+        }
+        let runtime = runtimes
+            .iter()
+            .find(|runtime| runtime.get("runtime_id").and_then(Value::as_str) == Some(runtime_id))
+            .ok_or_else(|| "Compose CatalogのAgent Runtime依存先が存在しません".to_string())?;
+        if runtime.get("adapter_id").and_then(Value::as_str) != Some(adapter_id) {
+            return Err("Compose CatalogのRuntimeとAgent Adapter依存が一致しません".to_string());
+        }
+        adapter_ids.insert(adapter_id.to_string());
+        if !nodes.insert(dependency_node_key("agent_instance", runtime_id)) {
+            return Err("Compose CatalogのAgent依存元が重複しています".to_string());
+        }
+    }
+    for adapter_id in &adapter_ids {
+        nodes.insert(dependency_node_key("adapter", adapter_id));
+    }
+    for runtime in runtimes {
+        let runtime_id = runtime
+            .get("runtime_id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "Compose CatalogのRuntime依存元IDが不正です".to_string())?;
+        match runtime.get("adapter_id").and_then(Value::as_str) {
+            Some(adapter_id) if adapter_ids.contains(adapter_id) => {
+                let expected = json!({
+                    "status":"partial",
+                    "items":[{"kind":"adapter", "id":adapter_id}]
+                });
+                if runtime.get("dependencies") != Some(&expected) {
+                    return Err("Compose CatalogのRuntime Adapter依存が不一致です".to_string());
+                }
+                edges.insert((
+                    dependency_node_key("runtime", runtime_id),
+                    dependency_node_key("adapter", adapter_id),
+                ));
+            }
+            Some(_) => {
+                return Err("Compose CatalogのRuntime Adapter依存先が存在しません".to_string())
+            }
+            None => {
+                if runtime.get("dependencies") != Some(&json!({"status":"unknown", "items":[]})) {
+                    return Err("Compose CatalogのRuntime未知依存状態が不正です".to_string());
+                }
+            }
+        }
+    }
+    for agent in agents {
+        let runtime_id = agent
+            .get("runtime_id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "Compose CatalogのAgent依存元IDが不正です".to_string())?;
+        if agent.get("dependencies")
+            != Some(&json!({
+                "status":"partial",
+                "items":[{"kind":"runtime", "id":runtime_id}]
+            }))
+        {
+            return Err("Compose CatalogのAgent Runtime依存が不一致です".to_string());
+        }
+        edges.insert((
+            dependency_node_key("agent_instance", runtime_id),
+            dependency_node_key("runtime", runtime_id),
+        ));
+    }
+    for tool in tools {
+        let server_id = tool
+            .get("server_id")
+            .and_then(Value::as_str)
+            .filter(|value| valid_catalog_id(value))
+            .ok_or_else(|| "Compose CatalogのTool Server依存IDが不正です".to_string())?;
+        let tool_id = tool
+            .get("tool_id")
+            .and_then(Value::as_str)
+            .filter(|value| valid_catalog_id(value))
+            .ok_or_else(|| "Compose CatalogのTool依存元IDが不正です".to_string())?;
+        let node_id = format!(
+            "{}_{}_{}_{}",
+            server_id.len(),
+            server_id,
+            tool_id.len(),
+            tool_id
+        );
+        nodes.insert(dependency_node_key("mcp_server", server_id));
+        if !nodes.insert(dependency_node_key("tool", &node_id)) {
+            return Err("Compose CatalogのMCP Tool依存元が重複しています".to_string());
+        }
+        let expected = json!({
+            "status":"partial",
+            "items":[{"kind":"mcp_server", "id":server_id}]
+        });
+        if tool.get("dependencies") != Some(&expected) {
+            return Err("Compose CatalogのMCP Tool Server依存が不一致です".to_string());
+        }
+        edges.insert((
+            dependency_node_key("tool", &node_id),
+            dependency_node_key("mcp_server", server_id),
+        ));
+    }
+    for host in hosts {
+        let host_id = host
+            .get("host_id")
+            .and_then(Value::as_str)
+            .filter(|value| valid_catalog_id(value))
+            .ok_or_else(|| "Compose CatalogのHost依存IDが不正です".to_string())?;
+        if !nodes.insert(dependency_node_key("host", host_id)) {
+            return Err("Compose CatalogのHost依存元が重複しています".to_string());
+        }
+        if host.get("dependencies") != Some(&json!({"status":"unknown", "items":[]})) {
+            return Err("Compose CatalogのHost依存はunknownでなければなりません".to_string());
+        }
+    }
+    validate_dependency_edges(&nodes, &edges)
 }
 
 pub(super) fn catalog(
@@ -724,6 +951,7 @@ pub(super) fn validate_catalog_selection(
     broker: &mut Broker,
     manifest: &ComposeManifest,
 ) -> Result<(), String> {
+    catalog_snapshot(broker)?;
     let runtime_agent_catalog = broker
         .compose_runtime_agent_catalog()
         .map_err(|_| "現在のRuntime／Agent Catalogを検証できない".to_string())?;
@@ -1278,7 +1506,15 @@ mod tests {
         assert_eq!(body["runtimes"][0]["runtime_id"], "fixture-runtime");
         assert_eq!(body["runtimes"][0]["abi"], "unknown");
         assert_eq!(body["runtimes"][0]["permissions"]["status"], "not_granted");
-        assert_eq!(body["runtimes"][0]["dependencies"]["status"], "unknown");
+        assert_eq!(body["runtimes"][0]["dependencies"]["status"], "partial");
+        assert_eq!(
+            body["runtimes"][0]["dependencies"]["items"][0]["kind"],
+            "adapter"
+        );
+        assert_eq!(
+            body["agents"][0]["dependencies"]["items"][0]["kind"],
+            "runtime"
+        );
         assert!(body["hosts"]
             .as_array()
             .is_some_and(|hosts| !hosts.is_empty()));
@@ -1291,6 +1527,30 @@ mod tests {
             call_catalog(&mut broker, json!({"owner": true})).status,
             BrokerStatus::Rejected
         );
+    }
+
+    #[test]
+    fn Compose依存validatorは欠落先と循環を拒否する() {
+        assert!(valid_catalog_id("runtime-a"));
+        assert!(!valid_catalog_id("_runtime-a"));
+        assert!(!valid_catalog_id("runtime/../a"));
+        assert!(!valid_catalog_id(&"a".repeat(257)));
+
+        let first = dependency_node_key("runtime", "runtime-a");
+        let second = dependency_node_key("adapter", "adapter-a");
+        let nodes = BTreeSet::from([first.clone(), second.clone()]);
+        let missing = BTreeSet::from([(first.clone(), dependency_node_key("host", "missing"))]);
+        assert!(validate_dependency_edges(&nodes, &missing).is_err());
+        let cycle = BTreeSet::from([(first.clone(), second.clone()), (second, first)]);
+        assert!(validate_dependency_edges(&nodes, &cycle)
+            .expect_err("循環を拒否")
+            .contains("循環"));
+
+        let mut broker = Broker::new("session-1");
+        register_agent(&mut broker, "fixture-runtime", "fixture-agent", "supported");
+        let mut catalog = catalog_snapshot(&mut broker).expect("Catalog");
+        catalog["agents"][0]["dependencies"]["items"][0]["id"] = json!("missing-runtime");
+        assert!(validate_dependency_catalog(&catalog).is_err());
     }
 
     #[cfg(not(feature = "module_host_capabilities"))]

@@ -6980,7 +6980,7 @@ class _ComposeExportNavigationTransport implements BrokerTransport {
         'audit_event_id': 'fixture-compose-catalog-audit',
         'error': null,
         'body': {
-          'version': 2,
+          'version': 3,
           'snapshot_hash':
               'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           'runtime_ids': ['fixture-runtime'],
@@ -6995,7 +6995,12 @@ class _ComposeExportNavigationTransport implements BrokerTransport {
               'status': 'ready',
               'capabilities': [],
               'permissions': {'status': 'not_granted', 'requirements': []},
-              'dependencies': {'status': 'unknown', 'items': []},
+              'dependencies': {
+                'status': 'partial',
+                'items': [
+                  {'kind': 'adapter', 'id': 'fixture-adapter'},
+                ],
+              },
               'scope': {
                 'workspace': {
                   'mode': 'required',
@@ -7017,6 +7022,12 @@ class _ComposeExportNavigationTransport implements BrokerTransport {
           'agents': [
             {
               'runtime_id': 'fixture-runtime',
+              'dependencies': {
+                'status': 'partial',
+                'items': [
+                  {'kind': 'runtime', 'id': 'fixture-runtime'},
+                ],
+              },
               'metadata': {
                 'adapter_id': 'fixture-adapter',
                 'agent_id': 'fixture-agent',

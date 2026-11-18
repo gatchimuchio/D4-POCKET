@@ -10,7 +10,9 @@ GUI Shell構成は、D4 Pocketで選択したRuntime、Agent、Tool、MCP、Them
 
 Composeは通常認証済みBroker IPCの`GUI Shell構成`へ既存ManifestとCatalog snapshot hashを渡す。BrokerがManifestの構造、重複、識別子、表示範囲、継承禁止、現在Catalogとの整合を再検証する。受理時は`INTERNAL_STATE`のAuditEventを作成し、`gui_shell_compose_receipt`を返す。FlutterはBrokerを呼び出すだけで、filesystem、process、network、credential、Permission、Approvalを直接扱わない。
 
-Catalogは候補の観測を表し、実行可能性・Trust・Permission・Approvalを保証しない。現在producerに依存関係の識別子を供給するcontractがない候補は`dependencies.status=unknown`として投影し、空の一覧を「依存なし」と解釈しない。依存関係の不存在・循環拒否はI04-D01／D02の未成立条件として残り、dependency producerとresolverの契約が接続するまで成立扱いにしない。
+Catalog v3は、依存情報を`known`／`partial`／`unknown`で示す。現行Brokerが直接観測したRuntime→Adapter、Agent instance→Runtime、MCP Tool→登録Serverのbindingだけを`partial`のitemとして出す。Hostや、上流metadataに依存IDがない候補は`unknown`のままにし、空の一覧を「依存なし」と解釈しない。BrokerはCompose／MCP Tool作用の直前に現在Catalogを再構成し、binding先の欠落と循環を拒否する。Flutter consumerも参照先、重複、循環を検査する。
+
+これらのbindingは構造関係の観測であり、全package／ABI／Provider依存の解決、互換性、実行可能性、Trust、Permission、Approvalを保証しない。未提供の依存宣言は`unknown`として残るため、I04-D01の完全な依存compatibility resolverは未成立として扱う。
 
 ## 継承禁止
 

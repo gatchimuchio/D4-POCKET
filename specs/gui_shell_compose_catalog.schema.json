@@ -18,7 +18,7 @@
   ],
   "additionalProperties": false,
   "properties": {
-    "version": {"const": 2},
+    "version": {"const": 3},
     "snapshot_hash": {"$ref": "#/$defs/hash"},
     "runtime_ids": {
       "type": "array",
@@ -36,11 +36,12 @@
       "maxItems": 64,
       "items": {
         "type": "object",
-        "required": ["runtime_id", "metadata"],
+        "required": ["runtime_id", "metadata", "dependencies"],
         "additionalProperties": false,
         "properties": {
           "runtime_id": {"$ref": "#/$defs/id"},
-          "metadata": {"$ref": "agent_adapter.schema.json"}
+          "metadata": {"$ref": "agent_adapter.schema.json"},
+          "dependencies": {"$ref": "#/$defs/dependencyState"}
         }
       }
     },
@@ -69,6 +70,28 @@
     "hash": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$(?![\\s\\S])"
+    },
+    "dependencyItem": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["runtime", "adapter", "agent_instance", "mcp_server", "tool", "host"]},
+        "id": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"}
+      }
+    },
+    "dependencyState": {
+      "type": "object",
+      "required": ["status", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {"enum": ["known", "partial", "unknown"]},
+        "items": {"type": "array", "maxItems": 1600, "uniqueItems": true, "items": {"$ref": "#/$defs/dependencyItem"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "unknown"}}, "required": ["status"]}, "then": {"properties": {"items": {"maxItems": 0}}}},
+        {"if": {"properties": {"status": {"const": "partial"}}, "required": ["status"]}, "then": {"properties": {"items": {"minItems": 1}}}}
+      ]
     },
     "unknownDependencies": {
       "type": "object",
@@ -108,7 +131,7 @@
         "status": {"enum": ["ready", "degraded", "unavailable", "unsupported", "unknown"]},
         "capabilities": {"type": "array", "maxItems": 64},
         "permissions": {"$ref": "#/$defs/noPermission"},
-        "dependencies": {"$ref": "#/$defs/unknownDependencies"},
+        "dependencies": {"$ref": "#/$defs/dependencyState"},
         "scope": {
           "type": "object",
           "required": ["workspace", "host"],
@@ -150,7 +173,7 @@
         "authentication_status": {"enum": ["missing", "configured", "revoked", "unknown"]},
         "abi": {"const": "unknown"},
         "os": {"const": ["unknown"]},
-        "dependencies": {"$ref": "#/$defs/unknownDependencies"},
+        "dependencies": {"$ref": "#/$defs/dependencyState"},
         "scope": {
           "type": "object",
           "required": ["transport", "boundary"],

@@ -713,6 +713,12 @@ const _composeHostSwitchGeneration =
 
 Map<String, Object?> _composeAgent(String runtimeId, String model) => {
       'runtime_id': runtimeId,
+      'dependencies': {
+        'status': 'partial',
+        'items': [
+          {'kind': 'runtime', 'id': runtimeId},
+        ],
+      },
       'metadata': {
         'adapter_id': 'adapter.codex.fixture',
         'agent_id': 'agent.codex',
@@ -758,7 +764,12 @@ Map<String, Object?> _composeRuntime(String runtimeId, String model) {
     'status': metadata['status'],
     'capabilities': metadata['capabilities'],
     'permissions': {'status': 'not_granted', 'requirements': <Object?>[]},
-    'dependencies': {'status': 'unknown', 'items': <Object?>[]},
+    'dependencies': {
+      'status': 'partial',
+      'items': [
+        {'kind': 'adapter', 'id': metadata['adapter_id']},
+      ],
+    },
     'scope': {
       'workspace': metadata['workspace_requirements'],
       'host': metadata['host_requirements'],
@@ -798,7 +809,12 @@ Map<String, Object?> _composeTool(String toolId) => {
       'authentication_status': 'missing',
       'abi': 'unknown',
       'os': ['unknown'],
-      'dependencies': {'status': 'unknown', 'items': <Object?>[]},
+      'dependencies': {
+        'status': 'partial',
+        'items': [
+          {'kind': 'mcp_server', 'id': 'mcp.local'},
+        ],
+      },
       'scope': {
         'transport': 'stdio',
         'boundary': 'current_registered_connection',
@@ -888,7 +904,7 @@ class _ComposeScreenTransport implements BrokerTransport {
       'プロファイル一覧' => <String, Object?>{'Profiles': <Object?>[]},
       '更新一覧' => <String, Object?>{'更新一覧': <Object?>[]},
       'GUI Shell構成Catalog' => <String, Object?>{
-          'version': 2,
+          'version': 3,
           'snapshot_hash': _composeSnapshotHash,
           'runtime_ids': ['runtime.local', 'runtime.local.secondary'],
           'runtimes': [

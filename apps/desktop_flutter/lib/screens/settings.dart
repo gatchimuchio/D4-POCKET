@@ -654,7 +654,18 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
               title: Text(
                   'Runtime ${runtime.runtimeId} / version ${runtime.version}'),
               subtitle: Text(
-                'ABI: ${runtime.abi} / architecture: ${runtime.architecture} / OS: ${runtime.platforms.join(', ')} / status: ${runtime.status} / Permission: ${runtime.permissionStatus} / dependencies: ${runtime.dependencyStatus} / scope: ${runtime.scope['workspace']}',
+                'ABI: ${runtime.abi} / architecture: ${runtime.architecture} / OS: ${runtime.platforms.join(', ')} / status: ${runtime.status} / Permission: ${runtime.permissionStatus} / dependencies: ${runtime.dependencyStatus} ${runtime.dependencies.items.map((item) => '${item.kind}:${item.id}').join(', ')} / scope: ${runtime.scope['workspace']}',
+              ),
+            ),
+          for (final tool in _composeToolCandidates)
+            ListTile(
+              key: ValueKey(
+                  'compose-tool-dependency-${tool.serverId}-${tool.toolId}'),
+              dense: true,
+              contentPadding: const EdgeInsets.only(left: 12),
+              title: Text('Tool ${tool.name} / ${tool.serverName}'),
+              subtitle: Text(
+                'dependencies: ${tool.dependencies.status} ${tool.dependencies.items.map((item) => '${item.kind}:${item.id}').join(', ')} / authentication: ${tool.authenticationStatus}',
               ),
             ),
           for (final host in _composeHostCandidates)
@@ -665,7 +676,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
               title: Text(
                   'Host ${host.displayName} / ${host.platform} / ${host.kind}'),
               subtitle: Text(
-                'version: ${host.version} / ABI: ${host.abi} / architecture: ${host.architecture} / state: ${host.status} / connection: ${host.connectionState} / trust: ${host.trustState} / Permission: not_granted',
+                'version: ${host.version} / ABI: ${host.abi} / architecture: ${host.architecture} / state: ${host.status} / connection: ${host.connectionState} / trust: ${host.trustState} / Permission: not_granted / dependencies: ${host.dependencies.status}',
               ),
             ),
         ],
@@ -708,7 +719,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                 title:
                     Text('${group.key} (${group.value.first.agent.provider})'),
                 subtitle: Text(
-                  'Runtime／Model／状態: ${group.value.map((entry) => '${entry.runtimeId}=${entry.agent.model} (${entry.agent.status})').join(' / ')} / Capability: ${group.value.first.agent.capabilities.map((capability) => '${capability.capabilityId}=${capability.status}').join(', ')} / metadataは未信頼',
+                  'Runtime／Model／状態: ${group.value.map((entry) => '${entry.runtimeId}=${entry.agent.model} (${entry.agent.status}; dependency ${entry.dependencies.status})').join(' / ')} / Capability: ${group.value.first.agent.capabilities.map((capability) => '${capability.capabilityId}=${capability.status}').join(', ')} / metadataは未信頼',
                 ),
                 controlAffinity: ListTileControlAffinity.leading,
               ),

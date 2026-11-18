@@ -248,6 +248,37 @@ void main() {
     );
   });
 
+  test('Compose Catalogは既知依存を解決し欠落参照を拒否する', () async {
+    final response = _catalogResponse(
+      runtimeIds: const ['runtime-a'],
+      agents: [
+        _agentEntry('runtime-a', adapterId: 'adapter-a', agentId: 'agent-a'),
+      ],
+      tools: [_toolCandidate()],
+    );
+    final catalog = await ComposeClient(_FakeComposeTransport(response))
+        .refreshRuntimeAgentCatalog();
+    expect(catalog.runtimes.single.dependencies.status, 'partial');
+    expect(catalog.runtimes.single.dependencies.items.single.kind, 'adapter');
+    expect(catalog.agents.single.dependencies.items.single.id, 'runtime-a');
+    expect(catalog.tools.single.dependencies.items.single.id, 'server-a');
+    expect(catalog.hosts.single.dependencies.status, 'unknown');
+
+    final body = response['body']! as Map<String, Object?>;
+    final runtimes = body['runtimes']! as List<Object?>;
+    (runtimes.single! as Map<String, Object?>)['dependencies'] = {
+      'status': 'partial',
+      'items': [
+        {'kind': 'adapter', 'id': 'missing-adapter'},
+      ],
+    };
+    await expectLater(
+      ComposeClient(_FakeComposeTransport(response))
+          .refreshRuntimeAgentCatalog(),
+      throwsA(isA<BrokerClientException>()),
+    );
+  });
+
   test('Compose CatalogはWorkspace境界とHostの未知enumを拒否する', () async {
     final invalidWorkspace = _agentEntry(
       'runtime-a',
@@ -388,14 +419,25 @@ Map<String, Object?> _catalogResponse({
     'operation': 'GUI Shell構成Catalog',
     'evidence_source': 'INTERNAL_STATE',
     'body': {
-      'version': 2,
+      'version': 3,
       'snapshot_hash': _snapshotHash,
       'runtime_ids': runtimeIds,
       'runtimes': [
         for (final runtimeId in runtimeIds)
           _runtimeCandidate(runtimeId, entriesByRuntime[runtimeId]),
       ],
-      'agents': agents,
+      'agents': [
+        for (final entry in agents)
+          {
+            ...entry,
+            'dependencies': {
+              'status': 'partial',
+              'items': [
+                {'kind': 'runtime', 'id': entry['runtime_id']},
+              ],
+            },
+          },
+      ],
       'tools': tools,
       'hosts': [_hostCandidate()],
       'host_switch_generation': _hostSwitchGeneration,
@@ -430,7 +472,14 @@ Map<String, Object?> _runtimeCandidate(
     'status': metadata?['status'] ?? 'unknown',
     'capabilities': metadata?['capabilities'] ?? <Object?>[],
     'permissions': {'status': 'not_granted', 'requirements': <Object?>[]},
-    'dependencies': {'status': 'unknown', 'items': <Object?>[]},
+    'dependencies': metadata?['adapter_id'] is String
+        ? {
+            'status': 'partial',
+            'items': [
+              {'kind': 'adapter', 'id': metadata!['adapter_id']},
+            ],
+          }
+        : {'status': 'unknown', 'items': <Object?>[]},
     'scope': {'workspace': workspace, 'host': host},
     'evidence_source': metadata?['evidence_source'] ?? 'INTERNAL_STATE',
   };
@@ -452,7 +501,12 @@ Map<String, Object?> _toolCandidate({
       'authentication_status': authenticationStatus,
       'abi': 'unknown',
       'os': ['unknown'],
-      'dependencies': {'status': 'unknown', 'items': <Object?>[]},
+      'dependencies': {
+        'status': 'partial',
+        'items': [
+          {'kind': 'mcp_server', 'id': 'server-a'},
+        ],
+      },
       'scope': {
         'transport': 'stdio',
         'boundary': 'current_registered_connection',

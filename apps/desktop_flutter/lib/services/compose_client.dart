@@ -4,6 +4,20 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerTransport, BrokerClientException;
 import '../models/generated_contracts.dart';
 
+class ComposeDependencyReference {
+  const ComposeDependencyReference({required this.kind, required this.id});
+
+  final String kind;
+  final String id;
+}
+
+class ComposeDependencyState {
+  const ComposeDependencyState({required this.status, required this.items});
+
+  final String status;
+  final List<ComposeDependencyReference> items;
+}
+
 class ComposeAgentCatalogEntry {
   const ComposeAgentCatalogEntry({
     required this.runtimeId,
@@ -11,6 +25,7 @@ class ComposeAgentCatalogEntry {
     required this.workspaceMode,
     required this.hostPlatforms,
     required this.networkScope,
+    required this.dependencies,
   });
 
   final String runtimeId;
@@ -18,6 +33,7 @@ class ComposeAgentCatalogEntry {
   final String workspaceMode;
   final List<String> hostPlatforms;
   final String networkScope;
+  final ComposeDependencyState dependencies;
 }
 
 class ComposeRuntimeAgentCatalog {
@@ -43,6 +59,7 @@ class ComposeRuntimeAgentCatalog {
 class ComposeRuntimeCatalogEntry {
   const ComposeRuntimeCatalogEntry({
     required this.runtimeId,
+    required this.adapterId,
     required this.version,
     required this.abi,
     required this.architecture,
@@ -50,10 +67,12 @@ class ComposeRuntimeCatalogEntry {
     required this.status,
     required this.permissionStatus,
     required this.dependencyStatus,
+    required this.dependencies,
     required this.scope,
   });
 
   final String runtimeId;
+  final String? adapterId;
   final String version;
   final String abi;
   final String architecture;
@@ -61,6 +80,7 @@ class ComposeRuntimeCatalogEntry {
   final String status;
   final String permissionStatus;
   final String dependencyStatus;
+  final ComposeDependencyState dependencies;
   final Map<String, Object?> scope;
 }
 
@@ -71,6 +91,7 @@ class ComposeToolCatalogEntry {
     required this.serverVersion,
     required this.protocolVersion,
     required this.toolId,
+    required this.dependencies,
     required this.name,
     required this.status,
     required this.authenticationStatus,
@@ -83,6 +104,7 @@ class ComposeToolCatalogEntry {
   final String serverVersion;
   final String protocolVersion;
   final String toolId;
+  final ComposeDependencyState dependencies;
   final String name;
   final String status;
   final String authenticationStatus;
@@ -102,6 +124,7 @@ class ComposeHostCatalogEntry {
     required this.status,
     required this.connectionState,
     required this.trustState,
+    required this.dependencies,
     required this.scope,
   });
 
@@ -115,6 +138,7 @@ class ComposeHostCatalogEntry {
   final String status;
   final String connectionState;
   final String trustState;
+  final ComposeDependencyState dependencies;
   final Map<String, Object?> scope;
 }
 
@@ -173,7 +197,7 @@ class ComposeClient {
     };
     if (body.keys.any((key) => !allowedKeys.contains(key)) ||
         body.length != allowedKeys.length ||
-        body['version'] != 2 ||
+        body['version'] != 3 ||
         !_validTaggedHash(body['snapshot_hash']) ||
         !_validTaggedHash(body['host_switch_generation']) ||
         body['evidence_source'] != 'INTERNAL_STATE' ||
@@ -290,6 +314,7 @@ class ComposeClient {
         );
       }
       final agent = AgentAdapterRecord.fromJson(metadataMap);
+      final dependencyState = _parseDependencyState(record['dependencies']);
       final existingAdapterId = adapterByAgentId.putIfAbsent(
         agent.agentId,
         () => agent.adapterId,
@@ -298,6 +323,12 @@ class ComposeClient {
           agent.adapterId.isEmpty ||
           existingAdapterId != agent.adapterId ||
           !agentRuntimeIds.add(runtimeId) ||
+          !_matchesDependencyState(
+            dependencyState,
+            status: 'partial',
+            kind: 'runtime',
+            id: runtimeId,
+          ) ||
           !const {'ready', 'degraded', 'unavailable', 'unsupported'}
               .contains(agent.status)) {
         throw const BrokerClientException(
@@ -310,6 +341,7 @@ class ComposeClient {
         workspaceMode: workspace['mode']! as String,
         hostPlatforms: List.unmodifiable(rawPlatforms.cast<String>()),
         networkScope: host['network_scope']! as String,
+        dependencies: dependencyState!,
       ));
     }
     final tools = <ComposeToolCatalogEntry>[];
@@ -349,6 +381,7 @@ class ComposeClient {
       }
       hosts.add(host);
     }
+    _validateDependencyReferences(runtimes, agents, tools, hosts);
     return ComposeRuntimeAgentCatalog(
       runtimeIds: List.unmodifiable(runtimeIds),
       agents: List.unmodifiable(agents),
@@ -524,7 +557,7 @@ ComposeRuntimeCatalogEntry? _parseRuntimeCandidate(Object? value) {
   final capabilities = item['capabilities'];
   final scope = _objectMap(item['scope']);
   final permissions = _objectMap(item['permissions']);
-  final dependencies = _objectMap(item['dependencies']);
+  final dependencies = _parseDependencyState(item['dependencies']);
   final workspace = _objectMap(scope?['workspace']);
   final host = _objectMap(scope?['host']);
   final hostPlatforms = host?['platforms'];
@@ -548,11 +581,12 @@ ComposeRuntimeCatalogEntry? _parseRuntimeCandidate(Object? value) {
       permissions['status'] != 'not_granted' ||
       permissions['requirements'] is! List ||
       (permissions['requirements']! as List).isNotEmpty ||
-      dependencies == null ||
-      !_hasExactKeys(dependencies, const {'status', 'items'}) ||
-      dependencies['status'] != 'unknown' ||
-      dependencies['items'] is! List ||
-      (dependencies['items']! as List).isNotEmpty ||
+      !_matchesDependencyState(
+        dependencies,
+        status: adapterId is String ? 'partial' : 'unknown',
+        kind: adapterId is String ? 'adapter' : null,
+        id: adapterId is String ? adapterId : null,
+      ) ||
       scope == null ||
       !_hasExactKeys(scope, const {'workspace', 'host'}) ||
       workspace == null ||
@@ -578,13 +612,15 @@ ComposeRuntimeCatalogEntry? _parseRuntimeCandidate(Object? value) {
   }
   return ComposeRuntimeCatalogEntry(
     runtimeId: runtimeId,
+    adapterId: adapterId as String?,
     version: version,
     abi: item['abi']! as String,
     architecture: item['architecture']! as String,
     platforms: List.unmodifiable((platforms! as List).cast<String>()),
     status: item['status']! as String,
     permissionStatus: permissions['status']! as String,
-    dependencyStatus: dependencies['status']! as String,
+    dependencyStatus: dependencies!.status,
+    dependencies: dependencies,
     scope: Map.unmodifiable(scope),
   );
 }
@@ -619,7 +655,7 @@ ComposeToolCatalogEntry? _parseToolCandidate(Object? value) {
   final toolId = item['tool_id'];
   final name = item['name'];
   final scope = _objectMap(item['scope']);
-  final dependencies = _objectMap(item['dependencies']);
+  final dependencies = _parseDependencyState(item['dependencies']);
   if (serverId is! String ||
       !_validCatalogId(serverId) ||
       serverName is! String ||
@@ -642,11 +678,12 @@ ComposeToolCatalogEntry? _parseToolCandidate(Object? value) {
           .contains(item['authentication_status']) ||
       item['abi'] != 'unknown' ||
       !_sameJson(item['os'], const ['unknown']) ||
-      dependencies == null ||
-      !_hasExactKeys(dependencies, const {'status', 'items'}) ||
-      dependencies['status'] != 'unknown' ||
-      dependencies['items'] is! List ||
-      (dependencies['items']! as List).isNotEmpty ||
+      !_matchesDependencyState(
+        dependencies,
+        status: 'partial',
+        kind: 'mcp_server',
+        id: serverId,
+      ) ||
       scope == null ||
       !_hasExactKeys(scope, const {'transport', 'boundary'}) ||
       !const {'stdio', 'unknown'}.contains(scope['transport']) ||
@@ -663,6 +700,7 @@ ComposeToolCatalogEntry? _parseToolCandidate(Object? value) {
     serverVersion: serverVersion,
     protocolVersion: protocolVersion,
     toolId: toolId,
+    dependencies: dependencies!,
     name: name,
     status: item['status']! as String,
     authenticationStatus: item['authentication_status']! as String,
@@ -697,7 +735,7 @@ ComposeHostCatalogEntry? _parseHostCandidate(Object? value) {
   final displayName = item['display_name'];
   final architecture = item['architecture'];
   final permissions = _objectMap(item['permissions']);
-  final dependencies = _objectMap(item['dependencies']);
+  final dependencies = _parseDependencyState(item['dependencies']);
   final scope = _objectMap(item['scope']);
   if (hostId is! String ||
       !_validCatalogId(hostId) ||
@@ -723,11 +761,7 @@ ComposeHostCatalogEntry? _parseHostCandidate(Object? value) {
       permissions['status'] != 'not_granted' ||
       permissions['requirements'] is! List ||
       (permissions['requirements']! as List).isNotEmpty ||
-      dependencies == null ||
-      !_hasExactKeys(dependencies, const {'status', 'items'}) ||
-      dependencies['status'] != 'unknown' ||
-      dependencies['items'] is! List ||
-      (dependencies['items']! as List).isNotEmpty ||
+      !_matchesDependencyState(dependencies, status: 'unknown') ||
       scope == null ||
       !const {'INTERNAL_STATE', 'LIVE_RUNTIME'}
           .contains(item['evidence_source']) ||
@@ -745,6 +779,7 @@ ComposeHostCatalogEntry? _parseHostCandidate(Object? value) {
     status: item['status']! as String,
     connectionState: item['connection_state']! as String,
     trustState: item['trust_state']! as String,
+    dependencies: dependencies!,
     scope: Map.unmodifiable(scope),
   );
 }
@@ -850,6 +885,195 @@ Map<String, Object?>? _objectMap(Object? value) {
 bool _hasExactKeys(Map<String, Object?> value, Set<String> expected) =>
     value.length == expected.length &&
     value.keys.every((key) => expected.contains(key));
+
+ComposeDependencyState? _parseDependencyState(Object? value) {
+  final item = _objectMap(value);
+  if (item == null ||
+      !_hasExactKeys(item, const {'status', 'items'}) ||
+      !const {'known', 'partial', 'unknown'}.contains(item['status'])) {
+    return null;
+  }
+  final status = item['status']! as String;
+  final rawItems = item['items'];
+  if (rawItems is! List ||
+      rawItems.length > 1600 ||
+      (status == 'unknown' && rawItems.isNotEmpty) ||
+      (status == 'partial' && rawItems.isEmpty)) {
+    return null;
+  }
+  final references = <ComposeDependencyReference>[];
+  final unique = <String>{};
+  for (final raw in rawItems) {
+    final reference = _objectMap(raw);
+    if (reference == null ||
+        !_hasExactKeys(reference, const {'kind', 'id'}) ||
+        !const {
+          'runtime',
+          'adapter',
+          'agent_instance',
+          'mcp_server',
+          'tool',
+          'host',
+        }.contains(reference['kind']) ||
+        reference['id'] is! String ||
+        !RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,511}$')
+            .hasMatch(reference['id']! as String)) {
+      return null;
+    }
+    final key = '${reference['kind']}\u0000${reference['id']}';
+    if (!unique.add(key)) return null;
+    references.add(ComposeDependencyReference(
+      kind: reference['kind']! as String,
+      id: reference['id']! as String,
+    ));
+  }
+  return ComposeDependencyState(
+    status: status,
+    items: List.unmodifiable(references),
+  );
+}
+
+bool _matchesDependencyState(
+  ComposeDependencyState? state, {
+  required String status,
+  String? kind,
+  String? id,
+}) =>
+    state != null &&
+    state.status == status &&
+    (kind == null
+        ? state.items.isEmpty
+        : state.items.length == 1 &&
+            state.items.single.kind == kind &&
+            state.items.single.id == id);
+
+String _dependencyNodeKey(String kind, String id) => '$kind\u0000$id';
+
+String _toolDependencyNodeId(String serverId, String toolId) =>
+    '${serverId.length}_${serverId}_${toolId.length}_$toolId';
+
+void _validateDependencyReferences(
+  List<ComposeRuntimeCatalogEntry> runtimes,
+  List<ComposeAgentCatalogEntry> agents,
+  List<ComposeToolCatalogEntry> tools,
+  List<ComposeHostCatalogEntry> hosts,
+) {
+  final nodes = <String>{};
+  void addNode(String kind, String id, {bool allowExisting = false}) {
+    if (!nodes.add(_dependencyNodeKey(kind, id)) && !allowExisting) {
+      throw const BrokerClientException(
+        'Compose Catalogの依存関係に重複nodeがあります',
+      );
+    }
+  }
+
+  for (final runtime in runtimes) {
+    addNode('runtime', runtime.runtimeId);
+    if (runtime.adapterId != null) {
+      addNode('adapter', runtime.adapterId!, allowExisting: true);
+    }
+  }
+  for (final agent in agents) {
+    final matches =
+        runtimes.where((runtime) => runtime.runtimeId == agent.runtimeId);
+    if (matches.length != 1 ||
+        matches.single.adapterId != agent.agent.adapterId) {
+      throw const BrokerClientException(
+        'Compose CatalogのAgentとAdapter依存先が一致しません',
+      );
+    }
+    addNode('agent_instance', agent.runtimeId);
+    addNode('adapter', agent.agent.adapterId, allowExisting: true);
+  }
+  for (final runtime in runtimes) {
+    if (runtime.adapterId != null &&
+        !agents.any((agent) =>
+            agent.runtimeId == runtime.runtimeId &&
+            agent.agent.adapterId == runtime.adapterId)) {
+      throw const BrokerClientException(
+        'Compose CatalogのRuntime Adapter依存先に対応するAgentがありません',
+      );
+    }
+  }
+  for (final tool in tools) {
+    addNode('mcp_server', tool.serverId, allowExisting: true);
+    addNode('tool', _toolDependencyNodeId(tool.serverId, tool.toolId));
+  }
+  for (final host in hosts) {
+    addNode('host', host.hostId);
+  }
+  if (nodes.length > 2048) {
+    throw const BrokerClientException(
+      'Compose Catalogの依存関係node件数が上限を超えています',
+    );
+  }
+
+  final outgoing = <String, List<String>>{};
+  final indegree = {for (final node in nodes) node: 0};
+  final edges = <String>{};
+  void addDependencies(
+    String sourceKind,
+    String sourceId,
+    ComposeDependencyState state,
+  ) {
+    final source = _dependencyNodeKey(sourceKind, sourceId);
+    for (final dependency in state.items) {
+      final target = _dependencyNodeKey(dependency.kind, dependency.id);
+      if (!nodes.contains(target)) {
+        throw const BrokerClientException(
+          'Compose Catalogの依存先が現在の候補Catalogにありません',
+        );
+      }
+      if (!edges.add('$source\u0001$target')) {
+        throw const BrokerClientException(
+          'Compose Catalogの依存関係edgeが重複しています',
+        );
+      }
+      outgoing.putIfAbsent(source, () => <String>[]).add(target);
+      indegree[target] = indegree[target]! + 1;
+    }
+  }
+
+  for (final runtime in runtimes) {
+    addDependencies('runtime', runtime.runtimeId, runtime.dependencies);
+  }
+  for (final agent in agents) {
+    addDependencies('agent_instance', agent.runtimeId, agent.dependencies);
+  }
+  for (final tool in tools) {
+    addDependencies(
+      'tool',
+      _toolDependencyNodeId(tool.serverId, tool.toolId),
+      tool.dependencies,
+    );
+  }
+  for (final host in hosts) {
+    addDependencies('host', host.hostId, host.dependencies);
+  }
+  if (edges.length > 1600) {
+    throw const BrokerClientException(
+      'Compose Catalogの依存関係edge件数が上限を超えています',
+    );
+  }
+  final ready = indegree.entries
+      .where((entry) => entry.value == 0)
+      .map((entry) => entry.key)
+      .toList();
+  var visited = 0;
+  while (ready.isNotEmpty) {
+    final node = ready.removeLast();
+    visited++;
+    for (final dependency in outgoing[node] ?? const <String>[]) {
+      indegree[dependency] = indegree[dependency]! - 1;
+      if (indegree[dependency] == 0) ready.add(dependency);
+    }
+  }
+  if (visited != nodes.length) {
+    throw const BrokerClientException(
+      'Compose Catalogの依存関係に循環があります',
+    );
+  }
+}
 
 bool _validAuditId(String value) =>
     RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$').hasMatch(value);

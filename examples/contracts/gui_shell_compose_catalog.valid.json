@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "snapshot_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "runtime_ids": ["runtime.fixture"],
   "runtimes": [
@@ -21,7 +21,7 @@
         }
       ],
       "permissions": {"status": "not_granted", "requirements": []},
-      "dependencies": {"status": "unknown", "items": []},
+      "dependencies": {"status": "partial", "items": [{"kind": "adapter", "id": "example-local-agent-adapter"}]},
       "scope": {
         "workspace": {
           "mode": "required",
@@ -40,6 +40,7 @@
   "agents": [
     {
       "runtime_id": "runtime.fixture",
+      "dependencies": {"status": "partial", "items": [{"kind": "runtime", "id": "runtime.fixture"}]},
       "metadata": {
         "adapter_id": "example-local-agent-adapter",
         "agent_id": "example-local-agent",
