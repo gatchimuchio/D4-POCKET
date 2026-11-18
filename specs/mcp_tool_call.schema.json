@@ -22,6 +22,10 @@
       "$ref": "gui_shell_compose.schema.json",
       "description": "Composeからの呼出しではBrokerが現在Catalogと選択Server／Toolを再検査する。Manifestから権限を継承しない。"
     },
+    "compose_manifest_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "compose_catalog_snapshot_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "compose_connection_binding_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$", "description": "MCP endpoint／Workspaceを含むBroker接続束縛hash。実pathは公開しない。" },
+    "previewed_arguments_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "source_agent_task_id": {
       "type": "string",
       "minLength": 1,
@@ -43,6 +47,23 @@
     {
       "if": { "required": ["source_agent_result_hash"] },
       "then": { "required": ["source_agent_task_id"] }
+    },
+    {
+      "if": { "required": ["compose_manifest"] },
+      "then": { "required": ["compose_manifest_hash", "compose_catalog_snapshot_hash", "compose_connection_binding_hash", "previewed_arguments_hash"] }
+    },
+    {
+      "if": { "not": { "required": ["compose_manifest"] } },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["compose_manifest_hash"] },
+            { "required": ["compose_catalog_snapshot_hash"] },
+            { "required": ["compose_connection_binding_hash"] },
+            { "required": ["previewed_arguments_hash"] }
+          ]
+        }
+      }
     }
   ]
 }

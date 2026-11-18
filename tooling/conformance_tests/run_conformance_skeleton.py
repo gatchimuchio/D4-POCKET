@@ -6268,7 +6268,8 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     for name in (
         "mcp_connection", "mcp_connection_receipt", "mcp_connection_list",
         "mcp_disconnect", "mcp_disconnect_receipt", "mcp_tool_call",
-        "mcp_tool_call_receipt",
+        "mcp_tool_call_receipt", "mcp_tool_action_preview",
+        "mcp_tool_action_preview_receipt",
     ):
         schema = load_schema(name + ".schema.json")
         valid = load_contract_fixture(name + ".valid.json")
@@ -6296,6 +6297,8 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         "mcp_tool_call_compose_authority.invalid.json",
         "mcp_tool_call_unknown_field.invalid.json",
         "mcp_tool_call_receipt_full_content.invalid.json",
+        "mcp_tool_action_preview_secret.invalid.json",
+        "mcp_tool_action_preview_receipt_permission.invalid.json",
     )
     for name in invalid_names:
         invalid = load_contract_fixture("invalid/" + name)
@@ -6305,6 +6308,8 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
             "mcp_connection_receipt" if name.startswith(("mcp_connection_tool", "mcp_connection_resource", "mcp_connection_prompt")) else
             "mcp_connection_list" if name.startswith("mcp_connection_list") else
             "mcp_disconnect" if name.startswith("mcp_disconnect_authority") else
+            "mcp_tool_action_preview_receipt" if name.startswith("mcp_tool_action_preview_receipt_") else
+            "mcp_tool_action_preview" if name.startswith("mcp_tool_action_preview_") else
             "mcp_tool_call" if name.startswith("mcp_tool_call_") and not name.startswith("mcp_tool_call_receipt") else
             "mcp_tool_call_receipt" if name.startswith("mcp_tool_call_receipt") else
             "mcp_disconnect_receipt"
@@ -6327,6 +6332,32 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         or not tool_call_request["ToolID"].startswith("tool-")
     ):
         不整合.append("C9 MCP Tool実行要求のTool ID形式が現行Catalog生成形式と一致しない")
+    preview_request = load_contract_fixture("mcp_tool_action_preview.valid.json")
+    preview_receipt = load_contract_fixture("mcp_tool_action_preview_receipt.valid.json")
+    if preview_request.get("操作") != "Preview" or "compose_manifest" not in preview_request:
+        不整合.append("C9 Compose MCP Tool Preview要求が現在Manifestへ束縛されていない")
+    if (
+        preview_receipt.get("operation") != "MCP Tool実行Preview"
+        or preview_receipt.get("permission_generated") is not False
+        or preview_receipt.get("approval_requested") is not False
+        or preview_receipt.get("tool_effect_performed") is not False
+        or preview_receipt.get("authority_strip") is not True
+        or preview_receipt.get("evidence_source") != "INTERNAL_STATE"
+    ):
+        不整合.append("C9 Compose MCP Tool Preview receiptが権限非生成・無作用・INTERNAL_STATEではない")
+    permission_preview = preview_receipt.get("permission_preview")
+    if (
+        not isinstance(permission_preview, dict)
+        or permission_preview.get("permission_status") != "not_generated"
+        or permission_preview.get("approval_status") != "not_requested"
+        or permission_preview.get("requires_native_owner_confirmation") is not True
+    ):
+        不整合.append("C9 Compose MCP Tool Previewが一回Permissionとnative Owner要件を分離していない")
+    if any(
+        token in json.dumps(preview_receipt, ensure_ascii=False).lower()
+        for token in ("credential_value", "secret_value", "password", "api_key")
+    ):
+        不整合.append("C9 Compose MCP Tool Preview receiptへCredential実値が混入している")
     tools = receipt.get("Tool")
     if not isinstance(tools, list) or any(
         not isinstance(tool, dict)
@@ -6418,6 +6449,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     if "read_until(b'\\n'" in rust_stdio or 'read_until(b"\\n"' in rust_stdio:
         不整合.append("C9 MCP stdio readerが行上限前に無制限蓄積するread_untilを使用している")
     rust_protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
+    rust_mcp = (RUST_HELPER / "src" / "broker" / "mcp_center.rs").read_text(encoding="utf-8")
     owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
     main = (RUST_HELPER / "src" / "main.rs").read_text(encoding="utf-8")
     desktop_launcher = (RUST_HELPER / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")
@@ -6430,6 +6462,12 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("mcp_center::disconnect", rust_protocol),
         ("BrokerOperation::MCPTool実行", rust_protocol),
         ("mcp_center::call_tool", rust_protocol),
+        ("BrokerOperation::MCPTool実行Preview", rust_protocol),
+        ("mcp_center::preview_tool_action", rust_protocol),
+        ("pub(super) fn preview_tool_action", rust_mcp),
+        ("preview_mcp_tool_composition", rust_mcp),
+        ("validate_mcp_tool_composition_preview", rust_mcp),
+        ("previewed_arguments_hash", rust_mcp),
         ("pub fn MCP切断", owner_cli),
         ("owner_cli::MCP切断", main),
         ("BrokerOperation::MCP接続", desktop_launcher),
@@ -6461,6 +6499,14 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     ):
         if token not in source:
             不整合.append(f"C9 MCP接続／切断の統治済み経路がない: {token}")
+    preview_start = rust_mcp.find("pub(super) fn preview_tool_action")
+    preview_end = rust_mcp.find("pub(super) fn call_tool", preview_start + 1)
+    if preview_start < 0 or preview_end < 0:
+        不整合.append("C9 MCP Tool Previewの独立Broker実装範囲を特定できない")
+    else:
+        preview_implementation = rust_mcp[preview_start:preview_end]
+        if ".call_tool(" in preview_implementation or "permission_generated\": true" in preview_implementation:
+            不整合.append("C9 MCP Tool PreviewがTool作用またはPermission生成へ到達する")
     return 不整合
 
 

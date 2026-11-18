@@ -589,6 +589,8 @@ pub enum BrokerOperation {
     MCP切断,
     #[serde(rename = "MCP接続一覧")]
     MCP接続一覧,
+    #[serde(rename = "MCP Tool実行Preview")]
+    MCPTool実行Preview,
     #[serde(rename = "MCP Tool実行")]
     MCPTool実行,
     #[serde(rename = "A2A接続")]
@@ -804,6 +806,7 @@ impl BrokerOperation {
             BrokerOperation::MCP接続 => "MCP接続",
             BrokerOperation::MCP切断 => "MCP切断",
             BrokerOperation::MCP接続一覧 => "MCP接続一覧",
+            BrokerOperation::MCPTool実行Preview => "MCP Tool実行Preview",
             BrokerOperation::MCPTool実行 => "MCP Tool実行",
             BrokerOperation::A2A接続 => "A2A接続",
             BrokerOperation::A2A接続一覧 => "A2A接続一覧",
@@ -2730,6 +2733,13 @@ impl Broker {
                 &payload_hash,
             ),
             BrokerOperation::MCP接続一覧 => super::mcp_center::list(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::MCPTool実行Preview => super::mcp_center::preview_tool_action(
                 self,
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),

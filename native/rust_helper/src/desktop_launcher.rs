@@ -424,6 +424,14 @@ struct McpToolCallOwnerRequest {
     source_agent_result_hash: Option<String>,
     #[serde(default, rename = "compose_manifest")]
     compose_manifest: Option<serde_json::Value>,
+    #[serde(default, rename = "compose_manifest_hash")]
+    compose_manifest_hash: Option<String>,
+    #[serde(default, rename = "compose_catalog_snapshot_hash")]
+    compose_catalog_snapshot_hash: Option<String>,
+    #[serde(default, rename = "compose_connection_binding_hash")]
+    compose_connection_binding_hash: Option<String>,
+    #[serde(default, rename = "previewed_arguments_hash")]
+    previewed_arguments_hash: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -2271,16 +2279,55 @@ fn owner_operation_candidate_with_product_identity(
                     .source_agent_result_hash
                     .as_deref()
                     .is_some_and(|hash| !tagged_sha256_is_valid(hash))
+                || (request.compose_manifest.is_some()
+                    && !(request
+                        .compose_manifest_hash
+                        .as_deref()
+                        .is_some_and(tagged_sha256_is_valid)
+                        && request
+                            .compose_catalog_snapshot_hash
+                            .as_deref()
+                            .is_some_and(tagged_sha256_is_valid)
+                        && request
+                            .compose_connection_binding_hash
+                            .as_deref()
+                            .is_some_and(tagged_sha256_is_valid)
+                        && request
+                            .previewed_arguments_hash
+                            .as_deref()
+                            .is_some_and(tagged_sha256_is_valid)))
+                || (request.compose_manifest.is_none()
+                    && (request.compose_manifest_hash.is_some()
+                        || request.compose_catalog_snapshot_hash.is_some()
+                        || request.compose_connection_binding_hash.is_some()
+                        || request.previewed_arguments_hash.is_some()))
             {
                 return None;
             }
             let arguments = request.arguments.as_object()?;
             let arguments_hash = sha256_tagged(&serde_json::to_vec(&request.arguments).ok()?);
+            if request.compose_manifest.is_some()
+                && request.previewed_arguments_hash.as_deref() != Some(arguments_hash.as_str())
+            {
+                return None;
+            }
             let compose_summary = crate::broker::mcp_center::composed_tool_owner_summary(
                 request.compose_manifest.as_ref(),
                 &request.server_id,
                 &request.tool_id,
             )?;
+            let compose_summary = match (
+                request.compose_manifest_hash.as_deref(),
+                request.compose_catalog_snapshot_hash.as_deref(),
+                request.compose_connection_binding_hash.as_deref(),
+                request.previewed_arguments_hash.as_deref(),
+            ) {
+                (Some(manifest), Some(catalog), Some(connection), Some(arguments)) => format!(
+                    "{compose_summary}\nCompose Preview: Permission=not_generated / Approval=not_requested / Capability=mcp.tool.call / PermissionID=permission.mcp.tool.call.one_shot\nManifest hash: {manifest}\nCatalog snapshot hash: {catalog}\nConnection binding hash: {connection}\nPreviewed arguments hash: {arguments}"
+                ),
+                (None, None, None, None) => compose_summary,
+                _ => return None,
+            };
             DesktopOwnerOperationSummary::McpToolCall {
                 server_id: request.server_id,
                 tool_id: request.tool_id,
@@ -8919,18 +8966,23 @@ mod tests {
     }
 
     #[test]
-    #[allow(non_snake_case)]
-    fn MCP_Tool実行のnative確認は対象とhashを示し引数本文や秘密fieldを拒否する() {
+    fn mcp_tool_compose_preview_native_confirmation_binds_summary_and_arguments() {
         let tool_id = format!("tool-{}", "a".repeat(142));
+        let arguments = serde_json::json!({"query": "SENSITIVE_ARGUMENT_MARKER"});
+        let arguments_hash = sha256_tagged(&serde_json::to_vec(&arguments).expect("引数hash"));
         let payload = serde_json::json!({
             "版": 1,
             "操作": "実行",
             "ServerID": "mcp-fixture",
             "ToolID": tool_id,
             "名前": "search",
-            "arguments": {"query": "SENSITIVE_ARGUMENT_MARKER"},
+            "arguments": arguments,
             "source_agent_task_id": "task-source-123",
             "source_agent_result_hash": format!("sha256:{}", "e".repeat(64)),
+            "compose_manifest_hash": format!("sha256:{}", "a".repeat(64)),
+            "compose_catalog_snapshot_hash": format!("sha256:{}", "b".repeat(64)),
+            "compose_connection_binding_hash": format!("sha256:{}", "c".repeat(64)),
+            "previewed_arguments_hash": arguments_hash,
             "compose_manifest": {
                 "version": 1,
                 "compose_id": "owner-compose-test",
@@ -8983,7 +9035,44 @@ mod tests {
         assert!(confirmation.contains("期限付き・一回限り"));
         assert!(confirmation.contains("Compose ID: owner-compose-test"));
         assert!(confirmation.contains("Runtime 1件・Agent 1件・Tool 1件"));
+        assert!(confirmation.contains("Permission=not_generated / Approval=not_requested"));
+        assert!(confirmation.contains(&format!("Manifest hash: sha256:{}", "a".repeat(64))));
+        assert!(confirmation.contains(&format!("Catalog snapshot hash: sha256:{}", "b".repeat(64))));
+        assert!(confirmation.contains(&format!(
+            "Connection binding hash: sha256:{}",
+            "c".repeat(64)
+        )));
+        assert!(confirmation.contains(&format!("Previewed arguments hash: {arguments_hash}")));
         assert!(!confirmation.contains("SENSITIVE_ARGUMENT_MARKER"));
+
+        let mut missing_preview_binding = payload.clone();
+        missing_preview_binding
+            .as_object_mut()
+            .expect("Tool要求object")
+            .remove("compose_catalog_snapshot_hash");
+        let request = serde_json::json!({
+            "request_id": "desktop-mcp-tool-call-preview-binding-missing",
+            "operation": "MCP Tool実行",
+            "payload_hash": canonical_payload_hash(Some(&missing_preview_binding)),
+            "payload": missing_preview_binding,
+            "nonce": "desktop-mcp-tool-call-preview-binding-missing-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
+
+        let mut changed_arguments = payload.clone();
+        changed_arguments["arguments"]["query"] = serde_json::json!("changed-after-preview");
+        let request = serde_json::json!({
+            "request_id": "desktop-mcp-tool-call-arguments-changed",
+            "operation": "MCP Tool実行",
+            "payload_hash": canonical_payload_hash(Some(&changed_arguments)),
+            "payload": changed_arguments,
+            "nonce": "desktop-mcp-tool-call-arguments-changed-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
 
         let mut escalated = payload.clone();
         escalated["arguments"]["nested"] = serde_json::json!({"Credential_Value":"secret-marker"});

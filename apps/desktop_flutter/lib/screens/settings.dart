@@ -183,6 +183,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
   final Set<String> _selectedComposeToolIds = <String>{};
   bool _composeCatalogLoading = false;
   bool _composeToolCallInProgress = false;
+  bool _composeToolPreviewInProgress = false;
   List<String> _composeRuntimeIds = const [];
   List<ComposeAgentCatalogEntry> _composeAgentCatalog = const [];
   List<ComposeRuntimeCatalogEntry> _composeRuntimeCandidates = const [];
@@ -904,6 +905,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                 key: ValueKey('compose-tool-run-${tool.toolId}'),
                 tooltip: '現在Compose済みの構成からこのMCP Toolを実行',
                 onPressed: _composeToolCallInProgress ||
+                        _composeToolPreviewInProgress ||
                         !_acceptedComposeMatchesDraft ||
                         !_selectedComposeToolIds.contains(tool.toolId) ||
                         _selectedComposeToolConnection(tool.toolId) == null
@@ -912,12 +914,13 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                           _selectedComposeToolConnection(tool.toolId)!,
                           tool,
                         ),
-                icon: _composeToolCallInProgress
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.play_arrow),
+                icon:
+                    _composeToolCallInProgress || _composeToolPreviewInProgress
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.play_arrow),
               ),
               controlAffinity: ListTileControlAffinity.leading,
             ),
@@ -1080,6 +1083,8 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     }
 
     final controller = TextEditingController(text: '{}');
+    var previewRequested = false;
+    var actionRequested = false;
     try {
       final navigator = Navigator.of(context, rootNavigator: true);
       final route = DialogRoute<String>(
@@ -1096,7 +1101,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                 Text('接続先識別子: ${connection.serverId} / 操作識別子: ${tool.toolId}'),
                 const SizedBox(height: 8),
                 const Text(
-                  'argumentsを確認してください。送信後は既存Brokerのnative Owner確認、現在Catalog／Schema再検査、一回限りPermission、Auditを通ります。秘密値を入力しないでください。',
+                  'argumentsを入力すると、先にBrokerが現在の依存・互換性・一回Permission scopeをPreviewします。PreviewではToolを呼ばず、Permission／Approvalも生成しません。内容を確認した後に既存Rust native Owner確認へ進みます。秘密値を入力しないでください。',
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -1120,11 +1125,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
             FilledButton(
               key: const ValueKey('compose-tool-action-submit'),
               onPressed: () => Navigator.pop(dialogContext, controller.text),
-              child: Text(defaultTargetPlatform == TargetPlatform.macOS
-                  ? 'Mac native Owner確認へ'
-                  : defaultTargetPlatform == TargetPlatform.linux
-                      ? 'Linux native Owner確認へ'
-                      : 'Windows native Owner確認へ'),
+              child: const Text('Broker Previewを取得'),
             ),
           ],
         ),
@@ -1146,29 +1147,133 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         _setComposeMessage('argumentsの形式またはbyte上限が不正です。Toolは送信していません。');
         return;
       }
+      final arguments = Map<String, Object?>.from(decoded);
+
+      setState(() {
+        _composeToolPreviewInProgress = true;
+        _composeMessage =
+            '現在BrokerからCompose MCP Tool Previewを取得しています。Tool作用はありません。';
+      });
+      previewRequested = true;
+      final preview = await client.previewToolAction(
+        serverId: connection.serverId,
+        tool: tool,
+        arguments: arguments,
+        composeManifest: manifest,
+      );
+      if (!mounted) return;
+      setState(() => _composeToolPreviewInProgress = false);
+
+      final proceed = await _showComposedToolPreview(preview);
+      if (proceed != true || !mounted) {
+        _setComposeMessage('Previewを確認しました。MCP Toolは実行していません。');
+        return;
+      }
 
       setState(() {
         _composeToolCallInProgress = true;
         _composeMessage = '既存Brokerのnative Owner確認へ要求しています。';
       });
+      actionRequested = true;
       final receipt = await client.callTool(
         serverId: connection.serverId,
         tool: tool,
-        arguments: Map<String, Object?>.from(decoded),
+        arguments: arguments,
         composeManifest: manifest,
+        composePreview: preview,
       );
       _setComposeMessage(
         'Compose構成から既存MCP Toolを実行しました。result hash: ${receipt.resultHash} / content: ${receipt.contentTypes.join(', ')} / Audit: ${receipt.auditId}${receipt.toolError ? ' / Tool側error=true' : ''}。本文は表示していません。',
       );
     } catch (error) {
-      _setComposeMessage(
-          'ComposeからのMCP Tool実行に失敗しました。Brokerの拒否・Audit状態を確認してください: $error');
+      _setComposeMessage(previewRequested && !actionRequested
+          ? 'Compose MCP Tool Previewに失敗したため、native Owner確認とTool実行は開始していません: $error'
+          : 'ComposeからのMCP Tool実行に失敗しました。Brokerの拒否・Audit状態を確認してください: $error');
     } finally {
       controller.dispose();
       if (mounted && _composeToolCallInProgress) {
         setState(() => _composeToolCallInProgress = false);
       }
+      if (mounted && _composeToolPreviewInProgress) {
+        setState(() => _composeToolPreviewInProgress = false);
+      }
     }
+  }
+
+  Future<bool?> _showComposedToolPreview(McpToolActionPreview preview) {
+    final nativeOwnerLabel = switch (defaultTargetPlatform) {
+      TargetPlatform.macOS => 'Mac native Owner確認へ',
+      TargetPlatform.linux => 'Linux native Owner確認へ',
+      _ => 'Windows native Owner確認へ',
+    };
+    final visibleBindings = preview.dependencyBindings.take(12).toList();
+    return showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('現在状態に束縛したMCP Tool Preview'),
+        content: SizedBox(
+          width: 640,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Compose: ${preview.composeId}'),
+                Text('Server / Tool: ${preview.serverId} / ${preview.name}'),
+                Text('Dependency: ${preview.dependencyStatus}'),
+                Text(
+                  'dependency状態 incomplete=${preview.incompleteDependencySourceCount} / unknown=${preview.unknownDependencySourceCount}',
+                ),
+                for (final binding in visibleBindings)
+                  Text(
+                    '${binding.sourceKind}:${binding.sourceId} → ${binding.targetKind}:${binding.targetId}',
+                  ),
+                if (preview.dependencyBindings.length > visibleBindings.length)
+                  Text(
+                    'ほか ${preview.dependencyBindings.length - visibleBindings.length} binding',
+                  ),
+                const SizedBox(height: 8),
+                Text('Compatibility: ${preview.compatibilityStatus}'),
+                for (final check in preview.compatibilityChecks)
+                  Text('確認済み: $check'),
+                for (final unknown in preview.unknownCompatibility)
+                  Text('未確認: $unknown'),
+                const SizedBox(height: 8),
+                Text(
+                  '要求scope: ${preview.capabilityId} / ${preview.permissionId}',
+                ),
+                Text(
+                  'Permission=${preview.permissionStatus} / Approval=${preview.approvalStatus} / Native Owner確認=${preview.requiresNativeOwnerConfirmation ? '必要' : '不要'}',
+                ),
+                Text('arguments hash: ${preview.argumentsHash}'),
+                Text('Manifest hash: ${preview.composeManifestHash}'),
+                Text('Catalog hash: ${preview.catalogSnapshotHash}'),
+                Text(
+                    'Connection binding hash: ${preview.connectionBindingHash}'),
+                Text('Host generation: ${preview.hostSwitchGeneration}'),
+                Text('Preview Audit: ${preview.auditId}'),
+                const SizedBox(height: 8),
+                const Text(
+                  'このPreviewはINTERNAL_STATEです。Permission・Approvalを生成せず、Tool作用もしていません。依存の一部とpackage／ABI／Provider互換条件は未確認です。続行時もRust native Owner確認とBrokerの現在状態再検証が必要です。',
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('戻る'),
+          ),
+          FilledButton(
+            key: const ValueKey('compose-tool-preview-owner-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(nativeOwnerLabel),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _runPreview(ComposeClient client) async {

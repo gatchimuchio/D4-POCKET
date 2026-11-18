@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "operation": "MCP Tool実行Preview",
+  "status": "accepted",
+  "server_id": "mcp-fixture",
+  "tool_id": "tool-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "name": "search",
+  "arguments_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "compose_id": "d4-pocket-search",
+  "compose_manifest_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "catalog_snapshot_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "connection_binding_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "host_switch_generation": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "dependency_preview": {
+    "status": "partial",
+    "observed_bindings": [
+      {"source_kind": "tool", "source_id": "mcp-fixture:tool-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "target_kind": "mcp_server", "target_id": "mcp-fixture"}
+    ],
+    "incomplete_source_count": 1,
+    "unknown_source_count": 0
+  },
+  "compatibility_preview": {
+    "status": "observed_checks_passed",
+    "checks": [
+      "現在のRuntime／Agent／MCP Catalog選択",
+      "現在のCapability宣言",
+      "現在のMCP接続とTool arguments schema"
+    ],
+    "unknown": ["未提供のpackage／ABI／Provider互換条件"]
+  },
+  "permission_preview": {
+    "capability_id": "mcp.tool.call",
+    "permission_id": "permission.mcp.tool.call.one_shot",
+    "server_id": "mcp-fixture",
+    "tool_id": "tool-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "arguments_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "permission_status": "not_generated",
+    "approval_status": "not_requested",
+    "requires_native_owner_confirmation": true
+  },
+  "permission_generated": false,
+  "approval_requested": false,
+  "tool_effect_performed": false,
+  "authority_strip": true,
+  "evidence_source": "INTERNAL_STATE",
+  "audit_id": "broker-audit-preview"
+}

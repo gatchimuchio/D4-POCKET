@@ -89,6 +89,8 @@ REQUIRED = {
     "mcp_connection.schema.json",
     "mcp_connection_receipt.schema.json",
     "mcp_tool_call.schema.json",
+    "mcp_tool_action_preview.schema.json",
+    "mcp_tool_action_preview_receipt.schema.json",
     "agent_mcp_tool_request.schema.json",
     "mcp_tool_call_receipt.schema.json",
     "mcp_connection_list.schema.json",

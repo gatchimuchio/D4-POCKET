@@ -166,6 +166,66 @@ class _McpTransport implements BrokerTransport {
         '接続監査ID': 'audit-mcp-fixture',
       };
 
+  Map<String, Object?> _toolActionPreviewBody(
+    Map<String, Object?> payload,
+  ) =>
+      {
+        'version': 1,
+        'operation': 'MCP Tool実行Preview',
+        'status': 'accepted',
+        'server_id': payload['ServerID'],
+        'tool_id': payload['ToolID'],
+        'name': payload['名前'],
+        'arguments_hash': 'sha256:${List<String>.filled(64, 'a').join()}',
+        'compose_id': (payload['compose_manifest']! as Map)['compose_id'],
+        'compose_manifest_hash':
+            'sha256:${List<String>.filled(64, 'f').join()}',
+        'catalog_snapshot_hash':
+            'sha256:${List<String>.filled(64, 'b').join()}',
+        'connection_binding_hash':
+            'sha256:${List<String>.filled(64, 'c').join()}',
+        'host_switch_generation':
+            'sha256:${List<String>.filled(64, 'd').join()}',
+        'dependency_preview': {
+          'status': 'partial',
+          'observed_bindings': [
+            {
+              'source_kind': 'tool',
+              'source_id': 'mcp-fixture:${payload['ToolID']}',
+              'target_kind': 'mcp_server',
+              'target_id': 'mcp-fixture',
+            },
+          ],
+          'incomplete_source_count': 1,
+          'unknown_source_count': 0,
+        },
+        'compatibility_preview': {
+          'status': 'observed_checks_passed',
+          'checks': [
+            '現在のRuntime／Agent／MCP Catalog選択',
+            '現在のCapability宣言',
+            '現在のMCP接続とTool arguments schema',
+          ],
+          'unknown': ['未提供のpackage／ABI／Provider互換条件'],
+        },
+        'permission_preview': {
+          'capability_id': 'mcp.tool.call',
+          'permission_id': 'permission.mcp.tool.call.one_shot',
+          'server_id': payload['ServerID'],
+          'tool_id': payload['ToolID'],
+          'arguments_hash': 'sha256:${List<String>.filled(64, 'a').join()}',
+          'permission_status': 'not_generated',
+          'approval_status': 'not_requested',
+          'requires_native_owner_confirmation': true,
+        },
+        'permission_generated': false,
+        'approval_requested': false,
+        'tool_effect_performed': false,
+        'authority_strip': true,
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_id': 'audit-mcp-tool-preview',
+      };
+
   @override
   Future<Map<String, Object?>> request(
     String operation, {
@@ -308,6 +368,16 @@ class _McpTransport implements BrokerTransport {
                       'sha256:${List<String>.filled(64, 'b').join()}',
                 },
         },
+      };
+    }
+    if (operation == 'MCP Tool実行Preview') {
+      return {
+        'status': 'accepted',
+        'operation': operation,
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'audit-mcp-tool-preview',
+        'error': null,
+        'body': _toolActionPreviewBody(payload!),
       };
     }
     throw StateError('予期しない操作: $operation');
@@ -686,6 +756,101 @@ void main() {
       '名前': 'tool-fixture',
       'arguments': {'query': 'needle'},
     });
+  });
+
+  test('Compose MCP Previewは権限を作らず、同一Manifest／argumentsだけをActionへ束縛する',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _McpTransport();
+    final client = McpConnectionClient(transport);
+    final tool = McpToolSummary(
+      toolId: transport.toolMetadata['tool_id']! as String,
+      name: transport.toolMetadata['name']! as String,
+      inputSchemaHash: transport.toolMetadata['input_schema_hash']! as String,
+    );
+    const arguments = {'query': 'needle'};
+    final manifest = <String, Object?>{
+      'compose_id': 'compose-preview-test',
+      'tool_ids': [tool.toolId],
+      'mcp_connection_ids': ['mcp-fixture'],
+    };
+    final preview = await client.previewToolAction(
+      serverId: 'mcp-fixture',
+      tool: tool,
+      arguments: arguments,
+      composeManifest: manifest,
+    );
+
+    expect(preview.dependencyStatus, 'partial');
+    expect(preview.compatibilityStatus, 'observed_checks_passed');
+    expect(preview.unknownCompatibility, ['未提供のpackage／ABI／Provider互換条件']);
+    expect(preview.permissionStatus, 'not_generated');
+    expect(preview.approvalStatus, 'not_requested');
+    expect(preview.requiresNativeOwnerConfirmation, isTrue);
+    expect(transport.operations, ['MCP Tool実行Preview']);
+    expect(transport.payloads.single, {
+      '版': 1,
+      '操作': 'Preview',
+      'ServerID': 'mcp-fixture',
+      'ToolID': tool.toolId,
+      '名前': tool.name,
+      'arguments': arguments,
+      'compose_manifest': manifest,
+    });
+
+    await expectLater(
+      client.callTool(
+        serverId: 'mcp-fixture',
+        tool: tool,
+        arguments: arguments,
+        composeManifest: manifest,
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    await expectLater(
+      client.callTool(
+        serverId: 'mcp-fixture',
+        tool: tool,
+        arguments: const {'query': 'different'},
+        composeManifest: manifest,
+        composePreview: preview,
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.operations, ['MCP Tool実行Preview']);
+
+    await client.callTool(
+      serverId: 'mcp-fixture',
+      tool: tool,
+      arguments: arguments,
+      composeManifest: manifest,
+      composePreview: preview,
+    );
+    expect(transport.operations, ['MCP Tool実行Preview', 'MCP Tool実行']);
+    expect(transport.payloads.last,
+        containsPair('compose_manifest_hash', preview.composeManifestHash));
+    expect(
+        transport.payloads.last,
+        containsPair(
+            'compose_catalog_snapshot_hash', preview.catalogSnapshotHash));
+    expect(
+        transport.payloads.last,
+        containsPair(
+            'compose_connection_binding_hash', preview.connectionBindingHash));
+    expect(transport.payloads.last,
+        containsPair('previewed_arguments_hash', preview.argumentsHash));
+    await expectLater(
+      client.callTool(
+        serverId: 'mcp-fixture',
+        tool: tool,
+        arguments: arguments,
+        composeManifest: manifest,
+        composePreview: preview,
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.operations, ['MCP Tool実行Preview', 'MCP Tool実行']);
   });
 
   test('Agent連続Tool receiptは元Taskとresult context hashを束縛し本文を返さない', () async {

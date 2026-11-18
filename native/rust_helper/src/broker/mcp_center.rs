@@ -21,9 +21,11 @@ use zeroize::{Zeroize, Zeroizing};
 const OP_CONNECT: &str = "MCP接続";
 const OP_DISCONNECT: &str = "MCP切断";
 const OP_LIST: &str = "MCP接続一覧";
+const OP_TOOL_PREVIEW: &str = "MCP Tool実行Preview";
 const OP_TOOL_CALL: &str = "MCP Tool実行";
 const VERSION: u64 = 1;
 const MAX_ARGUMENTS: usize = 32;
+const MAX_TOOL_ARGUMENT_PROPERTIES: usize = 256;
 const MAX_ARGUMENT_BYTES: usize = 1024;
 const MAX_AGENT_CAPABILITY_BYTES: usize = 16 * 1024;
 const MAX_AGENT_RESULTS: usize = 8;
@@ -140,6 +142,33 @@ struct ToolCallRequest {
     source_agent_result_hash: Option<String>,
     #[serde(default, rename = "compose_manifest")]
     compose_manifest: Option<Value>,
+    #[serde(default, rename = "compose_manifest_hash")]
+    compose_manifest_hash: Option<String>,
+    #[serde(default, rename = "compose_catalog_snapshot_hash")]
+    compose_catalog_snapshot_hash: Option<String>,
+    #[serde(default, rename = "compose_connection_binding_hash")]
+    compose_connection_binding_hash: Option<String>,
+    #[serde(default, rename = "previewed_arguments_hash")]
+    previewed_arguments_hash: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ToolActionPreviewRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "操作")]
+    operation: String,
+    #[serde(rename = "ServerID")]
+    server_id: String,
+    #[serde(rename = "ToolID")]
+    tool_id: String,
+    #[serde(rename = "名前")]
+    name: String,
+    #[serde(rename = "arguments")]
+    arguments: Value,
+    #[serde(rename = "compose_manifest")]
+    compose_manifest: Value,
 }
 
 struct OneShotMcpPermission {
@@ -853,6 +882,173 @@ pub(super) fn list(
 }
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+pub(super) fn preview_tool_action(
+    broker: &mut Broker,
+    request_id: &str,
+    _payload: &Value,
+    _owner: bool,
+    payload_hash: &str,
+) -> BrokerResponse {
+    broker.reject_with_payload_hash(
+        request_id,
+        OP_TOOL_PREVIEW,
+        "mcp_tool_preview_platform_unsupported",
+        "MCP Tool実行PreviewはDesktop Brokerだけに対応しています",
+        true,
+        payload_hash,
+    )
+}
+
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+pub(super) fn preview_tool_action(
+    broker: &mut Broker,
+    request_id: &str,
+    payload: &Value,
+    _owner: bool,
+    payload_hash: &str,
+) -> BrokerResponse {
+    if !broker.state_store.persistence_ready() {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_TOOL_PREVIEW,
+            "broker_persistence_unavailable",
+            "MCP Tool実行PreviewのAuditを保存できないためPreviewを返さない",
+            true,
+            payload_hash,
+        );
+    }
+    let request = match parse_tool_action_preview_request(payload) {
+        Ok(request) => request,
+        Err(error) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_TOOL_PREVIEW,
+                error.code,
+                error.message,
+                true,
+                payload_hash,
+            )
+        }
+    };
+    let composition = match super::compose_center::preview_mcp_tool_composition(
+        broker,
+        &request.compose_manifest,
+        &request.server_id,
+        &request.tool_id,
+    ) {
+        Ok(preview) => preview,
+        Err(_) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_TOOL_PREVIEW,
+                "mcp_tool_compose_preview_unavailable",
+                "現在Catalog／依存／互換性を確認できないためTool Previewを返さない",
+                true,
+                payload_hash,
+            )
+        }
+    };
+    if let Err(error) = validate_current_tool_request(
+        broker,
+        &request.server_id,
+        &request.tool_id,
+        &request.name,
+        &request.arguments,
+    ) {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_TOOL_PREVIEW,
+            error.code,
+            error.message,
+            true,
+            payload_hash,
+        );
+    }
+    let arguments_hash = crate::audit_hash::sha256_tagged(
+        &serde_json::to_vec(&request.arguments).expect("JSON Valueは直列化可能"),
+    );
+    let permission_preview = json!({
+        "capability_id": "mcp.tool.call",
+        "permission_id": "permission.mcp.tool.call.one_shot",
+        "server_id": request.server_id,
+        "tool_id": request.tool_id,
+        "arguments_hash": arguments_hash,
+        "permission_status": "not_generated",
+        "approval_status": "not_requested",
+        "requires_native_owner_confirmation": true,
+    });
+    let audit = match broker.append_audit(
+        request_id,
+        OP_TOOL_PREVIEW,
+        "previewed",
+        &format!(
+            "Compose MCP Tool実行Preview。effect=false Permission=not_generated Approval=not_requested compose_id={} manifest_hash={} catalog_hash={} connection_binding_hash={} host_switch_generation={} arguments_hash={}",
+            composition.composition.compose_id,
+            composition.composition.manifest_hash,
+            composition.catalog_snapshot_hash,
+            composition.connection_binding_hash,
+            composition.host_switch_generation,
+            arguments_hash,
+        ),
+        EVIDENCE_SOURCE_INTERNAL_STATE,
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(error) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_TOOL_PREVIEW,
+                "mcp_audit_append_failed",
+                &error.message(),
+            )
+        }
+    };
+    BrokerResponse {
+        request_id: request_id.to_string(),
+        operation: OP_TOOL_PREVIEW.to_string(),
+        status: BrokerStatus::Accepted,
+        evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+        audit_event_id: audit.event_id.clone(),
+        error: None,
+        health: None,
+        body: Some(json!({
+            "version": VERSION,
+            "operation": OP_TOOL_PREVIEW,
+            "status": "accepted",
+            "server_id": request.server_id,
+            "tool_id": request.tool_id,
+            "name": request.name,
+            "arguments_hash": arguments_hash,
+            "compose_id": composition.composition.compose_id,
+            "compose_manifest_hash": composition.composition.manifest_hash,
+            "catalog_snapshot_hash": composition.catalog_snapshot_hash,
+            "connection_binding_hash": composition.connection_binding_hash,
+            "host_switch_generation": composition.host_switch_generation,
+            "dependency_preview": composition.dependency_preview,
+            "compatibility_preview": {
+                "status": "observed_checks_passed",
+                "checks": [
+                    "現在のRuntime／Agent／MCP Catalog選択",
+                    "現在のCapability宣言",
+                    "現在のMCP接続とTool arguments schema",
+                ],
+                "unknown": [
+                    "未提供のpackage／ABI／Provider互換条件",
+                ],
+            },
+            "permission_preview": permission_preview,
+            "permission_generated": false,
+            "approval_requested": false,
+            "tool_effect_performed": false,
+            "authority_strip": true,
+            "evidence_source": EVIDENCE_SOURCE_INTERNAL_STATE,
+            "audit_id": audit.event_id,
+        })),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 pub(super) fn call_tool(
     broker: &mut Broker,
     request_id: &str,
@@ -911,23 +1107,57 @@ pub(super) fn call_tool(
             )
         }
     };
+    let arguments_hash = crate::audit_hash::sha256_tagged(
+        &serde_json::to_vec(&request.arguments).expect("JSON Valueは直列化可能"),
+    );
     let composition = match request.compose_manifest.as_ref() {
-        Some(manifest) => match super::compose_center::validate_mcp_tool_composition(
-            broker,
-            manifest,
-            &request.server_id,
-            &request.tool_id,
-        ) {
-            Ok(binding) => Some(binding),
-            Err(_) => return broker.reject_with_payload_hash(
-                request_id,
-                OP_TOOL_CALL,
-                "mcp_tool_compose_selection_invalid",
-                "Composeで選択した現在のRuntime／Agent／MCP Tool構成を確認できないため送信しない",
-                true,
-                payload_hash,
-            ),
-        },
+        Some(manifest) => {
+            let expected_manifest_hash = request
+                .compose_manifest_hash
+                .as_deref()
+                .expect("Compose実行要求はPreview hashを必要とする");
+            let expected_catalog_hash = request
+                .compose_catalog_snapshot_hash
+                .as_deref()
+                .expect("Compose実行要求はCatalog hashを必要とする");
+            let expected_connection_hash = request
+                .compose_connection_binding_hash
+                .as_deref()
+                .expect("Compose実行要求は接続束縛hashを必要とする");
+            let expected_arguments_hash = request
+                .previewed_arguments_hash
+                .as_deref()
+                .expect("Compose実行要求はarguments Preview hashを必要とする");
+            if arguments_hash != expected_arguments_hash {
+                return broker.reject_with_payload_hash(
+                    request_id,
+                    OP_TOOL_CALL,
+                    "mcp_tool_compose_preview_stale",
+                    "Preview後にMCP argumentsが変化したためToolを送信しない",
+                    true,
+                    payload_hash,
+                );
+            }
+            match super::compose_center::validate_mcp_tool_composition_preview(
+                broker,
+                manifest,
+                &request.server_id,
+                &request.tool_id,
+                expected_manifest_hash,
+                expected_catalog_hash,
+                expected_connection_hash,
+            ) {
+                Ok(binding) => Some(binding),
+                Err(_) => return broker.reject_with_payload_hash(
+                    request_id,
+                    OP_TOOL_CALL,
+                    "mcp_tool_compose_preview_stale",
+                    "Preview後に現在Manifest／Runtime／Workspace／Host／Tool Catalogが変化したため送信しない",
+                    true,
+                    payload_hash,
+                ),
+            }
+        }
         None => None,
     };
     let composition_audit = composition.as_ref().map_or_else(String::new, |binding| {
@@ -957,9 +1187,6 @@ pub(super) fn call_tool(
         );
     }
 
-    let arguments_hash = crate::audit_hash::sha256_tagged(
-        &serde_json::to_vec(&request.arguments).expect("JSON Valueは直列化可能"),
-    );
     let agent_source_requested = request.source_agent_task_id.is_some();
     let credential_id = broker
         .mcp_connections
@@ -983,33 +1210,13 @@ pub(super) fn call_tool(
             payload_hash,
         );
     }
-    let preflight = match broker.mcp_connections.get_mut(&request.server_id) {
-        None => Err(McpError::new(
-            "mcp_connection_unknown",
-            "指定MCP Serverの接続が存在しない",
-        )),
-        Some(entry) => {
-            if entry.quarantined {
-                Err(McpError::new(
-                    "mcp_connection_quarantined",
-                    "MCP接続は隔離中のためTool実行できない。ownerが切断・再接続する",
-                ))
-            } else if !entry.connection.is_alive() {
-                quarantine(entry);
-                Err(McpError::new(
-                    "mcp_server_unavailable",
-                    "MCP Serverが終了したためTool実行できない",
-                ))
-            } else {
-                entry.connection.catalog().validate_tool_identity_and_call(
-                    &request.tool_id,
-                    &request.name,
-                    &request.arguments,
-                )
-            }
-        }
-    };
-    if let Err(error) = preflight {
+    if let Err(error) = validate_current_tool_request(
+        broker,
+        &request.server_id,
+        &request.tool_id,
+        &request.name,
+        &request.arguments,
+    ) {
         return broker.reject_with_payload_hash(
             request_id,
             OP_TOOL_CALL,
@@ -1871,6 +2078,10 @@ mod tests {
             "ToolID": format!("tool-{}", "a".repeat(142)),
             "名前": "echo",
             "arguments": {"text": "公開fixture本文"},
+            "compose_manifest_hash": format!("sha256:{}", "a".repeat(64)),
+            "compose_catalog_snapshot_hash": format!("sha256:{}", "b".repeat(64)),
+            "compose_connection_binding_hash": format!("sha256:{}", "c".repeat(64)),
+            "previewed_arguments_hash": format!("sha256:{}", "d".repeat(64)),
             "compose_manifest": {
                 "version": 1,
                 "compose_id": "owner-compose",
@@ -2581,9 +2792,101 @@ echo {{"jsonrpc":"2.0","id":3,"result":{{"resultType":"complete","content":[{{"t
             tool_id
         );
 
+        let arguments = json!({});
+        let preview = broker_test_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行Preview,
+            json!({
+                "版": 1,
+                "操作": "Preview",
+                "ServerID": SERVER,
+                "ToolID": tool_id,
+                "名前": "echo",
+                "arguments": arguments,
+                "compose_manifest": composed.body.as_ref().unwrap()["compose_manifest"],
+            }),
+            false,
+        );
+        assert_eq!(preview.status, BrokerStatus::Accepted, "{preview:?}");
+        assert_eq!(preview.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+        let preview_body = preview.body.as_ref().expect("MCP Tool Preview");
+        assert_eq!(preview_body["permission_generated"], false);
+        assert_eq!(preview_body["approval_requested"], false);
+        assert_eq!(preview_body["tool_effect_performed"], false);
+        assert_eq!(preview_body["authority_strip"], true);
+        assert_eq!(
+            preview_body["permission_preview"]["permission_status"],
+            "not_generated"
+        );
+        assert_eq!(
+            preview_body["permission_preview"]["approval_status"],
+            "not_requested"
+        );
+        assert_eq!(
+            preview_body["compatibility_preview"]["status"],
+            "observed_checks_passed"
+        );
+        assert_eq!(
+            preview_body["dependency_preview"]["status"], "partial",
+            "未提供dependencyはknownへ偽装しない"
+        );
+        assert!(!calls_path.exists(), "PreviewはMCP Toolを呼び出さない");
+        let preview_hashes = json!({
+            "compose_manifest_hash": preview_body["compose_manifest_hash"],
+            "compose_catalog_snapshot_hash": preview_body["catalog_snapshot_hash"],
+            "compose_connection_binding_hash": preview_body["connection_binding_hash"],
+            "previewed_arguments_hash": preview_body["arguments_hash"],
+        });
+        assert!(broker.audit_events().iter().any(|event| {
+            event.operation == OP_TOOL_PREVIEW
+                && event.decision == "previewed"
+                && event.evidence_source == EVIDENCE_SOURCE_INTERNAL_STATE
+        }));
+
         let mut stale_runtime = selected.clone();
         stale_runtime["runtime_ids"] = json!(["compose-stale-runtime"]);
-        let stale_composed_tool_call = broker_test_native_owner_operation(
+        let stale_preview = broker_test_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行Preview,
+            json!({
+                "版": 1,
+                "操作": "Preview",
+                "ServerID": SERVER,
+                "ToolID": tool_id,
+                "名前": "echo",
+                "arguments": arguments,
+                "compose_manifest": stale_runtime,
+            }),
+            false,
+        );
+        assert_eq!(stale_preview.status, BrokerStatus::Rejected);
+        assert_eq!(
+            stale_preview
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("mcp_tool_compose_preview_unavailable"),
+            "現在CatalogにないCompose RuntimeはPreview段階で拒否する"
+        );
+        assert!(
+            !calls_path.exists(),
+            "stale Compose selectionはPreviewもTool作用もしない"
+        );
+
+        let original_connection_binding = broker
+            .mcp_connections
+            .get(SERVER)
+            .and_then(|entry| entry.projection.get("Transport"))
+            .and_then(|transport| transport.get("接続先hash"))
+            .and_then(Value::as_str)
+            .expect("接続束縛hash")
+            .to_string();
+        broker
+            .mcp_connections
+            .get_mut(SERVER)
+            .expect("登録MCP接続")
+            .projection["Transport"]["接続先hash"] = json!(format!("sha256:{}", "d".repeat(64)));
+        let changed_connection_action = broker_test_native_owner_operation(
             &mut broker,
             BrokerOperation::MCPTool実行,
             json!({
@@ -2592,23 +2895,84 @@ echo {{"jsonrpc":"2.0","id":3,"result":{{"resultType":"complete","content":[{{"t
                 "ServerID": SERVER,
                 "ToolID": tool_id,
                 "名前": "echo",
-                "arguments": {},
-                "compose_manifest": stale_runtime,
+                "arguments": arguments,
+                "compose_manifest": composed.body.as_ref().unwrap()["compose_manifest"],
+                "compose_manifest_hash": preview_hashes["compose_manifest_hash"],
+                "compose_catalog_snapshot_hash": preview_hashes["compose_catalog_snapshot_hash"],
+                "compose_connection_binding_hash": preview_hashes["compose_connection_binding_hash"],
+                "previewed_arguments_hash": preview_hashes["previewed_arguments_hash"],
             }),
         );
-        assert_eq!(stale_composed_tool_call.status, BrokerStatus::Rejected);
+        assert_eq!(changed_connection_action.status, BrokerStatus::Rejected);
         assert_eq!(
-            stale_composed_tool_call
+            changed_connection_action
                 .error
                 .as_ref()
                 .map(|error| error.code.as_str()),
-            Some("mcp_tool_compose_selection_invalid"),
-            "現在CatalogにないCompose RuntimeはTool送信前に拒否する"
+            Some("mcp_tool_compose_preview_stale"),
+            "Preview後にWorkspace接続束縛が変われば作用しない"
         );
-        assert!(
-            !calls_path.exists(),
-            "stale Compose selectionは外部作用しない"
+        broker
+            .mcp_connections
+            .get_mut(SERVER)
+            .expect("登録MCP接続")
+            .projection["Transport"]["接続先hash"] = json!(original_connection_binding);
+        assert!(!calls_path.exists(), "古い接続束縛Previewでは作用しない");
+
+        let changed_arguments = json!({"different": true});
+        let changed_arguments_call = broker_test_native_owner_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行,
+            json!({
+                "版": 1,
+                "操作": "実行",
+                "ServerID": SERVER,
+                "ToolID": tool_id,
+                "名前": "echo",
+                "arguments": changed_arguments,
+                "compose_manifest": composed.body.as_ref().unwrap()["compose_manifest"],
+                "compose_manifest_hash": preview_hashes["compose_manifest_hash"],
+                "compose_catalog_snapshot_hash": preview_hashes["compose_catalog_snapshot_hash"],
+                "compose_connection_binding_hash": preview_hashes["compose_connection_binding_hash"],
+                "previewed_arguments_hash": preview_hashes["previewed_arguments_hash"],
+            }),
         );
+        assert_eq!(changed_arguments_call.status, BrokerStatus::Rejected);
+        assert_eq!(
+            changed_arguments_call
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("mcp_tool_compose_preview_stale"),
+            "Preview後にargumentsが変わった要求はOwner確認後も送信しない"
+        );
+        assert!(!calls_path.exists(), "古いarguments Previewでは作用しない");
+
+        let no_owner = broker_test_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行,
+            json!({
+                "版": 1,
+                "操作": "実行",
+                "ServerID": SERVER,
+                "ToolID": tool_id,
+                "名前": "echo",
+                "arguments": arguments,
+                "compose_manifest": composed.body.as_ref().unwrap()["compose_manifest"],
+                "compose_manifest_hash": preview_hashes["compose_manifest_hash"],
+                "compose_catalog_snapshot_hash": preview_hashes["compose_catalog_snapshot_hash"],
+                "compose_connection_binding_hash": preview_hashes["compose_connection_binding_hash"],
+                "previewed_arguments_hash": preview_hashes["previewed_arguments_hash"],
+            }),
+            false,
+        );
+        assert_eq!(no_owner.status, BrokerStatus::Rejected);
+        assert_eq!(
+            no_owner.error.as_ref().map(|error| error.code.as_str()),
+            Some("mcp_owner_required"),
+            "Previewはnative Owner確認を置き換えない"
+        );
+        assert!(!calls_path.exists(), "Owner確認なしでは作用しない");
 
         let composed_tool_call = broker_test_native_owner_operation(
             &mut broker,
@@ -2619,8 +2983,12 @@ echo {{"jsonrpc":"2.0","id":3,"result":{{"resultType":"complete","content":[{{"t
                 "ServerID": SERVER,
                 "ToolID": tool_id,
                 "名前": "echo",
-                "arguments": {},
+                "arguments": arguments,
                 "compose_manifest": composed.body.as_ref().unwrap()["compose_manifest"],
+                "compose_manifest_hash": preview_hashes["compose_manifest_hash"],
+                "compose_catalog_snapshot_hash": preview_hashes["compose_catalog_snapshot_hash"],
+                "compose_connection_binding_hash": preview_hashes["compose_connection_binding_hash"],
+                "previewed_arguments_hash": preview_hashes["previewed_arguments_hash"],
             }),
         );
         assert_eq!(
@@ -2803,6 +3171,10 @@ fn parse_tool_call_request(payload: &Value) -> Result<ToolCallRequest, McpError>
         || request.name.as_bytes().len() > 256
         || request.name.chars().any(char::is_control)
         || !request.arguments.is_object()
+        || request
+            .arguments
+            .as_object()
+            .is_some_and(|arguments| arguments.len() > MAX_TOOL_ARGUMENT_PROPERTIES)
         || request.source_agent_task_id.is_some() != request.source_agent_result_hash.is_some()
         || request
             .source_agent_task_id
@@ -2817,6 +3189,32 @@ fn parse_tool_call_request(payload: &Value) -> Result<ToolCallRequest, McpError>
             })
         || request
             .source_agent_result_hash
+            .as_deref()
+            .is_some_and(|hash| !valid_tagged_hash(hash))
+        || (request.compose_manifest.is_some()
+            && !(request.compose_manifest_hash.is_some()
+                && request.compose_catalog_snapshot_hash.is_some()
+                && request.compose_connection_binding_hash.is_some()
+                && request.previewed_arguments_hash.is_some()))
+        || (request.compose_manifest.is_none()
+            && (request.compose_manifest_hash.is_some()
+                || request.compose_catalog_snapshot_hash.is_some()
+                || request.compose_connection_binding_hash.is_some()
+                || request.previewed_arguments_hash.is_some()))
+        || request
+            .compose_manifest_hash
+            .as_deref()
+            .is_some_and(|hash| !valid_tagged_hash(hash))
+        || request
+            .compose_catalog_snapshot_hash
+            .as_deref()
+            .is_some_and(|hash| !valid_tagged_hash(hash))
+        || request
+            .compose_connection_binding_hash
+            .as_deref()
+            .is_some_and(|hash| !valid_tagged_hash(hash))
+        || request
+            .previewed_arguments_hash
             .as_deref()
             .is_some_and(|hash| !valid_tagged_hash(hash))
         || request.compose_manifest.as_ref().is_some_and(|manifest| {
@@ -2834,6 +3232,83 @@ fn parse_tool_call_request(payload: &Value) -> Result<ToolCallRequest, McpError>
         ));
     }
     Ok(request)
+}
+
+fn parse_tool_action_preview_request(
+    payload: &Value,
+) -> Result<ToolActionPreviewRequest, McpError> {
+    let request: ToolActionPreviewRequest =
+        serde_json::from_value(payload.clone()).map_err(|_| {
+            McpError::new(
+                "mcp_tool_preview_request_invalid",
+                "MCP Tool実行Preview payloadの構造が不正",
+            )
+        })?;
+    if request.version != VERSION
+        || request.operation != "Preview"
+        || request.server_id.is_empty()
+        || request.server_id.as_bytes().len() > 128
+        || request.server_id.chars().any(char::is_control)
+        || request.tool_id.len() != 147
+        || !request.tool_id.starts_with("tool-")
+        || !request.tool_id[5..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        || request.name.is_empty()
+        || request.name.as_bytes().len() > 256
+        || request.name.chars().any(char::is_control)
+        || !request.arguments.is_object()
+        || request
+            .arguments
+            .as_object()
+            .is_some_and(|arguments| arguments.len() > MAX_TOOL_ARGUMENT_PROPERTIES)
+        || super::compose_center::mcp_tool_composition_owner_summary(
+            &request.compose_manifest,
+            &request.server_id,
+            &request.tool_id,
+        )
+        .is_err()
+    {
+        return Err(McpError::new(
+            "mcp_tool_preview_request_invalid",
+            "MCP Tool実行Preview payloadの識別子または値が不正",
+        ));
+    }
+    Ok(request)
+}
+
+fn validate_current_tool_request(
+    broker: &mut Broker,
+    server_id: &str,
+    tool_id: &str,
+    name: &str,
+    arguments: &Value,
+) -> Result<(), McpError> {
+    match broker.mcp_connections.get_mut(server_id) {
+        None => Err(McpError::new(
+            "mcp_connection_unknown",
+            "指定MCP Serverの接続が存在しない",
+        )),
+        Some(entry) => {
+            if entry.quarantined {
+                Err(McpError::new(
+                    "mcp_connection_quarantined",
+                    "MCP接続は隔離中のためTool実行できない。ownerが切断・再接続する",
+                ))
+            } else if !entry.connection.is_alive() {
+                quarantine(entry);
+                Err(McpError::new(
+                    "mcp_server_unavailable",
+                    "MCP Serverが終了したためTool実行できない",
+                ))
+            } else {
+                entry
+                    .connection
+                    .catalog()
+                    .validate_tool_identity_and_call(tool_id, name, arguments)
+            }
+        }
+    }
 }
 
 /// Desktop native確認の公開表示。承認・catalog適合・実行資格は既存Brokerが別途再評価する。
@@ -2871,6 +3346,17 @@ pub(crate) fn desktop_owner_summary(operation: &str, payload: &Value) -> Option<
                 &request.server_id,
                 &request.tool_id,
             )?;
+            let permission_preview = request.compose_manifest.as_ref().map_or_else(
+                String::new,
+                |_| {
+                    format!(
+                        "\nPermission Preview: Capability=mcp.tool.call / Permission=permission.mcp.tool.call.one_shot / permission_status=not_generated / approval_status=not_requested / catalog_snapshot_hash={} / connection_binding_hash={} / previewed_arguments_hash={}",
+                        request.compose_catalog_snapshot_hash.as_deref().unwrap_or("unknown"),
+                        request.compose_connection_binding_hash.as_deref().unwrap_or("unknown"),
+                        request.previewed_arguments_hash.as_deref().unwrap_or("unknown"),
+                    )
+                },
+            );
             let agent_source = match (
                 request.source_agent_task_id.as_deref(),
                 request.source_agent_result_hash.as_deref(),
@@ -2880,7 +3366,7 @@ pub(crate) fn desktop_owner_summary(operation: &str, payload: &Value) -> Option<
                 ),
                 _ => String::new(),
             };
-            Some(format!("このToolを現在Serverへ一回だけ実行します。\nServer ID: {}\nTool: {} ({})\n引数: {}項目\n引数hash: {hash}{agent_source}{composition}\n前画面のJSON argumentsを確認してください。秘密値を含めないでください。Brokerが現在Catalog／Schemaを再検査し、一回PermissionとAuditを確定します。結果本文はFlutter／receiptへ公開せずhashだけを返します。外部副作用は取消できず、結果不明時は隔離・自動再送なしです。",
+            Some(format!("このToolを現在Serverへ一回だけ実行します。\nServer ID: {}\nTool: {} ({})\n引数: {}項目\n引数hash: {hash}{agent_source}{composition}{permission_preview}\n前画面のJSON argumentsを確認してください。秘密値を含めないでください。PreviewはPermission／Approval／Authorityを生成しません。Brokerが現在Catalog／Schema／Preview束縛を再検査し、Owner確認後に一回PermissionとAuditを確定します。結果本文はFlutter／receiptへ公開せずhashだけを返します。外部副作用は取消できず、結果不明時は隔離・自動再送なしです。",
                 request.server_id, request.name, request.tool_id, request.arguments.as_object()?.len()))
         }
         _ => None,

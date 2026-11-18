@@ -187,6 +187,19 @@ void main() {
     final submit = find.byKey(const ValueKey('compose-tool-action-submit'));
     await tester.ensureVisible(submit);
     await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(
+      oldTransport.requests
+          .where((request) => request['operation'] == 'MCP Tool実行Preview'),
+      hasLength(1),
+    );
+    expect(
+      oldTransport.requests
+          .where((request) => request['operation'] == 'MCP Tool実行'),
+      isEmpty,
+      reason: 'Preview中はnative Owner確認とTool作用を開始しない',
+    );
+    await _tap(tester, 'compose-tool-preview-owner-confirm');
     for (var frame = 0;
         frame < 10 && !oldTransport.mcpToolCallRequestStarted.isCompleted;
         frame++) {
@@ -211,6 +224,54 @@ void main() {
       isEmpty,
     );
     expect(find.textContaining('Compose構成から既存MCP Toolを実行しました'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Compose Tool Preview拒否時はnative Owner確認とTool実行へ進まない', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final transport = _ComposeScreenTransport(
+      rejectMcpToolActionPreview: true,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SettingsScreen(
+            client: ShellCoreClient.mock(transport: transport),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tap(tester, 'compose-runtime-agent-catalog-refresh');
+    await _tap(tester, 'compose-agent-agent.codex');
+    await _tap(tester, 'compose-mcp-catalog-refresh');
+    await _tap(tester, 'compose-mcp-server-mcp.local');
+    await _tap(tester, 'compose-mcp-tool-${transport.composeToolId}');
+    await _tap(tester, 'compose-manifest-button');
+    await _tap(tester, 'compose-tool-run-${transport.composeToolId}');
+    await _enter(tester, 'compose-tool-action-arguments', '{"query":"needle"}');
+    await _tap(tester, 'compose-tool-action-submit');
+    await tester.pumpAndSettle();
+
+    expect(
+      transport.requests
+          .where((request) => request['operation'] == 'MCP Tool実行Preview'),
+      hasLength(1),
+    );
+    expect(
+      transport.requests
+          .where((request) => request['operation'] == 'MCP Tool実行'),
+      isEmpty,
+    );
+    expect(find.byKey(const ValueKey('compose-tool-preview-owner-confirm')),
+        findsNothing);
+    expect(find.textContaining('Previewに失敗'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -373,11 +434,37 @@ void main() {
         '{"query":"needle"}',
       );
       await _tap(tester, 'compose-tool-action-submit');
+      expect(
+        transport.requests
+            .where((request) => request['operation'] == 'MCP Tool実行Preview'),
+        hasLength(1),
+      );
+      expect(transport.requests.last['operation'], 'MCP Tool実行Preview');
+      expect(find.textContaining('Permission=not_generated'), findsOneWidget);
+      expect(find.textContaining('未確認: 未提供のpackage／ABI／Provider互換条件'),
+          findsOneWidget);
+      expect(
+        transport.requests
+            .where((request) => request['operation'] == 'MCP Tool実行'),
+        isEmpty,
+      );
+      await _tap(tester, 'compose-tool-preview-owner-confirm');
       final composedToolCall = transport.lastPayload('MCP Tool実行');
       expect(composedToolCall['ServerID'], 'mcp.local');
       expect(composedToolCall['ToolID'], transport.composeToolId);
       expect(composedToolCall['arguments'], {'query': 'needle'});
       expect(composedToolCall['compose_manifest'], compose);
+      expect(composedToolCall['compose_manifest_hash'], startsWith('sha256:'));
+      expect(composedToolCall['compose_catalog_snapshot_hash'],
+          startsWith('sha256:'));
+      expect(composedToolCall['compose_connection_binding_hash'],
+          startsWith('sha256:'));
+      expect(
+          composedToolCall['previewed_arguments_hash'], startsWith('sha256:'));
+      expect(
+        transport.requests.map((request) => request['operation']).toList(),
+        containsAllInOrder(['MCP Tool実行Preview', 'MCP Tool実行']),
+      );
       expect(
         find.textContaining('Compose構成から既存MCP Toolを実行しました'),
         findsOneWidget,
@@ -830,6 +917,7 @@ class _ComposeScreenTransport implements BrokerTransport {
     this.mcpServerDisplayName = 'Fixture MCP',
     this.holdMcpCatalog = false,
     this.holdMcpToolCall = false,
+    this.rejectMcpToolActionPreview = false,
     this.holdAiEditProposal = false,
   });
 
@@ -838,6 +926,7 @@ class _ComposeScreenTransport implements BrokerTransport {
   final String mcpServerDisplayName;
   final bool holdMcpCatalog;
   final bool holdMcpToolCall;
+  final bool rejectMcpToolActionPreview;
   final bool holdAiEditProposal;
   final Completer<void> mcpCatalogRequestStarted = Completer<void>();
   final Completer<void> mcpToolCallRequestStarted = Completer<void>();
@@ -897,6 +986,13 @@ class _ComposeScreenTransport implements BrokerTransport {
     Map<String, Object?>? payload,
   }) async {
     requests.add({'operation': operation, 'payload': payload ?? {}});
+    if (operation == 'MCP Tool実行Preview' && rejectMcpToolActionPreview) {
+      return {
+        'status': 'rejected',
+        'operation': operation,
+        'error': {'code': 'mcp_tool_compose_preview_unavailable'},
+      };
+    }
     if (operation == 'GUI Shell書出し') {
       return exportBrokerResponse(payload!);
     }
@@ -926,6 +1022,7 @@ class _ComposeScreenTransport implements BrokerTransport {
         holdMcpCatalog ? await _waitForMcpCatalog() : _mcpConnectionListBody(),
       'MCP Tool実行' =>
         holdMcpToolCall ? await _waitForMcpToolCall() : _mcpToolCallBody(),
+      'MCP Tool実行Preview' => _mcpToolActionPreviewBody(payload!),
       'GUI Shell編集提案' => holdAiEditProposal
           ? await _waitForAiEditProposal()
           : _aiEditProposalBody(payload!),
@@ -1020,6 +1117,9 @@ class _ComposeScreenTransport implements BrokerTransport {
       if (operation == 'GUI Shell構成' || operation == 'GUI Shell構成Preview')
         'audit_event_id': 'broker-audit-compose',
       if (operation == 'MCP Tool実行') 'evidence_source': 'LIVE_RUNTIME',
+      if (operation == 'MCP Tool実行Preview') 'evidence_source': 'INTERNAL_STATE',
+      if (operation == 'MCP Tool実行Preview')
+        'audit_event_id': 'audit-compose-tool-preview',
       if (operation == 'GUI Shell編集提案') 'evidence_source': 'INTERNAL_STATE',
       if (operation == 'GUI Shell編集提案')
         'audit_event_id': 'audit-compose-ai-edit',
@@ -1049,6 +1149,66 @@ class _ComposeScreenTransport implements BrokerTransport {
         '公開範囲': 'hash_only',
         '証拠種別': 'LIVE_RUNTIME',
         '監査ID': 'audit-compose-tool-call',
+      };
+
+  Map<String, Object?> _mcpToolActionPreviewBody(
+    Map<String, Object?> payload,
+  ) =>
+      {
+        'version': 1,
+        'operation': 'MCP Tool実行Preview',
+        'status': 'accepted',
+        'server_id': payload['ServerID'],
+        'tool_id': payload['ToolID'],
+        'name': payload['名前'],
+        'arguments_hash': 'sha256:${List<String>.filled(64, 'a').join()}',
+        'compose_id': (payload['compose_manifest']! as Map)['compose_id'],
+        'compose_manifest_hash':
+            'sha256:${List<String>.filled(64, 'f').join()}',
+        'catalog_snapshot_hash':
+            'sha256:${List<String>.filled(64, 'b').join()}',
+        'connection_binding_hash':
+            'sha256:${List<String>.filled(64, 'c').join()}',
+        'host_switch_generation':
+            'sha256:${List<String>.filled(64, 'd').join()}',
+        'dependency_preview': {
+          'status': 'partial',
+          'observed_bindings': [
+            {
+              'source_kind': 'tool',
+              'source_id': 'mcp.local:${payload['ToolID']}',
+              'target_kind': 'mcp_server',
+              'target_id': 'mcp.local',
+            },
+          ],
+          'incomplete_source_count': 1,
+          'unknown_source_count': 0,
+        },
+        'compatibility_preview': {
+          'status': 'observed_checks_passed',
+          'checks': [
+            '現在のRuntime／Agent／MCP Catalog選択',
+            '現在のCapability宣言',
+            '現在のMCP接続とTool arguments schema',
+          ],
+          'unknown': ['未提供のpackage／ABI／Provider互換条件'],
+        },
+        'permission_preview': {
+          'capability_id': 'mcp.tool.call',
+          'permission_id': 'permission.mcp.tool.call.one_shot',
+          'server_id': payload['ServerID'],
+          'tool_id': payload['ToolID'],
+          'arguments_hash': 'sha256:${List<String>.filled(64, 'a').join()}',
+          'permission_status': 'not_generated',
+          'approval_status': 'not_requested',
+          'requires_native_owner_confirmation': true,
+        },
+        'permission_generated': false,
+        'approval_requested': false,
+        'tool_effect_performed': false,
+        'authority_strip': true,
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_id': 'audit-compose-tool-preview',
       };
 
   Map<String, Object?> _aiEditProposalBody(Map<String, Object?> payload) => {

@@ -14,6 +14,12 @@ Catalog v3は、依存情報を`known`／`partial`／`unknown`で示す。現行
 
 これらのbindingは構造関係の観測であり、全package／ABI／Provider依存の解決、互換性、実行可能性、Trust、Permission、Approvalを保証しない。未提供の依存宣言は`unknown`として残るため、I04-D01の完全な依存compatibility resolverは未成立として扱う。
 
+## ComposeからのMCP Tool実行
+
+Compose済みToolの実行前に、`MCP Tool実行Preview`で現在Catalog上の選択・dependency binding・観測済みcompatibility・Tool arguments schemaと一回Permissionの要求scopeを照合する。Preview receiptは現在Manifest hash、Catalog snapshot hash、Workspaceを含むMCP接続束縛hash、Host switch generation、arguments hashに結び付く。未提供dependency／package／ABI／Provider情報は`partial`／`unknown`として表示し、互換性を推測でPASSにしない。
+
+Previewは`INTERNAL_STATE`とAuditだけを記録し、Permission・Approval・Tool effectを生成しない。Flutterは同じManifestとarguments、Preview hashesを既存`MCP Tool実行`へ渡す。既存Rust native Owner確認後、Brokerは現在状態とPreview bindingを再評価してから元のBroker MCP Tool作用関数を呼ぶ。Tool消失、依存／Host／Workspace／Manifest／argumentsの変更、native Owner拒否では実Tool effectを起こさない。PermissionはPreview receiptから継承せず、実Actionの既存Broker経路だけが一回Permissionを生成・消費する。
+
 ## 継承禁止
 
 構成ManifestはAuthority、Permission、Approval、Credential、Audit chainを継承しない。`inheritance_policy`の各値は`none`に固定する。Capability requirementは選択要求の説明であり、PermissionまたはAuthorityではない。

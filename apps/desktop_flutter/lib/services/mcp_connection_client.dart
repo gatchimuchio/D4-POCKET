@@ -10,7 +10,9 @@ export 'package:agent_orchestration/mcp_connection_client.dart'
         McpCredentialSummary,
         McpPromptSummary,
         McpResourceSummary,
+        McpToolActionPreview,
         McpToolCallReceipt,
+        McpToolDependencyBinding,
         McpToolSummary;
 
 class McpConnectionClient extends runtime.McpConnectionClient {

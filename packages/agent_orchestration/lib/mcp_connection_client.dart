@@ -119,6 +119,80 @@ class McpToolCallReceipt {
   final McpAgentResultContext? agentResultContext;
 }
 
+class McpToolDependencyBinding {
+  const McpToolDependencyBinding({
+    required this.sourceKind,
+    required this.sourceId,
+    required this.targetKind,
+    required this.targetId,
+  });
+
+  final String sourceKind;
+  final String sourceId;
+  final String targetKind;
+  final String targetId;
+}
+
+class McpToolActionPreview {
+  McpToolActionPreview._({
+    required Object clientIdentity,
+    required this.serverId,
+    required this.toolId,
+    required this.name,
+    required this.argumentsHash,
+    required this.composeId,
+    required this.composeManifestHash,
+    required this.catalogSnapshotHash,
+    required this.connectionBindingHash,
+    required this.hostSwitchGeneration,
+    required this.dependencyStatus,
+    required this.dependencyBindings,
+    required this.incompleteDependencySourceCount,
+    required this.unknownDependencySourceCount,
+    required this.capabilityId,
+    required this.permissionId,
+    required this.permissionStatus,
+    required this.approvalStatus,
+    required this.requiresNativeOwnerConfirmation,
+    required this.compatibilityStatus,
+    required this.compatibilityChecks,
+    required this.unknownCompatibility,
+    required this.auditId,
+    required String argumentsFingerprint,
+    required String manifestFingerprint,
+  }) : _clientIdentity = clientIdentity,
+       _argumentsFingerprint = argumentsFingerprint,
+       _manifestFingerprint = manifestFingerprint;
+
+  final Object _clientIdentity;
+  final String _argumentsFingerprint;
+  final String _manifestFingerprint;
+  bool _consumed = false;
+
+  final String serverId;
+  final String toolId;
+  final String name;
+  final String argumentsHash;
+  final String composeId;
+  final String composeManifestHash;
+  final String catalogSnapshotHash;
+  final String connectionBindingHash;
+  final String hostSwitchGeneration;
+  final String dependencyStatus;
+  final List<McpToolDependencyBinding> dependencyBindings;
+  final int incompleteDependencySourceCount;
+  final int unknownDependencySourceCount;
+  final String capabilityId;
+  final String permissionId;
+  final String permissionStatus;
+  final String approvalStatus;
+  final bool requiresNativeOwnerConfirmation;
+  final String compatibilityStatus;
+  final List<String> compatibilityChecks;
+  final List<String> unknownCompatibility;
+  final String auditId;
+}
+
 class McpAgentResultContext {
   const McpAgentResultContext({
     required this.status,
@@ -139,6 +213,7 @@ class McpConnectionClient {
 
   final BrokerTransport _transport;
   final AgentRuntimePlatform platform;
+  final Object _previewClientIdentity = Object();
 
   Future<void> registerMacNativeCredential({
     required String credentialId,
@@ -671,6 +746,276 @@ class McpConnectionClient {
     }
   }
 
+  Future<McpToolActionPreview> previewToolAction({
+    required String serverId,
+    required McpToolSummary tool,
+    required Map<String, Object?> arguments,
+    required Map<String, Object?> composeManifest,
+  }) async {
+    if (!const {
+          AgentRuntimePlatform.windows,
+          AgentRuntimePlatform.macos,
+          AgentRuntimePlatform.linux,
+        }.contains(platform) ||
+        !_validIdentifier(serverId) ||
+        !RegExp(r'^tool-[a-f0-9]{142}$').hasMatch(tool.toolId) ||
+        !_safeMetadataName(tool.name)) {
+      throw const BrokerClientException('MCP Tool Preview要求が不正です');
+    }
+
+    final canonicalArguments = _canonicalJsonObject(arguments);
+    final canonicalManifest = _canonicalJsonObject(composeManifest);
+    final argumentsFingerprint = jsonEncode(canonicalArguments);
+    final manifestFingerprint = jsonEncode(canonicalManifest);
+    if (canonicalArguments.length > 256 ||
+        utf8.encode(argumentsFingerprint).length > 32 * 1024 ||
+        utf8.encode(manifestFingerprint).length > 32 * 1024) {
+      throw const BrokerClientException('MCP Tool Preview要求が上限を超過しています');
+    }
+    final composeId = canonicalManifest['compose_id'];
+    if (composeId is! String || !_validIdentifier(composeId)) {
+      throw const BrokerClientException('Compose IDが不正です');
+    }
+
+    final response = await _transport.request(
+      'MCP Tool実行Preview',
+      payload: {
+        '版': 1,
+        '操作': 'Preview',
+        'ServerID': serverId,
+        'ToolID': tool.toolId,
+        '名前': tool.name,
+        'arguments': canonicalArguments,
+        'compose_manifest': canonicalManifest,
+      },
+    );
+    final body = _acceptedBody(response, 'MCP Tool実行Preview');
+    const requiredFields = {
+      'version',
+      'operation',
+      'status',
+      'server_id',
+      'tool_id',
+      'name',
+      'arguments_hash',
+      'compose_id',
+      'compose_manifest_hash',
+      'catalog_snapshot_hash',
+      'connection_binding_hash',
+      'host_switch_generation',
+      'dependency_preview',
+      'compatibility_preview',
+      'permission_preview',
+      'permission_generated',
+      'approval_requested',
+      'tool_effect_performed',
+      'authority_strip',
+      'evidence_source',
+      'audit_id',
+    };
+    if (response['operation'] != 'MCP Tool実行Preview' ||
+        response['evidence_source'] != 'INTERNAL_STATE' ||
+        !body.keys.toSet().containsAll(requiredFields) ||
+        body.keys.any((key) => !requiredFields.contains(key)) ||
+        body['version'] != 1 ||
+        body['operation'] != 'MCP Tool実行Preview' ||
+        body['status'] != 'accepted' ||
+        body['server_id'] != serverId ||
+        body['tool_id'] != tool.toolId ||
+        body['name'] != tool.name ||
+        body['compose_id'] != composeId ||
+        body['permission_generated'] != false ||
+        body['approval_requested'] != false ||
+        body['tool_effect_performed'] != false ||
+        body['authority_strip'] != true ||
+        body['evidence_source'] != 'INTERNAL_STATE' ||
+        body['audit_id'] is! String ||
+        (body['audit_id'] as String).isEmpty ||
+        response['audit_event_id'] != body['audit_id']) {
+      throw const BrokerClientException('MCP Tool Preview receiptの境界が不正です');
+    }
+
+    String requireHash(String field) {
+      final value = body[field];
+      if (value is! String ||
+          !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(value)) {
+        throw BrokerClientException('MCP Tool Previewの$fieldが不正です');
+      }
+      return value;
+    }
+
+    final argumentsHash = requireHash('arguments_hash');
+    final composeManifestHash = requireHash('compose_manifest_hash');
+    final catalogSnapshotHash = requireHash('catalog_snapshot_hash');
+    final connectionBindingHash = requireHash('connection_binding_hash');
+    final hostSwitchGeneration = requireHash('host_switch_generation');
+
+    final dependency = body['dependency_preview'];
+    if (dependency is! Map || dependency.keys.any((key) => key is! String)) {
+      throw const BrokerClientException('MCP Tool Previewの依存情報が不正です');
+    }
+    final dependencyBody = Map<String, Object?>.from(dependency);
+    const dependencyFields = {
+      'status',
+      'observed_bindings',
+      'incomplete_source_count',
+      'unknown_source_count',
+    };
+    final rawBindings = dependencyBody['observed_bindings'];
+    final incompleteCount = dependencyBody['incomplete_source_count'];
+    final unknownCount = dependencyBody['unknown_source_count'];
+    if (dependencyBody.length != dependencyFields.length ||
+        !dependencyBody.keys.toSet().containsAll(dependencyFields) ||
+        !const {
+          'known',
+          'partial',
+          'unknown',
+        }.contains(dependencyBody['status']) ||
+        rawBindings is! List ||
+        rawBindings.length > 256 ||
+        incompleteCount is! int ||
+        incompleteCount < 0 ||
+        incompleteCount > 256 ||
+        unknownCount is! int ||
+        unknownCount < 0 ||
+        unknownCount > incompleteCount) {
+      throw const BrokerClientException('MCP Tool Previewの依存情報が不正です');
+    }
+    final bindings = <McpToolDependencyBinding>[];
+    for (final rawBinding in rawBindings) {
+      if (rawBinding is! Map || rawBinding.keys.any((key) => key is! String)) {
+        throw const BrokerClientException('MCP Tool Previewの依存bindingが不正です');
+      }
+      final binding = Map<String, Object?>.from(rawBinding);
+      const bindingFields = {
+        'source_kind',
+        'source_id',
+        'target_kind',
+        'target_id',
+      };
+      if (binding.length != bindingFields.length ||
+          !binding.keys.toSet().containsAll(bindingFields) ||
+          !const {
+            'runtime',
+            'agent',
+            'tool',
+          }.contains(binding['source_kind']) ||
+          !const {
+            'runtime',
+            'adapter',
+            'agent_instance',
+            'mcp_server',
+            'tool',
+            'host',
+          }.contains(binding['target_kind']) ||
+          binding['source_id'] is! String ||
+          (binding['source_id'] as String).isEmpty ||
+          utf8.encode(binding['source_id'] as String).length > 512 ||
+          binding['target_id'] is! String ||
+          (binding['target_id'] as String).isEmpty ||
+          utf8.encode(binding['target_id'] as String).length > 512) {
+        throw const BrokerClientException('MCP Tool Previewの依存bindingが不正です');
+      }
+      bindings.add(
+        McpToolDependencyBinding(
+          sourceKind: binding['source_kind']! as String,
+          sourceId: binding['source_id']! as String,
+          targetKind: binding['target_kind']! as String,
+          targetId: binding['target_id']! as String,
+        ),
+      );
+    }
+
+    final compatibility = body['compatibility_preview'];
+    if (compatibility is! Map ||
+        compatibility.keys.any((key) => key is! String)) {
+      throw const BrokerClientException('MCP Tool Previewの互換性情報が不正です');
+    }
+    final compatibilityBody = Map<String, Object?>.from(compatibility);
+    const compatibilityFields = {'status', 'checks', 'unknown'};
+    const expectedChecks = {
+      '現在のRuntime／Agent／MCP Catalog選択',
+      '現在のCapability宣言',
+      '現在のMCP接続とTool arguments schema',
+    };
+    final checks = compatibilityBody['checks'];
+    final unknownCompatibility = compatibilityBody['unknown'];
+    if (compatibilityBody.length != compatibilityFields.length ||
+        !compatibilityBody.keys.toSet().containsAll(compatibilityFields) ||
+        compatibilityBody['status'] != 'observed_checks_passed' ||
+        checks is! List ||
+        checks.length != expectedChecks.length ||
+        checks.any(
+          (value) => value is! String || !expectedChecks.contains(value),
+        ) ||
+        checks.toSet().length != expectedChecks.length ||
+        unknownCompatibility is! List ||
+        unknownCompatibility.length != 1 ||
+        unknownCompatibility.single != '未提供のpackage／ABI／Provider互換条件') {
+      throw const BrokerClientException('MCP Tool Previewの互換性情報が不正です');
+    }
+
+    final permission = body['permission_preview'];
+    if (permission is! Map || permission.keys.any((key) => key is! String)) {
+      throw const BrokerClientException('MCP Tool PreviewのPermission情報が不正です');
+    }
+    final permissionBody = Map<String, Object?>.from(permission);
+    const permissionFields = {
+      'capability_id',
+      'permission_id',
+      'server_id',
+      'tool_id',
+      'arguments_hash',
+      'permission_status',
+      'approval_status',
+      'requires_native_owner_confirmation',
+    };
+    if (permissionBody.length != permissionFields.length ||
+        !permissionBody.keys.toSet().containsAll(permissionFields) ||
+        permissionBody['capability_id'] != 'mcp.tool.call' ||
+        permissionBody['permission_id'] !=
+            'permission.mcp.tool.call.one_shot' ||
+        permissionBody['server_id'] != serverId ||
+        permissionBody['tool_id'] != tool.toolId ||
+        permissionBody['arguments_hash'] != argumentsHash ||
+        permissionBody['permission_status'] != 'not_generated' ||
+        permissionBody['approval_status'] != 'not_requested' ||
+        permissionBody['requires_native_owner_confirmation'] != true) {
+      throw const BrokerClientException('MCP Tool PreviewのPermission情報が不正です');
+    }
+
+    return McpToolActionPreview._(
+      clientIdentity: _previewClientIdentity,
+      serverId: serverId,
+      toolId: tool.toolId,
+      name: tool.name,
+      argumentsHash: argumentsHash,
+      composeId: composeId,
+      composeManifestHash: composeManifestHash,
+      catalogSnapshotHash: catalogSnapshotHash,
+      connectionBindingHash: connectionBindingHash,
+      hostSwitchGeneration: hostSwitchGeneration,
+      dependencyStatus: dependencyBody['status']! as String,
+      dependencyBindings: List.unmodifiable(bindings),
+      incompleteDependencySourceCount: incompleteCount,
+      unknownDependencySourceCount: unknownCount,
+      capabilityId: permissionBody['capability_id']! as String,
+      permissionId: permissionBody['permission_id']! as String,
+      permissionStatus: permissionBody['permission_status']! as String,
+      approvalStatus: permissionBody['approval_status']! as String,
+      requiresNativeOwnerConfirmation:
+          permissionBody['requires_native_owner_confirmation']! as bool,
+      compatibilityStatus: compatibilityBody['status']! as String,
+      compatibilityChecks: List.unmodifiable(checks.cast<String>()),
+      unknownCompatibility: List.unmodifiable(
+        unknownCompatibility.cast<String>(),
+      ),
+      auditId: body['audit_id']! as String,
+      argumentsFingerprint: argumentsFingerprint,
+      manifestFingerprint: manifestFingerprint,
+    );
+  }
+
   Future<McpToolCallReceipt> callTool({
     required String serverId,
     required McpToolSummary tool,
@@ -678,21 +1023,46 @@ class McpConnectionClient {
     String? sourceAgentTaskId,
     String? sourceAgentResultHash,
     Map<String, Object?>? composeManifest,
+    McpToolActionPreview? composePreview,
   }) async {
+    final canonicalArguments = _canonicalJsonObject(arguments);
+    final canonicalManifest = composeManifest == null
+        ? null
+        : _canonicalJsonObject(composeManifest);
+    final argumentsFingerprint = jsonEncode(canonicalArguments);
+    final manifestFingerprint = canonicalManifest == null
+        ? null
+        : jsonEncode(canonicalManifest);
     if (!_validIdentifier(serverId) ||
         !RegExp(r'^tool-[a-f0-9]{142}$').hasMatch(tool.toolId) ||
         !_safeMetadataName(tool.name) ||
-        utf8.encode(jsonEncode(arguments)).length > 32 * 1024 ||
+        canonicalArguments.length > 256 ||
+        utf8.encode(argumentsFingerprint).length > 32 * 1024 ||
         (sourceAgentTaskId == null) != (sourceAgentResultHash == null) ||
         (sourceAgentTaskId != null && !_validIdentifier(sourceAgentTaskId)) ||
-        (composeManifest != null &&
-            utf8.encode(jsonEncode(composeManifest)).length > 32 * 1024) ||
+        (manifestFingerprint != null &&
+            utf8.encode(manifestFingerprint).length > 32 * 1024) ||
         (sourceAgentResultHash != null &&
             !RegExp(
               r'^sha256:[a-f0-9]{64}$',
-            ).hasMatch(sourceAgentResultHash))) {
+            ).hasMatch(sourceAgentResultHash)) ||
+        (composeManifest == null) != (composePreview == null)) {
       throw const BrokerClientException('MCP Tool実行要求が不正または上限超過です');
     }
+    if (composePreview != null &&
+        (composePreview._clientIdentity != _previewClientIdentity ||
+            composePreview._consumed ||
+            composePreview.serverId != serverId ||
+            composePreview.toolId != tool.toolId ||
+            composePreview.name != tool.name ||
+            composePreview.composeId != canonicalManifest!['compose_id'] ||
+            composePreview._argumentsFingerprint != argumentsFingerprint ||
+            composePreview._manifestFingerprint != manifestFingerprint)) {
+      throw const BrokerClientException(
+        'Compose MCP Tool Previewが現在のServer／Tool／arguments／Manifestに一致しません',
+      );
+    }
+    composePreview?._consumed = true;
     final response = await _transport.request(
       'MCP Tool実行',
       payload: {
@@ -701,12 +1071,19 @@ class McpConnectionClient {
         'ServerID': serverId,
         'ToolID': tool.toolId,
         '名前': tool.name,
-        'arguments': arguments,
+        'arguments': canonicalArguments,
         if (sourceAgentTaskId != null)
           'source_agent_task_id': sourceAgentTaskId,
         if (sourceAgentResultHash != null)
           'source_agent_result_hash': sourceAgentResultHash,
-        if (composeManifest != null) 'compose_manifest': composeManifest,
+        if (canonicalManifest != null) ...{
+          'compose_manifest': canonicalManifest,
+          'compose_manifest_hash': composePreview!.composeManifestHash,
+          'compose_catalog_snapshot_hash': composePreview.catalogSnapshotHash,
+          'compose_connection_binding_hash':
+              composePreview.connectionBindingHash,
+          'previewed_arguments_hash': composePreview.argumentsHash,
+        },
       },
     );
     final body = _acceptedBody(response, 'MCP Tool実行');
@@ -746,6 +1123,8 @@ class McpConnectionClient {
         !RegExp(
           r'^sha256:[a-f0-9]{64}$',
         ).hasMatch(body['arguments_hash'] as String) ||
+        (composePreview != null &&
+            body['arguments_hash'] != composePreview.argumentsHash) ||
         body['result_hash'] is! String ||
         !RegExp(
           r'^sha256:[a-f0-9]{64}$',
@@ -1151,6 +1530,36 @@ class McpConnectionClient {
         (rune >= 0x202a && rune <= 0x202e) ||
         (rune >= 0x2066 && rune <= 0x206f),
   );
+}
+
+Map<String, Object?> _canonicalJsonObject(Map<String, Object?> value) {
+  final canonical = _canonicalJsonValue(value);
+  return canonical as Map<String, Object?>;
+}
+
+Object? _canonicalJsonValue(Object? value) {
+  if (value == null || value is String || value is bool) return value;
+  if (value is num) {
+    if (value is double && !value.isFinite) {
+      throw const BrokerClientException('JSON numberは有限値である必要があります');
+    }
+    return value;
+  }
+  if (value is List) {
+    return List<Object?>.unmodifiable(value.map(_canonicalJsonValue));
+  }
+  if (value is Map) {
+    if (value.keys.any((key) => key is! String)) {
+      throw const BrokerClientException('JSON objectのkeyは文字列である必要があります');
+    }
+    final keys = value.keys.cast<String>().toList()..sort();
+    final canonical = <String, Object?>{};
+    for (final key in keys) {
+      canonical[key] = _canonicalJsonValue(value[key]);
+    }
+    return Map<String, Object?>.unmodifiable(canonical);
+  }
+  throw const BrokerClientException('MCP Tool要求にJSON以外の値が含まれています');
 }
 
 Map<String, Object?> _acceptedBody(

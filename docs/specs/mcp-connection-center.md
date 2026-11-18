@@ -20,6 +20,12 @@ Brokerはcatalogの`inputSchema`適合、32 KiB以下・2048 node以下・深さ
 
 Tool結果本文はFlutter、snapshot、Audit内容、error、log、traceへ渡さない。`hash_only` receiptはresult hash、Tool側error flag、content件数／型だけを持つ。Receipt確定後にBrokerの一時応答を破棄する。Agentへの結果引渡しとContent Exposureによる本文表示は未接続の`release_blocker`である。
 
+### Composeからの実Tool Preview
+
+Compose選択から実Toolを呼ぶ前に、通常の認証済みBroker IPC `MCP Tool実行Preview` を使う。Brokerは現在Compose Catalogと依存binding、観測可能な互換条件、現在MCP接続、Tool arguments schema、および一回Permissionの対象（Server／Tool／arguments hash）を再検査し、`INTERNAL_STATE` Preview receiptとAuditを返す。ReceiptはManifest、Catalog snapshot、接続束縛、Host切替generation、arguments hashに結び付く。接続pathやarguments本文はreceipt／Auditへ公開しない。
+
+PreviewはPermissionを生成せず、Approvalを要求せず、MCP Toolを呼ばない。依存が`partial`／`unknown`、またはpackage／ABI／Provider互換情報が未提供の場合は、その状態を明示する。Flutterは同一Manifest・argumentsとPreview hashを元の`MCP Tool実行`へ渡す。Rust native Owner確認後、Brokerは現在Manifest／Catalog／Workspace接続／Host／Tool／argumentsを再計算し、一致しないPreviewを送信前に拒否する。native Owner確認、現在の一回Permission、Audit、hash-only結果receiptは既存Tool作用経路のまま維持する。Preview receipt自体は権限・承認ではない。
+
 版2026-07-28の応答では、結果種別`resultType`が`complete`の場合だけを受け付ける。旧版互換として、結果種別の欠落は許容する。`server/discover`がJSON-RPCのmethod未対応（`-32601`）を返すか、対応protocol versionがない場合だけ、旧`initialize`／`notifications/initialized`へ切り替える。
 
 通信期限切れ、応答形式不正、要求ID不一致、parameter不正その他の失敗では、再起動や旧protocolでの再試行を行わない。外部Serverの実装を推測せず、JSON-RPC応答、capability、一覧、重複、pagination、秘密値・権限fieldをBroker側で検証する。Tool `inputSchema`はJSON Schema Draft 2020-12のmeta-schema検証とvalidator構築に成功したものだけをCatalogへ入れる。外部`$ref`を取得せず、128 KiB／4096 node／深さ64の上限を適用する。receiptの公開範囲は`metadata_only`に固定する。

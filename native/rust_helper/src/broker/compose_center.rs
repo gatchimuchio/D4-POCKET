@@ -68,6 +68,15 @@ pub(super) struct McpToolComposition {
     pub(super) tool_count: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct McpToolCompositionPreview {
+    pub(super) composition: McpToolComposition,
+    pub(super) catalog_snapshot_hash: String,
+    pub(super) connection_binding_hash: String,
+    pub(super) host_switch_generation: String,
+    pub(super) dependency_preview: Value,
+}
+
 fn latest_host_switch_generation(broker: &Broker) -> String {
     broker
         .audit_events()
@@ -929,6 +938,214 @@ pub(super) fn validate_mcp_tool_composition(
     let (manifest, binding) = parse_mcp_tool_composition(value, server_id, tool_id)?;
     validate_catalog_selection(broker, &manifest)?;
     Ok(binding)
+}
+
+pub(super) fn preview_mcp_tool_composition(
+    broker: &mut Broker,
+    value: &Value,
+    server_id: &str,
+    tool_id: &str,
+) -> Result<McpToolCompositionPreview, String> {
+    let (manifest, composition) = parse_mcp_tool_composition(value, server_id, tool_id)?;
+    let before = catalog_snapshot(broker)?;
+    validate_catalog_selection(broker, &manifest)?;
+    let current = catalog_snapshot(broker)?;
+    let catalog_snapshot_hash = current
+        .get("snapshot_hash")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "現在Compose Catalogのhashを確定できない".to_string())?;
+    if before.get("snapshot_hash").and_then(Value::as_str) != Some(catalog_snapshot_hash) {
+        return Err("Compose Preview中に現在Catalogが変化した".to_string());
+    }
+    let connection_binding_hash = broker
+        .mcp_connections
+        .get(server_id)
+        .and_then(|entry| entry.projection.get("Transport"))
+        .and_then(|transport| transport.get("接続先hash"))
+        .and_then(Value::as_str)
+        .filter(|hash| valid_snapshot_hash(hash))
+        .ok_or_else(|| "MCP接続のWorkspaceを含む接続束縛hashを確認できない".to_string())?;
+    let host_switch_generation = current
+        .get("host_switch_generation")
+        .and_then(Value::as_str)
+        .filter(|hash| valid_snapshot_hash(hash))
+        .ok_or_else(|| "現在Host切替generationを確認できない".to_string())?;
+    let dependency_preview = selected_dependency_preview(&current, &manifest, server_id, tool_id)?;
+
+    Ok(McpToolCompositionPreview {
+        composition,
+        catalog_snapshot_hash: catalog_snapshot_hash.to_string(),
+        connection_binding_hash: connection_binding_hash.to_string(),
+        host_switch_generation: host_switch_generation.to_string(),
+        dependency_preview,
+    })
+}
+
+pub(super) fn validate_mcp_tool_composition_preview(
+    broker: &mut Broker,
+    value: &Value,
+    server_id: &str,
+    tool_id: &str,
+    expected_manifest_hash: &str,
+    expected_catalog_snapshot_hash: &str,
+    expected_connection_binding_hash: &str,
+) -> Result<McpToolComposition, String> {
+    let preview = preview_mcp_tool_composition(broker, value, server_id, tool_id)?;
+    if preview.composition.manifest_hash != expected_manifest_hash
+        || preview.catalog_snapshot_hash != expected_catalog_snapshot_hash
+        || preview.connection_binding_hash != expected_connection_binding_hash
+    {
+        return Err(
+            "Compose Tool Previewと現在Manifest／Catalog／Workspaceが一致しない".to_string(),
+        );
+    }
+    Ok(preview.composition)
+}
+
+fn selected_dependency_preview(
+    catalog: &Value,
+    manifest: &ComposeManifest,
+    server_id: &str,
+    tool_id: &str,
+) -> Result<Value, String> {
+    let mut sources = Vec::<(String, String, Value)>::new();
+    for runtime_id in &manifest.runtime_ids {
+        let runtime = catalog
+            .get("runtimes")
+            .and_then(Value::as_array)
+            .and_then(|items| {
+                items.iter().find(|item| {
+                    item.get("runtime_id").and_then(Value::as_str) == Some(runtime_id.as_str())
+                })
+            })
+            .ok_or_else(|| "Compose Preview対象Runtimeが現在Catalogにありません".to_string())?;
+        sources.push((
+            "runtime".to_string(),
+            runtime_id.clone(),
+            runtime.get("dependencies").cloned().unwrap_or(Value::Null),
+        ));
+    }
+    let agents = catalog
+        .get("agents")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "Compose PreviewのAgent依存Catalogが不正".to_string())?;
+    for agent_id in &manifest.agent_ids {
+        let selected = agents
+            .iter()
+            .filter(|entry| {
+                manifest.runtime_ids.iter().any(|runtime_id| {
+                    entry.get("runtime_id").and_then(Value::as_str) == Some(runtime_id.as_str())
+                }) && entry
+                    .get("metadata")
+                    .and_then(|metadata| metadata.get("agent_id"))
+                    .and_then(Value::as_str)
+                    == Some(agent_id.as_str())
+            })
+            .collect::<Vec<_>>();
+        if selected.is_empty() {
+            return Err("Compose Preview対象Agentが現在Catalogにありません".to_string());
+        }
+        for agent in selected {
+            let runtime_id = agent
+                .get("runtime_id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "Compose Preview対象AgentのRuntime参照が不正".to_string())?;
+            sources.push((
+                "agent".to_string(),
+                format!("{agent_id}@{runtime_id}"),
+                agent.get("dependencies").cloned().unwrap_or(Value::Null),
+            ));
+        }
+    }
+    let tools = catalog
+        .get("tools")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "Compose PreviewのTool依存Catalogが不正".to_string())?;
+    for selected_tool_id in &manifest.tool_ids {
+        let tool = tools
+            .iter()
+            .find(|entry| {
+                entry.get("tool_id").and_then(Value::as_str) == Some(selected_tool_id.as_str())
+                    && manifest.mcp_connection_ids.iter().any(|selected_server| {
+                        entry.get("server_id").and_then(Value::as_str)
+                            == Some(selected_server.as_str())
+                    })
+            })
+            .ok_or_else(|| "Compose Preview対象Toolが現在Catalogにありません".to_string())?;
+        let source_server = tool
+            .get("server_id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "Compose Preview対象ToolのServer参照が不正".to_string())?;
+        sources.push((
+            "tool".to_string(),
+            format!(
+                "{selected_server}:{selected_tool_id}",
+                selected_server = source_server
+            ),
+            tool.get("dependencies").cloned().unwrap_or(Value::Null),
+        ));
+    }
+    if !manifest.tool_ids.iter().any(|selected| selected == tool_id)
+        || !manifest
+            .mcp_connection_ids
+            .iter()
+            .any(|selected| selected == server_id)
+    {
+        return Err("Compose Preview対象Server／ToolがManifestに含まれていない".to_string());
+    }
+    if sources.len() > 256 {
+        return Err("Compose Previewの依存項目上限を超過した".to_string());
+    }
+
+    let mut observed_bindings = Vec::new();
+    let mut incomplete_sources = 0usize;
+    let mut unknown_sources = 0usize;
+    for (source_kind, source_id, dependencies) in &sources {
+        let status = dependencies
+            .get("status")
+            .and_then(Value::as_str)
+            .filter(|status| ["known", "partial", "unknown"].contains(status))
+            .ok_or_else(|| "Compose Previewの依存状態が不正".to_string())?;
+        if status != "known" {
+            incomplete_sources += 1;
+        }
+        if status == "unknown" {
+            unknown_sources += 1;
+        }
+        let items = dependencies
+            .get("items")
+            .and_then(Value::as_array)
+            .ok_or_else(|| "Compose Previewの依存参照一覧が不正".to_string())?;
+        for item in items {
+            let target_kind = item
+                .get("kind")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "Compose Previewの依存種別が不正".to_string())?;
+            let target_id = item
+                .get("id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "Compose Previewの依存IDが不正".to_string())?;
+            observed_bindings.push(json!({
+                "source_kind": source_kind,
+                "source_id": source_id,
+                "target_kind": target_kind,
+                "target_id": target_id,
+            }));
+        }
+    }
+    let status = if unknown_sources > 0 && observed_bindings.is_empty() {
+        "unknown"
+    } else if incomplete_sources > 0 {
+        "partial"
+    } else {
+        "known"
+    };
+    Ok(json!({
+        "status": status,
+        "observed_bindings": observed_bindings,
+        "incomplete_source_count": incomplete_sources,
+        "unknown_source_count": unknown_sources,
+    }))
 }
 
 pub(super) fn mcp_tool_composition_owner_summary(
