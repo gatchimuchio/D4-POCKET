@@ -26,6 +26,22 @@ struct EditProposal {
     execution_mode: String,
 }
 
+pub(crate) fn owner_confirmation_summary(payload: &Value, payload_hash: &str) -> Option<String> {
+    let proposal = parse_proposal(payload).ok()?;
+    let scope = match proposal.scope.as_str() {
+        "composition" => "構成",
+        "ui" => "画面",
+        "contract" => "契約",
+        _ => return None,
+    };
+    Some(format!(
+        "このGUI Shell編集提案を審査待ちとして記録しますか？\n\n提案ID {}\n範囲 {scope}\n対象ファイル {} 件\n予定変更 {} 件\n要求hash {payload_hash}\n\n指示と対象は元の入力画面で確認してください。Taskの開始、ファイルの変更、PermissionやApprovalの発行は行いません。",
+        proposal.edit_id,
+        proposal.target_paths.len(),
+        proposal.expected_changes.len(),
+    ))
+}
+
 pub(super) fn propose(
     broker: &mut Broker,
     request_id: &str,

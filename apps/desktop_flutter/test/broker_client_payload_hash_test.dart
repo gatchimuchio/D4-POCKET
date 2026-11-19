@@ -69,6 +69,7 @@ void main() {
   test('native Owner確認のBroker操作はFlutter待機時間を共有する', () {
     for (final operation in [
       'GUI Shell書出し',
+      'GUI Shell編集提案',
       '回帰Case登録',
       '回帰Case削除',
       '回帰Case削除中断確認',

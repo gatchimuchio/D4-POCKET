@@ -2065,6 +2065,7 @@ impl Broker {
             envelope.operation,
             Some(
                 BrokerOperation::GuiShell書出し
+                    | BrokerOperation::GuiShell編集提案
                     | BrokerOperation::A2A接続
                     | BrokerOperation::A2Aメッセージ送信
                     | BrokerOperation::A2Aタスク状態取得

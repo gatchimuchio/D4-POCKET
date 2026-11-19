@@ -70,6 +70,7 @@ const AGENT_CLI_REGISTRATION_NOTICE: &str = "この登録操作ではTaskを実�
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DesktopOwnerOperationSummary {
     GuiShellExport(ExportConfirmationSummary),
+    GuiShellEditProposal(String),
     AgentTaskWorkspacePermission {
         runtime_id: String,
         session_id: String,
@@ -1972,6 +1973,11 @@ fn owner_operation_candidate_with_product_identity(
         BrokerOperation::GuiShell書出し => DesktopOwnerOperationSummary::GuiShellExport(
             export_center::owner_confirmation_summary(payload, &payload_hash).ok()?,
         ),
+        BrokerOperation::GuiShell編集提案 => {
+            DesktopOwnerOperationSummary::GuiShellEditProposal(
+                crate::broker::ai_edit_center::owner_confirmation_summary(payload, &payload_hash)?,
+            )
+        }
         BrokerOperation::AgentCLI実行系作業領域登録 => {
             let request: AgentCliRuntimeWorkspaceRegistrationRequest =
                 serde_json::from_value(payload.clone()).ok()?;
@@ -2932,6 +2938,7 @@ fn owner_confirmation_text_for_identity(
     product_identity: Option<&ProductRuntimeIdentity>,
 ) -> String {
     match summary {
+        DesktopOwnerOperationSummary::GuiShellEditProposal(text) => text.clone(),
         DesktopOwnerOperationSummary::GuiShellExport(summary) => {
             let target_platform = export_center::target_platform_label(&summary.target_platform)
                 .unwrap_or("不明");
@@ -4391,6 +4398,38 @@ pub fn run() -> Result<(), DesktopLaunchError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ai_edit_proposal_owner_candidate_checks_scope_and_request_hash() {
+        let mut payload: Value = serde_json::from_str(include_str!(
+            "../../../examples/contracts/gui_shell_edit_proposal.valid.json"
+        ))
+        .unwrap();
+        let request = desktop_owner_request(
+            "GUI Shell編集提案",
+            "edit-proposal-native",
+            "edit-proposal-native-nonce",
+            payload.clone(),
+        );
+        let (normalized, summary) =
+            owner_operation_candidate(request.to_string().as_bytes(), &endpoint()).unwrap();
+        let normalized: Value = serde_json::from_str(&normalized).unwrap();
+        assert_eq!(normalized["payload"], payload);
+        assert_eq!(normalized["payload_hash"], request["payload_hash"]);
+        let prompt = owner_confirmation_text(&summary);
+        assert!(prompt.contains(request["payload_hash"].as_str().unwrap()));
+        assert!(prompt.contains("対象ファイル 2 件"));
+        assert!(!prompt.contains(payload["instruction"].as_str().unwrap()));
+
+        payload["self_approval"] = json!(true);
+        let invalid = desktop_owner_request(
+            "GUI Shell編集提案",
+            "edit-proposal-invalid",
+            "edit-proposal-invalid-nonce",
+            payload,
+        );
+        assert!(owner_operation_candidate(invalid.to_string().as_bytes(), &endpoint()).is_none());
+    }
 
     fn activation_response() -> crate::broker::protocol::BrokerResponse {
         crate::broker::protocol::BrokerResponse {

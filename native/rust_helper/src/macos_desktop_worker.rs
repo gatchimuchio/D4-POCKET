@@ -588,6 +588,77 @@ mod tests {
     use serde_json::{json, Value};
 
     #[cfg(unix)]
+    #[test]
+    fn native_ai_edit_proposal_records_only_the_confirmed_request() {
+        let (_temp, root) = recovery_fixture();
+        let payload: Value = serde_json::from_str(include_str!(
+            "../../../examples/contracts/gui_shell_edit_proposal.valid.json"
+        ))
+        .unwrap();
+        let request = |id: &str, payload: &Value| {
+            json!({
+                "request_id": id, "nonce": id, "operation": "GUI Shell編集提案",
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"},
+                "payload_hash": crate::broker::protocol::canonical_payload_hash(Some(payload)),
+                "payload": payload,
+            })
+        };
+        let denied = request("edit-proposal-denied", &payload);
+        let mut invalid_payload = payload.clone();
+        invalid_payload["self_approval"] = json!(true);
+        let invalid = request("edit-proposal-invalid", &invalid_payload);
+        let approved = request("edit-proposal-approved", &payload);
+        let hash = approved["payload_hash"].as_str().unwrap();
+        let instruction = payload["instruction"].as_str().unwrap();
+        let mut confirmations = 0;
+        let mut output = Vec::new();
+        serve(
+            &root,
+            &VerifiedBundle::default(),
+            &mut io::Cursor::new(format!("{denied}\n{invalid}\n{approved}\n{approved}\n")),
+            &mut output,
+            &mut |summary| {
+                assert!(summary.contains(hash));
+                assert!(summary.contains("対象ファイル 2 件"));
+                assert!(!summary.contains(instruction));
+                confirmations += 1;
+                confirmations != 1
+            },
+        )
+        .unwrap();
+        assert_eq!(confirmations, 3);
+        let replies: Vec<Value> = std::str::from_utf8(&output)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(replies.len(), 4);
+        assert_eq!(replies[0]["error"]["code"], "owner_required");
+        assert_eq!(replies[1]["error"]["code"], "owner_required");
+        assert_eq!(replies[2]["status"], "accepted");
+        let receipt = &replies[2]["body"];
+        assert_eq!(receipt["instruction_hash"], hash);
+        assert_eq!(receipt["apply_status"], "not_started");
+        assert_eq!(receipt["files_written"], false);
+        assert_eq!(receipt["permission_generated"], false);
+        assert_eq!(replies[3]["error"]["code"], "broker_replay_detected");
+        let audit = fs::read_to_string(root.join("store/audit.jsonl")).unwrap();
+        let accepted: Vec<Value> = audit
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .filter(|event| {
+                event["operation"] == "GUI Shell編集提案" && event["decision"] == "accepted"
+            })
+            .collect();
+        assert_eq!(accepted.len(), 1);
+        assert_eq!(accepted[0]["event_id"], receipt["audit_id"]);
+        assert_eq!(accepted[0]["payload_hash"], hash);
+        assert!(!audit.contains(instruction));
+        assert!(!std::str::from_utf8(&output).unwrap().contains(instruction));
+    }
+
+    #[cfg(unix)]
     fn export_request(id: &str) -> Value {
         let mut payload: Value = serde_json::from_str(include_str!(
             "../../../examples/contracts/gui_shell_export.valid.json"

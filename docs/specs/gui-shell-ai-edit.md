@@ -8,6 +8,8 @@
 
 Owner資格経路から編集指示、対象path、予定変更を認証済みRust Brokerへ渡す。Brokerは版、識別子、範囲、対象path、規約確認、自己承認禁止、`proposal_only`を再検証し、`INTERNAL_STATE`のAuditEvent付きReceiptを返す。指示本文はReceiptへ返さず、要求hashだけを結合する。
 
+DesktopのSettingsからは、Windows起動器またはLinux／macOS用のネイティブ確認経路を通す。ネイティブ側で提案を検査し、提案ID、範囲、対象ファイル数、予定変更数と要求hashを表示する。確認した当該要求だけをBrokerの専用経路へ渡す。元の入力画面で指示と対象を確認できる。通常IPCおよび確認の拒否からは提案を受理せず、Brokerは確認済み要求の再送も拒否する。
+
 ## 適用範囲
 
 対象pathは`apps/desktop_flutter`、`packages`、`specs`、`docs`、`tooling`、`native/rust_helper/src`、`規定`の境界内に限定する。`.git`、Manifest、release evidence、secret、credential、private、signingに関係するpathは拒否する。外部Agentのmetadataや履歴はAuthority、Permission、Approvalを生成しない。

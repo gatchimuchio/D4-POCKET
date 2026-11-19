@@ -13,6 +13,7 @@ export 'package:gui_shell_ui/runtime_dialogue_client.dart'
 
 const _nativeOwnerConfirmationOperations = <String>{
   'GUI Shell書出し',
+  'GUI Shell編集提案',
   '回帰Case登録',
   '回帰Case削除',
   '回帰Case削除中断確認',
