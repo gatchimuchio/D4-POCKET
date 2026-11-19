@@ -132,7 +132,15 @@ jobs:
           fi
       - name: Linux fake Codex Task, deadline and descendant cleanup
         shell: bash
-        run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests::偽CodexCLIはAdapterのTask成功・期限超過cleanup・子孫停止を通る -- --exact --test-threads=1
+        run: |
+          set -euo pipefail
+          test_name='adapters::codex_cli::tests::偽CodexCLIのtask_scratchは成功・期限超過cleanup・子孫停止を通る'
+          if ! report="$(cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib "$test_name" -- --exact --test-threads=1 --color never)"; then
+            printf '%s\n' "$report"
+            exit 1
+          fi
+          printf '%s\n' "$report"
+          grep -Fxq -- "test $test_name ... ok" <<< "$report"
       - name: Linux Broker crash guardian process-group recovery
         shell: bash
         run: 'cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::process_tree::unix_tests:: -- --test-threads=1'

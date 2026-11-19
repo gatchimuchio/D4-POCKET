@@ -93,7 +93,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
-      "sha256": "87ba1199f9f67bad045a69e20553ba5027dee72732047de64d4b734011f42961"
+      "sha256": "9ed433c0f4d2445ea2d02ee33aa76823e329a1bccc825c605cb7d3d2c51be3ed"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -1645,7 +1645,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "a233b20e4655e4a21fafe422e36acf5a1eda5fac55696c6d7c4e9895a9ce6731"
+      "sha256": "0c15649a96d35f5d1e14d091145c2d660cf8b02c319c410491e24a31280b99ab"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
