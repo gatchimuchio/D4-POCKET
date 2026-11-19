@@ -197,6 +197,7 @@ pub(super) fn agent_capability_snapshot(
     broker: &mut Broker,
 ) -> Result<AgentCapabilitySnapshot, McpError> {
     let mut capabilities = Vec::new();
+    let mut connection_audits = std::collections::BTreeMap::new();
     for (server_id, entry) in &mut broker.mcp_connections {
         if entry.quarantined || !entry.connection.is_alive() {
             quarantine(entry);
@@ -205,12 +206,23 @@ pub(super) fn agent_capability_snapshot(
                 "MCP capability一覧に未確認または隔離中の接続があるためTaskへ提示できない",
             ));
         }
-        capabilities.extend(
-            entry
-                .connection
-                .catalog()
-                .agent_capability_projection(server_id),
-        );
+        let tools = entry
+            .connection
+            .catalog()
+            .agent_capability_projection(server_id);
+        if !tools.is_empty() {
+            let connection_audit_id = entry.projection["接続監査ID"]
+                .as_str()
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| {
+                    McpError::new(
+                        "mcp_capability_snapshot_invalid",
+                        "MCP Toolを公開する接続の受理監査を確認できない",
+                    )
+                })?;
+            connection_audits.insert(server_id.as_str(), connection_audit_id);
+            capabilities.extend(tools);
+        }
     }
     capabilities.sort_by(|left, right| {
         (left["server_id"].as_str(), left["name"].as_str())
@@ -228,7 +240,10 @@ pub(super) fn agent_capability_snapshot(
             "MCP capability snapshotがAgent Task上限を超過した",
         ));
     }
-    let hash = crate::audit_hash::sha256_tagged(&encoded);
+    let hash = super::protocol::canonical_payload_hash(Some(&json!({
+        "catalog_hash": crate::audit_hash::sha256_tagged(&encoded),
+        "connection_audits": connection_audits,
+    })));
     let prompt_context = if capabilities.is_empty() {
         String::new()
     } else {
@@ -247,6 +262,26 @@ pub(super) fn agent_capability_snapshot(
         tool_count: capabilities.len(),
         prompt_context,
     })
+}
+
+fn agent_capability_snapshot_matching(
+    broker: &mut Broker,
+    expected_hash: &str,
+) -> Result<AgentCapabilitySnapshot, McpError> {
+    let snapshot = agent_capability_snapshot(broker)?;
+    if snapshot.tool_count == 0 {
+        return Err(McpError::new(
+            "mcp_capability_unavailable",
+            "接続中MCP ToolがないためAgent capabilityを利用できない",
+        ));
+    }
+    if snapshot.hash != expected_hash {
+        return Err(McpError::new(
+            "mcp_capability_snapshot_stale",
+            "Agent Taskに提示したMCP Tool一覧または接続が変化したため再検査が必要",
+        ));
+    }
+    Ok(snapshot)
 }
 
 pub(super) fn enrich_agent_task_payload(
@@ -308,19 +343,7 @@ pub(super) fn enrich_agent_task_payload(
 
     let mut effective_instruction = instruction;
     if let Some(expected_hash) = snapshot_hash {
-        let snapshot = agent_capability_snapshot(broker)?;
-        if snapshot.tool_count == 0 {
-            return Err(McpError::new(
-                "mcp_capability_unavailable",
-                "接続中MCP ToolがないためAgent capability discoveryを開始できない",
-            ));
-        }
-        if snapshot.hash != expected_hash {
-            return Err(McpError::new(
-                "mcp_capability_snapshot_stale",
-                "MCP Tool catalogがTask検査後に変化したため再検査が必要",
-            ));
-        }
+        let snapshot = agent_capability_snapshot_matching(broker, expected_hash)?;
         effective_instruction.push_str(&snapshot.prompt_context);
     }
 
@@ -1249,19 +1272,30 @@ pub(super) fn call_tool(
         request.source_agent_task_id.as_deref(),
         request.source_agent_result_hash.as_deref(),
     ) {
-        if let Err(code) = broker.validate_agent_mcp_tool_proposal(
+        let source = broker.validate_agent_mcp_tool_proposal(
             task_id,
             result_hash,
             &request.server_id,
             &request.tool_id,
             &request.name,
             &request.arguments,
-        ) {
+        );
+        let verification = source
+            .map_err(|code| {
+                McpError::new(
+                    code,
+                    "Agentの保存済みTask結果・現在Session・WorkspaceとMCP Tool要求を照合できない",
+                )
+            })
+            .and_then(|provenance| {
+                agent_capability_snapshot_matching(broker, &provenance.mcp_capability_snapshot_hash)
+            });
+        if let Err(error) = verification {
             return broker.reject_with_payload_hash(
                 request_id,
                 OP_TOOL_CALL,
-                code,
-                "Agentの保存済みTask結果とMCP Tool要求が一致しない、期限切れ、または再利用済み",
+                error.code,
+                error.message,
                 true,
                 payload_hash,
             );
@@ -2273,7 +2307,8 @@ if errorlevel 1 exit /b 45
                 "environment_variable": "MCP_TEST_CREDENTIAL"
             }
         });
-        let connected = broker_test_operation(&mut broker, BrokerOperation::MCP接続, connect, true);
+        let connected =
+            broker_test_operation(&mut broker, BrokerOperation::MCP接続, connect.clone(), true);
         assert_eq!(connected.status, BrokerStatus::Accepted, "{connected:?}");
         assert_eq!(connected.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
         assert_eq!(
@@ -2288,6 +2323,37 @@ if errorlevel 1 exit /b 45
             "unverified"
         );
         assert_eq!(connected.body.as_ref().unwrap()["権限生成"], "なし");
+
+        let before_reconnect = agent_capability_snapshot(&mut broker).expect("接続中のTool一覧");
+        assert_eq!(before_reconnect.tool_count, 1);
+        agent_capability_snapshot_matching(&mut broker, &before_reconnect.hash)
+            .expect("同じ接続中のTool一覧を受理");
+        let disconnect = broker_test_operation(
+            &mut broker,
+            BrokerOperation::MCP切断,
+            json!({"版": 1, "操作": "切断", "ServerID": SERVER}),
+            true,
+        );
+        assert_eq!(disconnect.status, BrokerStatus::Accepted);
+        let reconnected =
+            broker_test_operation(&mut broker, BrokerOperation::MCP接続, connect, true);
+        assert_eq!(
+            reconnected.status,
+            BrokerStatus::Accepted,
+            "{reconnected:?}"
+        );
+        assert_eq!(
+            reconnected.body.as_ref().unwrap()["Tool"],
+            connected.body.as_ref().unwrap()["Tool"]
+        );
+        match agent_capability_snapshot_matching(&mut broker, &before_reconnect.hash) {
+            Err(error) => assert_eq!(error.code, "mcp_capability_snapshot_stale"),
+            Ok(_) => panic!("同じTool一覧でも再接続前のsnapshotを受理しない"),
+        }
+        assert!(
+            !calls_path.exists(),
+            "再接続前のsnapshot照合はToolを呼ばない"
+        );
 
         let listed = broker_test_operation(
             &mut broker,
@@ -2775,12 +2841,27 @@ echo {{"jsonrpc":"2.0","id":3,"result":{{"resultType":"complete","content":[{{"t
             })
         };
         let selected = manifest(SERVER, vec![tool_id.clone()]);
-        let composed = broker_test_operation(
-            &mut broker,
-            BrokerOperation::GuiShell構成,
-            selected.clone(),
-            false,
-        );
+        let compose = |broker: &mut Broker, manifest: Value| {
+            let catalog = broker_test_operation(
+                broker,
+                BrokerOperation::GuiShell構成Catalog,
+                json!({}),
+                false,
+            );
+            assert_eq!(catalog.status, BrokerStatus::Accepted, "{catalog:?}");
+            let catalog = catalog.body.expect("現在Compose Catalog");
+            broker_test_operation(
+                broker,
+                BrokerOperation::GuiShell構成,
+                json!({
+                    "version": 1,
+                    "catalog_snapshot_hash": catalog["snapshot_hash"],
+                    "compose_manifest": manifest,
+                }),
+                false,
+            )
+        };
+        let composed = compose(&mut broker, selected.clone());
         assert_eq!(composed.status, BrokerStatus::Accepted, "{composed:?}");
         assert_eq!(composed.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
         assert_eq!(
@@ -2967,11 +3048,12 @@ echo {{"jsonrpc":"2.0","id":3,"result":{{"resultType":"complete","content":[{{"t
             false,
         );
         assert_eq!(no_owner.status, BrokerStatus::Rejected);
+        let no_owner_error = no_owner.error.as_ref().expect("native Owner確認の拒否");
         assert_eq!(
-            no_owner.error.as_ref().map(|error| error.code.as_str()),
-            Some("mcp_owner_required"),
-            "Previewはnative Owner確認を置き換えない"
+            no_owner_error.code, "desktop_native_owner_confirmation_required",
+            "PreviewはBroker入口のnative Owner確認を置き換えない"
         );
+        assert!(no_owner_error.fail_closed);
         assert!(!calls_path.exists(), "Owner確認なしでは作用しない");
 
         let composed_tool_call = broker_test_native_owner_operation(
@@ -3030,12 +3112,7 @@ echo {{"jsonrpc":"2.0","id":3,"result":{{"resultType":"complete","content":[{{"t
         assert_eq!(preview.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
 
         let unknown_tool = manifest(SERVER, vec![format!("tool-{}", "b".repeat(142))]);
-        let rejected_tool = broker_test_operation(
-            &mut broker,
-            BrokerOperation::GuiShell構成,
-            unknown_tool,
-            false,
-        );
+        let rejected_tool = compose(&mut broker, unknown_tool);
         assert_eq!(rejected_tool.status, BrokerStatus::Rejected);
         assert_eq!(
             rejected_tool
@@ -3046,12 +3123,7 @@ echo {{"jsonrpc":"2.0","id":3,"result":{{"resultType":"complete","content":[{{"t
         );
 
         let unknown_server = manifest("compose-unregistered", Vec::new());
-        let rejected_server = broker_test_operation(
-            &mut broker,
-            BrokerOperation::GuiShell構成,
-            unknown_server,
-            false,
-        );
+        let rejected_server = compose(&mut broker, unknown_server);
         assert_eq!(rejected_server.status, BrokerStatus::Rejected);
         assert_eq!(
             rejected_server
@@ -3072,12 +3144,7 @@ echo {{"jsonrpc":"2.0","id":3,"result":{{"resultType":"complete","content":[{{"t
             BrokerStatus::Accepted,
             "{disconnected:?}"
         );
-        let stale = broker_test_operation(
-            &mut broker,
-            BrokerOperation::GuiShell構成,
-            manifest(SERVER, vec![tool_id]),
-            false,
-        );
+        let stale = compose(&mut broker, manifest(SERVER, vec![tool_id]));
         assert_eq!(stale.status, BrokerStatus::Rejected);
         assert_eq!(
             stale.error.as_ref().map(|error| error.code.as_str()),

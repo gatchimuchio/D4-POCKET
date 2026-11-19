@@ -1645,7 +1645,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "f88ad9dac0a4fbd608f73e90984927e376e551ecad6eb6be7d520797066177c8"
+      "sha256": "17d4585679077001d68f22f94ea5405031dd4b762da73b4d1f8ac22586c7ee20"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1945,7 +1945,7 @@
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "sha256": "f6cc48c19748816e6418c01cc669b66f9765ab02d09033cc0ab86e4ff3ff953d"
+      "sha256": "ea2f47bfb2ceacb3a9cc7a5672fbf4be383e84e9a4991f0708f56335e0fc6727"
     },
     {
       "path": "docs/specs/mcp-contract.md",
@@ -4149,7 +4149,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "0a1ffa004a0440410d4bb55974b598f9d5be94cb14baa9d168219efffda5d140"
+      "sha256": "e2d97dfb4d55c3c54518a009cc99774861b73a7fda25f143347559ab53fed9c7"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -4189,7 +4189,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "994c2d15fedd3cb13d57851b20877775a00243eef170f32fb3661da9621c4579"
+      "sha256": "23f03ada8a3b85e474df006d49f44ef4dc58d7e4b8a2fd182cc10e36468c9f10"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -4217,7 +4217,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "686654cd0fcd687021917b6ee62d2011676a52debda5ec6d945eb287075eb75a"
+      "sha256": "061528b8afe8c422a1ff9f349263324d912f1b89786b25e9104c1ebc3672712f"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",

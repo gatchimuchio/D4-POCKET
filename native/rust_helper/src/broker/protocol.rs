@@ -5743,14 +5743,35 @@ impl Broker {
         name: &str,
         arguments: &Value,
     ) -> Result<super::dialogue::AgentTaskToolProvenance, &'static str> {
-        self.対話.validate_agent_mcp_tool_proposal(
+        let provenance = self.対話.validate_agent_mcp_tool_proposal(
             task_id,
             result_hash,
             server_id,
             tool_id,
             name,
             arguments,
-        )
+        )?;
+        if !self.agent_mcp_source_scope_is_current(&provenance) {
+            return Err("source_task_scope_stale");
+        }
+        Ok(provenance)
+    }
+
+    fn agent_mcp_source_scope_is_current(
+        &self,
+        provenance: &super::dialogue::AgentTaskToolProvenance,
+    ) -> bool {
+        self.作業領域
+            .dialogue_binding(&provenance.runtime_id, &provenance.workspace_id)
+            .is_some_and(|binding| {
+                binding.registration_hash() == provenance.workspace_registration_hash
+                    && self.対話.agent_task_session_is_current(
+                        &provenance.runtime_id,
+                        &provenance.session_id,
+                        &provenance.workspace_id,
+                        binding.registration_hash(),
+                    )
+            })
     }
 
     pub(super) fn consume_agent_mcp_tool_proposal(
@@ -11389,6 +11410,48 @@ mod 端末統治試験 {
                 Some(ancestry),
             )
             .unwrap();
+    }
+
+    #[test]
+    fn mcp_source_scope_rejects_a_different_registration_and_an_ended_session() {
+        let mut e = 環境生成();
+        agent_task_workspace(&mut e);
+        let runtime_id = "fixture-agent";
+        let workspace_id = "fixture-task-workspace";
+        let started = 通常要求(
+            &mut e.broker,
+            BrokerOperation::対話開始,
+            json!({"実行系ID":runtime_id,"作業領域ID":workspace_id}),
+        );
+        assert_eq!(started.status, BrokerStatus::Accepted, "{started:?}");
+        let body = started.body.unwrap();
+        let session_id = body["対話セッションID"].as_str().unwrap();
+        let binding = e
+            .broker
+            .作業領域
+            .dialogue_binding(runtime_id, workspace_id)
+            .unwrap();
+        let mut source = super::super::dialogue::AgentTaskToolProvenance {
+            runtime_id: runtime_id.into(),
+            session_id: session_id.into(),
+            workspace_id: workspace_id.into(),
+            workspace_registration_hash: binding.registration_hash().into(),
+            mcp_capability_snapshot_hash: sha256_tagged(b"fixture snapshot"),
+            result_hash: sha256_tagged(b"fixture Task result"),
+        };
+        assert!(e.broker.agent_mcp_source_scope_is_current(&source));
+
+        source.workspace_registration_hash = sha256_tagged(b"old registration");
+        assert!(!e.broker.agent_mcp_source_scope_is_current(&source));
+        source.workspace_registration_hash = binding.registration_hash().into();
+
+        let ended = 通常要求(
+            &mut e.broker,
+            BrokerOperation::対話終了,
+            json!({"対話セッションID":session_id}),
+        );
+        assert_eq!(ended.status, BrokerStatus::Accepted, "{ended:?}");
+        assert!(!e.broker.agent_mcp_source_scope_is_current(&source));
     }
 
     #[test]

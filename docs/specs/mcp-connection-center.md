@@ -18,7 +18,9 @@ Brokerはcatalogの`inputSchema`適合、32 KiB以下・2048 node以下・深さ
 
 同一stdio childへ`tools/call`を一回だけ送信し、ID／JSON-RPC形状／resultType／結果サイズを検証する。`content`は最大128個、`text`／`image`／`audio`／`resource_link`／`resource`だけを受け付ける。`structuredContent`はobjectだけを受け付ける。未知content type、malformed result、input-required／partial result、timeout、ID不一致、結果Audit失敗は結果不明として接続を隔離し、自動再送しない。
 
-Tool結果本文はFlutter、snapshot、Audit内容、error、log、traceへ渡さない。`hash_only` receiptはresult hash、Tool側error flag、content件数／型だけを持つ。Receipt確定後にBrokerの一時応答を破棄する。Agentへの結果引渡しとContent Exposureによる本文表示は未接続の`release_blocker`である。
+Tool結果本文はFlutter、snapshot、Audit内容、error、log、traceへ渡さない。操作者が直接呼び出した場合はresult hash、Tool側error flag、content件数／型を`hash_only` receiptで返し、Brokerの一時応答を破棄する。
+
+Agent発案のToolは、保存済み完了Taskの結果hashとServer／Tool／引数に束縛する。Brokerは送信前に、元TaskのRuntime・Session・Workspace登録が現在も有効であることと、Taskへ提示したTool一覧と接続が現在も一致することを再検査する。Tool一覧のhashと、当該一覧にToolを提供した各接続の受理Audit IDを合わせて照合するため、同じTool一覧で再接続しても旧提案は拒否する。照合が成立してから一回限りのPermissionを消費し、Toolを送信する。
 
 ### Composeからの実Tool Preview
 
@@ -60,7 +62,7 @@ Desktop設定のMCP接続センターは、サーバー識別子、Windows絶対
 
 Tool入力画面はJSON argumentsを操作者へ表示し、秘密値を入力しないよう警告する。native確認はServer ID、Tool ID／名前、top-level argument数、引数hash、request hashだけを示し、引数本文を表示しない。Ownerが確認を拒否した場合は送信しない。BrokerはWindowsまたは`macos-mcp-center.md`に定めるMac native確認経路以外からのTool呼出しを拒否する。他platformでは未対応として拒否する。
 
-成功・Tool実行errorのどちらも、Brokerは応答本文を保持・公開せず、結果hash、content件数／型、Tool側error flagだけを`hash_only`の`LIVE_RUNTIME` receiptに含める。Agentへの結果引渡し、全文表示、Resourceリンク追跡は行わない。結果本文はMCP Serverの未信頼dataであり、後続の安全redaction・Content Exposure contractが成立するまでBroker内にも保存しない。
+Agent発案の呼出しで成功した場合、Brokerは条件を満たす応答テキストだけを未信頼データとして、件数・サイズ・期限を制限して一時保持する。接続に使った登録Credentialの実値を伏せ、処理できない場合は後続Taskへ渡さない。受取先は別の現在PermissionとOwner Approvalを通した同じRuntime・Session・Workspaceの新Taskに限り、引渡しは一回限りとする。Flutterへ渡るのは本文を含まない参照情報である。Resourceリンクの追跡と本文表示は未接続。
 
 送信後にtimeout、malformed／unsupported response、ID不一致、結果監査失敗が発生した場合、Brokerは接続をquarantinedへ遷移させ、自動retryしない。owner切断だけがprocess群を終了・記録解消できる。quarantined接続は一覧で状態表示し、Tool呼出しを拒否する。ownerは外部副作用の有無を別途確認してから、必要なら再接続する。これは対象MCP Serverの外部状態を自動復旧・rollbackする保証ではない。
 
@@ -79,7 +81,7 @@ WindowsではMCP stdio Serverも既存のRust process群監督経路から起動
 - `Credential ref ≠ Credential value`
 - `Credential available ≠ Server trusted`
 - Agent metadata、MCP metadata、履歴、Profile、Tool schemaから権限を生成しない。
-- Windows stdioを除くCredential実値の注入、AgentへのTool結果引渡し、Resource／Prompt実取得、Streamable HTTP、OAuth、Tool出力redaction／full content approvalは未接続である。
+- Windows stdio以外のCredential実値の注入、Resource／Prompt実取得、Streamable HTTP、OAuth、Tool結果の全文表示に必要なContent Exposure承認は未接続である。
 - Windows／Mac以外ではprocess群停止を保証する既存監督がないため、`mcp_process_tree_supervision_unsupported`として`MCP切断`をfail-closedで拒否する。WindowsのJob Object試験を他OSのprocess群停止証拠へ流用しない。
 - Windowsのfake MCP stdio child／descendant process fixtureはJob Objectによる起動・停止だけを検証する。外部MCP Serverの適合やinstalled product経路の証拠ではない。Windows以外のprocess群監督は別途検証を要する。
 - `server/discover`またはlegacy `initialize`の応答は、Serverが信頼済みまたは承認済みであることを証明しない。
@@ -88,7 +90,7 @@ WindowsではMCP stdio Serverも既存のRust process群監督経路から起動
 
 未知Server、応答id不一致、malformed JSON-RPC、authority／secret field、未処理pagination、応答timeout、child終了、必須Credentialの不足は接続または一覧を拒否する。`mcp_server_unavailable`と`mcp_timeout`を成功へ変換しない。
 
-Agentへ結果を渡すMCP Tool実行経路、Windows stdio以外のCredential実値注入、Tool結果のContent Exposure、外部MCP実物Test Harness、非Windows process群監督、installed product上のOwner Credential利用証拠が未成立であることは`release_blocker`である。操作者向けの一回限りWindows呼出しreceiptとstdio Credential injectionだけで、Agent統合、外部MCP全体、D4 Pocket全体または正式releaseの完成を主張しない。
+installed product上の実AgentによるMCP Tool実行と結果依存の後続Task、Windows stdio以外のCredential実値注入、Tool結果のContent Exposure、外部MCP実物Test Harness、非Windows process群監督、installed product上のOwner Credential利用証拠は、該当する`release_blocker`の受入条件に従って検証する。
 
 ## Macの限定製品経路
 

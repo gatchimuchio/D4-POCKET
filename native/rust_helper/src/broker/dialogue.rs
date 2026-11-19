@@ -631,6 +631,8 @@ pub(crate) struct AgentTaskToolProvenance {
     pub(crate) runtime_id: String,
     pub(crate) session_id: String,
     pub(crate) workspace_id: String,
+    pub(crate) workspace_registration_hash: String,
+    pub(crate) mcp_capability_snapshot_hash: String,
     pub(crate) result_hash: String,
 }
 
@@ -1472,9 +1474,12 @@ impl 対話制御 {
             .agent_tasks
             .get(task_id)
             .ok_or("source_task_unavailable")?;
+        let capability_snapshot_hash = task
+            .mcp_capability_snapshot_hash
+            .as_ref()
+            .ok_or("source_task_not_eligible")?;
         if task.status != "completed"
             || task.result_hash.as_deref() != Some(result_hash)
-            || task.mcp_capability_snapshot_hash.is_none()
             || task.mcp_tool_request_consumed
             || task
                 .result_expires_at
@@ -1498,6 +1503,8 @@ impl 対話制御 {
             runtime_id: task.runtime_id.clone(),
             session_id: task.session_id.clone(),
             workspace_id: task.workspace_id.clone(),
+            workspace_registration_hash: task.workspace_registration_hash.clone(),
+            mcp_capability_snapshot_hash: capability_snapshot_hash.clone(),
             result_hash: result_hash.to_owned(),
         })
     }
@@ -4398,6 +4405,14 @@ mod tests {
         assert_eq!(provenance.runtime_id, "runtime-fixture");
         assert_eq!(provenance.session_id, "session-fixture");
         assert_eq!(provenance.workspace_id, "workspace-fixture");
+        assert_eq!(
+            provenance.workspace_registration_hash,
+            sha256_tagged(b"workspace-registration")
+        );
+        assert_eq!(
+            provenance.mcp_capability_snapshot_hash,
+            sha256_tagged(b"capability-snapshot")
+        );
         assert_eq!(provenance.result_hash, result_hash);
         assert!(control.agent_tasks[&task_id].mcp_tool_request_consumed);
         assert!(matches!(
