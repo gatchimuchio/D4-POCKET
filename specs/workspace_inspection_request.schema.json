@@ -5,6 +5,31 @@
   "oneOf": [
     {
       "type": "object",
+      "required": ["operation", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {"const": "GUI Shell編集提案審査"},
+        "payload": {
+          "type": "object",
+          "required": [
+            "version", "proposal", "proposal_audit_id", "workspace_id",
+            "registration_hash", "baseline_hash", "approval_id"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "version": {"const": 1},
+            "proposal": {"$ref": "gui_shell_edit_proposal.schema.json"},
+            "proposal_audit_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+            "workspace_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+            "registration_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+            "baseline_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+            "approval_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"}
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
       "required": [
         "operation",
         "payload"

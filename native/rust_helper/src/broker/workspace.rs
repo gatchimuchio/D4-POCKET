@@ -12,6 +12,8 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
+use super::ai_edit_center::{ReviewRequest, REVIEW_OPERATION};
+
 type Audit<'a> = dyn FnMut(&str, &str) -> Result<(), &'static str> + 'a;
 
 #[derive(Default)]
@@ -43,6 +45,63 @@ struct RegisteredWorkspace {
     reader: WorkspaceReader,
     grant: Option<Grant>,
     baseline: Option<Baseline>,
+}
+
+impl RegisteredWorkspace {
+    fn compare_whole(
+        &self,
+        baseline: &Baseline,
+        grant: &Grant,
+        mut changed: impl FnMut(
+            String,
+            &'static str,
+            Option<&crate::workspace_reader::ComparedFile>,
+            Option<&crate::workspace_reader::ComparedFile>,
+        ) -> Result<(), &'static str>,
+    ) -> Result<(usize, usize), &'static str> {
+        let inventory = self
+            .reader
+            .comparison_inventory()
+            .map_err(|_| "変更探索が不成立")?;
+        let mut paths: std::collections::BTreeSet<_> = inventory.files.iter().cloned().collect();
+        paths.extend(baseline.files.keys().cloned());
+        let mut remaining = crate::workspace_reader::MAX_COMPARISON_BYTES;
+        let mut unchanged = 0;
+        for path in paths {
+            if Instant::now() >= grant.deadline {
+                return Err("変更探索中に承認期限超過");
+            }
+            let after = self
+                .reader
+                .read_comparison_version(&path, remaining)
+                .map_err(|_| "変更対象の取得拒否")?;
+            remaining -= after.as_ref().map(|v| v.bytes as u64).unwrap_or(0);
+            let before = baseline.files.get(&path).and_then(|v| v.as_ref());
+            let state = match (before, after.as_ref()) {
+                (None, None) => return Err("探索中に新規fileが消失"),
+                (None, Some(_)) => Some("added"),
+                (Some(_), None) => Some("deleted"),
+                (Some(a), Some(b)) if a.bytes != b.bytes || a.sha256 != b.sha256 => {
+                    Some("modified")
+                }
+                _ => None,
+            };
+            if let Some(status) = state {
+                changed(path, status, before, after.as_ref())?;
+            } else {
+                unchanged += 1;
+            }
+        }
+        if self
+            .reader
+            .comparison_inventory()
+            .map_err(|_| "変更取得後の探索が不成立")?
+            != inventory
+        {
+            return Err("変更取得中に探索範囲が変化");
+        }
+        Ok((unchanged, inventory.excluded_secrets))
+    }
 }
 
 /// Broker内で照合済みのSession-to-Workspace参照。
@@ -182,7 +241,7 @@ struct Revocation {
 fn parse<T: serde::de::DeserializeOwned>(value: &Value) -> Result<T, &'static str> {
     serde_json::from_value(value.clone()).map_err(|_| "作業領域要求の構造が不正")
 }
-fn identifier(id: &str) -> bool {
+pub(super) fn identifier(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 128
         && id.as_bytes()[0].is_ascii_alphanumeric()
@@ -569,6 +628,74 @@ impl WorkspaceRegistry {
             entry.baseline = Some(Baseline { whole, hash, files });
             return Ok(body);
         }
+        if operation == REVIEW_OPERATION {
+            let p = ReviewRequest::parse(payload)?;
+            let (proposal_id, paths) = p.proposal_scope()?;
+            let entry = self
+                .entries
+                .get(&p.workspace_id)
+                .ok_or("作業領域が未登録")?;
+            let grant = entry
+                .grant
+                .as_ref()
+                .filter(|g| g.id == p.approval_id && g.visibility == "full")
+                .ok_or("審査には現在のfull読取承認が必要")?;
+            let baseline = entry
+                .baseline
+                .as_ref()
+                .filter(|v| v.whole && v.hash == p.baseline_hash)
+                .ok_or("審査には現在の全体基準点が必要")?;
+            if p.registration_hash != entry.registration_hash {
+                return Err("作業領域の登録hashが不一致");
+            }
+            for path in &paths {
+                entry
+                    .reader
+                    .validate_relative_path(path, false)
+                    .map_err(|_| "提案の対象pathが不正または除外対象")?;
+            }
+            audit(
+                "編集提案、作業領域、現在の読取承認と全体基準点を照合",
+                &digest(payload),
+            )?;
+            let mut changes = Vec::new();
+            let mut projection_bytes = 0;
+            let (_, excluded_secrets) =
+                entry.compare_whole(baseline, grant, |path, status, before, after| {
+                    if !paths.contains(&path) {
+                        return Err("提案の対象外に変更がある");
+                    }
+                    let change = json!({
+                        "path": path,
+                        "status": status,
+                        "diff": crate::workspace_diff::generate_versions(before, after)
+                    });
+                    projection_bytes += serde_json::to_vec(&change)
+                        .map_err(|_| "審査差分を整形できない")?
+                        .len();
+                    if projection_bytes > 2 * 1024 * 1024 {
+                        return Err("審査差分が表示上限を超えた");
+                    }
+                    changes.push(change);
+                    Ok(())
+                })?;
+            if changes.is_empty() {
+                return Err("審査対象の変更がない");
+            }
+            let changes = Value::Array(changes);
+            return Ok(json!({
+                "version": 1, "operation": REVIEW_OPERATION, "要求hash": digest(payload),
+                "作業領域ID": p.workspace_id, "実行系ID": entry.runtime,
+                "登録hash": entry.registration_hash, "approval_id": grant.id,
+                "有効期限": grant.expires, "表示範囲": grant.visibility,
+                "projection": {
+                    "proposal_id": proposal_id, "proposal_audit_id": p.proposal_audit_id,
+                    "proposal_hash": digest(&p.proposal), "基準点hash": baseline.hash,
+                    "diff_hash": digest(&json!({"changes": &changes})), "changes": changes,
+                    "excluded_secrets": excluded_secrets
+                }
+            }));
+        }
         if !matches!(
             operation,
             "作業領域ツリー"
@@ -644,50 +771,13 @@ impl WorkspaceRegistry {
                     json!({"基準点hash":entry.baseline.as_ref().map(|v|v.hash.as_str()),"相対paths":entry.baseline.as_ref().map(|v|v.files.keys().collect::<Vec<_>>()).unwrap_or_default()})
                 } else if operation == "作業領域変更一覧" {
                     let baseline = baseline.ok_or("全体基準点が必要")?;
-                    let inventory = entry
-                        .reader
-                        .comparison_inventory()
-                        .map_err(|_| "変更探索が不成立")?;
-                    let mut paths: std::collections::BTreeSet<_> =
-                        inventory.files.iter().cloned().collect();
-                    paths.extend(baseline.files.keys().cloned());
-                    let mut remaining = crate::workspace_reader::MAX_COMPARISON_BYTES;
                     let mut changes = Vec::new();
-                    let mut unchanged = 0;
-                    for path in paths {
-                        if Instant::now() >= grant.deadline {
-                            return Err("変更探索中に承認期限超過");
-                        }
-                        let after = entry
-                            .reader
-                            .read_comparison_version(&path, remaining)
-                            .map_err(|_| "変更対象の取得拒否")?;
-                        remaining -= after.as_ref().map(|v| v.bytes as u64).unwrap_or(0);
-                        let before = baseline.files.get(&path).and_then(|v| v.as_ref());
-                        let state = match (before, after.as_ref()) {
-                            (None, None) => return Err("探索中に新規fileが消失"),
-                            (None, Some(_)) => Some("added"),
-                            (Some(_), None) => Some("deleted"),
-                            (Some(a), Some(b)) if a.bytes != b.bytes || a.sha256 != b.sha256 => {
-                                Some("modified")
-                            }
-                            _ => None,
-                        };
-                        if let Some(status) = state {
+                    let (unchanged, excluded_secrets) =
+                        entry.compare_whole(baseline, grant, |path, status, _, _| {
                             changes.push(json!({"path":path,"status":status}));
-                        } else {
-                            unchanged += 1;
-                        }
-                    }
-                    if entry
-                        .reader
-                        .comparison_inventory()
-                        .map_err(|_| "変更取得後の探索が不成立")?
-                        != inventory
-                    {
-                        return Err("変更取得中に探索範囲が変化");
-                    }
-                    json!({"基準点hash":baseline.hash,"changes":changes,"unchanged":unchanged,"excluded_secrets":inventory.excluded_secrets})
+                            Ok(())
+                        })?;
+                    json!({"基準点hash":baseline.hash,"changes":changes,"unchanged":unchanged,"excluded_secrets":excluded_secrets})
                 } else if let Some(baseline) = baseline {
                     let after = entry
                         .reader

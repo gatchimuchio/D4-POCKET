@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 
 const VERSION: u64 = 1;
 const OPERATION: &str = "GUI Shell編集提案";
+pub(super) const REVIEW_OPERATION: &str = "GUI Shell編集提案審査";
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,6 +25,75 @@ struct EditProposal {
     repository_rules_acknowledged: bool,
     self_approval: bool,
     execution_mode: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ReviewRequest {
+    version: u64,
+    pub(super) proposal: Value,
+    pub(super) proposal_audit_id: String,
+    pub(super) workspace_id: String,
+    pub(super) registration_hash: String,
+    pub(super) baseline_hash: String,
+    pub(super) approval_id: String,
+}
+
+impl ReviewRequest {
+    pub(super) fn parse(payload: &Value) -> Result<Self, &'static str> {
+        let request: Self =
+            serde_json::from_value(payload.clone()).map_err(|_| "編集提案審査の入力が不正")?;
+        if request.version != VERSION
+            || !valid_identifier(&request.proposal_audit_id)
+            || !super::workspace::identifier(&request.workspace_id)
+            || !valid_identifier(&request.approval_id)
+            || ![&request.registration_hash, &request.baseline_hash]
+                .into_iter()
+                .all(|hash| {
+                    hash.strip_prefix("sha256:").is_some_and(|value| {
+                        value.len() == 64
+                            && value
+                                .bytes()
+                                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+                    })
+                })
+        {
+            return Err("編集提案審査の版、作業領域、承認または基準点が不正");
+        }
+        Ok(request)
+    }
+
+    pub(super) fn proposal_scope(&self) -> Result<(String, Vec<String>), &'static str> {
+        let proposal = parse_proposal(&self.proposal).map_err(|_| "審査対象の提案が不正")?;
+        Ok((proposal.edit_id, proposal.target_paths))
+    }
+
+    pub(super) fn verify_receipt(&self, broker: &Broker) -> Result<(), &'static str> {
+        self.proposal_scope()?;
+        let log = broker
+            .state_store
+            .verified_audit_log()
+            .map_err(|_| "提案の永続監査を検証できない")?
+            .ok_or("提案の永続監査がない")?;
+        let hash = super::protocol::canonical_payload_hash(Some(&self.proposal));
+        for event in log.events().iter().rev() {
+            if event.operation == "Host切替" && event.decision == "accepted" {
+                break;
+            }
+            if event.event_id == self.proposal_audit_id {
+                return if event.operation == OPERATION
+                    && event.decision == "accepted"
+                    && event.evidence_source == EVIDENCE_SOURCE_INTERNAL_STATE
+                    && event.payload_hash == hash
+                {
+                    Ok(())
+                } else {
+                    Err("提案受付の監査と現在の提案が不一致")
+                };
+            }
+        }
+        Err("現在Hostに一致する提案受付の監査がない")
+    }
 }
 
 pub(crate) fn owner_confirmation_summary(payload: &Value, payload_hash: &str) -> Option<String> {

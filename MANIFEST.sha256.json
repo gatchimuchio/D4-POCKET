@@ -221,7 +221,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "34e96f47632886468f015f333e3f5ca54d1434979953acf365d617a8f858ac76"
+      "sha256": "909661fb1e6c9f12ffce13f4427f70c9958ec036926aec2aa79dd858b9d0828a"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -325,7 +325,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "a95c04f1821399876397460a61015341822b92fc24b3d07cfe7e34a32eaa04fa"
+      "sha256": "1c3196c60b5e7f59b08a01950b05df5c257a9c65174330ae72f0e4c45cf013d3"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -349,7 +349,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/workspace_inspector.dart",
-      "sha256": "df701ceb6aca811f768d12389a8f945dd076ef3757c52428ecacd84f48c617e7"
+      "sha256": "62593fcfd6a334e53d393d4a32d18c1d6350ab5bbec3d7daa382f4c06a84c692"
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart",
@@ -381,7 +381,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/ai_edit_client.dart",
-      "sha256": "bee56b5c0c76e0de9ded899c4ce3a03ecfe6e049d8176f35c6563b739ffcea4a"
+      "sha256": "88cdbc65486965948aa66c0d04a022f6ec48e12a0320e8ecbd6b12b0e2df1917"
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
@@ -457,7 +457,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
-      "sha256": "4124187860d29fccf2528a368432d600fca2e7a709bfc9371d651ea8cca18b88"
+      "sha256": "e23a87240e60f085e14443ead18bc1a6f1652e15d09377764a653fcd8959d5b8"
     },
     {
       "path": "apps/desktop_flutter/linux/.gitignore",
@@ -869,7 +869,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
-      "sha256": "f1b463bb23b129022b515a4a30381b8fab442411d1a2d2094dfe830518b15edc"
+      "sha256": "ef9741816d6c1a2811c9248ff1b2264b8d0b3b4f4593701a6775636c49bd16e9"
     },
     {
       "path": "apps/desktop_flutter/tool/content_live_client.dart",
@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "2b498287401a44300ba0352e808740f8056951720cea7973c0e264b655264f93"
+      "sha256": "6941f434c9ead309d0095a6f612b2610dd5f414f7daf89f0b2d885255cfc0212"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "docs/specs/gui-shell-ai-edit.md",
-      "sha256": "899253f2fe81a64a4aa9a2a026fcda5f115c7b21ecd2f0d6226a1e44b2a1446d"
+      "sha256": "a87e2b0e89cf33aaafccc1483b6185bb465b139163c82a778877b94bd8f3a3be"
     },
     {
       "path": "docs/specs/gui-shell-compose.md",
@@ -4093,7 +4093,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ai_edit_center.rs",
-      "sha256": "5f453aa11eb95f0d951a093502ffd9503150726f5a98ae64088d0c8dad6dd0ba"
+      "sha256": "8a87f36d6a19edafb2babbade695e880c1cc5b632663b2abb3a27b819e7dbe68"
     },
     {
       "path": "native/rust_helper/src/broker/audit.rs",
@@ -4221,7 +4221,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "2f0ee65aed9307dd06776c58e714830afb1d20a18fa73b8c3768d305fdb74e42"
+      "sha256": "98f10bcaf5e9968b416ac0608c45f42ddcccd8dce380b8be6c39e79c9fe9993e"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -4261,7 +4261,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "b58a986b474a313f80c88d72598b231b32584066e6bad7a0c50071dc58f7966d"
+      "sha256": "23f3e6385f26f078d5c3417623fc54360479af95df82ed81b7115ea5697b526c"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -5389,11 +5389,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "bc3a147d4b32bb354b50423a05caae35a2e586a8d1dc220244e3cec20d19736c"
+      "sha256": "32883b7e611b37d36ad26cd7c9d4c4218f5a0172d996f95ccf6d251553e88706"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "7513128ecdf830cc34cdcb866c82e36ce61168116bc877eb0e8120d353bceb92"
+      "sha256": "a8b07f318e931f27af3d15e545ed26b0eb5e0d19eedb30cf97aee8a33ff7b6f0"
     },
     {
       "path": "specs/linux_workspace_selection.schema.json",
@@ -5729,11 +5729,11 @@
     },
     {
       "path": "specs/workspace_inspection_request.schema.json",
-      "sha256": "de12e44b026e4e58966c8acd4d1a75129e5fa91588931cb53ead2d0037f788d8"
+      "sha256": "ee730f97047e1faee1bea5bb7a36508da1db8dc9c518f454f8b5452fc010ff14"
     },
     {
       "path": "specs/workspace_inspection_response.schema.json",
-      "sha256": "e35a9c118587f7f49a095d81fd3b76459050fed48caf93dfae2ab067b0b2e282"
+      "sha256": "b2e0cb81fc56176d719eea8be39ceef9088861710ada81973f4cde54d62d0a99"
     },
     {
       "path": "specs/workspace_startup.schema.json",

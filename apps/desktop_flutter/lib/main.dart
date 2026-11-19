@@ -495,12 +495,15 @@ class _ShellHomePageState extends State<ShellHomePage> {
       RecoveryCenter(client: widget.client, active: selectedIndex == 8),
       ProblemsPanel(client: widget.client, active: selectedIndex == 9),
       EvidenceCenter(client: widget.client),
-      SettingsScreen(
-        client: widget.client,
-        active: selectedIndex == 11,
-        focusUpdateCenterRequest: _updateCenterFocusRequest,
-        onPrepareAiEditTask: _openAiEditProposal,
-        onBrokerMutationOutcomeUnknown: _reportBrokerMutationOutcomeUnknown,
+      WorkspaceInspectorHostScope(
+        generation: _hostContextGeneration,
+        child: SettingsScreen(
+          client: widget.client,
+          active: selectedIndex == 11,
+          focusUpdateCenterRequest: _updateCenterFocusRequest,
+          onPrepareAiEditTask: _openAiEditProposal,
+          onBrokerMutationOutcomeUnknown: _reportBrokerMutationOutcomeUnknown,
+        ),
       ),
       if (_dialogueVisited)
         RuntimeDialogueScreen(

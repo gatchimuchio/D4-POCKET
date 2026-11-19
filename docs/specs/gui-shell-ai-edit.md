@@ -33,3 +33,9 @@ Settingsの編集提案画面は受理Receipt後、指示本文、対象path、�
 この機能は結果の直接適用ではない。事前検査からWorkspaceへの書込み、Task開始、Permission／Approval発行を行わない。準備された適用Taskは通常のAgent Task経路へ戻し、対象WorkspaceのPermissionとTaskごとの一回Owner Approvalを別々に新規取得する。提案・結果からPermission、Approval、Credential、Trust、Authorityを継承しない。Flutterはfilesystemやprocessを直接操作しない。結果本文とAgentの変更・test申告は未信頼データのまま保持する。
 
 適用Taskは別Session／別Workspaceの実装作業として、提案元Agentのsummary・changed files・diff・test申告を証拠とせず、変更前の適用先Workspaceを確認し、Owner／Developerの指示と現在のWorkspace Permissionの範囲内で作業する。適用先で関連test／検査を新たに実行し、正確なcommand・exit status、実際に観測した変更file／diff、Recovery状態を報告する。実行不能は`NOT_RUN`、失敗は`FAIL`として残し、Broker Workspace Inspectorで照合するまではAgent申告と明示する。この指示やその実行結果は検証・Approval・Authorityを生成せず、適用元Workspaceへの直接書込みも許可しない。
+
+## 実際の差分の審査
+
+Settingsの受理済み提案から「実差分を審査」を開く。Workspace Inspectorで候補の登録を選び、変更前に保存した全体基準点と、現在のfull読取承認を使って「提案範囲と実差分を照合」を実行する。
+
+Brokerの `GUI Shell編集提案審査` は、現在のHost表示世代における永続監査の受付事象を元の提案と照合する。登録hash・全体基準点hash・読取承認の一致を確認し、登録rootの既存取得器で現在の版を取得する。除外された秘密パスを表示せず、許可対象外の変更を発見した場合は差分の返却を拒否する。受理時は、変更ファイルの前後の版、差分hash、受付参照と審査の監査IDを結ぶ。表示は取得時点の内容であり、適用や復旧には現在の条件に結ばれた独立の権限が必要になる。

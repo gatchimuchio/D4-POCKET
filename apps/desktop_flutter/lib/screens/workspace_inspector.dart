@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
+import '../services/ai_edit_client.dart';
 import '../services/workspace_client.dart';
 import 'workspace_diff_panel.dart';
 
@@ -26,11 +27,13 @@ class WorkspaceInspector extends StatefulWidget {
     required this.client,
     this.runtimeId,
     this.workspaceId,
+    this.editProposal,
     this.active = true,
   });
   final WorkspaceClient client;
   final String? runtimeId;
   final String? workspaceId;
+  final AiEditProposalReview? editProposal;
   final bool active;
 
   @override
@@ -46,6 +49,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   bool _busy = false;
   bool _active = true;
   bool _diffPaired = false;
+  final Set<String> _expandedReviewPaths = {};
   String _requestedVisibility = 'hash_only';
   int _generation = 0;
   int _bindingGeneration = 0;
@@ -103,6 +107,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     _selected = null;
     _busy = false;
     _diffPaired = false;
+    _expandedReviewPaths.clear();
     _requestedVisibility = 'hash_only';
     _message = message;
   }
@@ -126,7 +131,8 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.client != widget.client ||
         oldWidget.runtimeId != widget.runtimeId ||
-        oldWidget.workspaceId != widget.workspaceId) {
+        oldWidget.workspaceId != widget.workspaceId ||
+        oldWidget.editProposal != widget.editProposal) {
       _clearBinding('作業領域の接続先または対象が変わりました。登録状態を更新してください。');
       _refresh();
     } else if (oldWidget.active != widget.active) {
@@ -289,24 +295,29 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       {bool scope = false,
       bool changes = false,
       bool preview = false,
+      bool review = false,
       String? baselineHash}) async {
     if (!_isActive) return;
     _cancelViewMaintenance();
     final generation = ++_generation;
     setState(() {
       _diffPaired = false;
+      _expandedReviewPaths.clear();
       _view = null;
       _busy = true;
       _selected = registration.id;
       _message = '承認済み範囲を取得中';
     });
     try {
-      final view = await widget.client.read(registration, path,
-          tree: tree,
-          scope: scope,
-          changes: changes,
-          preview: preview,
-          baselineHash: baselineHash);
+      final view = review
+          ? await widget.client.reviewEditProposal(
+              registration, widget.editProposal!, baselineHash!)
+          : await widget.client.read(registration, path,
+              tree: tree,
+              scope: scope,
+              changes: changes,
+              preview: preview,
+              baselineHash: baselineHash);
       if (!mounted || !_isActive || generation != _generation) return;
       setState(() {
         _view = view;
@@ -658,6 +669,45 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
                                 item['path'] as String, false,
                                 baselineHash: view.baselineHash));
                   })),
+        ],
+        if (widget.editProposal != null &&
+            view.registration.visibility == 'full' &&
+            projection?['基準点hash'] is String &&
+            (view.operation == '作業領域比較範囲' ||
+                view.operation == '作業領域全体基準点保存'))
+          OutlinedButton(
+            onPressed: _busy
+                ? null
+                : () => _read(view.registration, '', false,
+                    review: true,
+                    baselineHash: projection!['基準点hash'] as String),
+            child: const Text('提案範囲と実差分を照合'),
+          ),
+        if (view.operation == workspaceEditReviewOperation) ...[
+          Text('審査差分 ${projection!['diff_hash']}'),
+          Text('読取除外 ${projection['excluded_secrets']}件'),
+          for (final item in projection['changes'] as List)
+            ExpansionTile(
+              key: ValueKey('${view.auditId}:${item['path']}'),
+              title: Text(item['path'] as String),
+              initiallyExpanded: _expandedReviewPaths.contains(item['path']),
+              onExpansionChanged: (expanded) {
+                final path = item['path'] as String;
+                if (expanded) {
+                  _expandedReviewPaths.add(path);
+                } else {
+                  _expandedReviewPaths.remove(path);
+                }
+              },
+              children: [
+                WorkspaceDiffPanel(
+                  diff: Map<String, Object?>.from(item['diff'] as Map),
+                  paired: _diffPaired,
+                  onPairedChanged: (value) =>
+                      setState(() => _diffPaired = value),
+                ),
+              ],
+            ),
         ],
         if (view.registration.visibility == 'full' &&
             (view.operation == '作業領域差分' ||

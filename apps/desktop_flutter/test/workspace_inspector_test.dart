@@ -7,6 +7,7 @@ import 'package:broker_contract/broker_request_envelope.dart' show brokerTextHas
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/workspace_inspector.dart';
+import 'package:gui_shell_desktop/services/ai_edit_client.dart';
 import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/workspace_client.dart';
 import 'support/test_broker_tcp_transport.dart';
@@ -17,6 +18,7 @@ class TestBroker implements BrokerTransport {
   String baselineHash = "sha256:${'c' * 64}";
   String baselineEvidence = 'LIVE_RUNTIME';
   String diffKind = "text";
+  String reviewPath = 'docs/allowed.txt';
   String? approval = 'approval-a';
   int expires = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 240;
   bool revokeAfterRead = false;
@@ -30,6 +32,7 @@ class TestBroker implements BrokerTransport {
   List<Map<String, Object?>> additionalRegistrations = [];
   void Function(Map<String, Object?>)? mutate;
   Completer<void>? pendingRead;
+  Completer<void>? pendingList;
   Completer<void>? pendingApproval;
   final operations = <String>[];
   Map<String, Object?> get registration => {
@@ -64,6 +67,7 @@ class TestBroker implements BrokerTransport {
     Map<String, Object?> body;
     String evidence = 'INTERNAL_STATE';
     if (operation == '作業領域一覧') {
+      await pendingList?.future;
       body = {
         '作業領域': [registration, ...additionalRegistrations]
       };
@@ -166,7 +170,9 @@ class TestBroker implements BrokerTransport {
         };
       }
       if (visibility == 'full' &&
-          (operation == '作業領域差分' || operation == '作業領域復旧プレビュー')) {
+          (operation == '作業領域差分' ||
+              operation == '作業領域復旧プレビュー' ||
+              operation == workspaceEditReviewOperation)) {
         body['projection'] = {
           '基準点hash': baselineHash,
           'diff': {
@@ -188,6 +194,25 @@ class TestBroker implements BrokerTransport {
                   ]
                 : [],
           }
+        };
+      }
+      if (operation == workspaceEditReviewOperation) {
+        final proposal = payload!['proposal'] as Map<String, Object?>;
+        final changes = [
+          {
+            'path': reviewPath,
+            'status': 'modified',
+            'diff': (body['projection'] as Map)['diff'],
+          }
+        ];
+        body['projection'] = {
+          'proposal_id': proposal['edit_id'],
+          'proposal_audit_id': payload['proposal_audit_id'],
+          'proposal_hash': brokerPayloadHash(proposal),
+          '基準点hash': baselineHash,
+          'diff_hash': brokerPayloadHash({'changes': changes}),
+          'changes': changes,
+          'excluded_secrets': 1,
         };
       }
       if (visibility == 'full' && operation == '作業領域復旧プレビュー') {
@@ -227,6 +252,96 @@ Future<void> _scrollRootTo(WidgetTester tester, Finder target) async {
 }
 
 void main() {
+  AiEditProposalReview reviewedProposal() {
+    final proposal = AiEditProposalReview(
+      editId: 'edit-proposal',
+      scope: 'composition',
+      instruction: '公開文書を更新する',
+      targetPaths: ['docs/allowed.txt'],
+      expectedChanges: ['説明を変更する'],
+      instructionHash: '',
+      auditId: 'broker-audit-89',
+    );
+    return AiEditProposalReview(
+      editId: proposal.editId,
+      scope: proposal.scope,
+      instruction: proposal.instruction,
+      targetPaths: proposal.targetPaths,
+      expectedChanges: proposal.expectedChanges,
+      instructionHash: brokerPayloadHash(proposal.toBrokerProposal()),
+      auditId: proposal.auditId,
+    );
+  }
+
+  test('編集提案審査は提案範囲外と差分hash不一致を拒否する', () async {
+    final broker = TestBroker()..reviewPath = 'docs/outside.txt';
+    final client = WorkspaceClient(broker);
+    final registration = (await client.list()).single;
+    await expectLater(
+      client.reviewEditProposal(registration, reviewedProposal(), broker.baselineHash),
+      throwsA(isA<BrokerClientException>()),
+    );
+    broker
+      ..reviewPath = 'docs/allowed.txt'
+      ..mutate = (body) =>
+          (body['projection'] as Map)['diff_hash'] = 'sha256:${'a' * 64}';
+    await expectLater(
+      client.reviewEditProposal(registration, reviewedProposal(), broker.baselineHash),
+      throwsA(isA<BrokerClientException>()),
+    );
+  });
+
+  testWidgets('編集提案の実差分を表示しHostが切り替わると消去する', (tester) async {
+    final broker = TestBroker();
+    final history = ValueNotifier<int>(0);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: WorkspaceInspectorHostScope(
+            generation: history,
+            child: WorkspaceInspector(
+              client: WorkspaceClient(broker),
+              editProposal: reviewedProposal(),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    final baseline = find.text('既存baselineの比較範囲を確認');
+    await tester.ensureVisible(baseline);
+    await tester.tap(baseline);
+    await tester.pumpAndSettle();
+    final review = find.text('提案範囲と実差分を照合');
+    await tester.ensureVisible(review);
+    await tester.tap(review);
+    await tester.pumpAndSettle();
+    expect(broker.operations, contains(workspaceEditReviewOperation));
+    final path = find.text('docs/allowed.txt');
+    await tester.ensureVisible(path);
+    await tester.tap(path);
+    await tester.pumpAndSettle();
+    expect(find.text('テキスト差分'), findsOneWidget);
+
+    final recheck = Completer<void>();
+    broker.pendingList = recheck;
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 2200)));
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text('テキスト差分'), findsNothing);
+    recheck.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('テキスト差分'), findsOneWidget);
+
+    history.value++;
+    await tester.pumpAndSettle();
+    expect(path, findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    history.dispose();
+  });
+
   test('Broker拒否は安全なcodeとAudit参照を保持し自由記述を隠す', () async {
     final broker = TestBroker()
       ..failureOperation = '作業領域一覧'

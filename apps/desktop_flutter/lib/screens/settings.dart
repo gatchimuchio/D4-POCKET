@@ -16,9 +16,11 @@ import '../services/mcp_connection_client.dart';
 import '../services/profile_client.dart';
 import '../services/shell_core_client.dart';
 import '../services/update_client.dart';
+import '../services/workspace_client.dart';
 import 'mcp_connection_center.dart';
 import 'provider_credential_metadata_panel.dart';
 import 'shared.dart';
+import 'workspace_inspector.dart';
 
 bool _jsonContractEquals(Object? left, Object? right) {
   if (left is Map && right is Map) {
@@ -165,6 +167,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
   late final ComposeClient? _composeClient;
   late final ExportClient? _exportClient;
   late final AiEditClient? _aiEditClient;
+  late final WorkspaceClient? _aiEditWorkspaceClient;
   late final UpdateClient? _updateClient;
   Future<List<Map<String, Object?>>>? _profilesFuture;
   Future<Map<String, Object?>>? _updatesFuture;
@@ -204,6 +207,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
   String? _aiEditMessage;
   String? _aiEditReceipt;
   AiEditProposalReview? _aiEditProposal;
+  bool _aiEditInspectorOpen = false;
   bool _aiEditInProgress = false;
   String? _updateMessage;
   bool _checkingUpdateCatalog = false;
@@ -299,6 +303,9 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     _aiEditClient = widget.client.brokerTransport == null
         ? null
         : AiEditClient(widget.client.brokerTransport!);
+    _aiEditWorkspaceClient = widget.client.brokerTransport == null
+        ? null
+        : WorkspaceClient(widget.client.brokerTransport!);
     _updateClient = widget.client.brokerTransport == null
         ? null
         : UpdateClient(widget.client.brokerTransport!);
@@ -1595,6 +1602,17 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
             ),
             if (widget.onPrepareAiEditTask == null)
               const Text('Agent CenterとのTask連携がありません。提案はこの画面に保持されています。'),
+            OutlinedButton(
+              onPressed: () =>
+                  setState(() => _aiEditInspectorOpen = !_aiEditInspectorOpen),
+              child: Text(_aiEditInspectorOpen ? '実差分の審査を閉じる' : '実差分を審査'),
+            ),
+            if (_aiEditInspectorOpen)
+              WorkspaceInspector(
+                client: _aiEditWorkspaceClient!,
+                editProposal: _aiEditProposal,
+                active: widget.active,
+              ),
           ],
           if (_aiEditMessage != null) ...[
             const SizedBox(height: 8),
@@ -1638,6 +1656,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     setState(() {
       _aiEditInProgress = true;
       _aiEditProposal = null;
+      _aiEditInspectorOpen = false;
       _aiEditReceipt = null;
       _aiEditMessage = null;
     });
@@ -1751,6 +1770,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     if (!mounted) return;
     setState(() {
       _aiEditProposal = null;
+      _aiEditInspectorOpen = false;
       _aiEditReceipt = null;
       _aiEditMessage = message;
     });

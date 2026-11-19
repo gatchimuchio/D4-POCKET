@@ -19,18 +19,9 @@ class AiEditClient {
   }) async {
     final submittedPaths = List<String>.unmodifiable(targetPaths);
     final submittedChanges = List<String>.unmodifiable(expectedChanges);
-    final payload = {
-      'version': 1,
-      'edit_id': editId,
-      'scope': scope,
-      'instruction': instruction,
-      'target_paths': submittedPaths,
-      'expected_changes': submittedChanges,
-      'source': 'owner_directed_agent',
-      'repository_rules_acknowledged': true,
-      'self_approval': false,
-      'execution_mode': 'proposal_only',
-    };
+    final payload = _proposalPayload(
+      editId, scope, instruction, submittedPaths, submittedChanges,
+    );
     final response = await _transport.request(
       'GUI Shell編集提案',
       payload: payload,
@@ -108,6 +99,21 @@ class AiEditClient {
   }
 }
 
+Map<String, Object?> _proposalPayload(String id, String scope,
+        String instruction, List<String> paths, List<String> changes) =>
+    {
+      'version': 1,
+      'edit_id': id,
+      'scope': scope,
+      'instruction': instruction,
+      'target_paths': paths,
+      'expected_changes': changes,
+      'source': 'owner_directed_agent',
+      'repository_rules_acknowledged': true,
+      'self_approval': false,
+      'execution_mode': 'proposal_only',
+    };
+
 class AiEditProposalReview {
   AiEditProposalReview({
     required this.editId,
@@ -127,6 +133,9 @@ class AiEditProposalReview {
   final List<String> expectedChanges;
   final String instructionHash;
   final String auditId;
+
+  Map<String, Object?> toBrokerProposal() =>
+      _proposalPayload(editId, scope, instruction, targetPaths, expectedChanges);
 
   AiEditProposalProvenance toProvenance() => AiEditProposalProvenance(
         editId: editId,

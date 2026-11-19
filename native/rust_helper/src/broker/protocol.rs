@@ -647,6 +647,8 @@ pub enum BrokerOperation {
     GuiShell構成Preview,
     #[serde(rename = "GUI Shell編集提案")]
     GuiShell編集提案,
+    #[serde(rename = "GUI Shell編集提案審査")]
+    GuiShell編集提案審査,
     #[serde(rename = "GUI Shell書出し")]
     GuiShell書出し,
     #[serde(rename = "更新一覧")]
@@ -835,6 +837,7 @@ impl BrokerOperation {
             BrokerOperation::GuiShell構成Catalog => "GUI Shell構成Catalog",
             BrokerOperation::GuiShell構成Preview => "GUI Shell構成Preview",
             BrokerOperation::GuiShell編集提案 => "GUI Shell編集提案",
+            BrokerOperation::GuiShell編集提案審査 => super::ai_edit_center::REVIEW_OPERATION,
             BrokerOperation::GuiShell書出し => "GUI Shell書出し",
             BrokerOperation::更新一覧 => "更新一覧",
             BrokerOperation::更新候補取得 => "更新候補取得",
@@ -2577,6 +2580,7 @@ impl Broker {
             | BrokerOperation::作業領域比較範囲
             | BrokerOperation::作業領域全体基準点保存
             | BrokerOperation::作業領域変更一覧
+            | BrokerOperation::GuiShell編集提案審査
             | BrokerOperation::作業領域復旧プレビュー) => self.作業領域要求処理(
                 &request_id,
                 operation.as_str(),
@@ -3495,6 +3499,20 @@ impl Broker {
                 hash,
             );
         }
+        if operation == super::ai_edit_center::REVIEW_OPERATION {
+            let decision = super::ai_edit_center::ReviewRequest::parse(payload)
+                .and_then(|request| request.verify_receipt(self));
+            if let Err(reason) = decision {
+                return self.reject_with_payload_hash(
+                    id,
+                    operation,
+                    "ai_edit_review_provenance_invalid",
+                    reason,
+                    true,
+                    hash,
+                );
+            }
+        }
         if matches!(
             operation,
             "作業領域承認" | "作業領域失効" | "作業領域基準点保存" | "作業領域全体基準点保存"
@@ -3567,6 +3585,7 @@ impl Broker {
                             | "作業領域復旧プレビュー"
                             | "作業領域差分"
                             | "作業領域変更一覧"
+                            | super::ai_edit_center::REVIEW_OPERATION
                     ) && matches!(body["表示範囲"].as_str(), Some("full" | "hash_only"))
                     {
                         EVIDENCE_SOURCE_LIVE_RUNTIME
@@ -3592,6 +3611,7 @@ impl Broker {
                                 | "作業領域差分"
                                 | "作業領域変更一覧"
                                 | "作業領域比較範囲"
+                                | super::ai_edit_center::REVIEW_OPERATION
                         ) && !self
                             .作業領域
                             .response_current(&body, self.current_epoch_seconds())
@@ -7974,6 +7994,143 @@ mod tests {
         broker.current_epoch_seconds_override =
             Some(parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap());
         broker
+    }
+
+    #[test]
+    fn ai_edit_review_reads_only_current_approved_proposal_diff() {
+        let root = temp_store_dir("edit-review");
+        let workspace = root.join("workspace");
+        fs::create_dir_all(workspace.join("docs")).unwrap();
+        fs::write(workspace.join("docs/allowed.txt"), b"before\n").unwrap();
+        fs::write(workspace.join(".env"), b"SYNTHETIC_SECRET_DO_NOT_EXPOSE").unwrap();
+        let mut broker = persistent_test_broker(&root.join("store"));
+        broker
+            .作業領域
+            .register(
+                "runtime-edit",
+                "workspace-edit",
+                cap_std::fs::Dir::open_ambient_dir(&workspace, cap_std::ambient_authority())
+                    .unwrap(),
+                &[".env".into()],
+                None,
+                &mut |_, _| Ok(()),
+            )
+            .unwrap();
+        let binding = broker
+            .作業領域
+            .dialogue_binding("runtime-edit", "workspace-edit")
+            .unwrap();
+        let registration_hash = binding.registration_hash().to_owned();
+        let permission = broker.作業領域要求処理(
+            "grant",
+            "作業領域承認",
+            &json!({"作業領域ID": "workspace-edit", "登録hash": registration_hash, "表示範囲": "full"}),
+            true,
+            "unused",
+        );
+        let approval_id = permission.body.unwrap()["approval_id"].clone();
+        let baseline = broker.作業領域要求処理(
+            "capture",
+            "作業領域全体基準点保存",
+            &json!({"作業領域ID": "workspace-edit", "登録hash": registration_hash}),
+            true,
+            "unused",
+        );
+        let baseline_hash = baseline.body.unwrap()["projection"]["基準点hash"].clone();
+        let mut proposal: Value = serde_json::from_str(include_str!(
+            "../../../../examples/contracts/gui_shell_edit_proposal.valid.json"
+        ))
+        .unwrap();
+        proposal["target_paths"] = json!(["docs/allowed.txt"]);
+        let proposal_hash = canonical_payload_hash(Some(&proposal));
+        let recorded = super::super::ai_edit_center::propose(
+            &mut broker,
+            "proposal",
+            &proposal,
+            true,
+            &proposal_hash,
+        );
+        assert_eq!(recorded.status, BrokerStatus::Accepted);
+        let review = json!({
+            "version": 1, "proposal": proposal, "proposal_audit_id": recorded.audit_event_id,
+            "workspace_id": "workspace-edit", "registration_hash": registration_hash,
+            "baseline_hash": baseline_hash, "approval_id": approval_id
+        });
+        let request = |id: &str, payload: &Value| {
+            let mut envelope = audit_inspection_request(id, payload.clone());
+            envelope.operation = Some(BrokerOperation::GuiShell編集提案審査);
+            envelope
+        };
+
+        fs::write(workspace.join("docs/allowed.txt"), b"after\n").unwrap();
+        fs::write(workspace.join("docs/outside.txt"), b"other change\n").unwrap();
+        let outside = broker.handle(request("review-outside", &review));
+        assert_eq!(outside.status, BrokerStatus::Rejected);
+        assert_eq!(outside.error.unwrap().message, "提案の対象外に変更がある");
+        assert!(outside.body.is_none());
+        fs::remove_file(workspace.join("docs/outside.txt")).unwrap();
+
+        let mut changed_proposal = review.clone();
+        changed_proposal["proposal"]["instruction"] = json!("書き換えられた指示");
+        assert_eq!(
+            broker
+                .handle(request("review-changed", &changed_proposal))
+                .error
+                .unwrap()
+                .code,
+            "ai_edit_review_provenance_invalid"
+        );
+        let mut old_approval = review.clone();
+        old_approval["approval_id"] = json!("expired-approval");
+        let denied = broker.handle(request("review-old-approval", &old_approval));
+        assert_eq!(denied.status, BrokerStatus::Rejected);
+        assert!(denied.body.is_none());
+
+        let response = broker.handle(request("review-accepted", &review));
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        let body = response.body.unwrap();
+        let changes = &body["projection"]["changes"];
+        assert_eq!(changes[0]["path"], "docs/allowed.txt");
+        assert_eq!(
+            changes[0]["diff"]["before"]["sha256"],
+            sha256_tagged(b"before\n")
+        );
+        assert_eq!(
+            changes[0]["diff"]["after"]["sha256"],
+            sha256_tagged(b"after\n")
+        );
+        assert_eq!(body["projection"]["excluded_secrets"], 1);
+        assert_eq!(
+            body["projection"]["diff_hash"],
+            canonical_payload_hash(Some(&json!({"changes": changes})))
+        );
+        assert!(!body.to_string().contains("SYNTHETIC_SECRET_DO_NOT_EXPOSE"));
+        assert!(broker
+            .audit_events()
+            .iter()
+            .any(|event| event.event_id == response.audit_event_id
+                && event.payload_hash == canonical_payload_hash(Some(&body))));
+        assert_eq!(
+            fs::read(workspace.join("docs/allowed.txt")).unwrap(),
+            b"after\n"
+        );
+
+        broker
+            .append_audit(
+                "switch-host",
+                "Host切替",
+                "accepted",
+                "試験用のHost切替",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                "unused",
+            )
+            .unwrap();
+        assert!(broker
+            .handle(request("review-old-host", &review))
+            .body
+            .is_none());
+        drop(broker);
+        fs::remove_dir_all(root).unwrap();
     }
 
     fn setup_doctor_request(request_id: &str, payload: Value) -> BrokerRequestEnvelope {

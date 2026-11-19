@@ -2,9 +2,11 @@ import 'dart:convert';
 
 import 'package:broker_contract/broker_request_envelope.dart' show brokerTextHash;
 
+import 'ai_edit_client.dart';
 import 'broker_client.dart';
 
 const _visibilities = {'none', 'hash_only', 'summary', 'redacted', 'full'};
+const workspaceEditReviewOperation = 'GUI Shell編集提案審査';
 final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
 final _id = RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$');
 final _auditEventId = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$');
@@ -16,6 +18,7 @@ const _workspaceFailureCodes = {
   '監査失敗',
   'broker_audit_append_failed',
   '作業領域期限超過',
+  'ai_edit_review_provenance_invalid',
 };
 Never _invalid() => throw const BrokerClientException('作業領域の応答を確認できません');
 Map<String, Object?> _map(Object? value) {
@@ -356,6 +359,101 @@ class WorkspaceClient {
     }
     return WorkspaceView(selected, '作業領域全体基準点保存', '', projection,
         _string(response['audit_event_id']), baselineHash);
+  }
+
+  Future<WorkspaceView> reviewEditProposal(
+    WorkspaceRegistration selected,
+    AiEditProposalReview proposal,
+    String baselineHash,
+  ) async {
+    const operation = workspaceEditReviewOperation;
+    final original = proposal.toBrokerProposal();
+    if (selected.visibility != 'full' ||
+        !selected.current(DateTime.now()) ||
+        !_hash.hasMatch(baselineHash) ||
+        !_auditEventId.hasMatch(proposal.auditId) ||
+        brokerPayloadHash(original) != proposal.instructionHash) {
+      _invalid();
+    }
+    final payload = {
+      'version': 1,
+      'proposal': original,
+      'proposal_audit_id': proposal.auditId,
+      'workspace_id': selected.id,
+      'registration_hash': selected.hash,
+      'baseline_hash': baselineHash,
+      'approval_id': selected.approval,
+    };
+    final response = await _request(operation, payload);
+    final body = _map(response['body']);
+    _keys(body, [
+      'version', 'operation', '要求hash', '作業領域ID', '実行系ID', '登録hash',
+      'approval_id', '有効期限', '表示範囲', 'projection',
+    ]);
+    final auditId = _string(response['audit_event_id']);
+    if (response['evidence_source'] != 'LIVE_RUNTIME' ||
+        !_auditEventId.hasMatch(auditId) ||
+        auditId == _unavailableAuditEventId ||
+        body['version'] != 1 ||
+        body['operation'] != operation ||
+        body['要求hash'] != brokerPayloadHash(payload) ||
+        body['作業領域ID'] != selected.id ||
+        body['実行系ID'] != selected.runtime ||
+        body['登録hash'] != selected.hash ||
+        body['approval_id'] != selected.approval ||
+        body['有効期限'] != selected.expires ||
+        body['表示範囲'] != 'full') {
+      _invalid();
+    }
+    final projection = _map(body['projection']);
+    _keys(projection, [
+      'proposal_id', 'proposal_audit_id', 'proposal_hash', '基準点hash',
+      'diff_hash', 'changes', 'excluded_secrets',
+    ]);
+    final changes = projection['changes'];
+    final excluded = projection['excluded_secrets'];
+    if (projection['proposal_id'] != proposal.editId ||
+        projection['proposal_audit_id'] != proposal.auditId ||
+        projection['proposal_hash'] != proposal.instructionHash ||
+        projection['基準点hash'] != baselineHash ||
+        excluded is! int ||
+        excluded < 0 ||
+        excluded > 4096 ||
+        changes is! List ||
+        projection['diff_hash'] != brokerPayloadHash({'changes': changes}) ||
+        changes.isEmpty ||
+        changes.length > proposal.targetPaths.length) {
+      _invalid();
+    }
+    final paths = <String>{};
+    for (final raw in changes) {
+      final change = _map(raw);
+      _keys(change, ['path', 'status', 'diff']);
+      final path = _string(change['path']);
+      if (!proposal.targetPaths.contains(path) || !paths.add(path)) {
+        _invalid();
+      }
+      _validateDiff(change['diff']);
+      final diff = _map(change['diff']);
+      final before = diff['before'];
+      final after = diff['after'];
+      final status = before == null
+          ? 'added'
+          : after == null
+              ? 'deleted'
+              : 'modified';
+      if (diff['kind'] == 'unchanged' ||
+          (before == null && after == null) ||
+          change['status'] != status) {
+        _invalid();
+      }
+    }
+    final current = await list();
+    if (!selected.current(DateTime.now()) ||
+        !current.any((entry) => entry.sameGrant(selected))) {
+      _invalid();
+    }
+    return WorkspaceView(selected, operation, '', projection, auditId, baselineHash);
   }
 
   Future<WorkspaceView> read(WorkspaceRegistration selected, String path,
