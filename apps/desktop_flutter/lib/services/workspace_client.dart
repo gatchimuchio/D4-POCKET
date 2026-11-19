@@ -7,6 +7,7 @@ import 'broker_client.dart';
 
 const _visibilities = {'none', 'hash_only', 'summary', 'redacted', 'full'};
 const workspaceEditReviewOperation = 'GUI Shell編集提案審査';
+const workspaceEditApplyTargetOperation = 'GUI Shell編集適用先照合';
 final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
 final _id = RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$');
 final _auditEventId = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$');
@@ -19,6 +20,7 @@ const _workspaceFailureCodes = {
   'broker_audit_append_failed',
   '作業領域期限超過',
   'ai_edit_review_provenance_invalid',
+  'ai_edit_apply_binding_invalid',
 };
 Never _invalid() => throw const BrokerClientException('作業領域の応答を確認できません');
 Map<String, Object?> _map(Object? value) {
@@ -197,10 +199,11 @@ class WorkspaceRegistration {
 class WorkspaceView {
   WorkspaceView(this.registration, this.operation, this.path, this.projection,
       this.auditId,
-      [this.baselineHash]);
+      [this.baselineHash, this.sourceRegistration]);
   final WorkspaceRegistration registration;
   final String operation, path, auditId;
   final String? baselineHash;
+  final WorkspaceRegistration? sourceRegistration;
   final Map<String, Object?>? projection;
 }
 
@@ -454,6 +457,100 @@ class WorkspaceClient {
       _invalid();
     }
     return WorkspaceView(selected, operation, '', projection, auditId, baselineHash);
+  }
+
+  Future<WorkspaceView> prepareEditTarget(
+    WorkspaceView review,
+    WorkspaceRegistration target,
+  ) async {
+    const operation = workspaceEditApplyTargetOperation;
+    final source = review.registration;
+    final now = DateTime.now();
+    if (review.operation != workspaceEditReviewOperation ||
+        review.auditId == _unavailableAuditEventId ||
+        !_auditEventId.hasMatch(review.auditId) ||
+        target.id == source.id ||
+        target.visibility != 'full' ||
+        source.visibility != 'full' ||
+        !target.current(now) ||
+        !source.current(now)) {
+      _invalid();
+    }
+    final reviewed = _map(review.projection);
+    final changes = reviewed['changes'];
+    if (changes is! List ||
+        changes.isEmpty ||
+        changes.length > 32 ||
+        reviewed['diff_hash'] != brokerPayloadHash({'changes': changes})) {
+      _invalid();
+    }
+    final files = changes.map((raw) {
+      final change = _map(raw);
+      final diff = _map(change['diff']);
+      return {
+        'path': change['path'],
+        'before_hash': diff['before'] == null ? null : _map(diff['before'])['sha256'],
+        'after_hash': diff['after'] == null ? null : _map(diff['after'])['sha256'],
+      };
+    }).toList(growable: false);
+    final binding = {
+      'proposal_id': reviewed['proposal_id'],
+      'diff_hash': reviewed['diff_hash'],
+      'workspace_id': source.id,
+      'registration_hash': source.hash,
+      'approval_id': source.approval,
+      'expires_at': source.expires,
+      'baseline_hash': reviewed['基準点hash'],
+      'files': files,
+    };
+    final payload = {
+      'version': 1,
+      'review_audit_id': review.auditId,
+      'review_binding': binding,
+      'workspace_id': target.id,
+      'registration_hash': target.hash,
+      'approval_id': target.approval,
+    };
+    final response = await _request(operation, payload);
+    final auditId = _string(response['audit_event_id']);
+    final body = _map(response['body']);
+    _keys(body, [
+      'version', 'operation', '要求hash', '作業領域ID', '実行系ID', '登録hash',
+      'approval_id', '有効期限', '表示範囲', 'projection',
+    ]);
+    final projection = _map(body['projection']);
+    final expected = {
+      'review_audit_id': review.auditId,
+      'proposal_id': reviewed['proposal_id'],
+      'diff_hash': reviewed['diff_hash'],
+      'source_workspace_id': source.id,
+      'source_approval_id': source.approval,
+      'files': files,
+    };
+    if (response['evidence_source'] != 'LIVE_RUNTIME' ||
+        !_auditEventId.hasMatch(auditId) ||
+        auditId == _unavailableAuditEventId ||
+        body['version'] != 1 ||
+        body['operation'] != operation ||
+        body['要求hash'] != brokerPayloadHash(payload) ||
+        body['作業領域ID'] != target.id ||
+        body['実行系ID'] != target.runtime ||
+        body['登録hash'] != target.hash ||
+        body['approval_id'] != target.approval ||
+        body['有効期限'] != target.expires ||
+        body['表示範囲'] != 'full' ||
+        brokerPayloadHash(projection) != brokerPayloadHash(expected)) {
+      _invalid();
+    }
+    final current = await list();
+    final observed = DateTime.now();
+    if (!source.current(observed) ||
+        !target.current(observed) ||
+        !current.any((entry) => entry.sameGrant(source)) ||
+        !current.any((entry) => entry.sameGrant(target))) {
+      _invalid();
+    }
+    return WorkspaceView(target, operation, '', projection, auditId, null, source);
   }
 
   Future<WorkspaceView> read(WorkspaceRegistration selected, String path,

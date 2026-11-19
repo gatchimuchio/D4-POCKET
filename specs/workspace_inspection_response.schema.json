@@ -13,6 +13,41 @@
       "additionalProperties": false,
       "properties": {
         "version": {"const": 1},
+        "operation": {"const": "GUI Shell編集適用先照合"},
+        "要求hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "作業領域ID": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+        "実行系ID": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+        "登録hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "approval_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+        "有効期限": {"type": "integer", "minimum": 1},
+        "表示範囲": {"const": "full"},
+        "projection": {
+          "type": "object",
+          "required": [
+            "review_audit_id", "proposal_id", "diff_hash", "source_workspace_id",
+            "source_approval_id", "files"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "review_audit_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+            "proposal_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+            "diff_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+            "source_workspace_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+            "source_approval_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+            "files": {"$ref": "workspace_inspection_request.schema.json#/$defs/editApplyFiles"}
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "version", "operation", "要求hash", "作業領域ID", "実行系ID",
+        "登録hash", "approval_id", "有効期限", "表示範囲", "projection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {"const": 1},
         "operation": {"const": "GUI Shell編集提案審査"},
         "要求hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "作業領域ID": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},

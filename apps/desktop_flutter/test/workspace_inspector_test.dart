@@ -89,6 +89,32 @@ class TestBroker implements BrokerTransport {
       approval = null;
       visibility = 'none';
       body = {'作業領域ID': payload!['作業領域ID'], '承認状態': 'revoked'};
+    } else if (operation == workspaceEditApplyTargetOperation) {
+      final target = additionalRegistrations
+          .singleWhere((entry) => entry['作業領域ID'] == payload!['workspace_id']);
+      final binding = payload!['review_binding'] as Map;
+      body = {
+        'version': 1,
+        'operation': operation,
+        '要求hash': brokerPayloadHash(payload),
+        '作業領域ID': target['作業領域ID'],
+        '実行系ID': target['実行系ID'],
+        '登録hash': target['登録hash'],
+        'approval_id': target['approval_id'],
+        '有効期限': target['有効期限'],
+        '表示範囲': target['表示範囲'],
+        'projection': {
+          'review_audit_id': payload['review_audit_id'],
+          'proposal_id': binding['proposal_id'],
+          'diff_hash': binding['diff_hash'],
+          'source_workspace_id': binding['workspace_id'],
+          'source_approval_id': binding['approval_id'],
+          'files': binding['files'],
+        },
+      };
+      evidence = 'LIVE_RUNTIME';
+      mutate?.call(body);
+      if (revokeAfterRead) approval = null;
     } else if (operation == '作業領域全体基準点保存') {
       evidence = baselineEvidence;
       body = {
@@ -273,6 +299,45 @@ void main() {
     );
   }
 
+  Map<String, Object?> editTarget(TestBroker broker) => {
+        ...broker.registration,
+        '作業領域ID': 'workspace-target',
+        '実行系ID': 'runtime-target',
+        '登録hash': 'sha256:${'b' * 64}',
+        'approval_id': 'approval-target',
+      };
+
+  test('編集提案の適用先照合は差替えと審査元承認の失効を拒否する', () async {
+    final broker = TestBroker();
+    broker.additionalRegistrations = [editTarget(broker)];
+    final client = WorkspaceClient(broker);
+    final registrations = await client.list();
+    final review = await client.reviewEditProposal(
+        registrations.first, reviewedProposal(), broker.baselineHash);
+    final target = registrations.last;
+    final verified = await client.prepareEditTarget(review, target);
+    expect(verified.registration.id, target.id);
+    expect(verified.projection!['review_audit_id'], review.auditId);
+    expect(verified.projection!['files'], [
+      {
+        'path': 'docs/allowed.txt',
+        'before_hash': brokerTextHash('前\n'),
+        'after_hash': brokerTextHash('後\n'),
+      }
+    ]);
+
+    broker.mutate = (body) {
+      (body['projection'] as Map)['files'] = [];
+    };
+    await expectLater(client.prepareEditTarget(review, target),
+        throwsA(isA<BrokerClientException>()));
+    broker
+      ..mutate = null
+      ..revokeAfterRead = true;
+    await expectLater(client.prepareEditTarget(review, target),
+        throwsA(isA<BrokerClientException>()));
+  });
+
   test('編集提案審査は提案範囲外と差分hash不一致を拒否する', () async {
     final broker = TestBroker()..reviewPath = 'docs/outside.txt';
     final client = WorkspaceClient(broker);
@@ -293,6 +358,7 @@ void main() {
 
   testWidgets('編集提案の実差分を表示しHostが切り替わると消去する', (tester) async {
     final broker = TestBroker();
+    broker.additionalRegistrations = [editTarget(broker)];
     final history = ValueNotifier<int>(0);
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -335,9 +401,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('テキスト差分'), findsOneWidget);
 
+    final prepare = find.text('適用先を照合');
+    await tester.ensureVisible(prepare);
+    await tester.tap(prepare);
+    await tester.pumpAndSettle();
+    final target = find.descendant(
+        of: find.byType(SimpleDialog), matching: find.text('workspace-target'));
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+    expect(broker.operations, contains(workspaceEditApplyTargetOperation));
+    expect(find.text('適用先 workspace-target'), findsOneWidget);
+    expect(find.text('書込みには別の認可が必要です。'), findsOneWidget);
+
     history.value++;
     await tester.pumpAndSettle();
     expect(path, findsNothing);
+    expect(find.text('適用先 workspace-target'), findsNothing);
     await tester.pumpWidget(const SizedBox());
     history.dispose();
   });

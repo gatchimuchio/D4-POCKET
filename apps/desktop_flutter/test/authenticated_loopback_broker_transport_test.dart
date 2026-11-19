@@ -173,6 +173,7 @@ void main() {
     );
     try {
       for (final operation in <String>[
+        'GUI Shell編集提案',
         'GUI Shell書出し',
         '回帰Case登録',
         '回帰Case削除',

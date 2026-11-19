@@ -12,7 +12,9 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
-use super::ai_edit_center::{ReviewRequest, REVIEW_OPERATION};
+use super::ai_edit_center::{
+    ApplyTargetRequest, ReviewRequest, APPLY_TARGET_OPERATION, REVIEW_OPERATION,
+};
 
 type Audit<'a> = dyn FnMut(&str, &str) -> Result<(), &'static str> + 'a;
 
@@ -319,15 +321,23 @@ impl WorkspaceRegistry {
         if self.last_now.is_some_and(|last| now < last) {
             return false;
         }
-        body["作業領域ID"]
-            .as_str()
-            .and_then(|id| self.entries.get(id))
-            .and_then(|entry| entry.grant.as_ref())
-            .is_some_and(|grant| {
-                now < grant.expires
-                    && Instant::now() < grant.deadline
-                    && body["approval_id"] == grant.id
-            })
+        let current = |workspace: &Value, approval: &Value| {
+            workspace
+                .as_str()
+                .and_then(|id| self.entries.get(id))
+                .and_then(|entry| entry.grant.as_ref())
+                .is_some_and(|grant| {
+                    now < grant.expires
+                        && Instant::now() < grant.deadline
+                        && approval.as_str() == Some(grant.id.as_str())
+                })
+        };
+        current(&body["作業領域ID"], &body["approval_id"])
+            && (body["operation"] != APPLY_TARGET_OPERATION
+                || current(
+                    &body["projection"]["source_workspace_id"],
+                    &body["projection"]["source_approval_id"],
+                ))
     }
     /// 信頼済み起動制御面が渡すhandleを保持する。登録だけでは読取許可を作らない。
     pub(crate) fn register(
@@ -682,7 +692,7 @@ impl WorkspaceRegistry {
             if changes.is_empty() {
                 return Err("審査対象の変更がない");
             }
-            let changes = Value::Array(changes);
+            let diff_hash = digest(&json!({"changes": &changes}));
             return Ok(json!({
                 "version": 1, "operation": REVIEW_OPERATION, "要求hash": digest(payload),
                 "作業領域ID": p.workspace_id, "実行系ID": entry.runtime,
@@ -691,10 +701,13 @@ impl WorkspaceRegistry {
                 "projection": {
                     "proposal_id": proposal_id, "proposal_audit_id": p.proposal_audit_id,
                     "proposal_hash": digest(&p.proposal), "基準点hash": baseline.hash,
-                    "diff_hash": digest(&json!({"changes": &changes})), "changes": changes,
+                    "diff_hash": diff_hash, "changes": changes,
                     "excluded_secrets": excluded_secrets
                 }
             }));
+        }
+        if operation == APPLY_TARGET_OPERATION {
+            return self.prepare_edit_target(payload, audit);
         }
         if !matches!(
             operation,
@@ -835,5 +848,101 @@ impl WorkspaceRegistry {
             return Err("取得中に読取承認が期限超過");
         }
         Ok(body)
+    }
+
+    fn prepare_edit_target(
+        &self,
+        payload: &Value,
+        audit: &mut Audit<'_>,
+    ) -> Result<Value, &'static str> {
+        let request = ApplyTargetRequest::parse(payload)?;
+        let binding = request.binding()?;
+        let source = self
+            .entries
+            .get(&binding.workspace_id)
+            .ok_or("審査元の作業領域が未登録")?;
+        let target = self
+            .entries
+            .get(&request.workspace_id)
+            .ok_or("適用先の作業領域が未登録")?;
+        let identity = |entry: &RegisteredWorkspace| super::workspace_root::DirectoryIdentity {
+            device: entry.root_device,
+            file_id: entry.root_file_id,
+        };
+        if !source.root_ancestry_complete
+            || !target.root_ancestry_complete
+            || source.root_ancestry.contains(&identity(target))
+            || target.root_ancestry.contains(&identity(source))
+            || source.registration_hash != binding.registration_hash
+            || target.registration_hash != request.registration_hash
+        {
+            return Err("現在の審査元と適用先は相互に独立した登録rootである必要がある");
+        }
+        let source_grant = source
+            .grant
+            .as_ref()
+            .filter(|grant| {
+                grant.visibility == "full"
+                    && grant.id == binding.approval_id
+                    && grant.expires == binding.expires_at
+            })
+            .ok_or("審査時の読取承認が失効または置換された")?;
+        let target_grant = target
+            .grant
+            .as_ref()
+            .filter(|grant| grant.visibility == "full" && grant.id == request.approval_id)
+            .ok_or("適用先には現在のfull読取承認が必要")?;
+        if !source
+            .baseline
+            .as_ref()
+            .is_some_and(|baseline| baseline.whole && baseline.hash == binding.baseline_hash)
+        {
+            return Err("審査元の全体基準点が変わった");
+        }
+        audit("審査監査、独立rootと現在の読取承認を照合", &digest(payload))?;
+        let mut budgets = [crate::workspace_reader::MAX_COMPARISON_BYTES; 2];
+        let mut files = Vec::with_capacity(binding.files.len());
+        for file in binding.files {
+            for (index, (reader, grant, expected, error)) in [
+                (
+                    &source.reader,
+                    source_grant,
+                    &file.after_hash,
+                    "審査元の版が変更された",
+                ),
+                (
+                    &target.reader,
+                    target_grant,
+                    &file.before_hash,
+                    "適用先の版が審査時の変更前版と一致しない",
+                ),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                if Instant::now() >= grant.deadline {
+                    return Err("適用先照合中に承認期限超過");
+                }
+                let observed = reader
+                    .read_comparison_version(&file.path, budgets[index])
+                    .map_err(|_| "対象版を安全に確認できない")?;
+                budgets[index] -= observed.as_ref().map(|v| v.bytes as u64).unwrap_or(0);
+                if observed.as_ref().map(|v| &v.sha256) != expected.as_ref() {
+                    return Err(error);
+                }
+            }
+            files.push(json!({"path": file.path, "before_hash": file.before_hash, "after_hash": file.after_hash}));
+        }
+        Ok(json!({
+            "version": 1, "operation": APPLY_TARGET_OPERATION, "要求hash": digest(payload),
+            "作業領域ID": request.workspace_id, "実行系ID": target.runtime,
+            "登録hash": target.registration_hash, "approval_id": target_grant.id,
+            "有効期限": target_grant.expires, "表示範囲": target_grant.visibility,
+            "projection": {
+                "review_audit_id": request.review_audit_id, "proposal_id": binding.proposal_id,
+                "diff_hash": binding.diff_hash, "source_workspace_id": binding.workspace_id,
+                "source_approval_id": source_grant.id, "files": files
+            }
+        }))
     }
 }

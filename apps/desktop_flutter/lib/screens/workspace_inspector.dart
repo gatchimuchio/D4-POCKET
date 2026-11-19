@@ -169,7 +169,9 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
 
     final now = DateTime.now();
     final elapsed = _elapsed.elapsedMilliseconds;
-    if (!view.registration.current(now) || elapsed >= _viewLimit) {
+    if (!view.registration.current(now) ||
+        view.sourceRegistration?.current(now) == false ||
+        elapsed >= _viewLimit) {
       _expireView();
       return;
     }
@@ -183,6 +185,13 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         view.registration.expires! * 1000 - now.millisecondsSinceEpoch;
     if (registrationRemaining < delayMilliseconds) {
       delayMilliseconds = registrationRemaining;
+    }
+    final sourceExpires = view.sourceRegistration?.expires;
+    if (sourceExpires != null) {
+      final sourceRemaining = sourceExpires * 1000 - now.millisecondsSinceEpoch;
+      if (sourceRemaining < delayMilliseconds) {
+        delayMilliseconds = sourceRemaining;
+      }
     }
     if (delayMilliseconds < 1) delayMilliseconds = 1;
 
@@ -198,7 +207,9 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     final view = _view;
     if (view == null) return;
 
-    if (!view.registration.current(DateTime.now()) ||
+    final now = DateTime.now();
+    if (!view.registration.current(now) ||
+        view.sourceRegistration?.current(now) == false ||
         _elapsed.elapsedMilliseconds >= _viewLimit) {
       _expireView();
       return;
@@ -258,10 +269,15 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
 
       if (!mounted || !_isActive || generation != _generation) return;
       setState(() {
+        final source = previous?.sourceRegistration;
+        final now = DateTime.now();
         _registrations = registrations;
         if (!registrations.any((v) => v.id == _selected)) _selected = null;
         if (previous != null &&
-            previous.registration.current(DateTime.now()) &&
+            previous.registration.current(now) &&
+            (source == null ||
+                (source.current(now) &&
+                    registrations.any((v) => v.sameGrant(source)))) &&
             _elapsed.elapsedMilliseconds < _viewLimit &&
             registrations.any((v) => v.sameGrant(previous.registration))) {
           _view = refreshedComparison ?? previous;
@@ -296,6 +312,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       bool changes = false,
       bool preview = false,
       bool review = false,
+      WorkspaceView? prepareTargetFor,
       String? baselineHash}) async {
     if (!_isActive) return;
     _cancelViewMaintenance();
@@ -309,15 +326,20 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       _message = '承認済み範囲を取得中';
     });
     try {
-      final view = review
-          ? await widget.client.reviewEditProposal(
-              registration, widget.editProposal!, baselineHash!)
-          : await widget.client.read(registration, path,
+      final WorkspaceView view;
+      if (prepareTargetFor != null) {
+        view = await widget.client.prepareEditTarget(prepareTargetFor, registration);
+      } else if (review) {
+        view = await widget.client.reviewEditProposal(
+            registration, widget.editProposal!, baselineHash!);
+      } else {
+        view = await widget.client.read(registration, path,
               tree: tree,
               scope: scope,
               changes: changes,
               preview: preview,
               baselineHash: baselineHash);
+      }
       if (!mounted || !_isActive || generation != _generation) return;
       setState(() {
         _view = view;
@@ -342,6 +364,36 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         _scheduleViewMaintenance();
       }
     }
+  }
+
+  Future<void> _selectEditTarget(WorkspaceView review) async {
+    final now = DateTime.now();
+    final targets = _registrations.where((candidate) =>
+        candidate.id != review.registration.id &&
+        candidate.visibility == 'full' &&
+        candidate.current(now));
+    final target = await showDialog<WorkspaceRegistration>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('適用先Workspaceを選択'),
+        children: [
+          for (final registration in targets)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, registration),
+              child: Text(registration.id),
+            ),
+          if (targets.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('適用先Workspaceにfull読取承認が必要です。'),
+            ),
+        ],
+      ),
+    );
+    if (!mounted || !_isActive || _busy || _view != review || target == null) {
+      return;
+    }
+    await _read(target, '', false, prepareTargetFor: review);
   }
 
   Future<void> _approveContent(WorkspaceRegistration registration) async {
@@ -686,6 +738,10 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         if (view.operation == workspaceEditReviewOperation) ...[
           Text('審査差分 ${projection!['diff_hash']}'),
           Text('読取除外 ${projection['excluded_secrets']}件'),
+          OutlinedButton(
+            onPressed: _busy ? null : () => _selectEditTarget(view),
+            child: const Text('適用先を照合'),
+          ),
           for (final item in projection['changes'] as List)
             ExpansionTile(
               key: ValueKey('${view.auditId}:${item['path']}'),
@@ -708,6 +764,13 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
                 ),
               ],
             ),
+        ],
+        if (view.operation == workspaceEditApplyTargetOperation) ...[
+          Text('審査元 ${view.sourceRegistration!.id}'),
+          Text('適用先 ${view.registration.id}'),
+          Text('審査差分 ${projection!['diff_hash']}'),
+          Text('変更前後の版を照合した対象 ${(projection['files'] as List).length}件'),
+          const Text('書込みには別の認可が必要です。'),
         ],
         if (view.registration.visibility == 'full' &&
             (view.operation == '作業領域差分' ||

@@ -10026,6 +10026,7 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
     )
     errors: list[str] = []
     owner_operations = (
+        "GUI Shell編集提案",
         "GUI Shell書出し",
         "回帰Case登録",
         "回帰Case削除",

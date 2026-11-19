@@ -649,6 +649,8 @@ pub enum BrokerOperation {
     GuiShell編集提案,
     #[serde(rename = "GUI Shell編集提案審査")]
     GuiShell編集提案審査,
+    #[serde(rename = "GUI Shell編集適用先照合")]
+    GuiShell編集適用先照合,
     #[serde(rename = "GUI Shell書出し")]
     GuiShell書出し,
     #[serde(rename = "更新一覧")]
@@ -838,6 +840,9 @@ impl BrokerOperation {
             BrokerOperation::GuiShell構成Preview => "GUI Shell構成Preview",
             BrokerOperation::GuiShell編集提案 => "GUI Shell編集提案",
             BrokerOperation::GuiShell編集提案審査 => super::ai_edit_center::REVIEW_OPERATION,
+            BrokerOperation::GuiShell編集適用先照合 => {
+                super::ai_edit_center::APPLY_TARGET_OPERATION
+            }
             BrokerOperation::GuiShell書出し => "GUI Shell書出し",
             BrokerOperation::更新一覧 => "更新一覧",
             BrokerOperation::更新候補取得 => "更新候補取得",
@@ -2581,6 +2586,7 @@ impl Broker {
             | BrokerOperation::作業領域全体基準点保存
             | BrokerOperation::作業領域変更一覧
             | BrokerOperation::GuiShell編集提案審査
+            | BrokerOperation::GuiShell編集適用先照合
             | BrokerOperation::作業領域復旧プレビュー) => self.作業領域要求処理(
                 &request_id,
                 operation.as_str(),
@@ -3499,19 +3505,21 @@ impl Broker {
                 hash,
             );
         }
-        if operation == super::ai_edit_center::REVIEW_OPERATION {
-            let decision = super::ai_edit_center::ReviewRequest::parse(payload)
-                .and_then(|request| request.verify_receipt(self));
-            if let Err(reason) = decision {
-                return self.reject_with_payload_hash(
-                    id,
-                    operation,
-                    "ai_edit_review_provenance_invalid",
-                    reason,
-                    true,
-                    hash,
-                );
-            }
+        use super::ai_edit_center::{
+            review_binding, review_binding_reason, ApplyTargetRequest, ReviewRequest,
+            APPLY_TARGET_OPERATION, REVIEW_OPERATION,
+        };
+        let provenance = match operation {
+            REVIEW_OPERATION => ReviewRequest::parse(payload)
+                .and_then(|request| request.verify_receipt(self))
+                .map_err(|reason| ("ai_edit_review_provenance_invalid", reason)),
+            APPLY_TARGET_OPERATION => ApplyTargetRequest::parse(payload)
+                .and_then(|request| request.verify_receipt(self))
+                .map_err(|reason| ("ai_edit_apply_binding_invalid", reason)),
+            _ => Ok(()),
+        };
+        if let Err((code, reason)) = provenance {
+            return self.reject_with_payload_hash(id, operation, code, reason, true, hash);
         }
         if matches!(
             operation,
@@ -3585,18 +3593,36 @@ impl Broker {
                             | "作業領域復旧プレビュー"
                             | "作業領域差分"
                             | "作業領域変更一覧"
-                            | super::ai_edit_center::REVIEW_OPERATION
+                            | REVIEW_OPERATION
+                            | APPLY_TARGET_OPERATION
                     ) && matches!(body["表示範囲"].as_str(), Some("full" | "hash_only"))
                     {
                         EVIDENCE_SOURCE_LIVE_RUNTIME
                     } else {
                         EVIDENCE_SOURCE_INTERNAL_STATE
                     };
+                let binding_reason;
+                let audit_reason = if operation == REVIEW_OPERATION {
+                    let Some(changes) = body["projection"]["changes"].as_array() else {
+                        return self.reject_with_payload_hash(
+                            id,
+                            operation,
+                            "ai_edit_review_provenance_invalid",
+                            "編集審査の差分を確定できない",
+                            true,
+                            hash,
+                        );
+                    };
+                    binding_reason = review_binding_reason(&review_binding(&body, changes));
+                    &binding_reason
+                } else {
+                    "作業領域操作の結果を確定"
+                };
                 match self.append_audit(
                     id,
                     operation,
                     "accepted",
-                    "作業領域操作の結果を確定",
+                    audit_reason,
                     evidence,
                     &sha256_tagged(body.to_string().as_bytes()),
                 ) {
@@ -3611,7 +3637,8 @@ impl Broker {
                                 | "作業領域差分"
                                 | "作業領域変更一覧"
                                 | "作業領域比較範囲"
-                                | super::ai_edit_center::REVIEW_OPERATION
+                                | REVIEW_OPERATION
+                                | APPLY_TARGET_OPERATION
                         ) && !self
                             .作業領域
                             .response_current(&body, self.current_epoch_seconds())
@@ -8000,22 +8027,31 @@ mod tests {
     fn ai_edit_review_reads_only_current_approved_proposal_diff() {
         let root = temp_store_dir("edit-review");
         let workspace = root.join("workspace");
+        let target = root.join("target");
         fs::create_dir_all(workspace.join("docs")).unwrap();
+        fs::create_dir_all(target.join("docs")).unwrap();
         fs::write(workspace.join("docs/allowed.txt"), b"before\n").unwrap();
+        fs::write(target.join("docs/allowed.txt"), b"before\n").unwrap();
         fs::write(workspace.join(".env"), b"SYNTHETIC_SECRET_DO_NOT_EXPOSE").unwrap();
         let mut broker = persistent_test_broker(&root.join("store"));
-        broker
-            .作業領域
-            .register(
-                "runtime-edit",
-                "workspace-edit",
-                cap_std::fs::Dir::open_ambient_dir(&workspace, cap_std::ambient_authority())
-                    .unwrap(),
-                &[".env".into()],
-                None,
-                &mut |_, _| Ok(()),
-            )
-            .unwrap();
+        for (id, path) in [
+            ("workspace-edit", &workspace),
+            ("workspace-target", &target),
+        ] {
+            let (dir, _, ancestry) =
+                crate::broker::workspace_root::open_isolated_root_with_ancestry(path, &[]).unwrap();
+            broker
+                .作業領域
+                .register(
+                    "runtime-edit",
+                    id,
+                    dir,
+                    &[".env".into()],
+                    Some(ancestry),
+                    &mut |_, _| Ok(()),
+                )
+                .unwrap();
+        }
         let binding = broker
             .作業領域
             .dialogue_binding("runtime-edit", "workspace-edit")
@@ -8115,6 +8151,73 @@ mod tests {
             b"after\n"
         );
 
+        let target_hash = broker
+            .作業領域
+            .dialogue_binding("runtime-edit", "workspace-target")
+            .unwrap()
+            .registration_hash()
+            .to_owned();
+        let target_grant = broker.作業領域要求処理(
+            "target-grant",
+            "作業領域承認",
+            &json!({"作業領域ID": "workspace-target", "登録hash": target_hash, "表示範囲": "full"}),
+            true,
+            "unused",
+        );
+        let prepare = json!({
+            "version": 1, "review_audit_id": response.audit_event_id,
+            "review_binding": super::super::ai_edit_center::review_binding(&body, changes.as_array().unwrap()),
+            "workspace_id": "workspace-target", "registration_hash": target_hash,
+            "approval_id": target_grant.body.unwrap()["approval_id"]
+        });
+        let prepare_request = |id: &str, payload: &Value| {
+            let mut envelope = audit_inspection_request(id, payload.clone());
+            envelope.operation = Some(BrokerOperation::GuiShell編集適用先照合);
+            envelope
+        };
+        let prepared = broker.handle(prepare_request("target-verified", &prepare));
+        assert_eq!(
+            prepared.status,
+            BrokerStatus::Accepted,
+            "{:?}",
+            prepared.error
+        );
+        assert_eq!(prepared.evidence_source, EVIDENCE_SOURCE_LIVE_RUNTIME);
+        let projection = prepared.body.unwrap()["projection"].clone();
+        assert_eq!(projection["files"], prepare["review_binding"]["files"]);
+        assert_eq!(projection["review_audit_id"], response.audit_event_id);
+        assert_eq!(projection["source_approval_id"], approval_id);
+        assert_eq!(
+            fs::read(target.join("docs/allowed.txt")).unwrap(),
+            b"before\n"
+        );
+
+        let mut same_root = prepare.clone();
+        same_root["workspace_id"] = json!("workspace-edit");
+        same_root["registration_hash"] = json!(registration_hash);
+        same_root["approval_id"] = approval_id;
+        let denied = broker.handle(prepare_request("target-same", &same_root));
+        assert_eq!(denied.status, BrokerStatus::Rejected);
+        assert!(denied.body.is_none());
+
+        let mut forged = prepare.clone();
+        forged["review_binding"]["files"][0]["after_hash"] = json!(sha256_tagged(b"forged"));
+        let denied = broker.handle(prepare_request("target-forged", &forged));
+        assert_eq!(denied.error.unwrap().code, "ai_edit_apply_binding_invalid");
+        assert!(denied.body.is_none());
+
+        fs::write(target.join("docs/allowed.txt"), b"intervening edit\n").unwrap();
+        let denied = broker.handle(prepare_request("target-changed", &prepare));
+        assert_eq!(
+            denied.error.unwrap().message,
+            "適用先の版が審査時の変更前版と一致しない"
+        );
+        assert!(denied.body.is_none());
+        assert_eq!(
+            fs::read(target.join("docs/allowed.txt")).unwrap(),
+            b"intervening edit\n"
+        );
+
         broker
             .append_audit(
                 "switch-host",
@@ -8129,6 +8232,14 @@ mod tests {
             .handle(request("review-old-host", &review))
             .body
             .is_none());
+        assert_eq!(
+            broker
+                .handle(prepare_request("target-old-host", &prepare))
+                .error
+                .unwrap()
+                .code,
+            "ai_edit_apply_binding_invalid"
+        );
         drop(broker);
         fs::remove_dir_all(root).unwrap();
     }

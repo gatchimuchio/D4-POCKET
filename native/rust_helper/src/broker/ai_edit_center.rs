@@ -11,6 +11,7 @@ use serde_json::{json, Value};
 const VERSION: u64 = 1;
 const OPERATION: &str = "GUI Shell編集提案";
 pub(super) const REVIEW_OPERATION: &str = "GUI Shell編集提案審査";
+pub(super) const APPLY_TARGET_OPERATION: &str = "GUI Shell編集適用先照合";
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -47,16 +48,8 @@ impl ReviewRequest {
             || !valid_identifier(&request.proposal_audit_id)
             || !super::workspace::identifier(&request.workspace_id)
             || !valid_identifier(&request.approval_id)
-            || ![&request.registration_hash, &request.baseline_hash]
-                .into_iter()
-                .all(|hash| {
-                    hash.strip_prefix("sha256:").is_some_and(|value| {
-                        value.len() == 64
-                            && value
-                                .bytes()
-                                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
-                    })
-                })
+            || !valid_hash(&request.registration_hash)
+            || !valid_hash(&request.baseline_hash)
         {
             return Err("編集提案審査の版、作業領域、承認または基準点が不正");
         }
@@ -70,30 +63,140 @@ impl ReviewRequest {
 
     pub(super) fn verify_receipt(&self, broker: &Broker) -> Result<(), &'static str> {
         self.proposal_scope()?;
-        let log = broker
-            .state_store
-            .verified_audit_log()
-            .map_err(|_| "提案の永続監査を検証できない")?
-            .ok_or("提案の永続監査がない")?;
         let hash = super::protocol::canonical_payload_hash(Some(&self.proposal));
-        for event in log.events().iter().rev() {
-            if event.operation == "Host切替" && event.decision == "accepted" {
-                break;
-            }
-            if event.event_id == self.proposal_audit_id {
-                return if event.operation == OPERATION
-                    && event.decision == "accepted"
-                    && event.evidence_source == EVIDENCE_SOURCE_INTERNAL_STATE
-                    && event.payload_hash == hash
-                {
-                    Ok(())
-                } else {
-                    Err("提案受付の監査と現在の提案が不一致")
-                };
-            }
+        let event = current_host_receipt(broker, &self.proposal_audit_id)?;
+        if event.operation != OPERATION
+            || event.decision != "accepted"
+            || event.evidence_source != EVIDENCE_SOURCE_INTERNAL_STATE
+            || event.payload_hash != hash
+        {
+            return Err("提案受付の監査と現在の提案が不一致");
         }
-        Err("現在Hostに一致する提案受付の監査がない")
+        Ok(())
     }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ApplyTargetRequest {
+    version: u64,
+    pub(super) review_audit_id: String,
+    review_binding: Value,
+    pub(super) workspace_id: String,
+    pub(super) registration_hash: String,
+    pub(super) approval_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ApplyBinding {
+    pub(super) proposal_id: String,
+    pub(super) diff_hash: String,
+    pub(super) workspace_id: String,
+    pub(super) registration_hash: String,
+    pub(super) approval_id: String,
+    pub(super) expires_at: i64,
+    pub(super) baseline_hash: String,
+    pub(super) files: Vec<ApplyFile>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ApplyFile {
+    pub(super) path: String,
+    pub(super) before_hash: Option<String>,
+    pub(super) after_hash: Option<String>,
+}
+
+impl ApplyTargetRequest {
+    pub(super) fn parse(payload: &Value) -> Result<Self, &'static str> {
+        let request: Self =
+            serde_json::from_value(payload.clone()).map_err(|_| "編集適用先照合の入力が不正")?;
+        if request.version != VERSION
+            || !valid_identifier(&request.review_audit_id)
+            || !super::workspace::identifier(&request.workspace_id)
+            || !valid_hash(&request.registration_hash)
+            || !valid_identifier(&request.approval_id)
+        {
+            return Err("編集適用先照合の審査参照または登録が不正");
+        }
+        Ok(request)
+    }
+
+    pub(super) fn binding(&self) -> Result<ApplyBinding, &'static str> {
+        let value: ApplyBinding = serde_json::from_value(self.review_binding.clone())
+            .map_err(|_| "編集審査の結合が不正")?;
+        if value.files.is_empty() || value.files.len() > 32 {
+            return Err("編集審査の対象件数が不正");
+        }
+        Ok(value)
+    }
+
+    pub(super) fn verify_receipt(&self, broker: &Broker) -> Result<(), &'static str> {
+        let event = current_host_receipt(broker, &self.review_audit_id)?;
+        if event.operation != REVIEW_OPERATION
+            || event.decision != "accepted"
+            || event.evidence_source != super::protocol::EVIDENCE_SOURCE_LIVE_RUNTIME
+            || event.reason != review_binding_reason(&self.review_binding)
+        {
+            return Err("編集審査の永続監査と適用先照合の入力が不一致");
+        }
+        Ok(())
+    }
+}
+
+pub(super) fn review_binding(body: &Value, changes: &[Value]) -> Value {
+    let review = &body["projection"];
+    let files: Vec<Value> = changes
+        .iter()
+        .map(|change| {
+            json!({
+                "path": change["path"],
+                "before_hash": change["diff"]["before"]["sha256"],
+                "after_hash": change["diff"]["after"]["sha256"],
+            })
+        })
+        .collect();
+    json!({
+        "proposal_id": review["proposal_id"], "diff_hash": review["diff_hash"],
+        "workspace_id": body["作業領域ID"], "registration_hash": body["登録hash"],
+        "approval_id": body["approval_id"], "expires_at": body["有効期限"],
+        "baseline_hash": review["基準点hash"], "files": files
+    })
+}
+
+pub(super) fn review_binding_reason(binding: &Value) -> String {
+    format!(
+        "編集提案審査の適用用結合hash {}",
+        super::protocol::canonical_payload_hash(Some(binding))
+    )
+}
+
+fn current_host_receipt(
+    broker: &Broker,
+    audit_id: &str,
+) -> Result<super::audit::BrokerAuditEvent, &'static str> {
+    let log = broker
+        .state_store
+        .verified_audit_log()
+        .map_err(|_| "編集の永続監査を検証できない")?
+        .ok_or("編集の永続監査がない")?;
+    log.events()
+        .iter()
+        .rev()
+        .take_while(|event| !(event.operation == "Host切替" && event.decision == "accepted"))
+        .find(|event| event.event_id == audit_id)
+        .cloned()
+        .ok_or("現在Hostに一致する編集監査がない")
+}
+
+fn valid_hash(hash: &str) -> bool {
+    hash.strip_prefix("sha256:").is_some_and(|value| {
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    })
 }
 
 pub(crate) fn owner_confirmation_summary(payload: &Value, payload_hash: &str) -> Option<String> {
