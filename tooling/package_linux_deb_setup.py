@@ -13,6 +13,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -57,6 +58,45 @@ DESKTOP_CONTENT = (
     "Categories=Utility;Development;\n"
     "DBusActivatable=false\n"
 ).encode("utf-8")
+
+
+@dataclass(frozen=True)
+class SetupLayout:
+    package_name: str
+    install_root: PurePosixPath
+    desktop_entry: PurePosixPath
+    desktop_content: bytes
+
+
+def _setup_layout(manifest_raw: bytes, *, independent_export: bool) -> SetupLayout:
+    if not independent_export:
+        return SetupLayout(PACKAGE_NAME, INSTALL_ROOT, DESKTOP_ENTRY, DESKTOP_CONTENT)
+
+    identity = json.loads(manifest_raw)["manifest"]["app_identity"]
+    app_id = identity.get("app_id")
+    display_name = identity.get("display_name")
+    if not isinstance(app_id, str) or not re.fullmatch(r"d4-pocket-app-[a-f0-9]{32}", app_id):
+        raise ValueError("Debian ExportのApp IDが不正です")
+    if not isinstance(display_name, str) or not display_name.strip() or not display_name.isprintable():
+        raise ValueError("Debian Exportの表示名をDesktop Entryへ安全に記録できません")
+
+    package_name = f"{PACKAGE_NAME}-{app_id.removeprefix('d4-pocket-app-')}"
+    install_root = PurePosixPath("opt/d4-pocket/exports") / app_id / "setup"
+    desktop_entry = PurePosixPath("usr/share/applications") / f"{package_name}.desktop"
+    launcher = f"/{install_root}/gui_shell_desktop_launcher"
+    name = display_name.strip().replace("\\", "\\\\")
+    desktop_content = (
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        f"Name={name} Setup\n"
+        "Comment=Install or open this D4 Pocket export\n"
+        f"Exec={launcher}\n"
+        f"TryExec={launcher}\n"
+        "Terminal=false\n"
+        "Categories=Utility;Development;\n"
+        "DBusActivatable=false\n"
+    ).encode("utf-8")
+    return SetupLayout(package_name, install_root, desktop_entry, desktop_content)
 
 
 def _safe_environment() -> dict[str, str]:
@@ -136,9 +176,9 @@ def _parse_dependencies(output: str) -> str:
     return normalized
 
 
-def _control_text(package_version: str, dependencies: str, installed_kib: int) -> str:
+def _control_text(package_version: str, dependencies: str, installed_kib: int, *, package_name: str) -> str:
     fields = [
-        "Package: d4-pocket-setup",
+        f"Package: {package_name}",
         f"Version: {package_version}",
         "Section: utils",
         "Priority: optional",
@@ -235,15 +275,15 @@ def _copy_regular_file(
         os.close(source_fd)
 
 
-def _collect_dependencies(stage: Path, bundle_stage: Path) -> tuple[str, str]:
+def _collect_dependencies(stage: Path, package_root: Path, bundle_stage: Path) -> tuple[str, str]:
     control_root = stage / "debian"
     control_root.mkdir(mode=0o700)
     control = (
-        "Source: d4-pocket-setup\n"
+        f"Source: {package_root.name}\n"
         "Section: utils\n"
         "Priority: optional\n"
         "Maintainer: D4 Pocket Development <packages@example.invalid>\n\n"
-        "Package: d4-pocket-setup\n"
+        f"Package: {package_root.name}\n"
         "Architecture: amd64\n"
         "Depends: libc6\n"
         "Description: temporary shlibdeps input\n"
@@ -254,7 +294,7 @@ def _collect_dependencies(stage: Path, bundle_stage: Path) -> tuple[str, str]:
         "dpkg-shlibdeps",
         "-O",
         "-dDepends",
-        f"-S{bundle_stage.parents[2]}",
+        f"-S{package_root}",
         f"-l{bundle_stage / 'lib'}",
     ]
     command.extend(f"-e{bundle_stage / item}" for item in EXECUTABLES)
@@ -362,14 +402,16 @@ def write_debian_setup_package(
     output_dir: Path,
     *,
     package_revision: int,
+    independent_export: bool = False,
 ) -> dict[str, Any]:
     """検証済みLinux bundleをUbuntu用のOwner非権限bootstrap .debへ梱包する。"""
     _require_supported_target()
     if type(package_revision) is not int or package_revision < 1 or package_revision > 999_999:
         raise ValueError("Debian package revisionは1以上の整数でなければならない")
-    evidence, bundle, _manifest_raw, records, total_bytes, tree_hash = _load_export(
+    evidence, bundle, manifest_raw, records, total_bytes, tree_hash = _load_export(
         build_evidence_path, source_dir
     )
+    layout = _setup_layout(manifest_raw, independent_export=independent_export)
     source_commit = evidence.get("source_commit")
     if not isinstance(source_commit, str) or not re.fullmatch(r"[a-f0-9]{40}", source_commit):
         raise ValueError("Linux Export source commitが固定されていない")
@@ -379,7 +421,7 @@ def write_debian_setup_package(
         raise ValueError("Product versionをDebian package versionへ安全に写せない")
     package_version = f"{product_version}-{package_revision}"
     output_root = _safe_output_directory(output_dir, bundle)
-    output_path = output_root / f"{PACKAGE_NAME}_{package_version}_amd64.deb"
+    output_path = output_root / f"{layout.package_name}_{package_version}_amd64.deb"
     if output_path.exists() or output_path.is_symlink():
         raise ValueError("Debian package output already exists")
 
@@ -387,8 +429,8 @@ def write_debian_setup_package(
         temporary_root = Path(temporary)
         # dpkg-shlibdeps owns temporary_root/debian for its control metadata.
         # Keep the actual package tree separate so both staging contracts can coexist.
-        package_root = temporary_root / "package-root" / PACKAGE_NAME
-        payload_root = package_root.joinpath(*INSTALL_ROOT.parts)
+        package_root = temporary_root / "package-root" / layout.package_name
+        payload_root = package_root.joinpath(*layout.install_root.parts)
         payload_root.mkdir(mode=0o755, parents=True)
         os.chmod(package_root, 0o755)
         os.chmod(payload_root, 0o755)
@@ -406,25 +448,30 @@ def write_debian_setup_package(
                 package_mode,
                 relative,
             )
-        desktop_path = package_root.joinpath(*DESKTOP_ENTRY.parts)
+        desktop_path = package_root.joinpath(*layout.desktop_entry.parts)
         desktop_path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
         os.chmod(desktop_path.parent, 0o755)
-        desktop_path.write_bytes(DESKTOP_CONTENT)
+        desktop_path.write_bytes(layout.desktop_content)
         os.chmod(desktop_path, 0o644)
 
         staged_records, staged_bytes, staged_tree = _artifact_inventory(payload_root)
         if staged_records != records or staged_bytes != total_bytes or staged_tree != tree_hash:
             raise ValueError("Debian stageと検証済みLinux bundleが一致しない")
 
-        dependencies, dependency_warnings = _collect_dependencies(temporary_root, payload_root)
+        dependencies, dependency_warnings = _collect_dependencies(temporary_root, package_root, payload_root)
         package_debian_version = _run(["dpkg", "--compare-versions", package_version, "gt", "0"], cwd=temporary_root)
         if package_debian_version.returncode != 0:
             raise ValueError("dpkgがDebian package versionを解釈できない")
 
         control_dir = package_root / "DEBIAN"
         control_dir.mkdir(mode=0o755)
-        installed_bytes = total_bytes + len(DESKTOP_CONTENT)
-        control = _control_text(package_version, dependencies, (installed_bytes + 1023) // 1024)
+        installed_bytes = total_bytes + len(layout.desktop_content)
+        control = _control_text(
+            package_version,
+            dependencies,
+            (installed_bytes + 1023) // 1024,
+            package_name=layout.package_name,
+        )
         (control_dir / "control").write_text(control, encoding="utf-8", newline="\n")
         os.chmod(control_dir, 0o755)
         os.chmod(control_dir / "control", 0o644)
@@ -456,7 +503,7 @@ def write_debian_setup_package(
             fields[field] = result.stdout.strip()
         normalized_dependencies = re.sub(r"\n[ \t]+", " ", fields["Depends"]).strip()
         if (
-            fields["Package"] != PACKAGE_NAME
+            fields["Package"] != layout.package_name
             or fields["Version"] != package_version
             or fields["Architecture"] != "amd64"
             or _parse_dependencies("shlibs:Depends=" + normalized_dependencies) != dependencies
@@ -471,12 +518,12 @@ def write_debian_setup_package(
         extract = _run(["dpkg-deb", "--extract", str(staged_package), str(extracted)], cwd=temporary_root)
         if extract.returncode != 0:
             raise ValueError("生成packageを独立展開して検証できない")
-        extracted_bundle = extracted.joinpath(*INSTALL_ROOT.parts)
+        extracted_bundle = extracted.joinpath(*layout.install_root.parts)
         extracted_records, extracted_bytes, extracted_tree = _artifact_inventory(extracted_bundle)
         if extracted_records != records or extracted_bytes != total_bytes or extracted_tree != tree_hash:
             raise ValueError("生成packageのpayloadが検証済みbundleと一致しない")
-        extracted_desktop = extracted.joinpath(*DESKTOP_ENTRY.parts)
-        if _read_regular_file(extracted_desktop, 4096, "D4 Pocket Setup desktop entry") != DESKTOP_CONTENT:
+        extracted_desktop = extracted.joinpath(*layout.desktop_entry.parts)
+        if _read_regular_file(extracted_desktop, 4096, "D4 Pocket Setup desktop entry") != layout.desktop_content:
             raise ValueError("生成packageのdesktop entryが固定内容ではない")
         allowed_files = {
             extracted_bundle.joinpath(*PurePosixPath(record["path"]).parts)
@@ -534,7 +581,7 @@ def write_debian_setup_package(
     return {
         "evidence_type": "d4_pocket_linux_debian_setup_package",
         "evidence_source": "INTERNAL_STATE",
-        "package_name": PACKAGE_NAME,
+        "package_name": layout.package_name,
         "package_version": package_version,
         "product_version": product_version,
         "target": TARGET,
@@ -544,8 +591,8 @@ def write_debian_setup_package(
         "package_size_bytes": size,
         "runtime_dependencies": dependencies,
         "dependency_tool_warnings": dependency_warnings,
-        "installed_root": "/opt/d4-pocket/setup",
-        "desktop_entry": "/usr/share/applications/d4-pocket-setup.desktop",
+        "installed_root": f"/{layout.install_root}",
+        "desktop_entry": f"/{layout.desktop_entry}",
         "package_manager_scripts": [],
         "scope": "first_run_setup_bootstrap_only",
         "signed": False,
@@ -566,6 +613,11 @@ def main() -> int:
     parser.add_argument("--build-evidence", type=Path, required=True, help="d4_pocket_linux_export_build.json")
     parser.add_argument("--output-dir", type=Path, required=True, help="Repository／OneDrive外の新規package directory")
     parser.add_argument("--package-revision", type=int, required=True, help="同一製品版内での正整数package revision")
+    parser.add_argument(
+        "--independent-export",
+        action="store_true",
+        help="書き出した製品のApp IDでSetupのパッケージ名と配置を分離する",
+    )
     args = parser.parse_args()
     try:
         result = write_debian_setup_package(
@@ -573,6 +625,7 @@ def main() -> int:
             args.build_evidence,
             args.output_dir,
             package_revision=args.package_revision,
+            independent_export=args.independent_export,
         )
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"D4 Pocket Debian Setup package作成を停止した: {error}", file=sys.stderr)

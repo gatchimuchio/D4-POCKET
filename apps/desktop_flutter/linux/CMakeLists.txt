@@ -32,6 +32,7 @@ else()
       OR NOT _d4_manifest_hash_length EQUAL 64)
     message(FATAL_ERROR "D4 product identity or Manifest hash format is invalid")
   endif()
+  set(APPLICATION_ID "com.d4pocket.${D4_PRODUCT_APP_ID}")
   list(APPEND LINUX_PRODUCT_IDENTITY_ENV
     "GUI_SHELL_PRODUCT_APP_ID=${D4_PRODUCT_APP_ID}"
     "GUI_SHELL_PRODUCT_AUDIT_STORE_ID=${D4_PRODUCT_AUDIT_STORE_ID}"

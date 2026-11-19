@@ -28,6 +28,8 @@ Brokerが生成するApp IDは`d4-pocket-app-`に小文字hex 32桁を続けた�
 
 Linux nativeはWindows／macOSと同じく完全対応が必須の製品対象である。Linux targetのManifest生成はその必須経路の一部にすぎず、Linux bundle producer、package生成・検証・導入consumer、Desktop entry、更新・rollback・削除、native GUI／権限境界、installed runtimeの接続と受入れが成立するまではLinux製品対応完了としない。Windows bundle toolの証拠をLinuxへ転用しない。
 
+Ubuntu 24.04 amd64用の初回Setup `.deb`を `tooling/package_linux_deb_setup.py --independent-export` で作ると、検証済みManifestのApp IDから `d4-pocket-setup-<32桁ID>`、`/opt/d4-pocket/exports/<app_id>/setup`、`/usr/share/applications/<パッケージ名>.desktop` を導出する。同じApp IDのパッケージ改訂は同じ配置を使い、別App IDのパッケージは異なる配置を使う。`.desktop`の表示名と起動対象は書き出した製品に対応し、GTK側のアプリ識別子は `com.d4pocket.<app_id>` とする。オプションのない既存呼び出しはD4 Pocket本体用Setupのパッケージ名、更新経路、起動項目を維持する。初回起動ファイルだけをパッケージ管理に登録し、製品本体の利用者別導入、認可、更新、削除はBrokerが扱う。
+
 ## 開発専用Windows bundle build
 
 `tooling/export_windows_product.py`はWindows専用の開発用build pathである。clean `main`を要求し、GitHub `origin/main`の読取専用照会で同一commitを確認してから、そのcommitを`git archive`でRepository／OneDrive外の短い一時pathへ展開する。展開器はroot外path、Windows上のcase衝突、file／directory衝突、symlink等を拒否する。Flutter／PubとCargoへ渡す環境変数はallowlist化し、Pub cache、Cargo home、Cargo targetを一時領域へ分離する。

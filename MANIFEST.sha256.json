@@ -465,7 +465,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/CMakeLists.txt",
-      "sha256": "373a091cf3b154e04f42ef4f5e9ccdb72d2ff50387f18824aa9ad1b8d4b73ef7"
+      "sha256": "3e10a03269c5987172b62d176bb721725d8a208573136bc80f1ffaa6d09c8e1b"
     },
     {
       "path": "apps/desktop_flutter/linux/flutter/CMakeLists.txt",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "4f8eb7734f8bcb1b87aa903d1b8b96abc4aec569bf9324cb1cc3e3bfd89bebac"
+      "sha256": "40e9b6dd8e83a3525e8af41a6594336ee92f4c4c0701a1189ec53f933d4b594b"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "383d6b22ce7eb629de0307718b66c2b88c24d20bb7282d434054b8454df5efc1"
+      "sha256": "0edb01ab65157a8f806919a8a923bf9e6aa7df173b4fe662065719e8c5014038"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -5905,7 +5905,7 @@
     },
     {
       "path": "tooling/package_linux_deb_setup.py",
-      "sha256": "c30e7908c824e604ea0d683606dcc7e127d3c405e324497dc05313490d5b0d41"
+      "sha256": "47f7be97856369265a37e93aa0428e318bb5c117a1cac2375f097071a6fe33f7"
     },
     {
       "path": "tooling/package_linux_product.py",
@@ -6037,7 +6037,7 @@
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",
-      "sha256": "8563e77491fd1e17ff4bcd6eeeebce066b5d5efdea993142031befe99fab5c20"
+      "sha256": "5c7e17f190b74c2049df88fcdcd68de656f6f5ee5601d4a5d11d7750681a497d"
     },
     {
       "path": "tooling/tests/test_linux_gtk_bundle_smoke.py",
