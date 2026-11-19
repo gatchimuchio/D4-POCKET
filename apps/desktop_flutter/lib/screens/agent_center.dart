@@ -1934,11 +1934,11 @@ class _AgentCenterState extends State<_AgentCenterScreen>
     if (!mounted || sessionId == null) return;
     final state = _agentTasks[sessionId];
     if (state == null) return;
+    final currentTask = state.record;
     final hasSessionRecoveryNotice = update.sessionRecoveryNotice != null;
     if (!hasSessionRecoveryNotice &&
-        state.record?.taskId != null &&
-        state.record!.taskId != update.sourceTaskId &&
-        state.record!.taskId != state.mcpFollowupTaskId) {
+        currentTask != null &&
+        currentTask.taskId != update.sourceTaskId) {
       return;
     }
     final updatedTask = update.task;
@@ -1955,10 +1955,16 @@ class _AgentCenterState extends State<_AgentCenterScreen>
     }
     final mcpUpdate = update.mcpUpdate;
     final mcpProjection = mcpUpdate?.projection;
-    if (mcpProjection != null &&
-        (!_taskRecordMatchesUiState(state, state.record) ||
-            state.record?.taskId != mcpProjection.taskId ||
-            state.record?.resultHash != mcpProjection.resultHash)) {
+    final mcpReceipt = mcpUpdate?.toolReceipt;
+    final mcpSourceTask = updatedTask ?? currentTask;
+    if ((mcpProjection != null || mcpReceipt != null) &&
+        (!_taskRecordMatchesUiState(state, mcpSourceTask) ||
+            mcpSourceTask?.taskId != update.sourceTaskId ||
+            mcpSourceTask?.status != 'completed' ||
+            mcpSourceTask?.resultHash == null ||
+            (mcpProjection != null &&
+                (mcpSourceTask?.taskId != mcpProjection.taskId ||
+                    mcpSourceTask?.resultHash != mcpProjection.resultHash)))) {
       state.taskBindingRejected = true;
       setState(() {
         state.resultProjection = null;
@@ -2026,9 +2032,13 @@ class _AgentCenterState extends State<_AgentCenterScreen>
             state.resultProjection = null;
           }
         }
-        if (mcpUpdate.toolReceipt case final receipt?) {
-          state.mcpToolCallReceipt = receipt;
-          state.incomingMcpResult = receipt.agentResultContext;
+        if (mcpReceipt != null) {
+          if (state.mcpSourceTaskRecord?.taskId != mcpSourceTask?.taskId) {
+            state.mcpFollowupTaskId = null;
+          }
+          state.mcpSourceTaskRecord = mcpSourceTask;
+          state.mcpToolCallReceipt = mcpReceipt;
+          state.incomingMcpResult = mcpReceipt.agentResultContext;
         }
         if (mcpUpdate.followupRequest case final followupRequest?) {
           state.request = followupRequest;

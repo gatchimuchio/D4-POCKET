@@ -5477,13 +5477,14 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('Agent CenterはTask完了後にMCP結果依存Taskを自動でBrokerへ接続する',
+  testWidgets('Agent Centerは二回のMCP継続で各Tool受領票を直前のTaskへ結ぶ',
       (WidgetTester tester) async {
     const runtimeId = 'codex-auto-mcp';
     const workspaceId = 'workspace-auto-mcp';
     const sessionId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const sourceTaskId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const followupTaskId = 'cccccccccccccccccccccccccccccccc';
+    const finalTaskId = 'dddddddddddddddddddddddddddddddd';
     const sourceInstructionHash =
         'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const followupInstructionHash =
@@ -5501,6 +5502,12 @@ void main() {
     const resultId = 'mcp-agent-result-11111111111111111111111111111111';
     const serverId = 'mcp-auto-fixture';
     const toolName = 'lookup';
+    final followupResultHash = 'sha256:${'1' * 64}';
+    final secondToolResultHash = 'sha256:${'2' * 64}';
+    final secondContextHash = 'sha256:${'3' * 64}';
+    final finalInstructionHash = 'sha256:${'4' * 64}';
+    final finalResultHash = 'sha256:${'5' * 64}';
+    const secondResultId = 'mcp-agent-result-22222222222222222222222222222222';
 
     Map<String, Object?> taskRecord({
       required String taskId,
@@ -5608,14 +5615,67 @@ void main() {
           'status': 'issued_unconsumed',
         });
 
-    final mcpProposal = jsonEncode({
-      'd4_mcp_tool_request': {
-        'server_id': serverId,
-        'tool_id': toolId,
-        'name': toolName,
-        'arguments': {'query': 'AGENT_AUTO_MCP_RESULT_SENTINEL'},
-      },
-    });
+    String mcpProposal(String query) => jsonEncode({
+          'd4_mcp_tool_request': {
+            'server_id': serverId,
+            'tool_id': toolId,
+            'name': toolName,
+            'arguments': {'query': query},
+          },
+        });
+    Iterable<Map<String, Object?>> resultReview(
+      String taskId,
+      String resultHash,
+      String approvalId,
+      String text,
+    ) =>
+        [
+          _brokerAcceptedBody('AgentTask結果表示承認', {
+            'task_id': taskId,
+            'result_hash': resultHash,
+            'content_visibility': 'full',
+            'approval_id': approvalId,
+            'expires_at_epoch_seconds': 1900000000,
+            'use_limit': 1,
+            'uses_remaining': 1,
+          }),
+          _brokerAcceptedBody('AgentTask結果取得', {
+            'task_id': taskId,
+            'result_hash': resultHash,
+            'content_visibility': 'full',
+            'projection': {'result_hash': resultHash, 'text': text},
+          }),
+        ];
+    final hops = [
+      (
+        sourceId: sourceTaskId,
+        sourceHash: sourceResultHash,
+        toolHash: toolResultHash,
+        contextId: resultId,
+        contextHash: contextHash,
+        receiptSuffix: '1',
+        argument: 'AGENT_AUTO_MCP_RESULT_SENTINEL_FIRST',
+        exposureId: 'e' * 32,
+        nextId: followupTaskId,
+        nextInstructionHash: followupInstructionHash,
+        nextResultHash: followupResultHash,
+        nextPermissionId: '2' * 32,
+      ),
+      (
+        sourceId: followupTaskId,
+        sourceHash: followupResultHash,
+        toolHash: secondToolResultHash,
+        contextId: secondResultId,
+        contextHash: secondContextHash,
+        receiptSuffix: '2',
+        argument: 'AGENT_AUTO_MCP_RESULT_SENTINEL_SECOND',
+        exposureId: 'f' * 32,
+        nextId: finalTaskId,
+        nextInstructionHash: finalInstructionHash,
+        nextResultHash: finalResultHash,
+        nextPermissionId: '3' * 32,
+      ),
+    ];
     var agentCenterActive = true;
     late StateSetter updateHost;
     final transport = _FakeBrokerTransport([
@@ -5682,31 +5742,22 @@ void main() {
             status: 'completed',
             resultHash: sourceResultHash,
           )),
-      _brokerAcceptedBody('AgentTask結果表示承認', {
-        'task_id': sourceTaskId,
-        'result_hash': sourceResultHash,
-        'content_visibility': 'full',
-        'approval_id': 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-        'expires_at_epoch_seconds': 1900000000,
-        'use_limit': 1,
-        'uses_remaining': 1,
-      }),
-      _brokerAcceptedBody('AgentTask結果取得', {
-        'task_id': sourceTaskId,
-        'result_hash': sourceResultHash,
-        'content_visibility': 'full',
-        'projection': {'result_hash': sourceResultHash, 'text': mcpProposal},
-      }),
-      capabilityList(),
-      {
-        ..._brokerAcceptedBody('MCP Tool実行', {
+      for (final hop in hops) ...[
+        ...resultReview(
+          hop.sourceId,
+          hop.sourceHash,
+          hop.exposureId,
+          mcpProposal(hop.argument),
+        ),
+        capabilityList(),
+        _brokerAcceptedBody('MCP Tool実行', {
           '版': 1,
           '契約種別': 'MCP Tool実行receipt',
           'ServerID': serverId,
           'ToolID': toolId,
           '名前': toolName,
-          'arguments_hash': sourceResultHash,
-          'result_hash': toolResultHash,
+          'arguments_hash': hop.sourceHash,
+          'result_hash': hop.toolHash,
           'Tool error': false,
           'content_count': 1,
           'content_types': ['text'],
@@ -5714,47 +5765,51 @@ void main() {
           '能力ID': 'mcp.tool.call',
           '権限ID': 'permission.mcp.tool.call.one_shot',
           '承認状態': 'native_owner_confirmed',
-          '承認監査ID': 'audit-mcp-tool-owner-approval',
+          '承認監査ID': 'audit-mcp-tool-owner-approval-${hop.receiptSuffix}',
           '復旧ID': 'inspect-mcp-tool-side-effect',
           '権限生成': 'Broker内一回限りPermissionを消費',
           '公開範囲': 'hash_only',
           '証拠種別': 'LIVE_RUNTIME',
-          '監査ID': 'audit-mcp-tool-call',
+          '監査ID': 'audit-mcp-tool-call-${hop.receiptSuffix}',
           'Agent結果context': {
             '状態': 'available',
-            'result_id': resultId,
-            'context_hash': contextHash,
-            'tool_result_hash': toolResultHash,
+            'result_id': hop.contextId,
+            'context_hash': hop.contextHash,
+            'tool_result_hash': hop.toolHash,
           },
-        })
-      },
-      _brokerAcceptedBody('Agent作業要求検査', {
-        '版': 1,
-        '状態': '要求検査済み',
-        '実行状態': '未実行',
-        'Permission状態': '未付与',
-        'Approval状態': '未取得',
-        '実行系ID': runtimeId,
-        '対話セッションID': sessionId,
-        '作業領域ID': workspaceId,
-        '指示hash': followupInstructionHash,
-      }),
-      permissionReceipt('22222222222222222222222222222222'),
-      ownerApproval(followupInstructionHash),
-      _brokerAcceptedBody(
+        }),
+        _brokerAcceptedBody('Agent作業要求検査', {
+          '版': 1,
+          '状態': '要求検査済み',
+          '実行状態': '未実行',
+          'Permission状態': '未付与',
+          'Approval状態': '未取得',
+          '実行系ID': runtimeId,
+          '対話セッションID': sessionId,
+          '作業領域ID': workspaceId,
+          '指示hash': hop.nextInstructionHash,
+        }),
+        permissionReceipt(hop.nextPermissionId),
+        ownerApproval(hop.nextInstructionHash),
+        _brokerAcceptedBody(
           'AgentTask実行',
           taskRecord(
-            taskId: followupTaskId,
-            instructionHash: followupInstructionHash,
+            taskId: hop.nextId,
+            instructionHash: hop.nextInstructionHash,
             status: 'running',
-          )),
-      _brokerAcceptedBody(
+          ),
+        ),
+        _brokerAcceptedBody(
           'AgentTask状態',
           taskRecord(
-            taskId: followupTaskId,
-            instructionHash: followupInstructionHash,
+            taskId: hop.nextId,
+            instructionHash: hop.nextInstructionHash,
             status: 'completed',
-          )),
+            resultHash: hop.nextResultHash,
+          ),
+        ),
+      ],
+      ...resultReview(finalTaskId, finalResultHash, '9' * 32, '作業完了'),
     ], onRequest: (operation) {
       if (operation == 'AgentTask結果表示承認' && agentCenterActive) {
         updateHost(() => agentCenterActive = false);
@@ -5820,13 +5875,23 @@ void main() {
 
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
+    expect(find.text('MCP Tool result hash: $toolResultHash'), findsOneWidget);
+    expect(
+      find.text(
+        'MCP要求元Task: $sourceTaskId / $sourceResultHash / '
+        'Audit audit-$sourceTaskId-completed',
+      ),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
     final taskStarts = transport.requests
         .where((request) => request['operation'] == 'AgentTask実行')
         .toList(growable: false);
-    expect(taskStarts, hasLength(2));
+    expect(taskStarts, hasLength(3));
     expect(
       agentCenterActive,
       isFalse,
@@ -5840,29 +5905,36 @@ void main() {
       expect(payload, isNot(contains('permission_id')));
       expect(payload, isNot(contains('approval_id')));
     }
-    final toolCall = transport.requests.singleWhere(
-      (request) => request['operation'] == 'MCP Tool実行',
-    );
-    final toolPayload = toolCall['payload']! as Map<String, Object?>;
-    expect(toolPayload['source_agent_task_id'], sourceTaskId);
-    expect(toolPayload['source_agent_result_hash'], sourceResultHash);
-    final followupInspection = transport.requests.singleWhere(
-      (request) =>
-          request['operation'] == 'Agent作業要求検査' &&
-          ((request['payload']! as Map)['mcp_result_id'] == resultId),
-    );
-    final followupPayload =
-        followupInspection['payload']! as Map<String, Object?>;
-    expect(followupPayload['runtime_id'], isNull);
-    expect(followupPayload['agent_runtime_id'], runtimeId);
-    expect(followupPayload['session_id'], sessionId);
-    expect(followupPayload['workspace_id'], workspaceId);
-    expect(followupPayload['mcp_result_hash'], contextHash);
-    expect(followupPayload['mcp_capability_snapshot_hash'], capabilityHash);
+    final toolCalls = transport.requests
+        .where((request) => request['operation'] == 'MCP Tool実行')
+        .toList(growable: false);
+    expect(toolCalls, hasLength(2));
+    for (final (index, hop) in hops.indexed) {
+      final toolPayload = toolCalls[index]['payload']! as Map<String, Object?>;
+      expect(toolPayload['source_agent_task_id'], hop.sourceId);
+      expect(toolPayload['source_agent_result_hash'], hop.sourceHash);
+      expect(toolPayload['arguments'], {'query': hop.argument});
+      final followupInspection = transport.requests.singleWhere(
+        (request) =>
+            request['operation'] == 'Agent作業要求検査' &&
+            ((request['payload']! as Map)['mcp_result_id'] == hop.contextId),
+      );
+      final followupPayload =
+          followupInspection['payload']! as Map<String, Object?>;
+      expect(followupPayload['runtime_id'], isNull);
+      expect(followupPayload['agent_runtime_id'], runtimeId);
+      expect(followupPayload['session_id'], sessionId);
+      expect(followupPayload['workspace_id'], workspaceId);
+      expect(followupPayload['mcp_result_hash'], hop.contextHash);
+      expect(followupPayload['mcp_capability_snapshot_hash'], capabilityHash);
+      final nextStart = taskStarts[index + 1]['payload']! as Map;
+      expect(nextStart['mcp_result_id'], hop.contextId);
+      expect(nextStart['mcp_result_hash'], hop.contextHash);
+    }
     expect(
       transport.operations.where(
           (operation) => operation == 'AgentTaskWorkspacePermissionGrant'),
-      hasLength(2),
+      hasLength(3),
     );
     final issuedPermissionIds = transport.returnedResponses
         .where((response) =>
@@ -5875,12 +5947,13 @@ void main() {
       equals({
         '11111111111111111111111111111111',
         '22222222222222222222222222222222',
+        '33333333333333333333333333333333',
       }),
     );
     expect(
       transport.operations
           .where((operation) => operation == 'AgentTaskOwnerApprovalGrant'),
-      hasLength(2),
+      hasLength(3),
     );
     expect(
       transport.operations,
@@ -5897,11 +5970,14 @@ void main() {
         'AgentTask実行',
       ]),
     );
-    expect(find.textContaining(followupTaskId), findsWidgets);
+    expect(find.text('結果依存の後続Task: $finalTaskId'), findsOneWidget);
+    expect(find.text('Task状態: completed'), findsWidgets);
+    expect(find.text('MCP Tool result hash: $secondToolResultHash'), findsOneWidget);
+    expect(find.text('MCP Tool result hash: $toolResultHash'), findsNothing);
     expect(
       find.text(
-        'MCP要求元Task: $sourceTaskId / $sourceResultHash / '
-        'Audit audit-$sourceTaskId-completed',
+        'MCP要求元Task: $followupTaskId / $followupResultHash / '
+        'Audit audit-$followupTaskId-completed',
       ),
       findsOneWidget,
     );
