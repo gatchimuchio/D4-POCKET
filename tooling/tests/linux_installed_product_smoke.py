@@ -7832,13 +7832,13 @@ def _run_installed_agent_mcp_followup_acceptance(
             f"Task ID: {source_task_id}",
             f"確定結果hash: {source_result_hash}",
             "Content Exposure: full",
-            "Auditには本文を保存しません。",
+            "Auditへ本文を保存しません。",
         ),
     )
     _wait_for_owner_dialog_closed(environment)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible(
-        "承認済みTask結果を表示し、提案を照合しています。",
+        f"表示範囲: full・Task {source_task_id}",
         root=window,
         timeout=15,
     )
@@ -7952,6 +7952,8 @@ def _run_installed_agent_mcp_followup_acceptance(
         timeout=10,
     )
 
+    _open_mcp_center_from_installed_ui(environment, window_id)
+    _activate_named_control_by_keyboard("接続一覧を取得", environment, window_id)
     _activate_named_control_by_keyboard(
         "切断", environment, window_id, context_marker=server_id
     )
