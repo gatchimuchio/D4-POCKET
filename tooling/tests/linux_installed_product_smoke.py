@@ -8095,12 +8095,18 @@ def _run_installed_agent_mcp_followup_acceptance(
     }
     proposal_row = scenarios_by_name.get("mcp_proposal")
     followup_row = scenarios_by_name.get("mcp_followup")
+    proposal_shapes = proposal_row.get("request_shapes") if isinstance(proposal_row, dict) else None
     if (
         not isinstance(proposal_row, dict)
         or proposal_row.get("posts") != 2
         or proposal_row.get("mcp_function_calls") != 1
         or proposal_row.get("mcp_function_outputs") != 1
-        or not proposal_row.get("task_mcp_tool_offered")
+        or not isinstance(proposal_shapes, list)
+        or len(proposal_shapes) != 2
+        or any(
+            not isinstance(shape, dict) or shape.get("task_mcp_tool_offered") is not True
+            for shape in proposal_shapes
+        )
         or not isinstance(followup_row, dict)
         or followup_row.get("posts") != 1
         or followup_row.get("required_input_marker_observed") is not True
@@ -8148,7 +8154,7 @@ def _run_installed_agent_mcp_followup_acceptance(
         "audit": audit_evidence,
         "responses_fixture": {
             "proposal_posts": proposal_row["posts"],
-            "task_tool_offered": proposal_row["task_mcp_tool_offered"],
+            "task_tool_offered": proposal_shapes[0]["task_mcp_tool_offered"],
             "task_tool_calls": proposal_row["mcp_function_calls"],
             "task_tool_outputs": proposal_row["mcp_function_outputs"],
             "followup_input_observed": followup_row["required_input_marker_observed"],
