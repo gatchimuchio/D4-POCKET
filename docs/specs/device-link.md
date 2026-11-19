@@ -66,6 +66,8 @@ MobileはTool接続・呼出しを行わず、能力一覧やTask結果本文も
 
 Mobileは端末ID、Hostの固定情報、結合ID、端末秘密、有効期限だけをAndroidの安全保管／iOS Keychainへ保存する。招待秘密は結合後に消去する。一般設定、標準preferences、log、clipboardへの自動書出し、バックアップからの自動復元へ秘密を置かない。保管失敗時に平文へfallbackしない。
 
+Androidで初回保存が中断され、Keystoreの鍵だけが残った場合は、その鍵で新しい未結合状態を保存し、復号して確認する。暗号文が残っている場合は、現在の鍵で復号できた状態だけを採用する。鍵取得や認証付き復号に失敗した場合は暗号文を保持して停止し、復号経路で鍵を生成しない。既存の期限確認とDesktop側の失効は引き続き適用する。[Android Keystore](https://developer.android.com/privacy-and-security/keystore)
+
 iOSは現在の導入に対応する端末IDのSHA-256を、バックアップ対象外のApplication Support内に保存する。同じ導入でアプリを更新した場合は、Keychainの端末IDと照合できた資格だけを既存の期限・Desktop Brokerの確認に渡す。照合情報がない旧版や別の導入から引き継いだKeychain状態では、新しい端末IDで未結合状態から開始する。旧端末の失効は引き続きDesktop側で行う。照合情報に端末秘密は保存しない。[Appleのデータ保管とバックアップ除外](https://developer.apple.com/documentation/foundation/using-the-file-system-effectively)
 
 起動・復帰は資格の読取後に端末確認を行い、失効・期限切れ・Host不一致では入力と送信を無効にする。background中はpollingと新規送信を停止する。応答待ちは復帰後に同じ要求を照会し、自動再送しない。離脱はserver失効を先に要求する。通信不能時のlocal削除はserver失効と区別し、owner側の失効操作を案内する。

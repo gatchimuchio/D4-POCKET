@@ -17,22 +17,29 @@ internal data class NativeDeviceState(
     val localRecoveryAudit: List<Map<String, Any?>> = emptyList(),
 )
 
-internal class DeviceLinkNativeStore(context: Context) {
-    private val preferences = context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+internal class DeviceLinkNativeStore(
+    context: Context,
+    preferencesName: String = PREFERENCES,
+    private val keyAlias: String = KEY_ALIAS,
+) {
+    private val preferences = context.applicationContext.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
 
     @Synchronized
     fun loadOrCreate(): NativeDeviceState {
         val encoded = preferences.getString(STATE_KEY, null)
-        if (encoded == null) {
-            val keyStore = KeyStore.getInstance(ANDROID_KEY_STORE).apply { load(null) }
-            require(!keyStore.containsAlias(KEY_ALIAS))
-            val created = NativeDeviceState(randomId(), null)
-            persist(created)
-            return created
+        val currentKey = readKey()
+        if (encoded != null) {
+            // 鍵を取得できない暗号文は保持し、復号経路で別の鍵を生成しない。
+            return decodeState(encoded, requireNotNull(currentKey))
         }
+        // 初回保存の中断で鍵だけが残っている場合は、未結合状態の作成を再開する。
+        return persistAndVerify(NativeDeviceState(randomId(), null), currentKey ?: createKey())
+    }
+
+    private fun decodeState(encoded: String, key: SecretKey): NativeDeviceState {
         val blob = decodeBlob(encoded)
         val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(TAG_BITS, blob.first))
+        cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(TAG_BITS, blob.first))
         cipher.updateAAD(AAD)
         val clear = cipher.doFinal(blob.second).toString(Charsets.UTF_8)
         val state = StrictJson.parseObject(clear, MAX_STATE_BYTES)
@@ -78,20 +85,14 @@ internal class DeviceLinkNativeStore(context: Context) {
         val before = loadOrCreate()
         require(before.deviceId == credential.deviceId)
         val next = NativeDeviceState(before.deviceId, credential.asJson(), before.localRecoveryAudit)
-        persist(next)
-        val verified = loadOrCreate()
-        require(verified == next)
-        return verified
+        return persistAndVerify(next)
     }
 
     @Synchronized
     fun deleteCredential(): NativeDeviceState {
         val before = loadOrCreate()
         val next = NativeDeviceState(before.deviceId, null, before.localRecoveryAudit)
-        persist(next)
-        val verified = loadOrCreate()
-        require(verified == next)
-        return verified
+        return persistAndVerify(next)
     }
 
     @Synchronized
@@ -104,10 +105,7 @@ internal class DeviceLinkNativeStore(context: Context) {
         )
         val events = DeviceLinkLocalRecoveryAudit.appendBounded(before.localRecoveryAudit, event)
         val next = NativeDeviceState(before.deviceId, null, events)
-        persist(next)
-        val verified = loadOrCreate()
-        require(verified == next && verified.localRecoveryAudit.lastOrNull() == event)
-        return verified
+        return persistAndVerify(next)
     }
 
     @Synchronized
@@ -116,7 +114,10 @@ internal class DeviceLinkNativeStore(context: Context) {
         return loadOrCreate().localRecoveryAudit
     }
 
-    private fun persist(state: NativeDeviceState) {
+    private fun persistAndVerify(
+        state: NativeDeviceState,
+        key: SecretKey = requireNotNull(readKey()),
+    ): NativeDeviceState {
         val clear = StrictJson.encode(
             linkedMapOf(
                 "version" to 2L,
@@ -127,12 +128,16 @@ internal class DeviceLinkNativeStore(context: Context) {
         ).toByteArray(Charsets.UTF_8)
         require(clear.size <= MAX_STATE_BYTES)
         val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, key())
+        cipher.init(Cipher.ENCRYPT_MODE, key)
         cipher.updateAAD(AAD)
         val ciphertext = cipher.doFinal(clear)
         val encoded = ENCODING + Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + "." +
             Base64.encodeToString(ciphertext, Base64.NO_WRAP)
         require(preferences.edit().putString(STATE_KEY, encoded).commit())
+        val saved = requireNotNull(preferences.getString(STATE_KEY, null))
+        val verified = decodeState(saved, requireNotNull(readKey()))
+        require(verified == state)
+        return verified
     }
 
     private fun decodeBlob(encoded: String): Pair<ByteArray, ByteArray> {
@@ -145,14 +150,17 @@ internal class DeviceLinkNativeStore(context: Context) {
         return iv to ciphertext
     }
 
-    private fun key(): SecretKey {
+    private fun readKey(): SecretKey? {
         val store = KeyStore.getInstance(ANDROID_KEY_STORE).apply { load(null) }
-        val existing = store.getKey(KEY_ALIAS, null) as? SecretKey
-        if (existing != null) return existing
+        val key = store.getKey(keyAlias, null) ?: return null
+        return requireNotNull(key as? SecretKey)
+    }
+
+    private fun createKey(): SecretKey {
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE)
         generator.init(
             KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
+                keyAlias,
                 KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
             )
                 .setKeySize(256)

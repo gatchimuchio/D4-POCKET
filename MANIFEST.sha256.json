@@ -1004,6 +1004,10 @@
       "sha256": "978b8f51031934cc9ad9e079e4c70215e7db7bf25ec6ecc0b2574edee4d5b943"
     },
     {
+      "path": "apps/mobile_flutter/android/app/src/androidTest/kotlin/com/example/gui_shell_mobile/NativeDeviceLinkStoreRecoveryTest.kt",
+      "sha256": "8e12a7819b7d926dd55b38941ff4067604cc0726b6bd60c5d435dc086c793a9f"
+    },
+    {
       "path": "apps/mobile_flutter/android/app/src/debug/AndroidManifest.xml",
       "sha256": "30b0832ed8b92dfbd6ae2abfa939ccf26333d37600056b1572bd4a397a18a74b"
     },
@@ -1021,7 +1025,7 @@
     },
     {
       "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeStore.kt",
-      "sha256": "e55bcc3fc95bc3ebdf629d0a570218192092e78a5c53f16d66ee36f54525e4fb"
+      "sha256": "ab9524215e7946ccc43041b0a16331c700c8f332b11e08e789a5217bb039dbc5"
     },
     {
       "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkTlsClient.kt",
@@ -1645,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "3d87ec0a7dfb0adcc34819ccdaca5f8215a024da7bd90c3f66baf43937d9c416"
+      "sha256": "d811124a91bf22674e77b16d9c9c004542adac39127b556cc8c92a7126e51ff8"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1829,7 +1833,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "e20b2253f420ea0fc941c75662220cfa7e79ec4ccee1e5bce80667ac97d1632d"
+      "sha256": "8d8813f7c1e991afc11d49441ebaf3fa736da015674843b09d0f5447f6ddc66c"
     },
     {
       "path": "docs/specs/evaluation-lab.md",
