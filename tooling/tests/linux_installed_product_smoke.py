@@ -4453,28 +4453,49 @@ class _LinuxAgentTaskResponsesServer:
             assert isinstance(cast_shapes, list)
             tool_name = "d4_submit_mcp_tool_request"
             tool_namespace = "d4p_task_request"
+            direct_namespace = f"mcp__{tool_namespace}"
+            tool_descriptors = tools if isinstance(tools, list) else []
             task_tool_descriptors = [
                 {
                     key: tool.get(key)
                     for key in ("type", "name", "namespace", "server", "server_label")
                     if key in tool
                 }
-                for tool in (tools if isinstance(tools, list) else [])
+                for tool in tool_descriptors
                 if isinstance(tool, dict)
                 and (
                     tool.get("name") == tool_name
+                    or tool.get("name") == direct_namespace
                     or tool.get("namespace") == tool_namespace
                     or tool.get("server_label") == tool_namespace
                     or tool.get("name")
                     == f"mcp__{tool_namespace}__{tool_name}"
                 )
             ]
-            offers_task_mcp_tool = any(
+            offers_flat_task_mcp_tool = any(
                 isinstance(tool, dict)
                 and tool.get("type") == "function"
                 and tool.get("name") == tool_name
                 and tool.get("namespace") == tool_namespace
-                for tool in (tools if isinstance(tools, list) else [])
+                for tool in tool_descriptors
+            )
+            namespaces = [
+                tool
+                for tool in tool_descriptors
+                if isinstance(tool, dict)
+                and tool.get("type") == "namespace"
+                and tool.get("name") == direct_namespace
+            ]
+            functions = namespaces[0].get("tools") if len(namespaces) == 1 else None
+            offers_namespace_task_mcp_tool = (
+                isinstance(functions, list)
+                and len(functions) == 1
+                and isinstance(functions[0], dict)
+                and functions[0].get("type") == "function"
+                and functions[0].get("name") == tool_name
+            )
+            offers_task_mcp_tool = (
+                offers_flat_task_mcp_tool or offers_namespace_task_mcp_tool
             )
             cast_shapes.append(
                 {
@@ -4500,7 +4521,9 @@ class _LinuxAgentTaskResponsesServer:
                     return _responses_namespace_function_call_events(
                         posts,
                         call_id=call_id,
-                        namespace=tool_namespace,
+                        namespace=(
+                            direct_namespace if offers_namespace_task_mcp_tool else tool_namespace
+                        ),
                         name=tool_name,
                         arguments=proposal,
                     )
@@ -4511,17 +4534,19 @@ class _LinuxAgentTaskResponsesServer:
                     ):
                         self._rejections.append("task_mcp_function_output_mismatch")
                         raise RuntimeError("task MCP function output mismatch")
-                    output_text = tool_outputs[0].get("output")
-                    if not isinstance(output_text, str):
-                        self._rejections.append("task_mcp_function_output_not_text")
-                        raise RuntimeError("task MCP function output missing")
+                    output_text = _mcp_proposal_function_output_text(
+                        tool_outputs[0].get("output")
+                    )
+                    if output_text is None:
+                        self._rejections.append("task_mcp_function_output_unsupported_shape")
+                        raise RuntimeError("task MCP function output has unsupported shape")
                     if "D4P_SYNTHETIC_SECRET_CANARY" in output_text:
                         self._rejections.append("synthetic_secret_canary_in_tool_output")
                         raise RuntimeError("secret canary exposed")
                     scenario["mcp_function_outputs"] = 1
                     scenario["tool_outputs"] = 1
                     scenario["tool_output_sha256"] = hashlib.sha256(
-                        output_text.encode("utf-8", errors="replace")
+                        output_text.encode("utf-8")
                     ).hexdigest()
                     return _responses_final_message_events(
                         posts,
@@ -5513,6 +5538,55 @@ def _normalize_response_fixture_request_shapes(
     return normalized
 
 
+def _mcp_proposal_function_output_text(output: object) -> str | None:
+    """Accept bounded text-only Responses function output for this fixture."""
+    if isinstance(output, str):
+        parts = [output]
+    elif isinstance(output, list) and 1 <= len(output) <= 8:
+        parts = []
+        for item in output:
+            if (
+                not isinstance(item, dict)
+                or set(item) not in (
+                    {"type", "text"},
+                    {"type", "text", "prompt_cache_breakpoint"},
+                )
+                or item.get("type") != "input_text"
+                or not isinstance(item.get("text"), str)
+            ):
+                return None
+            if "prompt_cache_breakpoint" in item:
+                breakpoint = item["prompt_cache_breakpoint"]
+                if breakpoint is not None:
+                    if (
+                        not isinstance(breakpoint, dict)
+                        or not set(breakpoint).issubset({"mode", "ttl"})
+                        or breakpoint.get("mode", "explicit") != "explicit"
+                        or (
+                            "ttl" in breakpoint
+                            and (
+                                not isinstance(breakpoint["ttl"], str)
+                                or breakpoint["ttl"] not in {"30m", "12h"}
+                            )
+                        )
+                    ):
+                        return None
+            parts.append(item["text"])
+    else:
+        return None
+
+    normalized = "\n".join(parts)
+    if not normalized.strip():
+        return None
+    try:
+        encoded = normalized.encode("utf-8")
+    except UnicodeEncodeError:
+        return None
+    if len(encoded) > 64 * 1024:
+        return None
+    return normalized
+
+
 def _installed_task_response_fixture_diagnostics(
     responses_server: _LinuxAgentTaskResponsesServer,
     scenario_name: str,
@@ -5579,6 +5653,7 @@ def _installed_task_response_fixture_diagnostics(
         "synthetic_secret_canary_in_tool_output",
         "task_mcp_function_output_mismatch",
         "task_mcp_function_output_not_text",
+        "task_mcp_function_output_unsupported_shape",
         "task_mcp_namespace_function_not_offered",
         "task_mcp_proposal_missing",
         "tool_output_call_id_mismatch",

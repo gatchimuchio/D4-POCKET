@@ -67,6 +67,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _installed_task_write_failure_diagnostics,
     _installed_task_history_diagnostics,
     _installed_task_response_fixture_diagnostics,
+    _mcp_proposal_function_output_text,
     _stop_linux_agent_task_process_group,
     _linux_processes_with_task_nonce,
     _review_single_installed_mcp_tool_arguments,
@@ -5425,9 +5426,9 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
             "arguments": {"text": "installed-mcp-public-input"},
         }
         descriptor = {
-            "type": "function",
-            "namespace": "d4p_task_request",
-            "name": "d4_submit_mcp_tool_request",
+            "type": "namespace",
+            "name": "mcp__d4p_task_request",
+            "tools": [{"type": "function", "name": "d4_submit_mcp_tool_request"}],
         }
         server.configure(
             "mcp_proposal",
@@ -5443,7 +5444,7 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
             and isinstance(event.get("item"), dict)
             and event["item"].get("type") == "function_call"
         )
-        self.assertEqual(call["namespace"], "d4p_task_request")
+        self.assertEqual(call["namespace"], "mcp__d4p_task_request")
         self.assertEqual(call["name"], "d4_submit_mcp_tool_request")
         self.assertEqual(json.loads(call["arguments"]), proposal)
         self.assertEqual(call["status"], "completed")
@@ -5455,7 +5456,13 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
                     {
                         "type": "function_call_output",
                         "call_id": call["call_id"],
-                        "output": public_request_receipt,
+                        "output": [
+                            {
+                                "type": "input_text",
+                                "text": public_request_receipt,
+                                "prompt_cache_breakpoint": None,
+                            }
+                        ],
                     }
                 ],
                 "tools": [descriptor],
@@ -5474,6 +5481,16 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
         self.assertTrue(scenario["request_shapes"][0]["task_mcp_tool_offered"])
         self.assertNotIn(public_request_receipt, json.dumps(snapshot))
         self.assertNotIn("installed-mcp-public-input", json.dumps(snapshot))
+
+    def test_mcp_proposal_output_accepts_bounded_text_only(self) -> None:
+        self.assertEqual(_mcp_proposal_function_output_text("receipt"), "receipt")
+        for value in (
+            [{"type": "input_image", "text": "not a text block"}],
+            [{"type": "input_text", "text": "receipt", "authority": "owner"}],
+            "a" * (64 * 1024 + 1),
+        ):
+            with self.subTest(value_type=type(value).__name__):
+                self.assertIsNone(_mcp_proposal_function_output_text(value))
 
     def test_fixture_followup_requires_result_marker_and_rejects_secret_input(self) -> None:
         marker = "D4P_MCP_RESULT_PROBE_0123456789abcdef0123456789abcdef"

@@ -1499,6 +1499,13 @@ fn build_codex_command_with_model_and_task_tool(
         let helper = serde_json::to_string(helper).map_err(|_| 対話失敗::要求不正)?;
         let arguments = serde_json::to_string(&[TASK_TOOL_SERVER_ARGUMENT])
             .map_err(|_| 対話失敗::要求不正)?;
+        let proposal_namespace = format!("mcp__{TASK_TOOL_SERVER_NAME}");
+        let direct_namespaces =
+            serde_json::to_string(&[proposal_namespace]).map_err(|_| 対話失敗::要求不正)?;
+        // 提案Toolの構造化された完了イベントをCodexのexec JSONから回収する。
+        task_command.arg("-c").arg(format!(
+            "features.code_mode.direct_only_tool_namespaces={direct_namespaces}"
+        ));
         // This dedicated server advertises exactly one fixed, non-authoritative
         // request tool. Keep that allowlist in its own tools/list contract instead
         // of depending on Codex CLI's optional per-server enabled_tools filter.
@@ -1507,7 +1514,8 @@ fn build_codex_command_with_model_and_task_tool(
             format!("mcp_servers.d4p_task_request.args={arguments}"),
             "mcp_servers.d4p_task_request.enabled=true".to_owned(),
             "mcp_servers.d4p_task_request.required=true".to_owned(),
-            "mcp_servers.d4p_task_request.default_tools_approval_mode=\"auto\"".to_owned(),
+            // このstdio serverは提案の受付だけを行う。外部Toolの認可はBrokerが行う。
+            "mcp_servers.d4p_task_request.default_tools_approval_mode=\"approve\"".to_owned(),
             "mcp_servers.d4p_task_request.startup_timeout_sec=5".to_owned(),
         ];
         for setting in mcp_server_overrides {
@@ -2459,6 +2467,18 @@ mod tests {
             .filter(|setting| setting.starts_with("mcp_servers.d4p_task_request."))
             .collect::<Vec<_>>();
         assert_eq!(settings.len(), 6);
+        let direct_settings = args[..exec_index]
+            .windows(2)
+            .filter(|pair| pair[0] == "-c")
+            .map(|pair| pair[1].as_str())
+            .filter(|setting| {
+                setting.starts_with("features.code_mode.direct_only_tool_namespaces=")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            direct_settings,
+            ["features.code_mode.direct_only_tool_namespaces=[\"mcp__d4p_task_request\"]"]
+        );
         assert!(settings.iter().any(|setting| {
             setting.starts_with("mcp_servers.d4p_task_request.command=")
                 && setting.contains("gui_shell")
@@ -2474,7 +2494,7 @@ mod tests {
             .iter()
             .any(|setting| *setting == "mcp_servers.d4p_task_request.required=true"));
         assert!(settings.iter().any(|setting| {
-            *setting == "mcp_servers.d4p_task_request.default_tools_approval_mode=\"auto\""
+            *setting == "mcp_servers.d4p_task_request.default_tools_approval_mode=\"approve\""
         }));
         assert!(command.get_envs().all(|(name, value)| {
             name != "D4P_TASK_MCP_SUBMISSION_TOKEN"
@@ -2495,6 +2515,23 @@ mod tests {
             None,
         )
         .is_err());
+        let ordinary_task = build_codex_command_with_model_and_task_tool(
+            &executable,
+            &workspace,
+            CodexSandbox::WorkspaceWrite,
+            Some(&scratch),
+            &[],
+            None,
+            None,
+            false,
+            None,
+        )
+        .expect("MCP能力を指定しないTask");
+        assert!(ordinary_task.get_args().all(|arg| {
+            let setting = arg.to_string_lossy();
+            !setting.starts_with("features.code_mode.direct_only_tool_namespaces=")
+                && !setting.starts_with("mcp_servers.d4p_task_request.")
+        }));
     }
 
     #[test]
