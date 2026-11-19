@@ -43,3 +43,9 @@ Brokerの `GUI Shell編集提案審査` は、現在のHost表示世代におけ
 審査後は「適用先を照合」から、別のfull読取承認を得た登録済みWorkspaceを選択できる。Brokerの `GUI Shell編集適用先照合` は、変更対象の相対pathと前後の版hashを審査の永続監査に照合する。審査元と適用先の登録rootが同一または包含関係にある場合は拒否する。既存の取得器で、審査元の現在版が審査時の変更後版、適用先の現在版が審査時の変更前版と一致することを確認する。承認失効、版の変化、取得拒否があれば照合結果を返さない。
 
 適用先照合が返すのは、対象path、版hash、審査と照合の監査参照である。照合時点の情報を利用者に表示し、権限やファイルの状態は変更しない。制御適用では、別のOwner確認に加え、書込み時点の版の再照合と復旧が必要になる。
+
+## 制御適用と復旧で使うファイル移動
+
+編集前の版を退避し、復旧で戻すときは、同一volume上の登録済みdirectory handleを使う。既存のパスと秘密の検査を通し、移動前のファイル識別子と内容hashを照合する。OSの置換禁止付き移動で、別プロセスが宛先を確保していた場合は両方の版を保持する。Windowsでは共有を許可せず開いた同期I/Oのファイルhandleを、`NtSetInformationFile` と宛先directory handleで移動する。 [Microsoft FILE_RENAME_INFORMATION](https://learn.microsoft.com/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information)
+
+移動後は元の名前の不在と、宛先のファイル識別子・内容hashを確認する。移動前の拒否と、移動後に競合を観測した状態は区別する。後者では宛先を保持し、復旧記録から副作用を確認する。ファイル移動を呼び出すBroker操作は、実行前に現在のOwner認可と復旧記録を確定する必要がある。

@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "de337a87b8ea7dd551c32dbc56265546290f9df833b770e6029af7acb1baddd4"
+      "sha256": "632c3d0c36ae38d6a05cc4d95eb8871d05925e21a6671a02262527eecc24ef18"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "docs/specs/gui-shell-ai-edit.md",
-      "sha256": "80b9fa7307b878a0759746066eebb5b20df158c51f157270be6d215baec90d03"
+      "sha256": "1fb0c45fb9b37b22600ea5a87fd91750d0b6ab6363087f5d3ca9d95d0a2080d7"
     },
     {
       "path": "docs/specs/gui-shell-compose.md",
@@ -3989,7 +3989,7 @@
     },
     {
       "path": "native/rust_helper/Cargo.lock",
-      "sha256": "02610d8259989769664da162be82ad8aa92504860d498945e0af77bee5de6d8b"
+      "sha256": "8410530ab6f742ae535d8105c1e37af7696f924446c56290bb582b54adc025ff"
     },
     {
       "path": "native/rust_helper/Cargo.toml",
@@ -4389,7 +4389,11 @@
     },
     {
       "path": "native/rust_helper/src/workspace_reader.rs",
-      "sha256": "14f89c50e5c04cac322bd46927f3c74c995e0fb6f3108421f347ecabc41b426d"
+      "sha256": "9964fb0c001acfb5ef8499f9aad5760f67965384afe291163fe79bcaa1414b25"
+    },
+    {
+      "path": "native/rust_helper/src/workspace_reader/edit.rs",
+      "sha256": "16e1eeb72c07c34d5b3e280f3b84077182a73471175eba45883fcf6f015336e5"
     },
     {
       "path": "native/rust_helper/tests/agent_task_crash_recovery_e2e.rs",
@@ -4497,15 +4501,19 @@
     },
     {
       "path": "native/windows_protection/Cargo.toml",
-      "sha256": "e34fff6f98b4785f402bf3efff8130ffad6822c4ca0ace21206bf7845d5519b9"
+      "sha256": "d3f039888190534b343d22488f466c73796ac5d74d3b273233de2f532a98d969"
     },
     {
       "path": "native/windows_protection/src/file_delete.rs",
       "sha256": "764a01800dea501f946abb027d354ecaa3791983a69485456092086fec605d00"
     },
     {
+      "path": "native/windows_protection/src/file_move.rs",
+      "sha256": "d6ff5a83602df8853f0f02fc8588d24caaa2026de4bb364e0384bf4671e521b1"
+    },
+    {
       "path": "native/windows_protection/src/lib.rs",
-      "sha256": "9244d9f7ead4411cd51f01ac984ac8803afc3d55a2c09af3b4d2b1d174975a45"
+      "sha256": "ca0187ef25844ffeb3465027db9aa6af4ac5d22f8dc1dc389abcd697f0074280"
     },
     {
       "path": "native/windows_runtime_observation/.gitignore",

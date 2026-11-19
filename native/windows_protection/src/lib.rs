@@ -126,3 +126,4 @@ fn transform(context: &[u8], data: &[u8], protect: bool) -> Result<Vec<u8>, Erro
 }
 
 pub mod file_delete;
+pub mod file_move;

@@ -7,6 +7,11 @@ use sha2::{Digest, Sha256};
 use std::io::Read;
 use unicode_normalization::UnicodeNormalization;
 
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+mod edit;
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+pub use edit::EditMoveError;
+
 const MAX_BYTES: u64 = 65_536;
 pub const MAX_COMPARISON_BYTES: u64 = 128 * 1024 * 1024;
 
@@ -718,6 +723,54 @@ mod tests {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn edit_move_preserves_existing_names_and_checks_versions_in_both_directions() {
+        let work = Fixture::new();
+        let hold = Fixture::new();
+        fs::create_dir(work.0.join("src")).unwrap();
+        fs::write(work.0.join("src/例.txt"), b"reviewed").unwrap();
+        fs::write(hold.0.join("reserved"), b"occupied").unwrap();
+        let workspace = work.reader();
+        let vault = hold.reader();
+        let reviewed = crate::audit_hash::sha256_tagged(b"reviewed");
+        let stale = crate::audit_hash::sha256_tagged(b"stale");
+
+        assert_eq!(
+            workspace.move_edit_version("src/例.txt", &stale, &vault, "version"),
+            Err(EditMoveError::BeforeMove(ReadError::Changed))
+        );
+        assert_eq!(
+            workspace.move_edit_version("src/例.txt", &reviewed, &vault, ".env"),
+            Err(EditMoveError::BeforeMove(ReadError::SecretPath))
+        );
+        assert_eq!(
+            workspace.move_edit_version("src/例.txt", &reviewed, &vault, "reserved"),
+            Err(EditMoveError::BeforeMove(ReadError::Unavailable))
+        );
+        assert_eq!(fs::read(hold.0.join("reserved")).unwrap(), b"occupied");
+        assert_eq!(fs::read(work.0.join("src/例.txt")).unwrap(), b"reviewed");
+
+        workspace
+            .move_edit_version("src/例.txt", &reviewed, &vault, "version")
+            .unwrap();
+        assert!(!work.0.join("src/例.txt").exists());
+        assert_eq!(fs::read(hold.0.join("version")).unwrap(), b"reviewed");
+        fs::write(work.0.join("src/例.txt"), b"concurrent").unwrap();
+        assert_eq!(
+            vault.move_edit_version("version", &reviewed, &workspace, "src/例.txt"),
+            Err(EditMoveError::BeforeMove(ReadError::Unavailable))
+        );
+        assert_eq!(fs::read(work.0.join("src/例.txt")).unwrap(), b"concurrent");
+        assert_eq!(fs::read(hold.0.join("version")).unwrap(), b"reviewed");
+        fs::rename(work.0.join("src/例.txt"), work.0.join("src/conflict")).unwrap();
+        vault
+            .move_edit_version("version", &reviewed, &workspace, "src/例.txt")
+            .unwrap();
+        assert_eq!(fs::read(work.0.join("src/例.txt")).unwrap(), b"reviewed");
+        assert!(!hold.0.join("version").exists());
     }
 
     #[test]

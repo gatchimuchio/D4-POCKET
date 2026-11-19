@@ -811,6 +811,8 @@ dependencies = [
 name = "gui_shell_windows_protection"
 version = "0.1.0"
 dependencies = [
+ "cap-fs-ext",
+ "cap-std",
  "windows-sys 0.61.2",
 ]
 
