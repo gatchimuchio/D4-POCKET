@@ -21,14 +21,14 @@ import kotlin.math.roundToInt
 
 internal class DeviceLinkNativeService(
     private val activity: Activity,
+    private val worker: ExecutorService = Executors.newSingleThreadExecutor(),
 ) {
     private val store = DeviceLinkNativeStore(activity.applicationContext)
     private val transport = DeviceLinkTlsClient()
-    private val worker: ExecutorService = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val generation = AtomicLong(0)
     private val pairingInProgress = AtomicBoolean(false)
-    @Volatile private var foreground = true
+    @Volatile private var foreground = false
     @Volatile private var disposed = false
     @Volatile private var dismissActivePairing: (() -> Unit)? = null
 
@@ -40,12 +40,12 @@ internal class DeviceLinkNativeService(
         return when (call.method) {
             "read_state" -> {
                 if (arguments(call, setOf("version")) == null) fail(result)
-                else submit(result) { readState() }
+                else submit(result, requiresForeground = false, operation = ::readState)
                 true
             }
             "read_recovery_audit" -> {
                 if (arguments(call, setOf("version")) == null) fail(result)
-                else submit(result) { readLocalRecoveryAudit() }
+                else submit(result, operation = ::readLocalRecoveryAudit)
                 true
             }
             "pair" -> {
@@ -58,17 +58,17 @@ internal class DeviceLinkNativeService(
                 val operation = args?.get("broker_operation") as? String
                 val payload = toStringMap(args?.get("payload"))
                 if (args == null || operation == null || payload == null) fail(result)
-                else submit(result) { brokerRequest(operation, payload) }
+                else submit(result) { epoch -> brokerRequest(operation, payload, epoch) }
                 true
             }
             "disconnect" -> {
                 if (arguments(call, setOf("version")) == null) fail(result)
-                else submit(result) { disconnect() }
+                else submit(result, operation = ::disconnect)
                 true
             }
             "local_delete" -> {
                 if (arguments(call, setOf("version")) == null) fail(result)
-                else submit(result) { localDelete() }
+                else submit(result, operation = ::localDelete)
                 true
             }
             else -> false
@@ -77,11 +77,13 @@ internal class DeviceLinkNativeService(
 
     fun setForeground(value: Boolean) {
         if (foreground == value) return
-        foreground = value
+        if (!value) foreground = false
         generation.incrementAndGet()
-        if (!value) {
+        if (value) foreground = true
+        else {
             transport.cancelAll()
-            main.post { dismissActivePairing?.invoke() }
+            val dismiss = dismissActivePairing
+            main.post { dismiss?.invoke() }
         }
     }
 
@@ -113,13 +115,27 @@ internal class DeviceLinkNativeService(
         }
     }
 
-    private fun submit(result: MethodChannel.Result, operation: () -> Any?) {
+    private fun submit(
+        result: MethodChannel.Result,
+        requiresForeground: Boolean = true,
+        operation: (Long) -> Any?,
+    ) {
+        val epoch = generation.get()
+        if (!isCurrent(epoch, requiresForeground)) {
+            result.error("device_link_failed", GENERIC_FAILURE, null)
+            return
+        }
         try {
             worker.execute {
-                val outcome = runCatching(operation)
+                val outcome = runCatching {
+                    check(isCurrent(epoch, requiresForeground))
+                    operation(epoch)
+                }
                 main.post {
                     if (disposed) {
                         result.error("device_link_unavailable", GENERIC_FAILURE, null)
+                    } else if (!isCurrent(epoch, requiresForeground)) {
+                        result.error("device_link_failed", GENERIC_FAILURE, null)
                     } else {
                         outcome.fold(
                             onSuccess = { result.success(it) },
@@ -137,7 +153,7 @@ internal class DeviceLinkNativeService(
         result.error("device_link_invalid_request", GENERIC_FAILURE, null)
     }
 
-    private fun readState(): Map<String, Any?> {
+    private fun readState(epoch: Long): Map<String, Any?> {
         val state = store.loadOrCreate()
         if (pairingInProgress.get()) {
             return snapshot(
@@ -154,23 +170,22 @@ internal class DeviceLinkNativeService(
             status = "未接続。native画面からDesktopの招待を登録してください。",
         )
         val credential = DeviceCredential.stored(raw, state.deviceId)
-        if (!foreground || disposed) return snapshot(true, false, true, "バックグラウンド中は接続を停止しています。資格はnative保管にあります。")
+        if (!canSend(epoch)) return snapshot(true, false, true, "バックグラウンド中は接続を停止しています。資格はnative保管にあります。")
         if (credential.isExpired()) return snapshot(true, false, true, "端末資格の期限が切れています。Desktopで旧結合を失効し、新しい招待を発行してください。")
-        val epoch = generation.get()
         val response = runCatching {
             transport.exchange(credential, "端末確認", emptyMap(), { canSend(epoch) })
         }.getOrNull()
-        val connected = response?.get("status") == "accepted"
+        val connected = response?.get("status") == "accepted" && canSend(epoch)
         return snapshot(
             paired = true,
-            connected = connected && foreground && !disposed,
+            connected = connected,
             storageReady = true,
             status = if (connected) "Desktop端末資格を確認しました。" else "Desktop接続を確認できません。資格は削除せず、通信を停止しています。",
         )
     }
 
-    private fun readLocalRecoveryAudit(): List<Map<String, Any?>> {
-        require(foreground && !disposed && !pairingInProgress.get())
+    private fun readLocalRecoveryAudit(epoch: Long): List<Map<String, Any?>> {
+        require(canSend(epoch) && !pairingInProgress.get())
         return store.readLocalRecoveryAudit()
     }
 
@@ -189,11 +204,10 @@ internal class DeviceLinkNativeService(
         )
     }
 
-    private fun brokerRequest(operation: String, payload: Map<String, Any?>): Map<String, Any?> {
+    private fun brokerRequest(operation: String, payload: Map<String, Any?>, epoch: Long): Map<String, Any?> {
         DeviceLinkPayloadPolicy.validate(operation, payload)
         check(!pairingInProgress.get())
-        if (!foreground || disposed) throw IllegalStateException(GENERIC_FAILURE)
-        val epoch = generation.get()
+        check(canSend(epoch))
         val state = store.loadOrCreate()
         val raw = state.credential ?: throw IllegalStateException(GENERIC_FAILURE)
         val credential = DeviceCredential.stored(raw, state.deviceId)
@@ -201,24 +215,23 @@ internal class DeviceLinkNativeService(
         return transport.exchange(credential, operation, payload, { canSend(epoch) })
     }
 
-    private fun disconnect(): Map<String, Any?> {
+    private fun disconnect(epoch: Long): Map<String, Any?> {
         check(!pairingInProgress.get())
-        if (!foreground || disposed) throw IllegalStateException(GENERIC_FAILURE)
-        val epoch = generation.get()
+        check(canSend(epoch))
         val state = store.loadOrCreate()
         val raw = state.credential ?: return localSnapshot()
         val credential = DeviceCredential.stored(raw, state.deviceId)
         require(!credential.isExpired())
         val response = transport.exchange(credential, "端末離脱", emptyMap(), { canSend(epoch) })
-        require(response["status"] == "accepted" && response["body"] == mapOf("状態" to "失効"))
+        require(canSend(epoch) && response["status"] == "accepted" && response["body"] == mapOf("状態" to "失効"))
         val deleted = store.deleteCredential()
         require(deleted.credential == null)
         return snapshot(false, false, true, "Desktop側の結合解除と端末内資格の削除を確認しました。送信済み処理の停止は保証しません。")
     }
 
-    private fun localDelete(): Map<String, Any?> {
+    private fun localDelete(epoch: Long): Map<String, Any?> {
         check(!pairingInProgress.get())
-        require(foreground && !disposed)
+        require(canSend(epoch))
         val deleted = store.deleteCredentialWithLocalRecoveryAudit()
         require(deleted.credential == null)
         require(deleted.localRecoveryAudit.isNotEmpty())
@@ -226,18 +239,22 @@ internal class DeviceLinkNativeService(
     }
 
     private fun beginPairing(result: MethodChannel.Result): Boolean {
-        if (!pairingInProgress.compareAndSet(false, true)) {
+        val epoch = generation.get()
+        if (!canSend(epoch) || !pairingInProgress.compareAndSet(false, true)) {
             fail(result)
             return true
         }
         val returned = AtomicBoolean(false)
         try {
             worker.execute {
-                val state = runCatching { store.loadOrCreate() }.getOrNull()
+                val state = runCatching {
+                    check(canSend(epoch))
+                    store.loadOrCreate()
+                }.getOrNull()
                 main.post {
-                    if (disposed || !foreground) {
+                    if (!canSend(epoch)) {
                         pairingInProgress.set(false)
-                        returnSnapshot(result, returned, localSnapshotSafely())
+                        returnStalePairing(result, returned)
                     } else if (state == null) {
                         pairingInProgress.set(false)
                         returnSnapshot(result, returned, storageFailureSnapshot())
@@ -245,7 +262,7 @@ internal class DeviceLinkNativeService(
                         pairingInProgress.set(false)
                         returnSnapshot(result, returned, localSnapshotSafely())
                     } else {
-                        runCatching { showPairDialog(state, result, returned) }
+                        runCatching { showPairDialog(state, result, returned, epoch) }
                             .onFailure {
                                 pairingInProgress.set(false)
                                 val dismiss = dismissActivePairing
@@ -267,6 +284,7 @@ internal class DeviceLinkNativeService(
         state: NativeDeviceState,
         result: MethodChannel.Result,
         returned: AtomicBoolean,
+        epoch: Long,
     ) {
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -314,14 +332,20 @@ internal class DeviceLinkNativeService(
             invitation = null
             dialog.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             if (dismissActivePairing === dismissAction) dismissActivePairing = null
-            if (!pairRequestActive) pairingInProgress.set(false)
             if (!pairingCompleted && !pairRequestActive) {
-                returnSnapshot(result, returned, localSnapshotSafely())
+                pairingInProgress.set(false)
+                if (canSend(epoch)) returnSnapshot(result, returned, localSnapshotSafely())
+                else returnStalePairing(result, returned)
             }
         }
         dialog.setOnShowListener {
             dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
             dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener { button ->
+                if (!canSend(epoch)) {
+                    dismissAction()
+                    returnStalePairing(result, returned)
+                    return@setOnClickListener
+                }
                 if (invitation == null) {
                     val parsed = runCatching {
                         DeviceCredential.invitation(input.text.toString(), state.deviceId)
@@ -343,37 +367,32 @@ internal class DeviceLinkNativeService(
                         dialog.getButton(DialogInterface.BUTTON_POSITIVE).text = "一致を確認して結合"
                     }
                 } else {
-                    if (!foreground || disposed) {
-                        invitation = null
+                    button.isEnabled = false
+                    feedback.text = "Desktopへ一度だけ安全接続しています。再送しないでください。"
+                    val candidate = invitation
+                    invitation = null
+                    pairRequestActive = true
+                    try {
+                        worker.execute {
+                            val finalState = if (candidate == null) pairingFailure()
+                            else runCatching { pair(candidate, epoch) }.getOrElse { pairingFailure() }
+                            main.post {
+                                input.text.clear()
+                                pairRequestActive = false
+                                pairingInProgress.set(false)
+                                pairingCompleted = true
+                                dialog.dismiss()
+                                if (canSend(epoch)) returnSnapshot(result, returned, finalState)
+                                else returnStalePairing(result, returned)
+                            }
+                        }
+                    } catch (_: Throwable) {
+                        pairRequestActive = false
+                        pairingInProgress.set(false)
+                        pairingCompleted = true
                         input.text.clear()
                         dialog.dismiss()
                         returnSnapshot(result, returned, localSnapshotSafely())
-                    } else {
-                        button.isEnabled = false
-                        feedback.text = "Desktopへ一度だけ安全接続しています。再送しないでください。"
-                        val candidate = invitation
-                        invitation = null
-                        pairRequestActive = true
-                        try {
-                            worker.execute {
-                                val finalState = if (candidate == null) pairingFailure()
-                                else runCatching { pair(candidate, state) }.getOrElse { pairingFailure() }
-                                main.post {
-                                    input.text.clear()
-                                    pairRequestActive = false
-                                    pairingInProgress.set(false)
-                                    pairingCompleted = true
-                                    dialog.dismiss()
-                                    returnSnapshot(result, returned, finalState)
-                                }
-                            }
-                        } catch (_: Throwable) {
-                            pairRequestActive = false
-                            pairingInProgress.set(false)
-                            input.text.clear()
-                            dialog.dismiss()
-                            returnSnapshot(result, returned, localSnapshotSafely())
-                        }
                     }
                 }
             }
@@ -383,8 +402,7 @@ internal class DeviceLinkNativeService(
         dialog.show()
     }
 
-    private fun pair(invitation: DeviceCredential, state: NativeDeviceState): Map<String, Any?> {
-        val epoch = generation.get()
+    private fun pair(invitation: DeviceCredential, epoch: Long): Map<String, Any?> {
         if (!canSend(epoch)) return localSnapshot()
         val reply = transport.exchange(invitation, "端末結合", emptyMap(), { canSend(epoch) }, allowCredentialResponse = true)
         require(reply["status"] == "accepted")
@@ -448,7 +466,10 @@ internal class DeviceLinkNativeService(
         status = status,
     ).asChannelMap()
 
-    private fun canSend(epoch: Long): Boolean = foreground && !disposed && generation.get() == epoch
+    private fun isCurrent(epoch: Long, requiresForeground: Boolean): Boolean =
+        !disposed && (!requiresForeground || foreground) && generation.get() == epoch
+
+    private fun canSend(epoch: Long): Boolean = isCurrent(epoch, requiresForeground = true)
 
     private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).roundToInt()
 
@@ -458,6 +479,10 @@ internal class DeviceLinkNativeService(
         value: Map<String, Any?>,
     ) {
         if (returned.compareAndSet(false, true)) result.success(value)
+    }
+
+    private fun returnStalePairing(result: MethodChannel.Result, returned: AtomicBoolean) {
+        if (returned.compareAndSet(false, true)) result.error("device_link_failed", GENERIC_FAILURE, null)
     }
 
     companion object {

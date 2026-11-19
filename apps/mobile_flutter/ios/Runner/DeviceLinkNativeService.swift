@@ -3,20 +3,29 @@ import Foundation
 import UIKit
 
 final class DeviceLinkNativeService {
+  private struct PairingAttempt: Equatable {
+    let epoch: UInt64
+    let id = UUID()
+  }
+
   private let store = DeviceLinkNativeStore()
   private let transport = DeviceLinkTLSClient()
-  private let worker = DispatchQueue(label: "org.gatchimuchio.gui-shell.device-link.worker", qos: .userInitiated)
+  private let worker: DispatchQueue
   private let lock = NSLock()
   private var foreground = false
   private var disposed = false
   private var generation: UInt64 = 0
-  private var pairing = false
   private var pairNetworkActive = false
+  private var pairAttempt: PairingAttempt?
   private var pairResult: FlutterResult?
   private var activeDialog: UIAlertController?
   private var invitationField: UITextField?
   private var observers = [NSObjectProtocol]()
   private let genericFailure = "端末連携を完了できません。資格や通信の詳細は返しません。"
+
+  init(worker: DispatchQueue = DispatchQueue(label: "org.gatchimuchio.gui-shell.device-link.worker", qos: .userInitiated)) {
+    self.worker = worker
+  }
 
   func install(messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(name: "gui_shell/mobile_device_link", binaryMessenger: messenger)
@@ -51,7 +60,7 @@ final class DeviceLinkNativeService {
     observers.removeAll()
   }
 
-  private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) -> Bool {
+  func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) -> Bool {
     lock.lock()
     let isDisposed = disposed
     lock.unlock()
@@ -62,11 +71,11 @@ final class DeviceLinkNativeService {
     switch call.method {
     case "read_state":
       guard arguments(call, exactKeys: ["version"]) != nil else { fail(result); return true }
-      perform(result) { try self.readState() }
+      perform(result, requiresForeground: false) { try self.readState(epoch: $0) }
       return true
     case "read_recovery_audit":
       guard arguments(call, exactKeys: ["version"]) != nil else { fail(result); return true }
-      perform(result) { try self.readLocalRecoveryAudit() }
+      perform(result) { try self.readLocalRecoveryAudit(epoch: $0) }
       return true
     case "pair":
       guard arguments(call, exactKeys: ["version"]) != nil else { fail(result); return true }
@@ -76,15 +85,15 @@ final class DeviceLinkNativeService {
       guard let args = arguments(call, exactKeys: ["version", "broker_operation", "payload"]),
             let operation = args["broker_operation"] as? String,
             let payload = args["payload"] as? [String: Any] else { fail(result); return true }
-      perform(result) { try self.brokerRequest(operation, payload: payload) }
+      perform(result) { try self.brokerRequest(operation, payload: payload, epoch: $0) }
       return true
     case "disconnect":
       guard arguments(call, exactKeys: ["version"]) != nil else { fail(result); return true }
-      perform(result) { try self.disconnect() }
+      perform(result) { try self.disconnect(epoch: $0) }
       return true
     case "local_delete":
       guard arguments(call, exactKeys: ["version"]) != nil else { fail(result); return true }
-      perform(result) { try self.localDelete() }
+      perform(result) { try self.localDelete(epoch: $0) }
       return true
     default:
       return false
@@ -98,15 +107,30 @@ final class DeviceLinkNativeService {
     return values
   }
 
-  private func perform(_ result: @escaping FlutterResult, action: @escaping () throws -> Any) {
+  private func perform(_ result: @escaping FlutterResult, requiresForeground: Bool = true,
+                       action: @escaping (UInt64) throws -> Any) {
+    let epoch = currentState().generation
+    guard isCurrent(epoch, requiresForeground: requiresForeground) else {
+      fail(result, code: "device_link_failed")
+      return
+    }
     worker.async { [weak self] in
       guard let self else { return }
-      let outcome = Result { try action() }
+      let outcome = Result {
+        guard self.isCurrent(epoch, requiresForeground: requiresForeground) else {
+          throw DeviceLinkTransportError.failed
+        }
+        return try action(epoch)
+      }
       DispatchQueue.main.async {
         self.lock.lock()
         let isDisposed = self.disposed
         self.lock.unlock()
         if isDisposed { self.fail(result, code: "device_link_unavailable"); return }
+        guard self.isCurrent(epoch, requiresForeground: requiresForeground) else {
+          self.fail(result, code: "device_link_failed")
+          return
+        }
         switch outcome {
         case .success(let value): result(value)
         case .failure: self.fail(result, code: "device_link_failed")
@@ -119,7 +143,7 @@ final class DeviceLinkNativeService {
     result(FlutterError(code: code, message: genericFailure, details: nil))
   }
 
-  private func setForeground(_ value: Bool) {
+  func setForeground(_ value: Bool) {
     lock.lock()
     guard !disposed, foreground != value else { lock.unlock(); return }
     foreground = value
@@ -127,23 +151,27 @@ final class DeviceLinkNativeService {
     lock.unlock()
     if !value {
       transport.cancelAll()
-      DispatchQueue.main.async { [weak self] in self?.dismissForBackground() }
+      dismissForBackground()
     }
   }
 
   private func currentState() -> (foreground: Bool, disposed: Bool, generation: UInt64, pairing: Bool) {
     lock.lock()
     defer { lock.unlock() }
-    return (foreground, disposed, generation, pairing)
+    return (foreground, disposed, generation, pairAttempt != nil)
   }
 
   private func canSend(_ epoch: UInt64) -> Bool {
-    lock.lock()
-    defer { lock.unlock() }
-    return foreground && !disposed && generation == epoch
+    isCurrent(epoch, requiresForeground: true)
   }
 
-  private func readState() throws -> [String: Any] {
+  private func isCurrent(_ epoch: UInt64, requiresForeground: Bool) -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return !disposed && generation == epoch && (!requiresForeground || foreground)
+  }
+
+  private func readState(epoch: UInt64) throws -> [String: Any] {
     let state = try store.loadOrCreate()
     let current = currentState()
     if current.pairing {
@@ -155,7 +183,7 @@ final class DeviceLinkNativeService {
                       status: "未接続。native画面からDesktopの招待を登録してください。")
     }
     let credential = try DeviceLinkCredential.stored(raw, expectedDeviceID: state.deviceID)
-    guard current.foreground, !current.disposed else {
+    guard canSend(epoch) else {
       return snapshot(paired: true, connected: false, storageReady: true,
                       status: "バックグラウンド中は接続を停止しています。資格はnative保管にあります。")
     }
@@ -164,40 +192,39 @@ final class DeviceLinkNativeService {
                       status: "端末資格の期限が切れています。Desktopで旧結合を失効し、新しい招待を発行してください。")
     }
     let reply = try transport.exchange(credential, operation: "端末確認", payload: [:],
-                                       canSend: { self.canSend(current.generation) })
-    let connected = reply["status"] as? String == "accepted" && canSend(current.generation)
+                                       canSend: { self.canSend(epoch) })
+    let connected = reply["status"] as? String == "accepted" && canSend(epoch)
     return snapshot(paired: true, connected: connected, storageReady: true,
                     status: connected ? "Desktop端末資格を確認しました。" : "Desktop接続を確認できません。資格は削除せず、通信を停止しています。")
   }
 
-  private func readLocalRecoveryAudit() throws -> [[String: Any]] {
-    let current = currentState()
-    guard current.foreground, !current.disposed, !current.pairing else { throw DeviceLinkTransportError.failed }
+  private func readLocalRecoveryAudit(epoch: UInt64) throws -> [[String: Any]] {
+    guard canSend(epoch), !currentState().pairing else { throw DeviceLinkTransportError.failed }
     return try store.readLocalRecoveryAudit()
   }
 
-  private func brokerRequest(_ operation: String, payload: [String: Any]) throws -> [String: Any] {
+  private func brokerRequest(_ operation: String, payload: [String: Any], epoch: UInt64) throws -> [String: Any] {
     try DeviceLinkPayloadPolicy.validate(operation, payload: payload)
     let current = currentState()
-    guard !current.pairing, current.foreground, !current.disposed else { throw DeviceLinkTransportError.failed }
+    guard !current.pairing, canSend(epoch) else { throw DeviceLinkTransportError.failed }
     let state = try store.loadOrCreate()
     guard let raw = state.credential else { throw DeviceLinkTransportError.failed }
     let credential = try DeviceLinkCredential.stored(raw, expectedDeviceID: state.deviceID)
     guard !credential.isExpired() else { throw DeviceLinkTransportError.failed }
     return try transport.exchange(credential, operation: operation, payload: payload,
-                                  canSend: { self.canSend(current.generation) })
+                                  canSend: { self.canSend(epoch) })
   }
 
-  private func disconnect() throws -> [String: Any] {
+  private func disconnect(epoch: UInt64) throws -> [String: Any] {
     let current = currentState()
-    guard !current.pairing, current.foreground, !current.disposed else { throw DeviceLinkTransportError.failed }
+    guard !current.pairing, canSend(epoch) else { throw DeviceLinkTransportError.failed }
     let state = try store.loadOrCreate()
     guard let raw = state.credential else { return try localSnapshot() }
     let credential = try DeviceLinkCredential.stored(raw, expectedDeviceID: state.deviceID)
     guard !credential.isExpired() else { throw DeviceLinkTransportError.failed }
     let reply = try transport.exchange(credential, operation: "端末離脱", payload: [:],
-                                       canSend: { self.canSend(current.generation) })
-    guard reply["status"] as? String == "accepted",
+                                       canSend: { self.canSend(epoch) })
+    guard canSend(epoch), reply["status"] as? String == "accepted",
           NSDictionary(dictionary: reply["body"] as? [String: Any] ?? [:]).isEqual(to: ["状態": "失効"]) else {
       throw DeviceLinkTransportError.failed
     }
@@ -207,9 +234,8 @@ final class DeviceLinkNativeService {
                     status: "Desktop側の結合解除と端末内資格の削除を確認しました。送信済み処理の停止は保証しません。")
   }
 
-  private func localDelete() throws -> [String: Any] {
-    let current = currentState()
-    guard !current.pairing, current.foreground, !current.disposed else { throw DeviceLinkTransportError.failed }
+  private func localDelete(epoch: UInt64) throws -> [String: Any] {
+    guard canSend(epoch), !currentState().pairing else { throw DeviceLinkTransportError.failed }
     let deleted = try store.deleteCredentialWithLocalRecoveryAudit()
     guard deleted.credential == nil else { throw DeviceLinkTransportError.failed }
     guard !deleted.localRecoveryAudit.isEmpty else { throw DeviceLinkTransportError.failed }
@@ -219,32 +245,32 @@ final class DeviceLinkNativeService {
 
   private func beginPairing(_ result: @escaping FlutterResult) {
     lock.lock()
-    guard !pairing, foreground, !disposed else { lock.unlock(); fail(result); return }
-    pairing = true
+    guard pairAttempt == nil, foreground, !disposed else { lock.unlock(); fail(result); return }
+    let attempt = PairingAttempt(epoch: generation)
+    pairAttempt = attempt
     pairResult = result
     lock.unlock()
     worker.async { [weak self] in
       guard let self else { return }
-      let state = try? self.store.loadOrCreate()
+      let state = self.canSend(attempt.epoch) ? (try? self.store.loadOrCreate()) : nil
       DispatchQueue.main.async {
-        guard let state else { self.finishPairing(self.storageFailureSnapshot()); return }
-        let current = self.currentState()
-        guard current.foreground, !current.disposed else {
-          self.finishPairing(self.localSnapshotSafely())
+        guard self.canSend(attempt.epoch), self.isCurrentPair(attempt) else {
+          self.finishPairing(nil, attempt: attempt)
           return
         }
+        guard let state else { self.finishPairing(self.storageFailureSnapshot(), attempt: attempt); return }
         guard state.credential == nil else {
-          self.finishPairing(self.localSnapshotSafely())
+          self.finishPairing(self.localSnapshotSafely(), attempt: attempt)
           return
         }
-        self.presentInvitationEntry(state, message: nil)
+        self.presentInvitationEntry(state, message: nil, attempt: attempt)
       }
     }
   }
 
-  private func presentInvitationEntry(_ state: DeviceLinkNativeState, message: String?) {
-    guard currentState().foreground, let presenter = topPresenter() else {
-      cancelPairing()
+  private func presentInvitationEntry(_ state: DeviceLinkNativeState, message: String?, attempt: PairingAttempt) {
+    guard canSend(attempt.epoch), isCurrentPair(attempt), let presenter = topPresenter() else {
+      cancelPairing(attempt: attempt)
       return
     }
     let alert = UIAlertController(title: "端末を結合",
@@ -264,44 +290,55 @@ final class DeviceLinkNativeService {
     invitationField = field
     alert.addAction(UIAlertAction(title: "キャンセル", style: .cancel) { [weak self, weak field] _ in
       field?.text = nil
-      self?.cancelPairing()
+      self?.cancelPairing(attempt: attempt)
     })
     alert.addAction(UIAlertAction(title: "招待を確認", style: .default) { [weak self, weak field] _ in
       guard let self else { return }
       var raw = field?.text ?? ""
       field?.text = nil
       defer { raw.removeAll(keepingCapacity: false) }
-      guard let invitation = try? DeviceLinkCredential.invitation(raw, expectedDeviceID: state.deviceID) else {
-        DispatchQueue.main.async { self.presentInvitationEntry(state, message: "招待の形式・期限・端末IDを確認してください。") }
+      guard self.canSend(attempt.epoch), self.isCurrentPair(attempt) else {
+        self.cancelPairing(attempt: attempt)
         return
       }
-      DispatchQueue.main.async { self.presentHostConfirmation(invitation, state: state) }
+      guard let invitation = try? DeviceLinkCredential.invitation(raw, expectedDeviceID: state.deviceID) else {
+        DispatchQueue.main.async {
+          self.presentInvitationEntry(state, message: "招待の形式・期限・端末IDを確認してください。", attempt: attempt)
+        }
+        return
+      }
+      DispatchQueue.main.async { self.presentHostConfirmation(invitation, state: state, attempt: attempt) }
     })
     activeDialog = alert
     presenter.present(alert, animated: true)
   }
 
-  private func presentHostConfirmation(_ invitation: DeviceLinkCredential, state: DeviceLinkNativeState) {
-    guard currentState().foreground, let presenter = topPresenter() else {
-      cancelPairing()
+  private func presentHostConfirmation(_ invitation: DeviceLinkCredential, state: DeviceLinkNativeState, attempt: PairingAttempt) {
+    guard canSend(attempt.epoch), isCurrentPair(attempt), let presenter = topPresenter() else {
+      cancelPairing(attempt: attempt)
       return
     }
     let details = "接続先: \(invitation.host):\(invitation.port)\nHostID: \(invitation.hostID)\n証明書hash: \(invitation.certificateHash)\n\nDesktop ownerの画面と一致することを確認してください。"
     let alert = UIAlertController(title: "接続先を照合", message: details, preferredStyle: .alert)
-    alert.addAction(UIAlertAction(title: "キャンセル", style: .cancel) { [weak self] _ in self?.cancelPairing() })
+    alert.addAction(UIAlertAction(title: "キャンセル", style: .cancel) { [weak self] _ in
+      self?.cancelPairing(attempt: attempt)
+    })
     alert.addAction(UIAlertAction(title: "一致を確認して結合", style: .default) { [weak self] _ in
-      self?.startPairing(invitation, state: state)
+      self?.startPairing(invitation, state: state, attempt: attempt)
     })
     activeDialog = alert
     invitationField = nil
     presenter.present(alert, animated: true)
   }
 
-  private func startPairing(_ invitation: DeviceLinkCredential, state: DeviceLinkNativeState) {
+  private func startPairing(_ invitation: DeviceLinkCredential, state: DeviceLinkNativeState, attempt: PairingAttempt) {
     lock.lock()
-    guard pairing, foreground, !disposed else { lock.unlock(); cancelPairing(); return }
+    guard pairAttempt == attempt, generation == attempt.epoch, foreground, !disposed else {
+      lock.unlock()
+      cancelPairing(attempt: attempt)
+      return
+    }
     pairNetworkActive = true
-    let epoch = generation
     lock.unlock()
     activeDialog?.dismiss(animated: false)
     activeDialog = nil
@@ -309,8 +346,8 @@ final class DeviceLinkNativeService {
     invitationField = nil
     worker.async { [weak self] in
       guard let self else { return }
-      let value = self.pair(invitation, state: state, epoch: epoch)
-      DispatchQueue.main.async { self.finishPairing(value) }
+      let value = self.pair(invitation, state: state, epoch: attempt.epoch)
+      DispatchQueue.main.async { self.finishPairing(value, attempt: attempt) }
     }
   }
 
@@ -389,22 +426,33 @@ final class DeviceLinkNativeService {
                               status: status).channelValue
   }
 
-  private func finishPairing(_ value: [String: Any]) {
+  private func finishPairing(_ value: [String: Any]?, attempt: PairingAttempt) {
     lock.lock()
+    guard pairAttempt == attempt else { lock.unlock(); return }
     let completion = pairResult
     pairResult = nil
-    pairing = false
+    pairAttempt = nil
     pairNetworkActive = false
     lock.unlock()
     invitationField?.text = nil
     invitationField = nil
     activeDialog?.dismiss(animated: false)
     activeDialog = nil
-    completion?(value)
+    if let completion {
+      if let value, canSend(attempt.epoch) { completion(value) }
+      else { fail(completion, code: "device_link_failed") }
+    }
   }
 
-  private func cancelPairing() {
+  private func isCurrentPair(_ attempt: PairingAttempt) -> Bool {
     lock.lock()
+    defer { lock.unlock() }
+    return pairAttempt == attempt
+  }
+
+  private func cancelPairing(attempt: PairingAttempt) {
+    lock.lock()
+    guard pairAttempt == attempt else { lock.unlock(); return }
     let activeNetwork = pairNetworkActive
     lock.unlock()
     if activeNetwork {
@@ -414,28 +462,19 @@ final class DeviceLinkNativeService {
     worker.async { [weak self] in
       guard let self else { return }
       let value = self.localSnapshotSafely()
-      DispatchQueue.main.async { self.finishPairing(value) }
+      DispatchQueue.main.async { self.finishPairing(value, attempt: attempt) }
     }
   }
 
   private func dismissForBackground() {
-    let current = currentState()
     activeDialog?.dismiss(animated: false)
     activeDialog = nil
     invitationField?.text = nil
     invitationField = nil
-    guard current.pairing, !currentPairNetworkActive() else { return }
-    worker.async { [weak self] in
-      guard let self else { return }
-      let value = self.localSnapshotSafely()
-      DispatchQueue.main.async { self.finishPairing(value) }
-    }
-  }
-
-  private func currentPairNetworkActive() -> Bool {
     lock.lock()
-    defer { lock.unlock() }
-    return pairNetworkActive
+    let attempt = pairNetworkActive ? nil : pairAttempt
+    lock.unlock()
+    if let attempt { finishPairing(nil, attempt: attempt) }
   }
 
   private func topPresenter() -> UIViewController? {

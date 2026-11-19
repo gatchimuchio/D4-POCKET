@@ -27,7 +27,7 @@ internal class DeviceLinkTlsClient {
         canSend: () -> Boolean,
         allowCredentialResponse: Boolean = false,
     ): Map<String, Any?> {
-        require(!credential.isExpired())
+        require(canSend() && !credential.isExpired())
         val nonce = randomId()
         val request = linkedMapOf<String, Any?>(
             "版" to 1L,
@@ -47,6 +47,7 @@ internal class DeviceLinkTlsClient {
         val socket = context.socketFactory.createSocket() as SSLSocket
         activeSockets.add(socket)
         try {
+            require(canSend())
             socket.useClientMode = true
             socket.enabledProtocols = socket.supportedProtocols.filter { it == "TLSv1.3" || it == "TLSv1.2" }.toTypedArray()
             require(socket.enabledProtocols.isNotEmpty())
@@ -65,6 +66,7 @@ internal class DeviceLinkTlsClient {
             val raw = readSingleResponse(socket, deadline)
             val response = StrictJson.parseObject(raw, RESPONSE_LIMIT)
             validateResponse(response, nonce, operation, credential, allowCredentialResponse)
+            require(canSend() && !credential.isExpired())
             return sanitizeResponse(response)
         } finally {
             activeSockets.remove(socket)

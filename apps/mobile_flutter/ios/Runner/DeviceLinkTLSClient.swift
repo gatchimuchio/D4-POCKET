@@ -111,6 +111,7 @@ final class DeviceLinkTLSClient {
         ready.resolve(.failure(DeviceLinkTransportError.failed))
       }
     }
+    guard canSend(), !credential.isExpired() else { throw DeviceLinkTransportError.failed }
     connection.start(queue: queue)
     try ready.wait(until: deadline)
     guard canSend(), !credential.isExpired() else { throw DeviceLinkTransportError.failed }
@@ -127,6 +128,7 @@ final class DeviceLinkTLSClient {
     let response = try DeviceLinkStrictJSON.parseObject(frame, maximumBytes: 4 * 1024 * 1024)
     try validateResponse(response, nonce: nonce, operation: operation, credential: credential,
                          allowCredentialResponse: allowCredentialResponse)
+    guard canSend(), !credential.isExpired() else { throw DeviceLinkTransportError.failed }
     return try sanitize(response)
   }
 

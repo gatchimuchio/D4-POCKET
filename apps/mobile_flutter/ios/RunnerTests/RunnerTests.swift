@@ -11,6 +11,44 @@ class RunnerTests: XCTestCase {
     XCTAssertNotNil(UIApplication.shared.delegate as? AppDelegate)
   }
 
+  @MainActor
+  func testQueuedDeviceLinkRequestsAndRepliesCannotCrossNativeResume() {
+    let worker = DispatchQueue(label: "device-link-lifecycle-test")
+    let service = DeviceLinkNativeService(worker: worker)
+    defer { service.close() }
+    let method = FlutterMethodCall(methodName: "read_recovery_audit", arguments: ["version": 1])
+
+    let queued = expectation(description: "obsolete queued request")
+    worker.suspend()
+    service.setForeground(true)
+    XCTAssertTrue(service.handle(method) { value in
+      XCTAssertEqual((value as? FlutterError)?.code, "device_link_failed")
+      queued.fulfill()
+    })
+    service.setForeground(false)
+    service.setForeground(true)
+    worker.resume()
+    wait(for: [queued], timeout: 5)
+
+    let awaitingDelivery = expectation(description: "obsolete undelivered reply")
+    let replyQueued = DispatchSemaphore(value: 0)
+    XCTAssertTrue(service.handle(method) { value in
+      XCTAssertEqual((value as? FlutterError)?.code, "device_link_failed")
+      awaitingDelivery.fulfill()
+    })
+    worker.async { replyQueued.signal() }
+    XCTAssertEqual(replyQueued.wait(timeout: .now() + 3), .success)
+    service.setForeground(false)
+    service.setForeground(true)
+
+    let current = expectation(description: "current foreground request")
+    XCTAssertTrue(service.handle(method) { value in
+      XCTAssertTrue(value is [[String: Any]])
+      current.fulfill()
+    })
+    wait(for: [awaitingDelivery, current], timeout: 5)
+  }
+
   func testStrictJSONRejectsDuplicateAndEscapedDuplicateKeys() {
     XCTAssertThrowsError(try DeviceLinkStrictJSON.parseObject("{\"key\":1,\"key\":2}", maximumBytes: 128))
     XCTAssertThrowsError(try DeviceLinkStrictJSON.parseObject("{\"key\":1,\"\\u006bey\":2}", maximumBytes: 128))

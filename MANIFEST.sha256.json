@@ -1013,7 +1013,7 @@
     },
     {
       "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeService.kt",
-      "sha256": "3de7c2733c1dfcf9b4e6012fc573367962fb9de36c43f20ea054c77093157550"
+      "sha256": "05aee6fdc62a7f21afba674beadb674ff68580048fceec5ccfc789559c9a333f"
     },
     {
       "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeStore.kt",
@@ -1021,7 +1021,7 @@
     },
     {
       "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkTlsClient.kt",
-      "sha256": "34b3b8030c6c37c5ff833301e6529f823bee8a122147de1978634e1049fc9f2f"
+      "sha256": "5ea3062e498f809c366ad95f90199784f0d5a96d6b1264499379de16f6097fa5"
     },
     {
       "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/MainActivity.kt",
@@ -1249,7 +1249,7 @@
     },
     {
       "path": "apps/mobile_flutter/ios/Runner/DeviceLinkNativeService.swift",
-      "sha256": "2775a6e9fa40e3d1d6bc48ad4384b8889699199e3a024e381145105bb9a8d0e9"
+      "sha256": "8ea2ff4ac05582a61cfe9bad009e456262ba222765f72d2ef93a5a93b25cf1e6"
     },
     {
       "path": "apps/mobile_flutter/ios/Runner/DeviceLinkNativeStore.swift",
@@ -1265,7 +1265,7 @@
     },
     {
       "path": "apps/mobile_flutter/ios/Runner/DeviceLinkTLSClient.swift",
-      "sha256": "30eb94ca965dbf5eeb4e92b7059234d795e9ada7a13795bfa452c46300fcb7ab"
+      "sha256": "2350287ed48a7c77bed3657d97da0f953af790ccace152481e073ecb4ea9bfe4"
     },
     {
       "path": "apps/mobile_flutter/ios/Runner/Info.plist",
@@ -1285,7 +1285,7 @@
     },
     {
       "path": "apps/mobile_flutter/ios/RunnerTests/RunnerTests.swift",
-      "sha256": "c493e4e407fb61fb0594079f84a38ace1db29b7bec6782bb6144f53a44141dbb"
+      "sha256": "f16286f40183be1fc9794433b5d3a184b7dd43575c9fbdbbf0537839df30a228"
     },
     {
       "path": "apps/mobile_flutter/ios/RunnerUITests/DeviceLinkProductUITests.swift",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "83032742064ace66bc8c4125a1cd85c63bef7b12c6d4362672513240b62a1381"
+      "sha256": "0e06bcb9a58e740c8833b2d2879c51e556302bde3a4f3657bff75c9008ba7574"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1825,7 +1825,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "26497dbc2bf706a342dd94785012e8b685f0a5ce8684822881f6cef367ec223b"
+      "sha256": "014d15812596a44d0d1da054810eeb8713de7818c26073026611eb25bd68011b"
     },
     {
       "path": "docs/specs/evaluation-lab.md",
