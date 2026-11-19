@@ -17,6 +17,12 @@ Agent Task履歴は、Brokerが確定したAuditからTaskごとの最後の状�
 
 履歴情報はPermission／Approval／Credential／Trustを発行、再利用、復元しない。再実行、Workspace変更、結果表示は、それぞれ現在の独立したBroker統治経路を必要とする。
 
+## 同じ指示での再実行と分岐
+
+終端Taskからの再実行は、利用者が元と同じ指示を入力して要求する。既存の `対話再実行` に `source_task_id` を渡し、Brokerは現在の履歴閲覧承認、元Task／Runtime、最新の終端Audit IDとevent hash、入力のUTF-8 SHA-256を照合する。指示hashの不一致は新Sessionを作る前に拒否する。`対話分岐` は同じ履歴照合を経て新しい指示を受け取る。
+
+どちらも現在登録済みのRuntimeと元Workspaceに新Sessionを作り、参照元と指示hashをAuditへ残す。Task開始には新規の事前検査、Workspace Permission、別個の一回限りのOwner Approvalが必要である。元Taskの本文・結果・外部Tool入力・Session状態は復元しない。開始結果が不明な場合は再送せず、履歴・Audit・Recoveryを確認する。
+
 ## 旧Auditとの互換境界
 
 構造化Task metadataの導入前に作られたAgent Task AuditにはRuntime／Session／Workspaceを安全にRuntime別へ結び付ける公開情報がない。その記録は書換え・推測補完せず、新しいTask履歴一覧へ混ぜない。既存Audit chainとRecovery用途は保持する。

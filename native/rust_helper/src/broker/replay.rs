@@ -21,12 +21,13 @@ struct Selection {
     source_task_id: Option<String>,
 }
 
-fn agent_task_branch_source(
+fn agent_task_history_source(
     log: &BrokerAuditLog,
     runtime_id: &str,
     task_id: &str,
     audit_id: &str,
     event_hash: &str,
+    replay_instruction_hash: Option<&str>,
 ) -> Result<serde_json::Value, &'static str> {
     if task_id.len() != 32
         || !task_id
@@ -56,6 +57,11 @@ fn agent_task_branch_source(
     {
         return Err("Agent Task履歴の対象・Runtimeまたは終端状態が不一致");
     }
+    if let Some(expected) = replay_instruction_hash {
+        if record["instruction_hash"].as_str() != Some(expected) {
+            return Err("再実行の指示が元Taskの指示hashと一致しません");
+        }
+    }
     Ok(selected.clone())
 }
 
@@ -84,17 +90,7 @@ impl Broker {
             }
         };
         if let Some(source_task_id) = p.source_task_id.as_deref() {
-            if op != "対話分岐" {
-                return self.reject_with_payload_hash(
-                    id,
-                    op,
-                    "要求不正",
-                    "Agent Task履歴からの分岐は対話分岐操作に限ります",
-                    true,
-                    hash,
-                );
-            }
-            return self.AgentTask履歴分岐(id, op, &p, source_task_id, hash);
+            return self.AgentTask履歴再要求(id, op, &p, source_task_id, hash);
         }
         if p.input.trim().is_empty() || p.input.chars().count() > 4096 {
             return self.reject_with_payload_hash(id, op, "要求不正", "入力範囲が不正", true, hash);
@@ -267,7 +263,7 @@ impl Broker {
         }
     }
 
-    fn AgentTask履歴分岐(
+    fn AgentTask履歴再要求(
         &mut self,
         id: &str,
         op: &str,
@@ -322,12 +318,15 @@ impl Broker {
                 request_hash,
             );
         }
-        let source = match agent_task_branch_source(
+        let instruction_hash = sha256_tagged(selection.input.as_bytes());
+        let replay = op == "対話再実行";
+        let source = match agent_task_history_source(
             &self.audit_log,
             &selection.runtime,
             source_task_id,
             &selection.audit,
             &selection.event_hash,
+            replay.then_some(instruction_hash.as_str()),
         ) {
             Ok(entry) => entry,
             Err(reason) => {
@@ -454,7 +453,6 @@ impl Broker {
                 request_hash,
             );
         }
-        let instruction_hash = sha256_tagged(selection.input.as_bytes());
         let audit_record = json!({
             "source_task_id": source_task_id,
             "source_audit_event_id": selection.audit,
@@ -464,7 +462,8 @@ impl Broker {
             "new_session_id": session_id,
             "new_instruction_hash": instruction_hash
         });
-        let reason = format!("AgentTask履歴分岐:{audit_record}");
+        let action = if replay { "再実行" } else { "分岐" };
+        let reason = format!("AgentTask履歴{action}:{audit_record}");
         let event = match self.append_audit(
             id,
             op,
@@ -480,7 +479,7 @@ impl Broker {
                     id,
                     op,
                     "監査失敗",
-                    "新Task分岐Sessionを隔離したため監査修復後に再確認",
+                    "新Task Sessionを隔離したため監査修復後に再確認",
                 );
             }
         };
@@ -490,7 +489,7 @@ impl Broker {
                 id,
                 op,
                 "期限超過",
-                "Task分岐Sessionを隔離したため履歴承認の再確認が必要",
+                "新Task Sessionを隔離したため履歴承認の再確認が必要",
                 true,
                 request_hash,
             );
@@ -504,7 +503,7 @@ impl Broker {
             "実行系ID": selection.runtime,
             "参照監査ID": selection.audit,
             "参照event_hash": selection.event_hash,
-            "種別": "AgentTask分岐",
+            "種別": format!("AgentTask{action}"),
             "source_task_id": source_task_id,
             "作業領域ID": workspace_id
         });
@@ -585,37 +584,67 @@ mod agent_task_branch_tests {
     #[test]
     fn Task分岐元は現在の終端AuditとTask結合を必要とする() {
         let (log, audit_id, event_hash) = completed_task_log();
-        let selected =
-            agent_task_branch_source(&log, "runtime-a", &"a".repeat(32), &audit_id, &event_hash)
-                .unwrap();
+        let selected = agent_task_history_source(
+            &log,
+            "runtime-a",
+            &"a".repeat(32),
+            &audit_id,
+            &event_hash,
+            None,
+        )
+        .unwrap();
         assert_eq!(selected["record"]["status"], "completed");
         assert_eq!(
-            agent_task_branch_source(
+            agent_task_history_source(
                 &log,
                 "runtime-a",
                 &"a".repeat(32),
                 &audit_id,
                 &sha256_tagged(b"stale"),
+                None,
             )
             .unwrap_err(),
             "Agent Task履歴のAudit参照が不一致"
         );
-        assert!(agent_task_branch_source(
+        assert!(agent_task_history_source(
             &log,
             "runtime-b",
             &"a".repeat(32),
             &audit_id,
             &event_hash,
+            None,
         )
         .is_err());
-        assert!(agent_task_branch_source(
+        assert!(agent_task_history_source(
             &log,
             "runtime-a",
             &"c".repeat(32),
             &audit_id,
             &event_hash,
+            None,
         )
         .is_err());
+    }
+
+    #[test]
+    fn Task再実行は現在の終端Auditの指示hashに一致する場合だけ認める() {
+        let (log, audit_id, event_hash) = completed_task_log();
+        let task_id = "a".repeat(32);
+        let verify = |instruction: &str| {
+            agent_task_history_source(
+                &log,
+                "runtime-a",
+                &task_id,
+                &audit_id,
+                &event_hash,
+                Some(&sha256_tagged(instruction.as_bytes())),
+            )
+        };
+        assert!(verify("instruction").is_ok());
+        assert_eq!(
+            verify("instruction ").unwrap_err(),
+            "再実行の指示が元Taskの指示hashと一致しません"
+        );
     }
 
     #[test]
@@ -630,23 +659,25 @@ mod agent_task_branch_tests {
             EVIDENCE_SOURCE_INTERNAL_STATE,
             &digest,
         );
-        assert!(agent_task_branch_source(
+        assert!(agent_task_history_source(
             &log,
             "runtime-a",
             &"a".repeat(32),
             &start.event_id,
             &start.event_hash,
+            None,
         )
         .is_err());
 
         let (log, _, _) = completed_task_log();
         let start = &log.events()[0];
-        assert!(agent_task_branch_source(
+        assert!(agent_task_history_source(
             &log,
             "runtime-a",
             &"a".repeat(32),
             &start.event_id,
             &start.event_hash,
+            None,
         )
         .is_err());
     }

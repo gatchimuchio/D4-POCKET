@@ -389,7 +389,10 @@ class _HistoryScreenState extends State<HistoryScreen>
     }
   }
 
-  Future<void> _branchAgentTask(AgentTaskHistoryEntry entry) async {
+  Future<void> _openAgentTaskHistoryRequest(
+    AgentTaskHistoryEntry entry, {
+    required bool replay,
+  }) async {
     final client = _client;
     final grant = _grant;
     if (_busy ||
@@ -415,6 +418,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         source: entry,
         sourceGeneration: _contentSourceGeneration,
         generationAtOpen: sourceGeneration,
+        replay: replay,
       ),
     );
     if (mounted &&
@@ -577,16 +581,33 @@ class _HistoryScreenState extends State<HistoryScreen>
                               'completed',
                               'failed',
                               'cancelled',
-                              'suspended'
-                            }.contains(entry.status))
+                              'suspended',
+                            }.contains(entry.status)) ...[
                               TextButton(
                                 key: ValueKey(
-                                    'agent-task-branch-${entry.taskId}'),
+                                  'agent-task-branch-${entry.taskId}',
+                                ),
                                 onPressed: _busy
                                     ? null
-                                    : () => _branchAgentTask(entry),
+                                    : () => _openAgentTaskHistoryRequest(
+                                          entry,
+                                          replay: false,
+                                        ),
                                 child: const Text('新しいAgent Taskへ分岐'),
                               ),
+                              TextButton(
+                                key: ValueKey(
+                                  'agent-task-replay-${entry.taskId}',
+                                ),
+                                onPressed: _busy
+                                    ? null
+                                    : () => _openAgentTaskHistoryRequest(
+                                          entry,
+                                          replay: true,
+                                        ),
+                                child: const Text('同じ指示で再実行'),
+                              ),
+                            ],
                           ],
                         );
                       })

@@ -439,50 +439,7 @@
     {
       "properties": {
         "operation": {
-          "const": "対話再実行"
-        },
-        "payload": {
-          "type": "object",
-          "required": [
-            "approval_id",
-            "実行系ID",
-            "参照監査ID",
-            "参照event_hash",
-            "入力"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "approval_id": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{32}$"
-            },
-            "実行系ID": {
-              "type": "string",
-              "maxLength": 128,
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
-            },
-            "参照監査ID": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
-            },
-            "参照event_hash": {
-              "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$"
-            },
-            "入力": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 4096
-            }
-          }
-        }
-      }
-    },
-    {
-      "properties": {
-        "operation": {
-          "const": "対話分岐"
+          "enum": ["対話再実行", "対話分岐"]
         },
         "payload": {
           "type": "object",
@@ -520,23 +477,21 @@
             "入力": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 4096
+              "maxLength": 32768
             }
           },
-          "allOf": [
-            {
-              "if": {
-                "required": ["source_task_id"]
-              },
-              "then": {
-                "properties": {
-                  "入力": {
-                    "maxLength": 32768
-                  }
-                }
+          "if": {
+            "not": {
+              "required": ["source_task_id"]
+            }
+          },
+          "then": {
+            "properties": {
+              "入力": {
+                "maxLength": 4096
               }
             }
-          ]
+          }
         }
       }
     },

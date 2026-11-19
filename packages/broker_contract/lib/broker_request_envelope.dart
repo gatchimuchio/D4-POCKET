@@ -38,6 +38,9 @@ String brokerJsonValueHash(Object? value) {
   return _sha256Tagged(utf8.encode(canonicalJson));
 }
 
+/// Returns the tagged hash of exact UTF-8 text, as used for Task instructions.
+String brokerTextHash(String text) => _sha256Tagged(utf8.encode(text));
+
 Object? _canonicalizeJsonValue(Object? value) {
   if (value is Map) {
     final sorted = SplayTreeMap<String, Object?>();

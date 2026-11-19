@@ -1,3 +1,5 @@
+import 'package:broker_contract/broker_request_envelope.dart'
+    show brokerTextHash;
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:gui_shell_ui/gui_shell_ui.dart';
@@ -13,6 +15,7 @@ class AgentTaskHistoryBranchDialog extends StatefulWidget {
     required this.source,
     required this.sourceGeneration,
     required this.generationAtOpen,
+    this.replay = false,
   });
 
   final HistoryClient client;
@@ -20,6 +23,7 @@ class AgentTaskHistoryBranchDialog extends StatefulWidget {
   final AgentTaskHistoryEntry source;
   final ValueListenable<int> sourceGeneration;
   final int generationAtOpen;
+  final bool replay;
 
   @override
   State<AgentTaskHistoryBranchDialog> createState() =>
@@ -45,7 +49,14 @@ class _AgentTaskHistoryBranchDialogState
   bool _approvalAttempted = false;
   bool _approvalGranted = false;
   bool _startAttempted = false;
-  String _status = '元Taskの本文・結果本文・権限は引き継ぎません。新しい指示を入力してください。';
+  late String _status = widget.replay
+      ? '元Taskと同じ指示を入力してください。Brokerが履歴の指示hashと照合します。'
+      : '元Taskの本文・結果本文・権限は引き継ぎません。新しい指示を入力してください。';
+
+  String get _historyAction => widget.replay ? '再実行' : '分岐';
+
+  String get _historyAuditKey =>
+      widget.replay ? 'replay_audit_event_id' : 'branch_audit_event_id';
 
   bool get _scopeCurrent =>
       mounted &&
@@ -140,19 +151,26 @@ class _AgentTaskHistoryBranchDialogState
     final text = _instruction.text;
     if (_busy || !_active || _branchAttempted) return;
     if (text.trim().isEmpty || text.runes.length > 32768) {
-      setState(() => _status = '新しいTask指示は1〜32768文字で入力してください。');
+      setState(() => _status = 'Task指示は1〜32768文字で入力してください。');
+      return;
+    }
+    if (widget.replay &&
+        brokerTextHash(text) != widget.source.instructionHash) {
+      setState(() => _status = '元Taskの指示hashと一致しません。入力を確認してください。');
       return;
     }
     _branchAttempted = true;
     await _run(
-      '現在の履歴承認を確認し、新しいSessionと分岐Auditを作成しています。',
-      '分岐結果を確認できません。再送せず、履歴・Audit・Recoveryを確認してください。',
+      '現在の履歴承認を確認し、新しいSessionと${_historyAction}Auditを作成しています。',
+      '$_historyActionの準備結果を確認できません。再送せず、履歴・Audit・Recoveryを確認してください。',
       () async {
-        final branch = await _historyClient.branchAgentTask(
-          widget.grant,
-          widget.source,
-          text,
-        );
+        final branch = await (widget.replay
+            ? _historyClient.replayAgentTask(widget.grant, widget.source, text)
+            : _historyClient.branchAgentTask(
+                widget.grant,
+                widget.source,
+                text,
+              ));
         if (!_scopeCurrent) return;
         final request = AgentTaskRequest(
           runtimeId: branch['実行系ID']! as String,
@@ -165,7 +183,7 @@ class _AgentTaskHistoryBranchDialogState
           _branch = branch;
           _request = request;
           _instruction.clear();
-          _status = '新Sessionと分岐Auditを作成しました。新Taskを事前検査します。';
+          _status = '新Sessionと${_historyAction}Auditを作成しました。新Taskを事前検査します。';
         });
       },
     );
@@ -178,7 +196,7 @@ class _AgentTaskHistoryBranchDialogState
     if (_busy || !_active || branch == null || request == null) return;
     await _run(
       'Brokerが新TaskのRuntime／Workspace／指示を事前検査しています。',
-      'Sessionと分岐Auditは作成済みです。Taskを開始せず、事前検査を再取得してください。',
+      'Sessionと${_historyAction}Auditは作成済みです。Taskを開始せず、事前検査を再取得してください。',
       () async {
         final preflight = await _tasks.inspect(request);
         if (!_scopeCurrent) return;
@@ -346,7 +364,9 @@ class _AgentTaskHistoryBranchDialogState
       'suspended',
     }.contains(widget.source.status);
     return AlertDialog(
-      title: const Text('Agent Task履歴から新Taskへ分岐'),
+      title: Text(
+        widget.replay ? 'Agent Taskを同じ指示で再実行' : 'Agent Task履歴から新Taskへ分岐',
+      ),
       scrollable: true,
       content: SizedBox(
         width: 620,
@@ -367,9 +387,11 @@ class _AgentTaskHistoryBranchDialogState
               maxLength: 32768,
               minLines: 3,
               maxLines: 7,
-              decoration: const InputDecoration(labelText: '新しいTask指示'),
+              decoration: InputDecoration(
+                labelText: widget.replay ? '元Taskと同じ指示' : '新しいTask指示',
+              ),
             ),
-            if (!terminal) const Text('実行中または不明なTaskからは分岐できません。'),
+            if (!terminal) Text('実行中または不明なTaskは$_historyActionできません。'),
             if (branch == null)
               FilledButton(
                 onPressed: !_active || _busy || _branchAttempted || !terminal
@@ -379,7 +401,7 @@ class _AgentTaskHistoryBranchDialogState
               ),
             if (branch != null) ...[
               SelectableText(
-                '分岐Audit: ${branch['branch_audit_event_id']}\n'
+                '${_historyAction}Audit: ${branch[_historyAuditKey]}\n'
                 '新Session: ${branch['対話セッションID']}\n'
                 '新指示hash: ${branch['要求hash']}\n'
                 'Workspace: ${branch['作業領域ID']}',
