@@ -40,6 +40,8 @@ Linuxの初回導入では、Brokerが検証した製品ManifestのApp IDとAudi
 
 新たに登録するLinuxの利用者別 `.desktop` は、ファイル名と `StartupWMClass` を検証済みApp IDから導出する。GTKの初期化後にX11のウィンドウクラスを `com.d4pocket.<app_id>` に設定し、起動項目と揃える。従来の固定クラスで生成済みの項目は、同じ製品名と起動対象を含む従来の二つの形式に完全一致する場合に再利用する。[GTKのウィンドウクラス](https://docs.gtk.org/gdk3/func.set_program_class.html) [Desktop Entryのキー](https://specifications.freedesktop.org/desktop-entry/latest/recognized-keys.html)
 
+LinuxのRelease bundleは既存デスクトップ用の128px素材を `data/d4-pocket-icon.png` に同梱する。GTKは実行中のbundleを起点に読み込み、`.deb` のSetup項目はそのパッケージ内のファイルを参照する。Brokerは有効版の公開時に製品固有の導入rootへ同じ素材を配置し、利用者別の起動項目を固定ファイルへ結び付ける。初回に配置した素材は更新・ロールバックで保持する。既存の起動項目は、アイコンの有無に応じて生成した同じ製品の内容への完全一致を照合して再利用する。素材のない旧bundleのウィンドウにはGTKの既定表示が適用される。
+
 ## 開発専用Windows bundle build
 
 `tooling/export_windows_product.py`はWindows専用の開発用build pathである。clean `main`を要求し、GitHub `origin/main`の読取専用照会で同一commitを確認してから、そのcommitを`git archive`でRepository／OneDrive外の短い一時pathへ展開する。展開器はroot外path、Windows上のcase衝突、file／directory衝突、symlink等を拒否する。Flutter／PubとCargoへ渡す環境変数はallowlist化し、Pub cache、Cargo home、Cargo targetを一時領域へ分離する。

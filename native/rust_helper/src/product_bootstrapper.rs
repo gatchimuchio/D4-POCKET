@@ -19,6 +19,10 @@ const PRODUCT_MANIFEST: &str = "product_manifest.json";
 const MAX_ACTIVE_VERSION_BYTES: u64 = 4096;
 const MAX_PRODUCT_MANIFEST_BYTES: u64 = 64 * 1024;
 const MAX_LAUNCHER_BYTES: u64 = 256 * 1024 * 1024;
+#[cfg(target_os = "linux")]
+pub(crate) const LINUX_PRODUCT_ICON_FILE: &str = "d4-pocket-icon.png";
+#[cfg(target_os = "linux")]
+const MAX_LINUX_PRODUCT_ICON_BYTES: u64 = 512 * 1024;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -306,6 +310,9 @@ pub(crate) fn activate_staged_version(
         Err(_) => return Err(BootstrapperError("installed_bootstrapper_invalid")),
     }
 
+    #[cfg(target_os = "linux")]
+    install_linux_product_icon(product_root, &stage, root_device, temporary_suffix)?;
+
     let record = ActiveVersionRecord {
         version: 1,
         product: "D4 Pocket".to_owned(),
@@ -322,6 +329,64 @@ pub(crate) fn activate_staged_version(
         previous,
     };
     publish_active_version_record(product_root, &record, temporary_suffix)
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn has_linux_product_icon(product_root: &Dir) -> bool {
+    product_root
+        .symlink_metadata(LINUX_PRODUCT_ICON_FILE)
+        .is_ok_and(|metadata| {
+            metadata.is_file() && (1..=MAX_LINUX_PRODUCT_ICON_BYTES).contains(&metadata.len())
+        })
+}
+
+#[cfg(target_os = "linux")]
+fn install_linux_product_icon(
+    product_root: &Dir,
+    stage: &Dir,
+    root_device: u64,
+    temporary_suffix: &str,
+) -> Result<(), BootstrapperError> {
+    use cap_std::fs::OpenOptionsExt;
+
+    match product_root.symlink_metadata(LINUX_PRODUCT_ICON_FILE) {
+        Ok(_) => return Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(BootstrapperError("product_icon_target_unavailable")),
+    }
+    match stage.symlink_metadata("data") {
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(_) => return Err(BootstrapperError("product_icon_source_unavailable")),
+    }
+    let data = open_existing_directory(stage, "data", root_device)?;
+    match data.symlink_metadata(LINUX_PRODUCT_ICON_FILE) {
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(_) => return Err(BootstrapperError("product_icon_source_unavailable")),
+    }
+    let bytes = read_regular_file(&data, LINUX_PRODUCT_ICON_FILE, MAX_LINUX_PRODUCT_ICON_BYTES)?;
+    if !bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return Err(BootstrapperError("product_icon_invalid"));
+    }
+    let temporary_name = format!("d4-pocket-icon.{temporary_suffix}.tmp");
+    let mut options = OpenOptions::new();
+    options
+        .write(true)
+        .create_new(true)
+        .follow(FollowSymlinks::No)
+        .mode(0o600);
+    let mut file = product_root
+        .open_with(&temporary_name, &options)
+        .map_err(|_| BootstrapperError("product_icon_temporary_create_failed"))?;
+    let result = std::io::Write::write_all(&mut file, &bytes).and_then(|_| file.sync_all());
+    drop(file);
+    let publication = result.and_then(|_| {
+        product_root.hard_link(&temporary_name, product_root, LINUX_PRODUCT_ICON_FILE)
+    });
+    let cleanup = product_root.remove_file(&temporary_name);
+    publication.map_err(|_| BootstrapperError("product_icon_publish_failed"))?;
+    cleanup.map_err(|_| BootstrapperError("product_icon_temporary_cleanup_failed"))
 }
 
 pub(crate) fn active_version_snapshot(

@@ -33,6 +33,7 @@ PACKAGE_NAME = "d4-pocket-setup"
 TARGET = "ubuntu-24.04-amd64"
 INSTALL_ROOT = PurePosixPath("opt/d4-pocket/setup")
 DESKTOP_ENTRY = PurePosixPath("usr/share/applications/d4-pocket-setup.desktop")
+PRODUCT_ICON = "data/d4-pocket-icon.png"
 MAX_EVIDENCE_BYTES = 4 * 1024 * 1024
 MAX_MANIFEST_BYTES = 64 * 1024
 MAX_CONTROL_BYTES = 64 * 1024
@@ -412,6 +413,9 @@ def write_debian_setup_package(
         build_evidence_path, source_dir
     )
     layout = _setup_layout(manifest_raw, independent_export=independent_export)
+    desktop_content = layout.desktop_content
+    if any(record["path"] == PRODUCT_ICON for record in records):
+        desktop_content += f"Icon=/{layout.install_root}/{PRODUCT_ICON}\n".encode("utf-8")
     source_commit = evidence.get("source_commit")
     if not isinstance(source_commit, str) or not re.fullmatch(r"[a-f0-9]{40}", source_commit):
         raise ValueError("Linux Export source commitが固定されていない")
@@ -451,7 +455,7 @@ def write_debian_setup_package(
         desktop_path = package_root.joinpath(*layout.desktop_entry.parts)
         desktop_path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
         os.chmod(desktop_path.parent, 0o755)
-        desktop_path.write_bytes(layout.desktop_content)
+        desktop_path.write_bytes(desktop_content)
         os.chmod(desktop_path, 0o644)
 
         staged_records, staged_bytes, staged_tree = _artifact_inventory(payload_root)
@@ -465,7 +469,7 @@ def write_debian_setup_package(
 
         control_dir = package_root / "DEBIAN"
         control_dir.mkdir(mode=0o755)
-        installed_bytes = total_bytes + len(layout.desktop_content)
+        installed_bytes = total_bytes + len(desktop_content)
         control = _control_text(
             package_version,
             dependencies,
@@ -523,7 +527,7 @@ def write_debian_setup_package(
         if extracted_records != records or extracted_bytes != total_bytes or extracted_tree != tree_hash:
             raise ValueError("生成packageのpayloadが検証済みbundleと一致しない")
         extracted_desktop = extracted.joinpath(*layout.desktop_entry.parts)
-        if _read_regular_file(extracted_desktop, 4096, "D4 Pocket Setup desktop entry") != layout.desktop_content:
+        if _read_regular_file(extracted_desktop, 4096, "D4 Pocket Setup desktop entry") != desktop_content:
             raise ValueError("生成packageのdesktop entryが固定内容ではない")
         allowed_files = {
             extracted_bundle.joinpath(*PurePosixPath(record["path"]).parts)

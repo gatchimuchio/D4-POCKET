@@ -465,7 +465,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/CMakeLists.txt",
-      "sha256": "3e10a03269c5987172b62d176bb721725d8a208573136bc80f1ffaa6d09c8e1b"
+      "sha256": "01eccaa8150de227b705b1d5b747fe79a280c809d199289291f48984dd0ad01b"
     },
     {
       "path": "apps/desktop_flutter/linux/flutter/CMakeLists.txt",
@@ -517,7 +517,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.cc",
-      "sha256": "298f94173350c0c253116df34ffba3294b1c7cd46d4b8f9297e013b71a038674"
+      "sha256": "395fea55e9940d4cf5c7b0c90b371edc2502ef0dc9dbec200dba38a0559c1e4f"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.h",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "14731e661cd235ae8e607e3b8160a8c7fe6923898b526673b73507601e43ff32"
+      "sha256": "623b63ad574d75ad72a22e5a2fde00b7ff66779c4cc52a3cb2755ecd3f3d38f7"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "cc94311aaa54e8b328791fad8b6e88094961682766ddba19e61eb04e34690dec"
+      "sha256": "00babcec35d53d58ce0281fe7412270e2c123e38dcf49bb2826c391cce564bf0"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -4205,7 +4205,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "bf16877d251890aecf640ac31ff713fd4d0b13010838bf5498f4833af205ede5"
+      "sha256": "3e935f6d398c9628aea2889ad1e0aef6c2ac01ad7a866394c9e25422d15458e1"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -4357,7 +4357,7 @@
     },
     {
       "path": "native/rust_helper/src/product_bootstrapper.rs",
-      "sha256": "03a96e9c3753afd26b57cf353343eb39fe2c7296ea8eb62e2d252f1c8173babf"
+      "sha256": "1cf8c379ccbfaeab1177a4bf6c51e24ad4b244bacce7b46badac834161766743"
     },
     {
       "path": "native/rust_helper/src/product_package.rs",
@@ -5905,7 +5905,7 @@
     },
     {
       "path": "tooling/package_linux_deb_setup.py",
-      "sha256": "47f7be97856369265a37e93aa0428e318bb5c117a1cac2375f097071a6fe33f7"
+      "sha256": "f0197390272ab478ecc0ea695a3c69ace59fce4a83f32910400f420fc94bfea6"
     },
     {
       "path": "tooling/package_linux_product.py",
@@ -6037,7 +6037,7 @@
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",
-      "sha256": "cda542a8cb95dd85aa096ceacdee64c6d75ec105d8b38b4f7166cca0b22167ab"
+      "sha256": "4b1273b9b6a6c9680379a3879b5250252552d9fa4cdd35e00328903508d42c77"
     },
     {
       "path": "tooling/tests/test_linux_gtk_bundle_smoke.py",

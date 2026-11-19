@@ -678,6 +678,7 @@ fn linux_product_uninstall_targets(
         &product_root.join("gui_shell_desktop_launcher"),
         app_id,
         display_name.as_deref(),
+        crate::product_bootstrapper::has_linux_product_icon(&product_directory),
     )?;
 
     let data_metadata = std::fs::symlink_metadata(data_home)
@@ -1277,7 +1278,12 @@ pub(crate) fn register_linux_desktop_entry(
     let display_name =
         crate::product_bootstrapper::installed_linux_desktop_name(&root, app_id, audit_store_id)
             .map_err(|error| ProductInstallPlanError(error.0))?;
-    let expected = linux_desktop_entry_content(&launcher_path, app_id, display_name.as_deref())?;
+    let expected = linux_desktop_entry_content(
+        &launcher_path,
+        app_id,
+        display_name.as_deref(),
+        crate::product_bootstrapper::has_linux_product_icon(&root),
+    )?;
     let entry_name = linux_desktop_entry_name(app_id)?;
     match applications.symlink_metadata(&entry_name) {
         Ok(_) => {
@@ -1391,7 +1397,7 @@ fn linux_application_id(app_id: &str) -> Result<String, ProductInstallPlanError>
 #[derive(Debug)]
 struct LinuxDesktopEntryContent {
     current: Vec<u8>,
-    legacy: [Vec<u8>; 2],
+    compatible: [Vec<u8>; 3],
 }
 
 #[cfg(target_os = "linux")]
@@ -1415,6 +1421,7 @@ fn linux_desktop_entry_content(
     launcher: &Path,
     app_id: &str,
     display_name: Option<&str>,
+    has_icon: bool,
 ) -> Result<LinuxDesktopEntryContent, ProductInstallPlanError> {
     if !launcher.is_absolute()
         || launcher
@@ -1425,6 +1432,7 @@ fn linux_desktop_entry_content(
             "product_desktop_entry_launcher_invalid",
         ));
     }
+    let icon_path = launcher.with_file_name(crate::product_bootstrapper::LINUX_PRODUCT_ICON_FILE);
     let launcher = launcher.to_str().ok_or(ProductInstallPlanError(
         "product_desktop_entry_launcher_invalid",
     ))?;
@@ -1446,17 +1454,27 @@ fn linux_desktop_entry_content(
     let try_exec = launcher.replace('\\', "\\\\");
     let name = display_name.unwrap_or("D4 Pocket").replace('\\', "\\\\");
     let wm_class = linux_application_id(app_id)?;
-    let render = |exec: &str, wm_class: &str| {
+    let icon_path = icon_path.to_str().ok_or(ProductInstallPlanError(
+        "product_desktop_entry_launcher_invalid",
+    ))?;
+    let icon_line = format!("Icon={}\n", icon_path.replace('\\', "\\\\"));
+    let render = |exec: &str, wm_class: &str, icon: &str| {
         format!(
-            "[Desktop Entry]\nType=Application\nName={name}\nExec={exec}\nTryExec={try_exec}\nTerminal=false\nCategories=Utility;Development;\nStartupWMClass={wm_class}\n"
+            "[Desktop Entry]\nType=Application\nName={name}\nExec={exec}\nTryExec={try_exec}\nTerminal=false\nCategories=Utility;Development;\nStartupWMClass={wm_class}\n{icon}"
         )
         .into_bytes()
     };
+    let (current_icon, alternate_icon) = if has_icon {
+        (icon_line.as_str(), "")
+    } else {
+        ("", icon_line.as_str())
+    };
     Ok(LinuxDesktopEntryContent {
-        current: render(&exec, &wm_class),
-        legacy: [
-            render(&exec, "d4-pocket"),
-            render(&legacy_exec, "d4-pocket"),
+        current: render(&exec, &wm_class, current_icon),
+        compatible: [
+            render(&exec, &wm_class, alternate_icon),
+            render(&exec, "d4-pocket", ""),
+            render(&legacy_exec, "d4-pocket", ""),
         ],
     })
 }
@@ -1509,7 +1527,7 @@ fn verify_linux_desktop_entry(
     let mut actual = Vec::with_capacity(opened.len() as usize);
     file.read_to_end(&mut actual)
         .map_err(|_| ProductInstallPlanError("product_desktop_entry_invalid"))?;
-    if actual != expected.current && !expected.legacy.contains(&actual) {
+    if actual != expected.current && !expected.compatible.contains(&actual) {
         return Err(ProductInstallPlanError("product_desktop_entry_conflict"));
     }
     Ok(())
@@ -1858,6 +1876,10 @@ mod tests {
         )
         .unwrap();
         let first_name = "独立した\\製品";
+        let icon = include_bytes!("../../../../apps/desktop_flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png");
+        let icon_name = crate::product_bootstrapper::LINUX_PRODUCT_ICON_FILE;
+        std::fs::create_dir(version_directory.join("data")).unwrap();
+        std::fs::write(version_directory.join("data").join(icon_name), icon).unwrap();
         let write_manifest = |directory: &Path, name: &str| {
             let manifest = serde_json::json!({"manifest": {
                 "app_identity": {"app_id": APP_ID, "display_name": name},
@@ -1873,9 +1895,14 @@ mod tests {
         let data_home = std::fs::canonicalize(data_home).unwrap();
         let product_root = std::fs::canonicalize(product_root).unwrap();
         assert_eq!(
-            super::linux_desktop_entry_content(&product_root.join("bad\nlauncher"), APP_ID, None)
-                .unwrap_err()
-                .0,
+            super::linux_desktop_entry_content(
+                &product_root.join("bad\nlauncher"),
+                APP_ID,
+                None,
+                false
+            )
+            .unwrap_err()
+            .0,
             "product_desktop_entry_launcher_invalid"
         );
         let root_directory =
@@ -1958,6 +1985,11 @@ mod tests {
         let content = String::from_utf8(content).unwrap();
         assert!(content.contains("Name=独立した\\\\製品\n"));
         assert!(content.contains(&format!("StartupWMClass=com.d4pocket.{APP_ID}\n")));
+        assert!(content.contains(&format!(
+            "Icon={}\n",
+            product_root.join(icon_name).display()
+        )));
+        assert_eq!(std::fs::read(product_root.join(icon_name)).unwrap(), icon);
         assert!(content.contains("Exec=/bin/sh -c "));
         assert!(content.contains(&format!(
             "TryExec={}\n",
@@ -2002,10 +2034,11 @@ mod tests {
             &product_root.join("gui_shell_desktop_launcher"),
             APP_ID,
             Some(first_name),
+            true,
         )
         .unwrap();
         assert_eq!(std::fs::read(&registered).unwrap(), expected.current);
-        for legacy in &expected.legacy {
+        for legacy in &expected.compatible {
             assert_ne!(&expected.current, legacy);
             std::fs::write(&registered, legacy).unwrap();
             assert_eq!(
@@ -2019,6 +2052,7 @@ mod tests {
             &product_root.join("gui_shell_desktop_launcher"),
             "d4-pocket-app-33333333333333333333333333333333",
             Some(first_name),
+            true,
         )
         .unwrap();
         std::fs::write(&registered, foreign_entry.current).unwrap();
@@ -2091,7 +2125,7 @@ mod tests {
         std::fs::create_dir_all(entry.parent().unwrap()).unwrap();
         std::fs::write(
             &entry,
-            linux_desktop_entry_content(&launcher, APP_ID, None)
+            linux_desktop_entry_content(&launcher, APP_ID, None, false)
                 .unwrap()
                 .current,
         )

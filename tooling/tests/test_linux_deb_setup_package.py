@@ -124,11 +124,17 @@ class LinuxDebSetupPackageTests(unittest.TestCase):
         app_id: str = APP_ID,
         audit_store_id: str = AUDIT_ID,
         display_name: str = "D4 Pocket",
+        include_icon: bool = False,
     ) -> tuple[Path, Path]:
         output = root / "export"
         bundle = output / "bundle"
         bundle.mkdir(parents=True)
-        for relative, payload in PAYLOADS.items():
+        payloads = PAYLOADS.copy()
+        if include_icon:
+            payloads["data/d4-pocket-icon.png"] = (
+                ROOT / "apps/desktop_flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png"
+            ).read_bytes()
+        for relative, payload in payloads.items():
             if relative == "product_manifest.json":
                 manifest = json.loads(payload)
                 manifest["manifest"]["app_identity"].update(app_id=app_id, display_name=display_name)
@@ -176,9 +182,11 @@ class LinuxDebSetupPackageTests(unittest.TestCase):
         audit_store_id: str = AUDIT_ID,
         display_name: str = "D4 Pocket",
         independent_export: bool = False,
+        include_icon: bool = False,
     ) -> tuple[Path, dict[str, object]]:
         bundle, evidence = self.create_export(
-            root, app_id=app_id, audit_store_id=audit_store_id, display_name=display_name
+            root, app_id=app_id, audit_store_id=audit_store_id, display_name=display_name,
+            include_icon=include_icon,
         )
         for relative, mode in (source_modes or {}).items():
             (bundle / relative).chmod(mode)
@@ -227,6 +235,7 @@ class LinuxDebSetupPackageTests(unittest.TestCase):
                         audit_store_id=audit_store_id,
                         display_name=display_name,
                         independent_export=True,
+                        include_icon=True,
                     )
                 finally:
                     os.umask(original_umask)
@@ -240,7 +249,7 @@ class LinuxDebSetupPackageTests(unittest.TestCase):
                 subprocess.run(["dpkg-deb", "--extract", package, extracted], check=True)
                 next_files = {path for path in extracted.rglob("*") if path.is_file()}
                 self.assertLess(files, next_files)
-                self.assertEqual(len(next_files - files), len(PAYLOADS) + 1)
+                self.assertEqual(len(next_files - files), len(PAYLOADS) + 2)
                 files = next_files
                 launcher = extracted / install_root.lstrip("/") / "gui_shell_desktop_launcher"
                 self.assertTrue(os.access(launcher, os.X_OK))
@@ -250,6 +259,11 @@ class LinuxDebSetupPackageTests(unittest.TestCase):
                     self.assertEqual(stat.S_IMODE(parent.stat().st_mode), 0o755, parent)
                 entry = (extracted / desktop_entry.lstrip("/")).read_text(encoding="utf-8").splitlines()
                 self.assertIn(f"Exec={install_root}/gui_shell_desktop_launcher", entry)
+                self.assertIn(f"Icon={install_root}/data/d4-pocket-icon.png", entry)
+                self.assertEqual(
+                    (launcher.parent / "data/d4-pocket-icon.png").read_bytes(),
+                    (ROOT / "apps/desktop_flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png").read_bytes(),
+                )
                 escaped_name = display_name.replace("\\", "\\\\")
                 self.assertIn(f"Name={escaped_name} Setup", entry)
                 manifest = json.loads(launcher.with_name("product_manifest.json").read_text())

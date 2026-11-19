@@ -20,6 +20,20 @@ G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 static constexpr char kProductWindowTitle[] =
     "D4 Pocket powered by GUI Shell";
 
+static void set_product_window_icon(GtkWindow* window) {
+  g_autofree gchar* executable = g_file_read_link("/proc/self/exe", nullptr);
+  if (executable == nullptr) {
+    return;
+  }
+  g_autofree gchar* bundle = g_path_get_dirname(executable);
+  g_autofree gchar* icon =
+      g_build_filename(bundle, "data", "d4-pocket-icon.png", nullptr);
+  g_autoptr(GdkPixbuf) image = gdk_pixbuf_new_from_file(icon, nullptr);
+  if (image != nullptr) {
+    gtk_window_set_icon(window, image);
+  }
+}
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
@@ -30,6 +44,7 @@ static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
+  set_product_window_icon(window);
 
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu
