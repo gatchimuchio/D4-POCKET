@@ -32,6 +32,10 @@ measured は「状態、非負数値の値、証拠種別」を持つ。unknown 
 
 Disk I/O、Network I/O、GPU利用率、VRAMは、対応するprocess別の根拠sourceが接続されるまで `INTERNAL_STATE` のunknownにする。process aggregate I/O、host全体のnetwork、推定GPU値をこれらの項目へ転記しない。「処理中要求数」と「失敗要求数」はBrokerが実際に保持する要求集計を得られる場合だけ `INTERNAL_STATE` のmeasuredとして返す。
 
+LinuxのBrokerは、[Linux `inet_diag` UAPI](https://github.com/torvalds/linux/blob/master/include/uapi/linux/inet_diag.h)の `SOCK_DIAG` と `/proc` を使用する。明示IPv4 loopback接続先でTCP listenerが一つだけ存在し、そのソケットinodeを保有する同じ実効UIDのprocessを、OSが読取りを許すdescriptorから一つに特定できる場合に結合する。保護されたdescriptorの中身は推定しない。候補が複数ある場合、PIDを実測できない場合、またはlistener列挙が中断した場合は結合しない。PIDの作成時刻にはprocessの起動tickを使用する。
+
+結合後のLinuxのRAM working setはresident pagesから求める。`RAMPrivateBytes` は `/proc/<pid>/smaps_rollup` の private resident bytes、`DiskIOBytes` は `/proc/<pid>/io` のストレージ読取・書込bytesの合計を表示する。前者はWindowsのprivate commitとは定義が異なる。Linuxではprivate memoryへのアクセスが制限された場合は `LIVE_RUNTIME` のunknown、process別Disk I/Oが得られない場合は `INTERNAL_STATE` のunknownを表示する。結合済みの稼働時間は、ミリ秒単位の現在時刻と、OSから取得した作成時刻を比較する。[Linuxカーネルの `/proc` 資料](https://docs.kernel.org/filesystems/proc.html)
+
 現在の対話開始・終了時刻は監査用の秒精度であり、ミリ秒応答時間の実測ではない。そのため `平均応答Millis` は高精度の単調時計を記録するまで常に `INTERNAL_STATE` のunknownとし、秒時刻の差や0で補完しない。短期履歴の `エラー率Percent` は、完了要求数を分母、失敗要求数を分子として小数を保持して計算する。完了要求がない、失敗数が完了数を超える、または安全な数値精度を確保できない場合はunknownにする。
 
 ## 履歴

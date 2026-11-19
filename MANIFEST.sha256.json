@@ -93,7 +93,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
-      "sha256": "17d315406c3615635b4bc5a8c6b9d7f0351f1916a7697cc8920311c3c1c3420a"
+      "sha256": "be4329bb9e8725044be46e4cf0ea4e4b86ef4f44d236a93d1be4a518bd4eec3c"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "83ed114b0a0728b36df2f0b0fca41977a9ae0c49c056e92ba802b41dfa104044"
+      "sha256": "020ef6f47e3c95c548bde683eb94f3d9ee1a342597bf63a415e3f4429e1cffeb"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1989,7 +1989,7 @@
     },
     {
       "path": "docs/specs/runtime-resource-observation.md",
-      "sha256": "6e7192e2749b61afcd707aca41ce3e3fd99a789c3cfecbfbd5e50add60d50dac"
+      "sha256": "b902e8c4f6c48f7956a05c6d577ca343396936ecfd5718f94b18179c4398c6c0"
     },
     {
       "path": "docs/specs/trace-inspector.md",
@@ -3985,7 +3985,7 @@
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "b48df4706e41452e4274c3461bdf221991db4acdb6374a4e89cca203b4d07e0a"
+      "sha256": "3b87a678fd3736762d33e2bce1b63080a44b28fb84b055b3b60f82841596ecd0"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -4229,7 +4229,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/runtime_registry.rs",
-      "sha256": "acc1ad44a70ab5300beafae4e38cd6bd94af92869ccf9307331484ef24d04dbc"
+      "sha256": "88ef27d6aed206d45385e034832ad24d31710fe478d0350ac9208f645dc91a8d"
+    },
+    {
+      "path": "native/rust_helper/src/broker/runtime_registry_linux.rs",
+      "sha256": "0e56a96f27c04535915ef5b6e4004cb58ace4655f64ec889d23c04871781ddc5"
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
@@ -4805,7 +4809,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/src/runtime_resource_client.dart",
-      "sha256": "f90e92b128757de33d84fa0ed2111d652c4add8efed627703cd97afcfcd3de71"
+      "sha256": "0e2e7c40ce29159b1b45634bf1d55634d089e807891204e5758580e676e20ac1"
     },
     {
       "path": "packages/gui_shell_ui/pubspec.yaml",
@@ -4837,7 +4841,7 @@
     },
     {
       "path": "packages/gui_shell_ui/test/runtime_resource_client_test.dart",
-      "sha256": "15926d48146fd225c34a44964636ef6bdc5dd107169ade8bf885c9920e1ac91e"
+      "sha256": "708c4e3ffe4c195dca1968f43112ade6d0958ca4661369bc7e393ae05f3dfa02"
     },
     {
       "path": "packages/runtime_catalog/__init__.py",

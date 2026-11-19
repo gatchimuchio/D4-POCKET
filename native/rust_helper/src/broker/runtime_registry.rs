@@ -1,4 +1,4 @@
-//! Windows実行系のread-only資源観測をBroker内へ閉じ込める。
+//! OS実行系のread-only資源観測をBroker内へ閉じ込める。
 //!
 //! このmoduleはadapterのloopback listenerをOS側でPIDへ照合し、各観測で同じendpointの
 //! 所有者とprocess作成時刻を再照合する。PIDをIPC入力として受け取らず、PID再利用、
@@ -8,11 +8,15 @@
 
 use std::collections::{BTreeMap, VecDeque};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
 use super::dialogue::実行系資源統計;
+
+#[cfg(target_os = "linux")]
+#[path = "runtime_registry_linux.rs"]
+mod linux;
 
 const MAX_HISTORY: usize = 60;
 const WINDOWS_UNIX_EPOCH_OFFSET_100NS: u64 = 116_444_736_000_000_000;
@@ -52,9 +56,11 @@ struct CpuSample {
 #[derive(Debug, Clone, Copy)]
 struct ProcessSample {
     creation_time_100ns: u64,
+    creation_time_unix_millis: Option<i64>,
     total_cpu_100ns: u64,
     working_set_bytes: u64,
-    private_bytes: u64,
+    private_bytes: Option<u64>,
+    disk_io_bytes: Option<u64>,
     sampled_at: Instant,
 }
 
@@ -137,10 +143,16 @@ impl RuntimeResourceRegistry {
             }
         };
 
-        let uptime_millis = filetime_to_unix_millis(sample.creation_time_100ns)
-            .and_then(|created_at| observed_at_millis.checked_sub(created_at))
-            .filter(|value| *value >= 0)
-            .map(|value| value as u64);
+        // Brokerの監査時刻は秒精度。起動直後でも作成時刻と同じ精度で比較する。
+        let observed_wall_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .ok()
+            .and_then(|elapsed| i64::try_from(elapsed.as_millis()).ok());
+        let uptime_millis = observed_wall_time
+            .zip(sample.creation_time_unix_millis)
+            .and_then(|(observed, created)| observed.checked_sub(created))
+            .and_then(|elapsed| u64::try_from(elapsed).ok());
+        let observed_at_millis = observed_wall_time.unwrap_or(observed_at_millis);
         let cpu_percent = entry.previous_sample.and_then(|previous| {
             let elapsed_100ns = sample
                 .sampled_at
@@ -193,7 +205,7 @@ impl RuntimeResourceRegistry {
 }
 
 fn bind_at_registration(target: Option<SocketAddr>) -> RuntimeBinding {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     {
         let Some(target) = target else {
             return unbound("アダプターがloopback観測対象を提供していません");
@@ -220,9 +232,7 @@ fn bind_at_registration(target: Option<SocketAddr>) -> RuntimeBinding {
                     }
                 }
             };
-        let Some(creation_time_unix_millis) =
-            filetime_to_unix_millis(second_sample.creation_time_100ns)
-        else {
+        let Some(creation_time_unix_millis) = second_sample.creation_time_unix_millis else {
             return unbound("process作成時刻をUnix時刻へ安全に変換できませんでした");
         };
         return RuntimeBinding {
@@ -235,7 +245,7 @@ fn bind_at_registration(target: Option<SocketAddr>) -> RuntimeBinding {
             reason: None,
         };
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "linux")))]
     {
         let _ = target;
         RuntimeBinding {
@@ -245,7 +255,7 @@ fn bind_at_registration(target: Option<SocketAddr>) -> RuntimeBinding {
             pid: None,
             creation_time_100ns: None,
             creation_time_unix_millis: None,
-            reason: Some("このOSではWindows実行系資源観測を実装していません"),
+            reason: Some("このOSでは実行系資源観測を実装していません"),
         }
     }
 }
@@ -253,6 +263,11 @@ fn bind_at_registration(target: Option<SocketAddr>) -> RuntimeBinding {
 #[cfg(windows)]
 fn listener_owner_pid(target: SocketAddrV4) -> Result<Option<u32>, ()> {
     gui_shell_windows_runtime_observation::loopback_tcp_listener_owner_pid(target).map_err(|_| ())
+}
+
+#[cfg(target_os = "linux")]
+fn listener_owner_pid(target: SocketAddrV4) -> Result<Option<u32>, ()> {
+    linux::listener_owner_pid(target)
 }
 
 enum RegistrationBindingError {
@@ -343,7 +358,7 @@ enum CurrentBindingError {
 /// 観測時点にも、登録済みendpointの所有者が同じprocessであることを複数段階で確認する。
 /// 返すprocess sampleはowner照合の前後に置く。別owner、listener消失、PID再利用を
 /// 検出した場合は値を返さない。
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 fn capture_current_binding(
     entry: &RuntimeRegistration,
     expected_pid: u32,
@@ -414,14 +429,14 @@ where
     Ok(second_sample)
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 fn capture_current_binding(
     _entry: &RuntimeRegistration,
     _expected_pid: u32,
     _expected_creation: u64,
 ) -> Result<ProcessSample, CurrentBindingError> {
     Err(CurrentBindingError::Mismatch(
-        "このOSではWindows実行系資源観測を実装していません",
+        "このOSでは実行系資源観測を実装していません",
     ))
 }
 
@@ -506,11 +521,11 @@ fn measured_metrics(
         "CPU累積時間Millis": cpu_duration_metric(sample.total_cpu_100ns, "LIVE_RUNTIME"),
         "CPU利用率Percent": cpu_percent.and_then(|value| measured_decimal(value, "LIVE_RUNTIME")).unwrap_or_else(|| unknown("LIVE_RUNTIME", "初回観測、時間差不足、または安全な精度不足のためCPU変化率を測定できません")),
         "RAMWorkingSetBytes": measured(sample.working_set_bytes, "LIVE_RUNTIME"),
-        "RAMPrivateBytes": measured(sample.private_bytes, "LIVE_RUNTIME"),
-        "DiskIOBytes": unknown("INTERNAL_STATE", "Disk I/OはこのWindows collectorで分離測定していません"),
-        "NetworkIOBytes": unknown("INTERNAL_STATE", "Network I/OはこのWindows collectorで分離測定していません"),
-        "GPU利用率Percent": unknown("INTERNAL_STATE", "GPU利用率はこのWindows collectorで測定していません"),
-        "VRAMBytes": unknown("INTERNAL_STATE", "VRAMはこのWindows collectorで測定していません"),
+        "RAMPrivateBytes": sample.private_bytes.map(|value| measured(value, "LIVE_RUNTIME")).unwrap_or_else(|| unknown("LIVE_RUNTIME", "process private memoryを取得できません")),
+        "DiskIOBytes": sample.disk_io_bytes.map(|value| measured(value, "LIVE_RUNTIME")).unwrap_or_else(|| unknown("INTERNAL_STATE", "このOS collectorではprocess別Disk I/Oを取得できません")),
+        "NetworkIOBytes": unknown("INTERNAL_STATE", "Network I/OはこのOS collectorで分離測定していません"),
+        "GPU利用率Percent": unknown("INTERNAL_STATE", "GPU利用率はこのOS collectorで測定していません"),
+        "VRAMBytes": unknown("INTERNAL_STATE", "VRAMはこのOS collectorで測定していません"),
         "処理中要求数": measured(stats.処理中要求数, "INTERNAL_STATE"),
         "平均応答Millis": unknown("INTERNAL_STATE", "対話の応答時間をミリ秒精度で測定していません"),
         "失敗要求数": measured(stats.失敗要求数, "INTERNAL_STATE"),
@@ -623,14 +638,21 @@ fn capture_process(pid: u32) -> Result<ProcessSample, ()> {
     let memory = process.GetProcessMemoryInfo().map_err(|_| ())?;
     Ok(ProcessSample {
         creation_time_100ns: u64::from(creation),
+        creation_time_unix_millis: filetime_to_unix_millis(u64::from(creation)),
         total_cpu_100ns: u64::from(kernel).saturating_add(u64::from(user)),
         working_set_bytes: memory.WorkingSetSize as u64,
-        private_bytes: memory.PrivateUsage as u64,
+        private_bytes: Some(memory.PrivateUsage as u64),
+        disk_io_bytes: None,
         sampled_at: Instant::now(),
     })
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+fn capture_process(pid: u32) -> Result<ProcessSample, ()> {
+    linux::capture_process(pid)
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
 fn capture_process(_pid: u32) -> Result<ProcessSample, ()> {
     Err(())
 }
@@ -663,9 +685,11 @@ mod tests {
     fn test_process_sample(creation_time_100ns: u64) -> ProcessSample {
         ProcessSample {
             creation_time_100ns,
+            creation_time_unix_millis: filetime_to_unix_millis(creation_time_100ns),
             total_cpu_100ns: 10,
             working_set_bytes: 20,
-            private_bytes: 30,
+            private_bytes: Some(30),
+            disk_io_bytes: None,
             sampled_at: Instant::now(),
         }
     }

@@ -19,14 +19,16 @@ class _Fixture implements BrokerTransport {
   }
 }
 
-Map<String, Object?> _measured(num value, {String source = 'LIVE_RUNTIME'}) =>
-    {'状態': 'measured', '値': value, '証拠種別': source};
+Map<String, Object?> _measured(num value, {String source = 'LIVE_RUNTIME'}) => {
+  '状態': 'measured',
+  '値': value,
+  '証拠種別': source,
+};
 
 Map<String, Object?> _unknown(
   String reason, {
   String source = 'INTERNAL_STATE',
-}) =>
-    {'状態': 'unknown', '値': null, '証拠種別': source, '理由': reason};
+}) => {'状態': 'unknown', '値': null, '証拠種別': source, '理由': reason};
 
 Map<String, Object?> _metrics({bool allUnknown = false}) {
   final values = <String, Object?>{
@@ -52,13 +54,13 @@ Map<String, Object?> _metrics({bool allUnknown = false}) {
 }
 
 Map<String, Object?> _history() => {
-      '観測時刻UnixMillis': 1700000000100,
-      'CPU利用率Percent': _measured(12.5),
-      'RAMWorkingSetBytes': _measured(2048),
-      'NetworkIOBytes': _unknown('個別Network I/Oは未対応'),
-      '平均応答Millis': _unknown('対話の応答時間をミリ秒精度で測定していません'),
-      'エラー率Percent': _measured(0, source: 'INTERNAL_STATE'),
-    };
+  '観測時刻UnixMillis': 1700000000100,
+  'CPU利用率Percent': _measured(12.5),
+  'RAMWorkingSetBytes': _measured(2048),
+  'NetworkIOBytes': _unknown('個別Network I/Oは未対応'),
+  '平均応答Millis': _unknown('対話の応答時間をミリ秒精度で測定していません'),
+  'エラー率Percent': _measured(0, source: 'INTERNAL_STATE'),
+};
 
 Map<String, Object?> _body({
   String bindingStatus = 'bound',
@@ -94,22 +96,20 @@ Map<String, Object?> _body({
 Map<String, Object?> _response(
   Map<String, Object?> body, {
   String evidenceSource = 'LIVE_RUNTIME',
-}) =>
-    {
-      'request_id': 'fixture-request-1',
-      'operation': '実行系資源観測',
-      'status': 'accepted',
-      'evidence_source': evidenceSource,
-      'audit_event_id': 'audit-1',
-      'error': null,
-      'health': null,
-      'body': body,
-      'shutdown_requested': false,
-    };
+}) => {
+  'request_id': 'fixture-request-1',
+  'operation': '実行系資源観測',
+  'status': 'accepted',
+  'evidence_source': evidenceSource,
+  'audit_event_id': 'audit-1',
+  'error': null,
+  'health': null,
+  'body': body,
+  'shutdown_requested': false,
+};
 
 void main() {
-  test('資源観測はPIDでなく実行系IDだけを送り、監査付きの実測を返す',
-      () async {
+  test('資源観測はPIDでなく実行系IDだけを送り、監査付きの実測を返す', () async {
     final fixture = _Fixture(_response(_body()));
     final observation = await RuntimeResourceClient(fixture).observe('local');
 
@@ -126,8 +126,7 @@ void main() {
     expect(observation.history, hasLength(1));
   });
 
-  test('結合済みでも安全な数値を作れないLIVE_RUNTIME metricはunknownで返す',
-      () async {
+  test('結合済みでも安全な数値を作れないLIVE_RUNTIME metricはunknownで返す', () async {
     final body = _body();
     final metrics = body['計測'] as Map<String, Object?>;
     for (final key in const <String>[
@@ -138,8 +137,9 @@ void main() {
       metrics[key] = _unknown('安全な数値精度を確保できません', source: 'LIVE_RUNTIME');
     }
 
-    final observation = await RuntimeResourceClient(_Fixture(_response(body)))
-        .observe('local');
+    final observation = await RuntimeResourceClient(
+      _Fixture(_response(body)),
+    ).observe('local');
     for (final key in const <String>[
       '稼働時間Millis',
       'CPU累積時間Millis',
@@ -150,8 +150,34 @@ void main() {
     }
   });
 
-  test('unknownを数値に置換した応答、余分なfield、監査不一致を拒否する',
-      () async {
+  test('Linux LIVE_RUNTIMEからのDiskIO実測と未取得RAM値を受け入れる', () async {
+    final body = _body();
+    final metrics = body['計測'] as Map<String, Object?>;
+    metrics['DiskIOBytes'] = _measured(4096);
+    metrics['RAMPrivateBytes'] = _unknown(
+      'smaps_rollupを読めません',
+      source: 'LIVE_RUNTIME',
+    );
+
+    final observation = await RuntimeResourceClient(
+      _Fixture(_response(body)),
+    ).observe('local');
+    expect(observation.metric('DiskIOBytes').value, 4096);
+    expect(observation.metric('DiskIOBytes').evidenceSource, 'LIVE_RUNTIME');
+    expect(observation.metric('RAMPrivateBytes').isMeasured, isFalse);
+
+    metrics['DiskIOBytes'] = _unknown(
+      'process別I/OはこのLinux環境で未取得',
+      source: 'LIVE_RUNTIME',
+    );
+    final unknownIo = await RuntimeResourceClient(
+      _Fixture(_response(body)),
+    ).observe('local');
+    expect(unknownIo.metric('DiskIOBytes').isMeasured, isFalse);
+    expect(unknownIo.metric('DiskIOBytes').evidenceSource, 'LIVE_RUNTIME');
+  });
+
+  test('unknownを数値に置換した応答、余分なfield、監査不一致を拒否する', () async {
     final invalidMetric = _body();
     (invalidMetric['計測'] as Map<String, Object?>)['DiskIOBytes'] = {
       '状態': 'unknown',
@@ -161,31 +187,47 @@ void main() {
     };
     final fixture = _Fixture(_response(invalidMetric));
     final client = RuntimeResourceClient(fixture);
-    await expectLater(client.observe('local'), throwsA(isA<BrokerClientException>()));
+    await expectLater(
+      client.observe('local'),
+      throwsA(isA<BrokerClientException>()),
+    );
 
     fixture.response = _response(_body())..['余分'] = true;
-    await expectLater(client.observe('local'), throwsA(isA<BrokerClientException>()));
+    await expectLater(
+      client.observe('local'),
+      throwsA(isA<BrokerClientException>()),
+    );
 
     final auditMismatch = _body()..['観測監査ID'] = 'other-audit';
     fixture.response = _response(auditMismatch);
-    await expectLater(client.observe('local'), throwsA(isA<BrokerClientException>()));
+    await expectLater(
+      client.observe('local'),
+      throwsA(isA<BrokerClientException>()),
+    );
 
     fixture.response = _response(_body())..['audit_event_id'] = 1;
-    await expectLater(client.observe('local'), throwsA(isA<BrokerClientException>()));
+    await expectLater(
+      client.observe('local'),
+      throwsA(isA<BrokerClientException>()),
+    );
   });
 
-  test('非結合は全metric unknownと空履歴、INTERNAL_STATEだけを許可する',
-      () async {
+  test('非結合は全metric unknownと空履歴、INTERNAL_STATEだけを許可する', () async {
     final body = _body(bindingStatus: 'unsupported', allUnknown: true);
     final fixture = _Fixture(_response(body, evidenceSource: 'INTERNAL_STATE'));
     final observation = await RuntimeResourceClient(fixture).observe('local');
     expect(observation.binding.status, 'unsupported');
     expect(observation.history, isEmpty);
-    expect(observation.metrics.values.every((item) => !item.isMeasured), isTrue);
+    expect(
+      observation.metrics.values.every((item) => !item.isMeasured),
+      isTrue,
+    );
 
     final invalid = _body(bindingStatus: 'unsupported', allUnknown: true);
-    (invalid['計測'] as Map<String, Object?>)['処理中要求数'] =
-        _measured(0, source: 'INTERNAL_STATE');
+    (invalid['計測'] as Map<String, Object?>)['処理中要求数'] = _measured(
+      0,
+      source: 'INTERNAL_STATE',
+    );
     fixture.response = _response(invalid, evidenceSource: 'INTERNAL_STATE');
     await expectLater(
       RuntimeResourceClient(fixture).observe('local'),
@@ -203,30 +245,45 @@ void main() {
     final fixture = _Fixture(_response(_body()));
 
     for (final key in const <String>[
-      'DiskIOBytes',
       'NetworkIOBytes',
       'GPU利用率Percent',
       'VRAMBytes',
       '平均応答Millis',
     ]) {
       final measured = _body();
-      (measured['計測'] as Map<String, Object?>)[key] =
-          _measured(1, source: 'INTERNAL_STATE');
+      (measured['計測'] as Map<String, Object?>)[key] = _measured(
+        1,
+        source: 'INTERNAL_STATE',
+      );
       fixture.response = _response(measured);
       await expectLater(
         RuntimeResourceClient(fixture).observe('local'),
         throwsA(isA<BrokerClientException>()),
       );
-
-      final wrongSource = _body();
-      (wrongSource['計測'] as Map<String, Object?>)[key] =
-          _unknown('未接続の根拠', source: 'LIVE_RUNTIME');
-      fixture.response = _response(wrongSource);
-      await expectLater(
-        RuntimeResourceClient(fixture).observe('local'),
-        throwsA(isA<BrokerClientException>()),
-      );
     }
+
+    final diskWrongSource = _body();
+    (diskWrongSource['計測'] as Map<String, Object?>)['DiskIOBytes'] = _measured(
+      1,
+      source: 'INTERNAL_STATE',
+    );
+    fixture.response = _response(diskWrongSource);
+    await expectLater(
+      RuntimeResourceClient(fixture).observe('local'),
+      throwsA(isA<BrokerClientException>()),
+    );
+
+    final unsupportedMetricWrongSource = _body();
+    (unsupportedMetricWrongSource['計測']
+        as Map<String, Object?>)['NetworkIOBytes'] = _unknown(
+      '未接続の根拠',
+      source: 'LIVE_RUNTIME',
+    );
+    fixture.response = _response(unsupportedMetricWrongSource);
+    await expectLater(
+      RuntimeResourceClient(fixture).observe('local'),
+      throwsA(isA<BrokerClientException>()),
+    );
 
     for (final key in const <String>[
       '稼働時間Millis',
@@ -236,8 +293,10 @@ void main() {
       'RAMPrivateBytes',
     ]) {
       final wrongSource = _body();
-      (wrongSource['計測'] as Map<String, Object?>)[key] =
-          _measured(1, source: 'INTERNAL_STATE');
+      (wrongSource['計測'] as Map<String, Object?>)[key] = _measured(
+        1,
+        source: 'INTERNAL_STATE',
+      );
       fixture.response = _response(wrongSource);
       await expectLater(
         RuntimeResourceClient(fixture).observe('local'),
@@ -246,8 +305,10 @@ void main() {
     }
     for (final key in const <String>['処理中要求数', '失敗要求数']) {
       final wrongSource = _body();
-      (wrongSource['計測'] as Map<String, Object?>)[key] =
-          _measured(1, source: 'LIVE_RUNTIME');
+      (wrongSource['計測'] as Map<String, Object?>)[key] = _measured(
+        1,
+        source: 'LIVE_RUNTIME',
+      );
       fixture.response = _response(wrongSource);
       await expectLater(
         RuntimeResourceClient(fixture).observe('local'),
@@ -256,8 +317,9 @@ void main() {
     }
 
     final invalidHistory = _body();
-    final history = (invalidHistory['短期履歴'] as List<Object?>).single
-        as Map<String, Object?>;
+    final history =
+        (invalidHistory['短期履歴'] as List<Object?>).single
+            as Map<String, Object?>;
     history['平均応答Millis'] = _measured(1, source: 'INTERNAL_STATE');
     fixture.response = _response(invalidHistory);
     await expectLater(
@@ -265,8 +327,10 @@ void main() {
       throwsA(isA<BrokerClientException>()),
     );
 
-    final unboundWrongSource =
-        _body(bindingStatus: 'unsupported', allUnknown: true);
+    final unboundWrongSource = _body(
+      bindingStatus: 'unsupported',
+      allUnknown: true,
+    );
     (unboundWrongSource['計測'] as Map<String, Object?>)['CPU利用率Percent'] =
         _unknown('未結合', source: 'LIVE_RUNTIME');
     fixture.response = _response(

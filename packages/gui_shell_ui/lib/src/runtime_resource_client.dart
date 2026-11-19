@@ -100,8 +100,8 @@ class RuntimeResourceObservation {
     this.governance,
     Map<String, RuntimeResourceMetric> metrics,
     List<RuntimeResourceHistorySample> history,
-  )   : metrics = Map.unmodifiable(metrics),
-        history = List.unmodifiable(history);
+  ) : metrics = Map.unmodifiable(metrics),
+      history = List.unmodifiable(history);
 
   final String runtimeId;
   final int observedAtUnixMillis;
@@ -192,13 +192,12 @@ class RuntimeResourceObservation {
       return;
     }
 
-    for (final key in const <String>['RAMWorkingSetBytes', 'RAMPrivateBytes']) {
-      _requireMetric(
-        metrics[key]!,
-        evidenceSource: 'LIVE_RUNTIME',
-        measured: true,
-      );
-    }
+    _requireMetric(
+      metrics['RAMWorkingSetBytes']!,
+      evidenceSource: 'LIVE_RUNTIME',
+      measured: true,
+    );
+    _requireMetric(metrics['RAMPrivateBytes']!, evidenceSource: 'LIVE_RUNTIME');
     for (final key in const <String>[
       '稼働時間Millis',
       'CPU累積時間Millis',
@@ -207,8 +206,17 @@ class RuntimeResourceObservation {
       _requireMetric(metrics[key]!, evidenceSource: 'LIVE_RUNTIME');
     }
 
+    final diskIo = metrics['DiskIOBytes']!;
+    if (diskIo.isMeasured) {
+      _requireMetric(diskIo, evidenceSource: 'LIVE_RUNTIME', measured: true);
+    } else if (!const {
+      'INTERNAL_STATE',
+      'LIVE_RUNTIME',
+    }.contains(diskIo.evidenceSource)) {
+      _reject();
+    }
+
     for (final key in const <String>[
-      'DiskIOBytes',
       'NetworkIOBytes',
       'GPU利用率Percent',
       'VRAMBytes',
@@ -325,8 +333,12 @@ class RuntimeResourceBinding {
     _exactKeys(value, {...common, '理由'});
     final unsupported = status == 'unsupported';
     final registrationAuditId = value['登録監査ID'];
-    if (!{'unbound', 'binding_mismatch', 'exited', 'unsupported'}
-            .contains(status) ||
+    if (!{
+          'unbound',
+          'binding_mismatch',
+          'exited',
+          'unsupported',
+        }.contains(status) ||
         value['根拠'] !=
             (unsupported ? 'unsupported' : 'loopback_tcp_listener_owner_pid') ||
         value['PID'] != null ||
@@ -458,16 +470,13 @@ class RuntimeResourceHistorySample {
     if (!_timestampMillis(value['観測時刻UnixMillis'])) {
       _reject();
     }
-    return RuntimeResourceHistorySample._(
-      value['観測時刻UnixMillis'] as int,
-      {
-        for (final key in _historyMetricKeys)
-          key: RuntimeResourceMetric._parse(
-            value[key],
-            percent: _percentMetricKeys.contains(key),
-          ),
-      },
-    );
+    return RuntimeResourceHistorySample._(value['観測時刻UnixMillis'] as int, {
+      for (final key in _historyMetricKeys)
+        key: RuntimeResourceMetric._parse(
+          value[key],
+          percent: _percentMetricKeys.contains(key),
+        ),
+    });
   }
 }
 
@@ -504,5 +513,4 @@ bool _safeText(Object? value, {required int maxLength}) =>
     value.length <= maxLength &&
     !value.runes.any((codePoint) => codePoint < 32 || codePoint == 127);
 
-Never _reject() =>
-    throw const BrokerClientException('実行系資源観測の応答を確認できません');
+Never _reject() => throw const BrokerClientException('実行系資源観測の応答を確認できません');
