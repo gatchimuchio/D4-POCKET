@@ -28,9 +28,18 @@ class _MobileHistoryState extends State<MobileHistory> {
   }
 
   Future<HistoryPage?> _load() async {
-    final client = HistoryClient(widget.controller);
+    final controller = widget.controller;
+    final generation = controller.connectionGeneration;
+    final client = HistoryClient(controller);
     final grant = await client.status();
-    if (grant == null) return null;
+    if (grant == null ||
+        !mounted ||
+        !identical(widget.controller, controller) ||
+        !controller.ready ||
+        !controller.foreground ||
+        generation != controller.connectionGeneration) {
+      return null;
+    }
     return client.page(grant);
   }
 

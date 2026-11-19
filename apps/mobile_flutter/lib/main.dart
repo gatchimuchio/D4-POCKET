@@ -104,31 +104,39 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
     listenable: _controller,
     builder: (context, _) {
       final c = _controller;
+      final connected = c.ready && c.foreground;
+      final generation = c.connectionGeneration;
       final pages = <Widget>[
         MobileDashboard(status: c.status),
         MobileAgentStatus(
+          key: ValueKey(('agent', generation)),
           controller: c,
-          connected: c.ready && c.foreground,
+          connected: connected,
           active: _selected == 1,
         ),
         const ApprovalReview(),
         MobileNotifications(
+          key: ValueKey(('notifications', generation)),
           events: c.events,
           controller: c,
-          connected: c.ready && c.foreground,
+          connected: connected,
         ),
         RuntimeStatus(
+          key: ValueKey(('runtime', generation)),
           controller: c,
           runtimes: c.runtimes,
-          connected: c.ready && c.foreground,
+          connected: connected,
         ),
-        EmergencyStop(controller: c),
+        EmergencyStop(
+          key: ValueKey(('stop', generation, connected)),
+          controller: c,
+        ),
         const RecoveryInstruction(),
         if (_dialogueVisited)
           RuntimeDialogueScreen(
-            key: ValueKey(c.connectionGeneration),
+            key: ValueKey(generation),
             connect: () async => c.dialogue,
-            active: c.ready && c.foreground && _selected == 7,
+            active: connected && _selected == 7,
             workspaceSelectionSupported: true,
           )
         else
@@ -138,14 +146,18 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
         ResourceOverview(
           controller: c,
           runtimes: c.runtimes,
-          connected: c.ready && c.foreground,
+          connected: connected,
           active: _selected == 10,
         ),
-        MobileHistory(controller: c, connected: c.ready && c.foreground),
+        MobileHistory(
+          key: ValueKey(('history', generation)),
+          controller: c,
+          connected: connected,
+        ),
         const MobileMcpStatus(),
         MobileAgentTaskScreen(
           controller: c,
-          connected: c.ready && c.foreground,
+          connected: connected,
           active: _selected == 13,
         ),
       ];

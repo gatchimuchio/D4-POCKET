@@ -180,36 +180,47 @@ void main() {
     expect(find.textContaining('CPU: 12.5'), findsNothing);
   });
 
-  testWidgets('Runtime scope変更後も進行中要求の完了まで次の観測を待つ', (tester) async {
-    final transport = _Transport()..gate = Completer<void>();
-    final controller = _Controller(transport);
-    addTearDown(controller.dispose);
-    Widget page(List<String> runtimes) => MaterialApp(
-      home: Scaffold(
-        body: ResourceOverview(
-          controller: controller,
-          runtimes: runtimes,
-          connected: true,
-          active: true,
-        ),
-      ),
+  for (final sameRuntime in [false, true]) {
+    testWidgets(
+      sameRuntime
+          ? '同じRuntimeでも新しい接続世代で資源を再取得する'
+          : 'Runtime scope変更後も進行中要求の完了まで次の観測を待つ',
+      (tester) async {
+        final transport = _Transport()..gate = Completer<void>();
+        final controller = _Controller(transport);
+        addTearDown(controller.dispose);
+        Widget page(List<String> runtimes) => MaterialApp(
+          home: Scaffold(
+            body: ResourceOverview(
+              controller: controller,
+              runtimes: runtimes,
+              connected: true,
+              active: true,
+            ),
+          ),
+        );
+
+        await tester.pumpWidget(
+          page(sameRuntime ? const ['local'] : const ['local', 'other']),
+        );
+        await tester.pump();
+        expect(transport.calls, ['local']);
+        expect(transport.activeRequests, 1);
+
+        final nextRuntime = sameRuntime ? 'local' : 'replacement';
+        if (sameRuntime) controller.connectionGeneration++;
+        await tester.pumpWidget(page([nextRuntime]));
+        await tester.pump();
+        expect(transport.calls, ['local']);
+        expect(transport.activeRequests, 1);
+
+        transport.gate!.complete();
+        await tester.pumpAndSettle();
+
+        expect(transport.calls, ['local', nextRuntime]);
+        expect(transport.maxConcurrentRequests, 1);
+        expect(find.textContaining('CPU: 12.5'), findsOneWidget);
+      },
     );
-
-    await tester.pumpWidget(page(const ['local', 'other']));
-    await tester.pump();
-    expect(transport.calls, ['local']);
-    expect(transport.activeRequests, 1);
-
-    await tester.pumpWidget(page(const ['replacement']));
-    await tester.pump();
-    expect(transport.calls, ['local']);
-    expect(transport.activeRequests, 1);
-
-    transport.gate!.complete();
-    await tester.pumpAndSettle();
-
-    expect(transport.calls, ['local', 'replacement']);
-    expect(transport.maxConcurrentRequests, 1);
-    expect(find.textContaining('CPU: 12.5'), findsOneWidget);
-  });
+  }
 }

@@ -28,11 +28,13 @@ class _ResourceOverviewState extends State<ResourceOverview> {
   Future<List<_ResourceResult>>? _future;
   Future<void>? _requestTail;
   int _generation = 0;
+  late int _deviceLinkGeneration;
   bool _loading = false;
 
   @override
   void initState() {
     super.initState();
+    _deviceLinkGeneration = widget.controller.connectionGeneration;
     if (widget.active && widget.connected && widget.runtimes.isNotEmpty) {
       _future = _startLoad();
     }
@@ -41,10 +43,14 @@ class _ResourceOverviewState extends State<ResourceOverview> {
   @override
   void didUpdateWidget(ResourceOverview oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final deviceLinkGeneration = widget.controller.connectionGeneration;
     final scopeChanged =
+        !identical(oldWidget.controller, widget.controller) ||
+        _deviceLinkGeneration != deviceLinkGeneration ||
         oldWidget.connected != widget.connected ||
         oldWidget.runtimes.length != widget.runtimes.length ||
         !_same(oldWidget.runtimes, widget.runtimes);
+    _deviceLinkGeneration = deviceLinkGeneration;
     if (scopeChanged || (oldWidget.active && !widget.active)) {
       _generation++;
       _future = null;
@@ -90,7 +96,11 @@ class _ResourceOverviewState extends State<ResourceOverview> {
   }
 
   bool _current(int generation) =>
-      mounted && generation == _generation && widget.active && widget.connected;
+      mounted &&
+      generation == _generation &&
+      _deviceLinkGeneration == widget.controller.connectionGeneration &&
+      widget.active &&
+      widget.connected;
 
   Future<List<_ResourceResult>> _load(
     int generation,

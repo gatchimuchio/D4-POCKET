@@ -59,6 +59,7 @@ class _FakeNativePort implements DeviceLinkNativePort {
   Future<DeviceLinkSnapshot>? pendingReadState;
   Future<DeviceLinkSnapshot>? pendingPair;
   Future<Map<String, Object?>>? nextRequest;
+  String? notificationTitle;
   final calls = <String>[];
   final requests = <String>[];
   final recoveryAudit = <DeviceLinkLocalRecoveryAuditEvent>[];
@@ -142,6 +143,38 @@ class _FakeNativePort implements DeviceLinkNativePort {
         'evidence_source': 'INTERNAL_STATE',
       };
     }
+    if (operation == '通知一覧') {
+      final title = notificationTitle;
+      return _accepted(operation, {
+        '版': 1,
+        '通知一覧': [
+          if (title != null)
+            {
+              '版': 1,
+              '通知ID': 'notification-1',
+              'source': 'Broker',
+              'severity': 'warning',
+              'タイトル': title,
+              '概要': 'Broker操作を保留しました。',
+              '作成順': 1,
+              '関連監査ID': 'audit-1',
+              '関連監査hash': 'sha256:NaN',
+              '遷移先': 'dashboard',
+              '状態': 'unread',
+              '通知hash': 'sha256:NaN',
+              '表示範囲': 'summary',
+              '権限生成': 'なし',
+            },
+        ],
+        '件数': title == null ? 0 : 1,
+        '未読件数': title == null ? 0 : 1,
+        '重大件数': 0,
+        '証拠種別': 'INTERNAL_STATE',
+        '表示範囲': 'summary',
+        '権限生成': 'なし',
+        '操作': 'navigation_only',
+      });
+    }
     return _accepted(operation);
   }
 }
@@ -195,6 +228,32 @@ void main() {
     tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
     await tester.pumpAndSettle();
     expect(find.text('D4 Pocket（GUI Shell基盤）'), findsOneWidget);
+  });
+
+  testWidgets('接続中の表示が途切れなくても通知を再確認後のBrokerから取得する', (tester) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    final native = _FakeNativePort(
+      initial: DeviceLinkSnapshot.fromNative(_snapshot),
+    )..notificationTitle = '再確認前の通知';
+    final controller = DeviceLinkController(nativePort: native);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(GuiShellMobileApp(controller: controller));
+    await tester.pumpAndSettle();
+    tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(NavigationDrawerDestination, '通知'));
+    await tester.pumpAndSettle();
+    expect(find.text('再確認前の通知'), findsOneWidget);
+
+    native.notificationTitle = '現在の通知';
+    // 再確認中に描画を挟まず、接続済み→接続済みの更新を再現する。
+    await controller.verify();
+    await tester.pumpAndSettle();
+
+    expect(find.text('再確認前の通知'), findsNothing);
+    expect(find.text('現在の通知'), findsOneWidget);
+    expect(native.requests.where((op) => op == '通知一覧'), hasLength(2));
+    expect(native.requests, isNot(contains('全Runtime停止要求')));
   });
 
   test('Mobile対話clientはnative Device Link経由の選択用Workspace投影を使う', () async {

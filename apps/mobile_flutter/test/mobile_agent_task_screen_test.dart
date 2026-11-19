@@ -434,78 +434,93 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('切断中に残った状態読取が再接続後の操作を塞がない', (tester) async {
-    final staleStatusResponse = Completer<Map<String, Object?>>();
-    final statusRequestStarted = Completer<void>();
-    final port = _LifecyclePort(
-      runtimeId: 'runtime-current',
-      workspaceId: 'workspace-current',
-      requests: [_ownRequestRow()],
-      statusResponse: staleStatusResponse,
-      statusRequestStarted: statusRequestStarted,
-    );
-    final controller = DeviceLinkController(nativePort: port)..ready = true;
-    var connected = true;
-    late StateSetter update;
-    tester.view.physicalSize = const Size(800, 1200);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  for (final observedDisconnect in [true, false]) {
+    testWidgets(
+      observedDisconnect
+          ? '切断中に残った状態読取が再接続後の操作を塞がない'
+          : '接続世代だけが変わっても古い開始候補を採用しない',
+      (tester) async {
+        final staleStatusResponse = Completer<Map<String, Object?>>();
+        final statusRequestStarted = Completer<void>();
+        final port = _LifecyclePort(
+          runtimeId: 'runtime-current',
+          workspaceId: 'workspace-current',
+          requests: [_ownRequestRow()],
+          statusResponse: staleStatusResponse,
+          statusRequestStarted: statusRequestStarted,
+        );
+        final controller = DeviceLinkController(nativePort: port)..ready = true;
+        var connected = true;
+        late StateSetter update;
+        tester.view.physicalSize = const Size(800, 1200);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: StatefulBuilder(
-          builder: (context, setState) {
-            update = setState;
-            return Scaffold(
-              body: MobileAgentTaskScreen(
-                controller: controller,
-                connected: connected,
-                active: true,
-              ),
-            );
-          },
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final requestCard = find.byKey(
-      const ValueKey('mobile-agent-task-$_requestId'),
-    );
-    await tester.tap(requestCard);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Broker状態'));
-    await tester.pump();
-    expect(statusRequestStarted.isCompleted, isTrue);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StatefulBuilder(
+              builder: (context, setState) {
+                update = setState;
+                return Scaffold(
+                  body: MobileAgentTaskScreen(
+                    controller: controller,
+                    connected: connected,
+                    active: true,
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final requestCard = find.byKey(
+          const ValueKey('mobile-agent-task-$_requestId'),
+        );
+        await tester.tap(requestCard);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Broker状態'));
+        await tester.pump();
+        expect(statusRequestStarted.isCompleted, isTrue);
 
-    update(() => connected = false);
-    await tester.pump();
-    update(() => connected = true);
-    await tester.pump();
-    await tester.pumpAndSettle();
-    expect(find.text('runtime-current'), findsOneWidget);
+        if (observedDisconnect) {
+          update(() => connected = false);
+          await tester.pump();
+        }
+        update(() {
+          controller.connectionGeneration++;
+          connected = true;
+        });
+        await tester.pump();
+        await tester.pumpAndSettle();
+        expect(find.text('runtime-current'), findsOneWidget);
 
-    await tester.tap(requestCard);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Broker状態'));
-    await tester.pumpAndSettle();
-    expect(
-      port.operations.where((operation) => operation == 'AgentTask端末状態'),
-      hasLength(2),
-    );
-    expect(find.textContaining('Owner確認待ち'), findsOneWidget);
+        if (find.text('Broker状態').evaluate().isEmpty) {
+          await tester.tap(requestCard);
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.text('Broker状態'));
+        await tester.pumpAndSettle();
+        expect(
+          port.operations.where((operation) => operation == 'AgentTask端末状態'),
+          hasLength(2),
+        );
+        expect(find.textContaining('Owner確認待ち'), findsOneWidget);
 
-    staleStatusResponse.complete(
-      _response('AgentTask端末状態', 'accepted', {
-        '申請ID': _requestId,
-        '状態': '開始候補',
-      }),
+        staleStatusResponse.complete(
+          _response('AgentTask端末状態', 'accepted', {
+            '申請ID': _requestId,
+            '状態': '開始候補',
+          }),
+        );
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Owner確認待ち'), findsOneWidget);
+        expect(find.text('開始候補'), findsNothing);
+        expect(port.operations, isNot(contains('AgentTask端末開始')));
+        controller.dispose();
+      },
     );
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Owner確認待ち'), findsOneWidget);
-    expect(find.text('開始候補'), findsNothing);
-    controller.dispose();
-  });
+  }
 
   testWidgets('別Controllerへ切り替えた後に旧Task状態を表示しない', (tester) async {
     final oldStatusResponse = Completer<Map<String, Object?>>();

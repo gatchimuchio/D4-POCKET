@@ -29,6 +29,7 @@ class MobileAgentTaskScreen extends StatefulWidget {
 class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
   final _instruction = TextEditingController();
   int _connectionGeneration = 0;
+  late int _deviceLinkGeneration;
   int _operationSequence = 0;
   int? _activeOperation;
   bool _activeOperationReadOnly = false;
@@ -51,6 +52,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
   @override
   void initState() {
     super.initState();
+    _deviceLinkGeneration = widget.controller.connectionGeneration;
     if (widget.connected && widget.active) _reload();
   }
 
@@ -61,7 +63,11 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
       oldWidget.controller,
       widget.controller,
     );
+    final deviceLinkGeneration = widget.controller.connectionGeneration;
+    final connectionChanged = _deviceLinkGeneration != deviceLinkGeneration;
+    _deviceLinkGeneration = deviceLinkGeneration;
     if (controllerChanged ||
+        connectionChanged ||
         oldWidget.connected != widget.connected ||
         oldWidget.active != widget.active) {
       _connectionGeneration++;
@@ -73,6 +79,9 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
       _runtime = null;
       _workspace = null;
       _message = null;
+      if (controllerChanged || connectionChanged) {
+        _includeMcpCapabilities = false;
+      }
       if (controllerChanged || _activeOperationReadOnly) {
         // A stale read cannot keep the recovered connection's controls busy.
         _activeOperation = null;
@@ -94,6 +103,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
       mounted &&
       generation == _connectionGeneration &&
       identical(widget.controller, controller) &&
+      _deviceLinkGeneration == controller.connectionGeneration &&
       widget.connected &&
       widget.active;
 
@@ -104,9 +114,9 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
   }
 
   Future<void> _reload() async {
-    if (_loading || !widget.connected || !widget.active) return;
     final generation = _connectionGeneration;
     final controller = widget.controller;
+    if (_loading || !_isCurrentConnection(generation, controller)) return;
     setState(() {
       _loading = true;
       _message = null;
@@ -150,16 +160,22 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
     final runtime = _runtime;
     final workspace = _workspace;
     final instruction = _instruction.text;
+    final generation = _connectionGeneration;
+    final controller = widget.controller;
     if (_busy ||
-        !widget.connected ||
-        !widget.active ||
+        !_isCurrentConnection(generation, controller) ||
         runtime == null ||
         workspace == null ||
         instruction.trim().isEmpty) {
       return;
     }
-    final generation = _connectionGeneration;
-    final controller = widget.controller;
+    final deviceLinkGeneration = _deviceLinkGeneration;
+    bool canCloseSession() =>
+        mounted &&
+        identical(widget.controller, controller) &&
+        controller.ready &&
+        controller.foreground &&
+        deviceLinkGeneration == controller.connectionGeneration;
     final operation = ++_operationSequence;
     _activeOperation = operation;
     setState(() {
@@ -188,11 +204,12 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
         workspaceId: workspace,
       );
       if (!_isCurrentConnection(generation, controller)) {
-        try {
-          await controller.dialogue.close(sessionId);
-        } catch (_) {
-          // A newly created empty Session is closed only when submission did
-          // not reach the Broker; close failure remains an unknown outcome.
+        if (canCloseSession()) {
+          try {
+            await controller.dialogue.close(sessionId);
+          } catch (_) {
+            // 現接続で申請前のSessionだけを閉じる。失敗時は結果不明。
+          }
         }
         return;
       }
@@ -218,7 +235,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
       });
     } on MobileAgentTaskSubmissionRejected {
       var sessionClosed = false;
-      if (sessionId != null) {
+      if (sessionId != null && canCloseSession()) {
         try {
           await controller.dialogue.close(sessionId);
           sessionClosed = true;
@@ -235,7 +252,9 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
       }
     } catch (_) {
       var sessionClosed = false;
-      if (sessionId != null && !submissionMayHaveReachedBroker) {
+      if (sessionId != null &&
+          !submissionMayHaveReachedBroker &&
+          canCloseSession()) {
         try {
           await controller.dialogue.close(sessionId);
           sessionClosed = true;
@@ -334,9 +353,9 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
     operation, {
     bool readOnly = false,
   }) async {
-    if (_busy || !widget.connected || !widget.active) return;
     final generation = _connectionGeneration;
     final controller = widget.controller;
+    if (_busy || !_isCurrentConnection(generation, controller)) return;
     final operationId = ++_operationSequence;
     _activeOperation = operationId;
     _activeOperationReadOnly = readOnly;

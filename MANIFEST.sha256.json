@@ -1293,7 +1293,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/main.dart",
-      "sha256": "c42e77d5f82bb74865f18eb3477348795dab08d1313496a9d0722f273991b8e4"
+      "sha256": "8ca52315adfcda490a05646d9957faaef415f43c6655586fcac6cca0c40413b2"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/agent_status.dart",
@@ -1313,7 +1313,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/screens/history.dart",
-      "sha256": "01f3b8a1360e63f8f62d95cbba7b54fb6659dfccec1f018ec9ab8074178c9dee"
+      "sha256": "45a87e7ab981d75255b7f7ab5a5d5db540e83480b99d4c2a07e720a86d0315cc"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/mcp_status.dart",
@@ -1321,7 +1321,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/screens/mobile_agent_task.dart",
-      "sha256": "02e32d6b295c547270b089c6b5cdbf82f8f6810b39ce1f1bb76755d1dd71e977"
+      "sha256": "6806b83cc74954c6adddc729b470dbde95faa725bc9b0cf9ce7c3c7e399fb921"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/mobile_dashboard.dart",
@@ -1337,7 +1337,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/screens/resource_overview.dart",
-      "sha256": "0cfbb4f846224e184e92212b5252edf93bc406163408ab79ace5cc94d57eb90c"
+      "sha256": "284c739e2aa99f18ca9a1e0526ff7b36a9d143d6cd75839c0503922475a1a793"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/runtime_status.dart",
@@ -1365,11 +1365,11 @@
     },
     {
       "path": "apps/mobile_flutter/test/device_link_test.dart",
-      "sha256": "0c8e98d3b1c2efe1e144489f2261aded78c5b1a31a4b54a0727e94fd56ee0d92"
+      "sha256": "291cfb16ac6aa28c2b10eb231a7a53108f8d9c23bf71d82c22f4f5fdc97ec38d"
     },
     {
       "path": "apps/mobile_flutter/test/mobile_agent_task_screen_test.dart",
-      "sha256": "48814be9618cdfe4e9961ab4c7edd717ca7386e211caf5dfdedfd2e4cb8f4365"
+      "sha256": "6a322928618d7378367d90d7640e0cccc7a7024c8d4ab76409cbefde9f192aaf"
     },
     {
       "path": "apps/mobile_flutter/test/mobile_agent_task_test.dart",
@@ -1381,7 +1381,7 @@
     },
     {
       "path": "apps/mobile_flutter/test/resource_overview_test.dart",
-      "sha256": "9c7d6b7ddc95c977bc1a3c1c15b4813a5add6d30361360a46bb5b0cc49b29280"
+      "sha256": "0795c6eaa43005f0ffda80142f6ab95ef40ccfa34883b31d8da34296ea679820"
     },
     {
       "path": "config/audit_signing_trust.json",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "ef014e71c484365357d0a1fa2f28aed8c5f96e573bf9b49de9794f197fb7864d"
+      "sha256": "9887574b29a0983e4d0315d09c97812190e71975948622b78a448cd8b707ab54"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1825,7 +1825,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "f53712a8c2411826edb39b2c34f9dd3508536e47740b29d753bd62b1004e4e15"
+      "sha256": "26497dbc2bf706a342dd94785012e8b685f0a5ce8684822881f6cef367ec223b"
     },
     {
       "path": "docs/specs/evaluation-lab.md",
