@@ -7966,8 +7966,13 @@ def _run_installed_agent_mcp_followup_acceptance(
         timeout=10,
     )
 
-    _open_mcp_center_from_installed_ui(environment, window_id)
-    _activate_named_control_by_keyboard("接続一覧を取得", environment, window_id)
+    mcp_window = _open_mcp_center_from_installed_ui(environment, window_id)
+    _activate_accessible(
+        _find_operable_accessible("接続一覧を取得", root=mcp_window, exact=True),
+        "接続一覧を取得",
+        environment,
+    )
+    _find_accessible(f"サーバーID: {server_id}", root=mcp_window, timeout=15)
     _activate_named_control_by_keyboard(
         "切断", environment, window_id, context_marker=server_id
     )
