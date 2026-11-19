@@ -7788,6 +7788,64 @@ def _run_installed_agent_mcp_followup_acceptance(
     source_diagnostic_index = len(
         responses_server.snapshot()["agent_task_diagnostics"]
     )
+    audit_path = audit_store / "audit.jsonl"
+
+    def approve_result_view(
+        task_id: str, scenario: str, diagnostic_index: int, context: str
+    ) -> str:
+        # native確認中の親画面にTask終端の再描画を要求しない。
+        try:
+            _wait_for_owner_dialog_window(
+                environment,
+                timeout=90.0,
+                context=context,
+                diagnostic_root=window,
+                diagnostic_audit_path=audit_path,
+            )
+        except RuntimeError as error:
+            diagnostics = {
+                "task_history": _installed_task_history_diagnostics(audit_store, task_id),
+                "responses_fixture": _installed_task_response_fixture_diagnostics(
+                    responses_server, scenario, diagnostic_index
+                ),
+            }
+            raise RuntimeError(
+                f"{error}; " + json.dumps(diagnostics, ensure_ascii=False)
+            ) from error
+        events = [
+            json.loads(line)
+            for line in audit_path.read_text(encoding="utf-8").splitlines()
+            if line
+        ]
+        terminals = [
+            record
+            for record in _linux_agent_task_history_records(events, task_id)
+            if record.get("stage") == "terminal"
+        ]
+        if len(terminals) != 1 or terminals[0].get("status") != "completed":
+            raise RuntimeError(f"{context}: Taskに一意の完了Auditがありません")
+        result_hash = terminals[0].get("result_hash")
+        if not isinstance(result_hash, str) or not re.fullmatch(
+            r"sha256:[0-9a-f]{64}", result_hash
+        ):
+            raise RuntimeError(f"{context}: Taskの完了Auditに有効な結果hashがありません")
+        _answer_owner_dialog(
+            environment,
+            "許可",
+            context=context,
+            diagnostic_root=window,
+            diagnostic_audit_path=audit_path,
+            expected_summary_markers=(
+                "完了したAgent Taskの結果を一回だけ表示するApprovalを発行しますか？",
+                f"Task ID: {task_id}",
+                f"確定結果hash: {result_hash}",
+                "Content Exposure: full",
+                "Auditへ本文を保存しません。",
+            ),
+        )
+        _wait_for_owner_dialog_closed(environment)
+        return result_hash
+
     previous_task_ids = _linux_installed_visible_task_ids(
         deadline=time.monotonic() + 5.0
     )
@@ -7803,53 +7861,9 @@ def _run_installed_agent_mcp_followup_acceptance(
     source_task_id = _wait_for_installed_task_id(
         window, previously_visible_task_ids=previous_task_ids, timeout=15.0
     )
-    audit_path = audit_store / "audit.jsonl"
-    # Task完了直後にnative確認が開く。確認中の親画面にTask終端の再描画を要求しない。
-    try:
-        _wait_for_owner_dialog_window(
-            environment,
-            timeout=90.0,
-            context="Agent MCP提案のTask結果表示",
-            diagnostic_root=window,
-            diagnostic_audit_path=audit_path,
-        )
-    except RuntimeError as error:
-        diagnostics = {
-            "task_history": _installed_task_history_diagnostics(audit_store, source_task_id),
-            "responses_fixture": _installed_task_response_fixture_diagnostics(
-                responses_server, "mcp_proposal", source_diagnostic_index
-            ),
-        }
-        raise RuntimeError(f"{error}; " + json.dumps(diagnostics, ensure_ascii=False)) from error
-    source_events = [
-        json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines() if line
-    ]
-    source_terminals = [
-        record
-        for record in _linux_agent_task_history_records(source_events, source_task_id)
-        if record.get("stage") == "terminal"
-    ]
-    if len(source_terminals) != 1 or source_terminals[0].get("status") != "completed":
-        raise RuntimeError("先行MCP提案Taskに一意の完了Auditがありません")
-    source_result_hash = source_terminals[0].get("result_hash")
-    if not isinstance(source_result_hash, str) or not re.fullmatch(
-        r"sha256:[0-9a-f]{64}", source_result_hash
-    ):
-        raise RuntimeError("先行MCP提案Taskの完了Auditに有効な結果hashがありません")
-
-    _answer_owner_dialog(
-        environment,
-        "許可",
-        context="Agent MCP提案のTask結果表示",
-        expected_summary_markers=(
-            "完了したAgent Taskの結果を一回だけ表示するApprovalを発行しますか？",
-            f"Task ID: {source_task_id}",
-            f"確定結果hash: {source_result_hash}",
-            "Content Exposure: full",
-            "Auditへ本文を保存しません。",
-        ),
+    source_result_hash = approve_result_view(
+        source_task_id, "mcp_proposal", source_diagnostic_index, "Agent MCP提案のTask結果表示"
     )
-    _wait_for_owner_dialog_closed(environment)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible(
         f"表示範囲: full・Task {source_task_id}",
@@ -7927,6 +7941,9 @@ def _run_installed_agent_mcp_followup_acceptance(
     )
     if followup_task_id == source_task_id:
         raise RuntimeError("実MCP結果を受け取る後続Taskがfresh Task IDではありません")
+    followup_result_hash = approve_result_view(
+        followup_task_id, "mcp_followup", followup_diagnostic_index, "MCP後続Taskの最終結果表示"
+    )
     followup_snapshot = _wait_installed_task_status(
         environment,
         window,
@@ -7951,12 +7968,8 @@ def _run_installed_agent_mcp_followup_acceptance(
         raise RuntimeError("Agent CenterにMCP実結果のhash-only receiptが一つありません")
     if f"MCP要求元Task: {source_task_id} / {source_result_hash}" not in followup_snapshot:
         raise RuntimeError("Agent CenterのMCP source Task/result hash結合が不正です")
-    followup_result_hash_match = re.search(
-        r"結果hash:\s*(sha256:[0-9a-f]{64})", followup_snapshot
-    )
-    if followup_result_hash_match is None:
-        raise RuntimeError("Agent Centerに後続Taskの完了結果hashがありません")
-    followup_result_hash = followup_result_hash_match.group(1)
+    if f"結果hash: {followup_result_hash}" not in followup_snapshot:
+        raise RuntimeError("Agent Centerの後続Task結果hashが完了Auditと一致しません")
 
     if not call_marker.is_file() or call_marker.is_symlink():
         raise RuntimeError("Agent提案に起因する外部MCP Tool callがありません")
@@ -7972,22 +7985,6 @@ def _run_installed_agent_mcp_followup_acceptance(
         timeout=10,
     )
 
-    # MCP能力を保持した後続Taskの結果を読み、追加提案がないことを確認してから移動する。
-    _answer_owner_dialog(
-        environment,
-        "許可",
-        context="MCP後続Taskの最終結果表示",
-        diagnostic_root=window,
-        diagnostic_audit_path=audit_path,
-        expected_summary_markers=(
-            "完了したAgent Taskの結果を一回だけ表示するApprovalを発行しますか？",
-            f"Task ID: {followup_task_id}",
-            f"確定結果hash: {followup_result_hash}",
-            "Content Exposure: full",
-            "Auditへ本文を保存しません。",
-        ),
-    )
-    _wait_for_owner_dialog_closed(environment)
     _find_accessible(
         "Task結果にMCP Tool要求はありません。",
         root=_find_accessible(WINDOW_TITLE, timeout=10),
