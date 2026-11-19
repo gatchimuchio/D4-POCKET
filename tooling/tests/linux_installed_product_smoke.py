@@ -7668,11 +7668,9 @@ def _run_installed_agent_mcp_followup_acceptance(
     ):
         _set_public_text_by_keyboard(window, label, value, environment, window_id)
 
-    _activate_accessible(
-        _find_operable_accessible("MCP接続を開始", root=window, timeout=10),
-        "MCP接続を開始",
-        environment,
-    )
+    # 入力後に操作対象が一時的に無効なAT-SPI参照になり得る。
+    # 現在の製品窓で目的のボタンにfocusが移った場合にだけ操作する。
+    _activate_named_control_by_keyboard("MCP接続を開始", environment, window_id)
     _answer_owner_dialog(
         environment,
         "拒否",
@@ -7692,11 +7690,7 @@ def _run_installed_agent_mcp_followup_acceptance(
     if start_marker.exists() or call_marker.exists():
         raise RuntimeError("Owner拒否後にAgent MCP fixture processまたはTool作用が発生しました")
 
-    _activate_accessible(
-        _find_operable_accessible("MCP接続を開始", root=window, timeout=10),
-        "MCP接続を開始",
-        environment,
-    )
+    _activate_named_control_by_keyboard("MCP接続を開始", environment, window_id)
     _answer_owner_dialog(
         environment,
         "許可",
@@ -8097,7 +8091,7 @@ def _run_installed_agent_mcp_followup_acceptance(
         raise RuntimeError("MCP follow-up Task完了後にWorkspaceTaskScratchが残っています")
 
     return {
-        "installed_product": "Linux installed GTK product under WSL2/X11",
+        "installed_product": "Linux installed GTK product (X11)",
         "runtime_id": runtime_id,
         "workspace_id": workspace_id,
         "source_task_id": source_task_id,
