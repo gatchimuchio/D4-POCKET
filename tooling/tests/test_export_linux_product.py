@@ -4,6 +4,8 @@ import hashlib
 import io
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -426,6 +428,26 @@ class LinuxExportBuildTests(unittest.TestCase):
                     )
 
     def test_release_bundle_package_and_provenance_are_published_together(self) -> None:
+        self._check_release_export()
+
+    @unittest.skipUnless(shutil.which("dpkg-deb"), "dpkg-deb is required for Debian packaging")
+    def test_release_export_publishes_debian_setup_with_the_same_provenance(self) -> None:
+        self._check_release_export(debian_package_revision=2)
+
+    @unittest.skipUnless(shutil.which("dpkg-deb"), "dpkg-deb is required for Debian packaging")
+    def test_debian_packaging_failure_does_not_publish_the_export(self) -> None:
+        self._check_release_export(debian_package_revision=2, fail_debian_packaging=True)
+
+    def test_debian_setup_rejects_r2_e2e_test_build_before_source_build(self) -> None:
+        with self.assertRaisesRegex(ValueError, "通常Release build"):
+            build_linux_product(
+                Path("receipt.json"), Path("manifest.json"), Path("output"),
+                r2_e2e_test_build=True, debian_package_revision=1,
+            )
+
+    def _check_release_export(
+        self, *, debian_package_revision: int | None = None, fail_debian_packaging: bool = False,
+    ) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-linux-export-test-") as temporary:
             root = Path(temporary)
             receipt, manifest = self._input_files(root)
@@ -483,8 +505,11 @@ class LinuxExportBuildTests(unittest.TestCase):
             configure_args: list[str] = []
             commands: list[list[str]] = []
             command_environments: list[dict[str, str]] = []
+            real_run = subprocess.run
 
             def run(command: list[str], **kwargs: Any) -> Any:
+                if command[0] in {"dpkg", "dpkg-deb"}:
+                    return real_run(command, **kwargs)
                 commands.append(command)
                 command_environments.append(kwargs["env"])
                 if "--analyze-size" in command:
@@ -578,8 +603,19 @@ class LinuxExportBuildTests(unittest.TestCase):
                 patch("tooling.export_linux_product._write_source_archive", side_effect=write_archive),
                 patch("tooling.export_linux_product._safe_extract_source", side_effect=extract_source),
                 patch("tooling.export_linux_product.subprocess.run", side_effect=run),
+                patch("tooling.package_linux_deb_setup._require_supported_target"),
+                patch("tooling.package_linux_deb_setup._require_source_checkout"),
+                patch("tooling.package_linux_deb_setup.product_version_from_source", return_value="1.2.3+4"),
+                patch("tooling.package_linux_deb_setup._collect_dependencies", return_value=("libc6", "")) as dependencies,
             ):
-                evidence = build_linux_product(receipt, manifest, output)
+                if fail_debian_packaging:
+                    dependencies.side_effect = ValueError("simulated Debian dependency failure")
+                    with self.assertRaisesRegex(ValueError, "simulated Debian dependency failure"):
+                        build_linux_product(receipt, manifest, output, debian_package_revision=debian_package_revision)
+                    self.assertFalse(output.exists())
+                    self.assertEqual(set(root.iterdir()), {receipt, manifest})
+                    return
+                evidence = build_linux_product(receipt, manifest, output, debian_package_revision=debian_package_revision)
 
             self.assertTrue((output / "bundle" / "gui_shell_desktop").is_file())
             self.assertTrue((output / "D4Pocket-linux.d4pkg").is_file())
@@ -607,6 +643,27 @@ class LinuxExportBuildTests(unittest.TestCase):
                 hashlib.sha256(portable_archive.read_bytes()).hexdigest(),
             )
             self.assertFalse(evidence["portable_archive"]["signed"])
+            if debian_package_revision is None:
+                self.assertNotIn("debian_setup", evidence)
+                self.assertFalse((output / "debian-setup").exists())
+            else:
+                record = evidence["debian_setup"]
+                app_suffix = APP_ID.removeprefix("d4-pocket-app-")
+                self.assertEqual(record["file_name"], f"d4-pocket-setup-{app_suffix}_1.2.3+4-2_amd64.deb")
+                setup = output / "debian-setup" / record["file_name"]
+                payload = setup.read_bytes()
+                self.assertEqual(record["sha256"], hashlib.sha256(payload).hexdigest())
+                saved = json.loads((output / "d4_pocket_linux_export_build.json").read_text(encoding="utf-8"))
+                self.assertEqual(saved, evidence)
+                setup.write_bytes(payload[:-1] + bytes([payload[-1] ^ 1]))
+                try:
+                    with self.assertRaisesRegex(ValueError, "Debian Setupがbuild evidenceと一致しない"):
+                        validate_build_evidence(
+                            saved, output / "bundle", output / "D4Pocket-linux.d4pkg", manifest.read_bytes(),
+                            portable_archive, (ROOT / "installer/linux/PORTABLE_README_ja.txt").read_bytes(),
+                        )
+                finally:
+                    setup.write_bytes(payload)
             self.assertGreaterEqual(len(commands), 4)
             flutter_commands = [
                 (command, environment)

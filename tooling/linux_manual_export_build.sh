@@ -40,6 +40,9 @@ export_arguments=(
 if [ "$D4P_ACCEPTANCE_SCOPE" = 'agent_task_supervision' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'agent_mcp_followup' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'agent_task_crash_recovery' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'provider_credential_binding' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_lifecycle' ]; then
   export_arguments+=(--r2-e2e-test-build)
 fi
+if [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_package' ]; then
+  export_arguments+=(--debian-package-revision 1)
+fi
 python3 tooling/export_linux_product.py "${export_arguments[@]}"
 python3 tooling/package_linux_product.py \
   --source-dir "$output_root/bundle" \
@@ -100,6 +103,9 @@ fi
 {
   printf '\n- Export evidence: `%s`\n' "$(cat "$output_root/d4_pocket_linux_export_build.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["artifact_tree_sha256"])')"
   printf -- '- Package hash: `%s`\n' "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["package"]["sha256"])' "$output_root/d4_pocket_linux_export_build.json")"
+  if [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_package' ]; then
+    printf -- '- Independent Debian Setup hash: `%s`\n' "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["debian_setup"]["sha256"])' "$output_root/d4_pocket_linux_export_build.json")"
+  fi
   if [ "$D4P_ACCEPTANCE_SCOPE" = 'portable_archive' ]; then
     printf -- '- Portable archive hash: `%s`\n' "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["portable_archive"]["sha256"])' "$output_root/d4_pocket_linux_export_build.json")"
   fi

@@ -53,6 +53,7 @@ RECEIPT_NAME = "d4_pocket_linux_export_build.json"
 BUILD_SCHEMA_NAME = "gui_shell_linux_export_build.schema.json"
 BUILD_TEMP_PREFIX = "d4p-linux-build-"
 OUTPUT_TEMP_PREFIX = "d4p-linux-output-"
+DEBIAN_SETUP_DIR_NAME = "debian-setup"
 PORTABLE_ARCHIVE_ROOT = "D4Pocket"
 PORTABLE_ARCHIVE_TARGET = "ubuntu-24.04-x86_64"
 PORTABLE_README_MEMBER = "README-linux-ja.txt"
@@ -850,6 +851,34 @@ def validate_build_evidence(
             records,
             portable_record,
         )
+    if "debian_setup" in evidence:
+        _validate_debian_setup(evidence, package_path.parent)
+
+
+def _validate_debian_setup(evidence: dict[str, Any], output_root: Path) -> None:
+    record = evidence["debian_setup"]
+    app_suffix = evidence["app_id"].removeprefix("d4-pocket-app-")
+    toolchain = evidence["toolchain"]
+    if (
+        not record["file_name"].startswith(f"d4-pocket-setup-{app_suffix}_")
+        or toolchain["distribution_id"] != "ubuntu"
+        or toolchain["distribution_version"] != "24.04"
+        or toolchain["architecture"] != "x86_64"
+        or "-DD4_LINUX_R2_E2E_TEST_BUILD=OFF" not in evidence["cmake_configure_arguments"]
+        or "-DD4_LINUX_R2_E2E_TEST_BUILD=ON" in evidence["cmake_configure_arguments"]
+    ):
+        raise ValueError("Debian Setupの製品IDまたはbuild構成が一致しない")
+    directory = output_root / DEBIAN_SETUP_DIR_NAME
+    if not stat.S_ISDIR(directory.lstat().st_mode):
+        raise ValueError("Debian Setupの出力先が通常directoryではない")
+    path = directory / record["file_name"]
+    metadata = path.lstat()
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_size != record["byte_length"]
+        or _sha256_file(path) != record["sha256"]
+    ):
+        raise ValueError("Debian Setupがbuild evidenceと一致しない")
 
 
 def build_linux_product(
@@ -859,9 +888,19 @@ def build_linux_product(
     *,
     allow_verification_branch: bool = False,
     r2_e2e_test_build: bool = False,
+    debian_package_revision: int | None = None,
 ) -> dict[str, Any]:
     if not sys.platform.startswith("linux") or not hasattr(os, "O_NOFOLLOW"):
         raise ValueError("Linux Export buildはLinux host専用である")
+    if debian_package_revision is not None:
+        # The Debian writer checks the base Export evidence before packaging it.
+        from tooling.package_linux_deb_setup import _require_supported_target, write_debian_setup_package
+
+        if r2_e2e_test_build:
+            raise ValueError("Debian独立書き出しは通常Release buildだけで作成できる")
+        if type(debian_package_revision) is not int or not 1 <= debian_package_revision <= 999_999:
+            raise ValueError("Debian package revisionは1以上999999以下の整数でなければならない")
+        _require_supported_target()
     source_branch, commit = _require_clean_source(
         allow_verification_branch=allow_verification_branch
     )
@@ -1190,6 +1229,29 @@ def build_linux_product(
                 "portable_archive": portable_archive_record,
                 "credential_artifact_scan": credential_scan,
             }
+            evidence_path = staging_root / RECEIPT_NAME
+            if debian_package_revision is not None:
+                evidence_path.write_text(
+                    json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+                )
+                setup = write_debian_setup_package(
+                    bundle,
+                    evidence_path,
+                    staging_root / DEBIAN_SETUP_DIR_NAME,
+                    package_revision=debian_package_revision,
+                    independent_export=True,
+                )
+                if setup["source_commit"] != commit or setup["artifact_tree_sha256"] != tree_hash:
+                    raise ValueError("Debian Setupのsource commitまたはbundle hashが一致しない")
+                evidence["debian_setup"] = {
+                    "file_name": Path(setup["output_path"]).name,
+                    "format": "deb",
+                    "target": setup["target"],
+                    "byte_length": setup["package_size_bytes"],
+                    "sha256": setup["package_sha256"],
+                    "signed": setup["signed"],
+                    "scope": setup["scope"],
+                }
             if portable_archive_record is None:
                 validate_build_evidence(evidence, bundle, package_path, manifest_raw)
             else:
@@ -1203,7 +1265,7 @@ def build_linux_product(
                     portable_archive_path,
                     portable_readme_raw,
                 )
-            (staging_root / RECEIPT_NAME).write_text(
+            evidence_path.write_text(
                 json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
             )
         if output.exists() or output.is_symlink():
@@ -1229,6 +1291,11 @@ def main() -> int:
         action="store_true",
         help="固定test identity限定でLinux installed Agent Task acceptance buildを生成する",
     )
+    parser.add_argument(
+        "--debian-package-revision",
+        type=int,
+        help="Ubuntu 24.04 amd64で独立書き出し用Setup .debを同時生成する",
+    )
     args = parser.parse_args()
     try:
         evidence = build_linux_product(
@@ -1237,6 +1304,7 @@ def main() -> int:
             args.output_dir,
             allow_verification_branch=args.allow_verification_branch,
             r2_e2e_test_build=args.r2_e2e_test_build,
+            debian_package_revision=args.debian_package_revision,
         )
     except Exception as error:
         message = f": {error}" if isinstance(error, ValueError) else ""
@@ -1256,6 +1324,7 @@ def main() -> int:
                 "signed": False,
                 "installed_product_verified": False,
                 "r2_e2e_test_build": args.r2_e2e_test_build,
+                **({"debian_setup": evidence["debian_setup"]} if "debian_setup" in evidence else {}),
             },
             ensure_ascii=False,
             separators=(",", ":"),
