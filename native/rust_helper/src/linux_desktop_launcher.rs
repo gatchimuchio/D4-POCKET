@@ -731,7 +731,7 @@ fn finalize_linux_product_uninstall(
     std::env::set_current_dir(&home)
         .map_err(|_| failure("製品root外へ作業directoryを移動できません。"))?;
 
-    let store = crate::linux_desktop_worker::existing_store_directory()
+    let store = crate::linux_desktop_worker::existing_store_directory(identity)
         .map_err(|_| failure("既存Audit Storeを確認できません。製品を削除しません。"))?;
     crate::broker::product_install::validate_linux_product_uninstall_targets(
         data_home,
@@ -788,13 +788,13 @@ pub fn run() -> Result<(), LinuxLaunchError> {
     let plan = resolve_launch_plan(&launcher, identity.as_ref(), data_home.as_deref())?;
     match plan {
         LaunchPlan::DispatchToActiveVersion(bundle) => {
-            let runtime = crate::linux_desktop_worker::prepare_runtime_directory()
-                .map_err(|_| failure("製品runtime directoryを安全に準備できません。"))?;
-            let _launcher_lock = ProductLauncherLock::acquire(&runtime)?;
-            let launch_nonce = new_launch_nonce()?;
             let identity = identity
                 .as_ref()
                 .ok_or_else(|| failure("製品identityを確認できません。"))?;
+            let runtime = crate::linux_desktop_worker::prepare_runtime_directory(identity)
+                .map_err(|_| failure("製品runtime directoryを安全に準備できません。"))?;
+            let _launcher_lock = ProductLauncherLock::acquire(&runtime)?;
+            let launch_nonce = new_launch_nonce()?;
             let data_home = data_home
                 .as_deref()
                 .ok_or_else(|| failure("製品の利用者保存領域を確認できません。"))?;
@@ -811,14 +811,14 @@ pub fn run() -> Result<(), LinuxLaunchError> {
             run_frontend(&bundle, std::env::vars_os(), launch_nonce.as_deref())
         }
         LaunchPlan::RunInitialInstallBundle(bundle) => {
-            let runtime = crate::linux_desktop_worker::prepare_runtime_directory()
+            let identity = identity
+                .as_ref()
+                .ok_or_else(|| failure("製品identityを確認できません。"))?;
+            let runtime = crate::linux_desktop_worker::prepare_runtime_directory(identity)
                 .map_err(|_| failure("製品runtime directoryを安全に準備できません。"))?;
             let _launcher_lock = ProductLauncherLock::acquire(&runtime)?;
             run_frontend(&bundle, std::env::vars_os(), None)?;
 
-            let identity = identity
-                .as_ref()
-                .ok_or_else(|| failure("製品identityを確認できません。"))?;
             let data_home = data_home
                 .as_deref()
                 .ok_or_else(|| failure("製品の利用者保存領域を確認できません。"))?;

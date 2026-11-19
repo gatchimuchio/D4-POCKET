@@ -43,6 +43,8 @@ pub struct BrokerServerConfig {
     pub(crate) desktop_install_path_verified: bool,
     /// Product Build時に埋込み、要求payloadから受け取らないApp／Audit Store identity。
     pub(crate) desktop_product_identity: Option<(String, String)>,
+    /// Desktop起動器だけが設定する、作業領域として登録できない製品保存先。
+    pub(crate) desktop_workspace_protected_roots: Vec<PathBuf>,
 }
 
 impl BrokerServerConfig {
@@ -65,6 +67,7 @@ impl BrokerServerConfig {
             desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
             desktop_product_identity: None,
+            desktop_workspace_protected_roots: Vec::new(),
         }
     }
 }
@@ -190,6 +193,8 @@ fn run_loopback_server_inner(
     desktop_agent_workspace_protected_paths.extend(config.protected_store_dir.iter().cloned());
     desktop_agent_workspace_protected_paths
         .extend(config.desktop_protected_store_dir.iter().cloned());
+    desktop_agent_workspace_protected_paths
+        .extend(config.desktop_workspace_protected_roots.iter().cloned());
     broker.set_desktop_agent_workspace_protected_paths(desktop_agent_workspace_protected_paths);
     if let Some((path, root)) = desktop_export_root {
         broker.set_desktop_export_root(path, root);
@@ -257,6 +262,7 @@ fn run_loopback_server_inner(
         ];
         protected.extend(config.protected_store_dir.iter().cloned());
         protected.extend(config.desktop_protected_store_dir.iter().cloned());
+        protected.extend(config.desktop_workspace_protected_roots.iter().cloned());
         if let Err(reason) =
             verify_codex_workspace_roots(&config.codex_runtimes, &settings, &protected)
         {

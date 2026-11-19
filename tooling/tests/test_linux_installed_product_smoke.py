@@ -256,6 +256,11 @@ class LinuxInstalledRuntimeProvenanceTests(unittest.TestCase):
         self.assertEqual(result["runtime_identity"]["app_id"], self.app_id)
         self.assertEqual(result["runtime_identity"]["audit_store_id"], self.audit_store_id)
         self.assertEqual(result["component_sha256"]["broker"], hashlib.sha256(b"broker artifact").hexdigest())
+        self.assertEqual(
+            Path(result["audit_store_identity"]["path"]),
+            self.xdg_state_home / "d4-pocket/products" / self.app_id
+            / self.audit_store_id / "linux-broker/store",
+        )
 
     def test_rejects_compile_time_manifest_pin_mismatch(self) -> None:
         evidence = json.loads(self.evidence_path.read_text(encoding="utf-8"))

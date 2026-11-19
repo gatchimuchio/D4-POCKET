@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "d2d878138c42ad9c7e460ad709a3116e3fa44526245682352e9da4360c374e88"
+      "sha256": "bef009b88c922e99691e8af07ad9b4472ef17cfc94f27d16bfa0d63ec58f0bf8"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "85ab04a8dbb6a8894e0bd86dcfeb10196245de6ba394e0a8c01a5d80a82639d9"
+      "sha256": "383d6b22ce7eb629de0307718b66c2b88c24d20bb7282d434054b8454df5efc1"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -1889,7 +1889,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "5187384b2bb6b0c5cb7253bb8c1e6c274f84aa7f8784e8e35559f54a12252208"
+      "sha256": "74baa7e5b386325b65b3cd612554b5c9238542392edbb9acc0a26a2453f02b95"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -4177,7 +4177,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "719186bdd5e82b13bf5d02d47ac4b97de718b34fa31185b3261273301946c4ad"
+      "sha256": "8316cf836069bfaa698a65fe4641fdee605ea122f25e353d8d76255711981eba"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -4241,7 +4241,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "f20567989afa807d57d19dcd33811ee5c3bf03eae0089af4f71262923ce5e033"
+      "sha256": "14c9afd58052fd9c24257f7d20b1797f6d1c747d383bcf631a0611331b892d85"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -4297,11 +4297,11 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_launcher.rs",
-      "sha256": "7e3444c2cd8da93226624c2d82914e6145e9800033757e5ca58e9d60e4337504"
+      "sha256": "5d33adee381d991a8706249b572e527ea2031a52cc2e3cbfd587831a7c55fbc6"
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "99b33dc0aea397a804b9d1f0053c31908a2258fc62576d6312f93fd0bc81771c"
+      "sha256": "ae4630112a67c63669adec8e938a55a6eefefe9e75ab10d6dc292476be1c3b82"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",
@@ -5989,7 +5989,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "89b28dcef39d92ff05d4cc255e30bf1cd42691fb83c8474f99d72f85f68c9144"
+      "sha256": "ef817a3ff6ddbd829e5a99ddb84cce813b4705c8ef9ee17f99585d49254d81e6"
     },
     {
       "path": "tooling/tests/linux_status_notifier_test.cc",
@@ -6045,7 +6045,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "0d2222269b00791907ef978b5e426a60198bfb80fc5244c2fede32d89d33a961"
+      "sha256": "b08218fe0ef3b0f74e036d86111747490e26093780b713f4aeb5f0ca2b4ec826"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",

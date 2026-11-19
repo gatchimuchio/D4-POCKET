@@ -101,46 +101,107 @@ pub fn run() -> io::Result<()> {
         return Err(failure());
     }
     let bundle = verify_bundle(&std::env::current_exe()?)?;
-    let home = PathBuf::from(std::env::var_os("HOME").ok_or_else(failure)?);
-    let home = verify_owned_directory(&home, false)?;
-    let state = match std::env::var_os("XDG_STATE_HOME") {
-        Some(path) => {
-            let base = verify_owned_directory(Path::new(&path), false)?;
-            private_directory(&base, &["d4-pocket", "linux-broker"], 0)?
-        }
-        None => private_directory(&home, &[".local", "state", "d4-pocket", "linux-broker"], 2)?,
-    };
-    let runtime = prepare_runtime_directory()?;
+    let product_identity =
+        crate::broker::update_center::embedded_product_identity().map_err(|_| failure())?;
+    let directories = BrokerDirectories::prepare(
+        &state_home(true)?,
+        &runtime_home()?,
+        product_identity.as_ref(),
+    )?;
     let launch_nonce = std::env::var(crate::linux_desktop_launcher::LAUNCH_NONCE_ENV).ok();
     serve(
-        &state,
-        &runtime,
+        &directories,
         &bundle,
+        product_identity,
         launch_nonce.as_deref(),
         &mut io::stdin().lock(),
         &mut io::stdout().lock(),
     )
 }
 
-pub(crate) fn prepare_runtime_directory() -> io::Result<PathBuf> {
-    let runtime_base = PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").ok_or_else(failure)?);
-    let runtime_base = verify_owned_directory(&runtime_base, true)?;
-    private_directory(&runtime_base, &["d4-pocket", "linux-broker"], 0)
+struct BrokerDirectories {
+    state: PathBuf,
+    runtime: PathBuf,
+    protected_workspace_roots: Vec<PathBuf>,
 }
 
-pub(crate) fn existing_store_directory() -> io::Result<PathBuf> {
+impl BrokerDirectories {
+    fn prepare(
+        state_home: &Path,
+        runtime_home: &Path,
+        identity: Option<&(String, String)>,
+    ) -> io::Result<Self> {
+        Ok(Self {
+            state: prepare_broker_directory(state_home, identity)?,
+            runtime: prepare_broker_directory(runtime_home, identity)?,
+            protected_workspace_roots: vec![
+                state_home.join("d4-pocket"),
+                runtime_home.join("d4-pocket"),
+            ],
+        })
+    }
+}
+
+fn state_home(create: bool) -> io::Result<PathBuf> {
     let home = PathBuf::from(std::env::var_os("HOME").ok_or_else(failure)?);
     let home = verify_owned_directory(&home, false)?;
-    let state_base = match std::env::var_os("XDG_STATE_HOME") {
-        Some(path) => verify_owned_directory(Path::new(&path), false)?,
-        None => verify_owned_directory(&home.join(".local").join("state"), false)?,
-    };
-    let mut state = state_base.join("d4-pocket");
-    state = verify_owned_directory(&state, true)?;
-    state.push("linux-broker");
-    state = verify_owned_directory(&state, true)?;
-    let store = verify_owned_directory(&state.join("store"), false)?;
-    Ok(store)
+    match std::env::var_os("XDG_STATE_HOME") {
+        Some(path) => verify_owned_directory(Path::new(&path), false),
+        None if create => private_directory(&home, &[".local", "state"], 2),
+        None => {
+            let local = verify_owned_directory(&home.join(".local"), false)?;
+            verify_owned_directory(&local.join("state"), false)
+        }
+    }
+}
+
+fn runtime_home() -> io::Result<PathBuf> {
+    let runtime_base = PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").ok_or_else(failure)?);
+    verify_owned_directory(&runtime_base, true)
+}
+
+fn broker_directory_components(identity: Option<&(String, String)>) -> io::Result<Vec<&str>> {
+    use crate::broker::update_center::valid_product_identity;
+
+    match identity {
+        Some((app_id, audit_store_id))
+            if valid_product_identity(app_id, "d4-pocket-app-")
+                && valid_product_identity(audit_store_id, "audit-store-") =>
+        {
+            Ok(vec![
+                "d4-pocket",
+                "products",
+                app_id,
+                audit_store_id,
+                "linux-broker",
+            ])
+        }
+        Some(_) => Err(failure()),
+        None => Ok(vec!["d4-pocket", "linux-broker"]),
+    }
+}
+
+pub(crate) fn prepare_broker_directory(
+    base: &Path,
+    identity: Option<&(String, String)>,
+) -> io::Result<PathBuf> {
+    private_directory(base, &broker_directory_components(identity)?, 0)
+}
+
+pub(crate) fn prepare_runtime_directory(identity: &(String, String)) -> io::Result<PathBuf> {
+    prepare_broker_directory(&runtime_home()?, Some(identity))
+}
+
+fn open_product_store(base: PathBuf, identity: &(String, String)) -> io::Result<PathBuf> {
+    let mut state = base;
+    for name in broker_directory_components(Some(identity))? {
+        state = verify_owned_directory(&state.join(name), true)?;
+    }
+    verify_owned_directory(&state.join("store"), true)
+}
+
+pub(crate) fn existing_store_directory(identity: &(String, String)) -> io::Result<PathBuf> {
+    open_product_store(state_home(false)?, identity)
 }
 
 fn verify_bundle(helper: &Path) -> io::Result<VerifiedBundle> {
@@ -264,13 +325,15 @@ impl Drop for NormalEndpoint {
 }
 
 fn serve(
-    state: &Path,
-    runtime: &Path,
+    directories: &BrokerDirectories,
     bundle: &VerifiedBundle,
+    product_identity: Option<(String, String)>,
     launch_nonce: Option<&str>,
     input: &mut impl BufRead,
     output: &mut impl Write,
 ) -> io::Result<()> {
+    let state = &directories.state;
+    let runtime = &directories.runtime;
     let _lock = RunLock::acquire(runtime)?;
     let export_root = open_export_directory(state)?;
     let store = private_directory(state, &["store"], 0)?;
@@ -282,8 +345,7 @@ fn serve(
     let mut config = BrokerServerConfig::new(store, session.clone());
     config.max_request_bytes = REQUEST_LIMIT;
     config.desktop_package_layout_verified = true;
-    let product_identity =
-        crate::broker::update_center::embedded_product_identity().map_err(|_| failure())?;
+    config.desktop_workspace_protected_roots = directories.protected_workspace_roots.clone();
     let product_data_home = crate::broker::product_install::current_user_local_app_data().ok();
     let desktop_install_path_verified = installed_product_path_verified(
         bundle,
@@ -762,6 +824,86 @@ mod tests {
             "d4-linux-bundle-{label}-{}-{nonce}",
             std::process::id()
         ))
+    }
+
+    #[test]
+    fn exported_products_keep_separate_broker_state_and_runtime_locks() {
+        let root = unique_test_root("product-namespaces");
+        fs::create_dir(&root).unwrap();
+        let state_home = private_directory(&root, &["state"], 0).unwrap();
+        let runtime_home = private_directory(&root, &["runtime"], 0).unwrap();
+        let legacy = prepare_broker_directory(&state_home, None).unwrap();
+        let legacy_store = private_directory(&legacy, &["store"], 0).unwrap();
+        fs::write(legacy_store.join("legacy-marker"), b"untouched").unwrap();
+
+        let first = (PRODUCT_APP_ID.into(), PRODUCT_AUDIT_ID.into());
+        let second = (
+            format!("d4-pocket-app-{}", "3".repeat(32)),
+            format!("audit-store-{}", "4".repeat(32)),
+        );
+        assert_eq!(
+            open_product_store(state_home.clone(), &first)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::NotFound
+        );
+        let first_paths =
+            BrokerDirectories::prepare(&state_home, &runtime_home, Some(&first)).unwrap();
+        let second_paths =
+            BrokerDirectories::prepare(&state_home, &runtime_home, Some(&second)).unwrap();
+        let first_store = private_directory(&first_paths.state, &["store"], 0).unwrap();
+        let second_store = private_directory(&second_paths.state, &["store"], 0).unwrap();
+        crate::broker::Broker::new_persistent("app-one", &first_store).unwrap();
+        crate::broker::Broker::new_persistent("app-two", &second_store).unwrap();
+        assert!(
+            fs::read(first_store.join("audit_anchor.key")).unwrap()
+                != fs::read(second_store.join("audit_anchor.key")).unwrap()
+        );
+        assert_eq!(
+            open_product_store(state_home.clone(), &first).unwrap(),
+            first_store
+        );
+        assert_eq!(
+            open_product_store(state_home.clone(), &second).unwrap(),
+            second_store
+        );
+        assert_eq!(
+            fs::read(legacy_store.join("legacy-marker")).unwrap(),
+            b"untouched"
+        );
+
+        for candidate in [&legacy_store, &second_store, &second_paths.runtime] {
+            let result = crate::broker::workspace_root::open_isolated_root_with_ancestry(
+                candidate,
+                &first_paths.protected_workspace_roots,
+            );
+            assert!(result.is_err());
+        }
+        let first_lock = RunLock::acquire(&first_paths.runtime).unwrap();
+        let second_lock = RunLock::acquire(&second_paths.runtime).unwrap();
+        assert!(RunLock::acquire(&first_paths.runtime).is_err());
+        drop((first_lock, second_lock));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn product_namespace_rejects_invalid_identity_and_linked_store() {
+        use std::os::unix::fs::symlink;
+
+        let root = unique_test_root("unsafe-product-namespace");
+        fs::create_dir(&root).unwrap();
+        let invalid = ("../other-app".into(), PRODUCT_AUDIT_ID.into());
+        assert!(prepare_broker_directory(&root, Some(&invalid)).is_err());
+        assert!(!root.join("d4-pocket").exists());
+
+        let identity = (PRODUCT_APP_ID.into(), PRODUCT_AUDIT_ID.into());
+        let state = prepare_broker_directory(&root, Some(&identity)).unwrap();
+        let legacy = prepare_broker_directory(&root, None).unwrap();
+        let legacy_store = private_directory(&legacy, &["store"], 0).unwrap();
+        symlink(legacy_store, state.join("store")).unwrap();
+        assert!(private_directory(&state, &["store"], 0).is_err());
+        assert!(open_product_store(root.clone(), &identity).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

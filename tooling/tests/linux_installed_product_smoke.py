@@ -226,6 +226,15 @@ def _linux_runtime_artifact_inventory(root: Path) -> tuple[list[dict[str, object
     return records, total_bytes, tree_hash.hexdigest()
 
 
+def _broker_state_directory(state_home: Path, app_id: str, audit_store_id: str) -> Path:
+    if (
+        re.fullmatch(r"d4-pocket-app-[0-9a-f]{32}", app_id) is None
+        or re.fullmatch(r"audit-store-[0-9a-f]{32}", audit_store_id) is None
+    ):
+        raise RuntimeError("監査の製品identityが不正です")
+    return state_home / "d4-pocket" / "products" / app_id / audit_store_id / "linux-broker"
+
+
 def _verify_linux_installed_artifact_provenance(
     *,
     build_evidence_path: Path,
@@ -386,7 +395,7 @@ def _verify_linux_installed_artifact_provenance(
     except OSError as error:
         raise RuntimeError("固定root launcherを確認できません") from error
 
-    audit_store = xdg_state_home / "d4-pocket" / "linux-broker" / "store"
+    audit_store = _broker_state_directory(xdg_state_home, app_id, audit_store_id) / "store"
     return {
         "evidence_source": "LIVE_RUNTIME",
         "source_commit": source_commit,
@@ -409,7 +418,7 @@ def _verify_linux_installed_artifact_provenance(
         "audit_store_identity": {
             "audit_store_id": audit_store_id,
             "path": str(audit_store),
-            "path_contract": "XDG_STATE_HOME/d4-pocket/linux-broker/store",
+            "path_contract": "XDG_STATE_HOME/d4-pocket/products/<app_id>/<audit_store_id>/linux-broker/store",
         },
     }
 
@@ -10339,7 +10348,7 @@ def run_installed_smoke(
             package_hash = hashlib.sha256(package_bytes).hexdigest()
             stage_directory = product_root / "versions" / f"{product_version}-{package_hash}"
             desktop_entry = xdg_data_home / "applications" / f"com.d4pocket.{APP_ID}.desktop"
-            broker_state = xdg_state_home / "d4-pocket/linux-broker"
+            broker_state = _broker_state_directory(xdg_state_home, APP_ID, AUDIT_ID)
             audit_store = broker_state / "store"
             package_store = audit_store / "update_packages" / f"{package_hash}.pkg"
             bootstrap_launcher = Path("/opt/d4-pocket/setup/gui_shell_desktop_launcher")
@@ -10669,7 +10678,7 @@ def run_installed_smoke(
             helper.resolve(),
             *(path.resolve() for path in previous_binaries),
         }
-        broker_state = xdg_state_home / "d4-pocket/linux-broker"
+        broker_state = _broker_state_directory(xdg_state_home, APP_ID, AUDIT_ID)
         export_root = broker_state / "exports"
         preexisting = _processes_using(product_paths)
         if preexisting:

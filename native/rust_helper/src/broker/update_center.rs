@@ -669,7 +669,7 @@ fn product_identity_from_build(
     }
 }
 
-fn valid_product_identity(value: &str, prefix: &str) -> bool {
+pub(crate) fn valid_product_identity(value: &str, prefix: &str) -> bool {
     value.strip_prefix(prefix).is_some_and(|suffix| {
         suffix.len() == 32
             && suffix
@@ -8559,17 +8559,11 @@ mod tests {
         let state_metadata = std::fs::symlink_metadata(&state_home).unwrap();
         assert!(install_metadata.is_dir() && !install_metadata.file_type().is_symlink());
         assert!(state_metadata.is_dir() && !state_metadata.file_type().is_symlink());
-        let product_state = state_home.join("d4-pocket");
-        let broker_state = product_state.join("linux-broker");
+        let identity = (INSTALL_APP_ID.to_owned(), INSTALL_AUDIT_ID.to_owned());
+        let broker_state =
+            crate::linux_desktop_worker::prepare_broker_directory(&state_home, Some(&identity))
+                .unwrap();
         let store_root = broker_state.join("store");
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&product_state)
-            .unwrap();
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&broker_state)
-            .unwrap();
         std::fs::DirBuilder::new()
             .mode(0o700)
             .create(&store_root)
@@ -8855,10 +8849,11 @@ mod tests {
         let install_root = std::path::PathBuf::from(
             std::env::var_os("XDG_DATA_HOME").expect("XDG_DATA_HOMEが必要です"),
         );
-        let state_home = std::path::PathBuf::from(
-            std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOMEが必要です"),
-        );
-        let store_root = state_home.join("d4-pocket/linux-broker/store");
+        let store_root = crate::linux_desktop_worker::existing_store_directory(&(
+            INSTALL_APP_ID.to_owned(),
+            INSTALL_AUDIT_ID.to_owned(),
+        ))
+        .unwrap();
         let update_package_metadata = std::fs::symlink_metadata(&update_package_path).unwrap();
         assert!(update_package_metadata.is_file());
         assert!(!update_package_metadata.file_type().is_symlink());
@@ -9049,10 +9044,11 @@ mod tests {
     #[test]
     #[ignore = "explicit Ubuntu installed-product GTK acceptance harness"]
     fn linux_installed_acceptance_runtime_audit_is_durable() {
-        let state_home = std::path::PathBuf::from(
-            std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOMEが必要です"),
-        );
-        let store_root = state_home.join("d4-pocket/linux-broker/store");
+        let store_root = crate::linux_desktop_worker::existing_store_directory(&(
+            INSTALL_APP_ID.to_owned(),
+            INSTALL_AUDIT_ID.to_owned(),
+        ))
+        .unwrap();
         let broker = Broker::new_persistent("linux-installed-audit-check", &store_root).unwrap();
         let started = broker.audit_events().iter().position(|event| {
             event.operation == "D4 Pocket Desktop起動"
