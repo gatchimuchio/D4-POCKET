@@ -8,6 +8,7 @@ import plistlib
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -70,6 +71,31 @@ def _ensure_owned_directory(root: pathlib.Path, home: pathlib.Path) -> None:
     resolved_root = root.resolve(strict=True)
     if not resolved_root.is_relative_to(resolved_home):
         raise RuntimeError("installer smoke cleanup対象がuser home外へ解決された")
+
+
+def _require_protected_install_path(path: pathlib.Path, *, directory: bool) -> None:
+    metadata = path.lstat()
+    type_matches = stat.S_ISDIR(metadata.st_mode) if directory else stat.S_ISREG(metadata.st_mode)
+    if not type_matches or (metadata.st_uid, metadata.st_gid) != (0, 0) or metadata.st_mode & 0o022:
+        raise RuntimeError(f"macOS installed App Bundleの所有者・modeまたは種別が不正: {path.name}")
+
+
+def _verify_installed_bundle(app_path: pathlib.Path, bundle_id: str) -> None:
+    contents = app_path / "Contents"
+    macos = contents / "MacOS"
+    for path in (app_path, contents, macos):
+        _require_protected_install_path(path, directory=True)
+    info_path = contents / "Info.plist"
+    _require_protected_install_path(info_path, directory=False)
+    with info_path.open("rb") as stream:
+        installed_info = plistlib.load(stream)
+    if installed_info.get("CFBundleIdentifier") != bundle_id:
+        raise RuntimeError("native Installer後のBundle IDが一致しない")
+    executable = installed_info.get("CFBundleExecutable")
+    if not isinstance(executable, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", executable) is None:
+        raise RuntimeError("native Installer後のApp実行file名が不正")
+    for path in (macos / executable, macos / "gui_shell_macos_broker"):
+        _require_protected_install_path(path, directory=False)
 
 
 def _process_snapshot() -> list[tuple[int, int, str]]:
@@ -181,15 +207,7 @@ def run_installer_smoke(
             ["/usr/bin/sudo", "/usr/sbin/installer", "-pkg", str(output_dir / identity["package_name"]), "-target", "/"],
             check=True,
         )
-        if app_path.is_symlink() or not app_path.is_dir():
-            raise RuntimeError("native InstallerがApp Bundleを配置しなかった")
-        info_path = app_path / "Contents/Info.plist"
-        if info_path.is_symlink() or not info_path.is_file():
-            raise RuntimeError("installed App Info.plistが通常fileではない")
-        with info_path.open("rb") as stream:
-            installed_info = plistlib.load(stream)
-        if installed_info.get("CFBundleIdentifier") != identity["bundle_id"]:
-            raise RuntimeError("native Installer後のBundle IDが一致しない")
+        _verify_installed_bundle(app_path, identity["bundle_id"])
 
         launch = verify_installed_launch(app_path, identity["bundle_id"], launch_evidence_path)
         subprocess.run(
@@ -201,12 +219,7 @@ def run_installer_smoke(
             ["/usr/bin/sudo", "/usr/sbin/installer", "-pkg", str(output_dir / identity["package_name"]), "-target", "/"],
             check=True,
         )
-        if app_path.is_symlink() or not app_path.is_dir():
-            raise RuntimeError("native Installer repairがApp Bundleを復元しなかった")
-        with (app_path / "Contents/Info.plist").open("rb") as stream:
-            repaired_info = plistlib.load(stream)
-        if repaired_info.get("CFBundleIdentifier") != identity["bundle_id"]:
-            raise RuntimeError("native Installer repair後のBundle IDが一致しない")
+        _verify_installed_bundle(app_path, identity["bundle_id"])
 
         subprocess.run(
             ["/usr/bin/sudo", "/usr/sbin/installer", "-pkg", str(output_dir / identity["uninstaller_name"]), "-target", "/"],
@@ -227,9 +240,17 @@ def run_installer_smoke(
             "bundle_identifier": identity["bundle_id"],
             "install_package_sha256": record["package"]["sha256"],
             "uninstaller_package_sha256": record["uninstaller_package"]["sha256"],
-            "install": {"native_installer_completed": True, "bundle_identifier_verified": True},
+            "install": {
+                "native_installer_completed": True,
+                "bundle_identifier_verified": True,
+                "protected_bundle_entrypoints_verified": True,
+            },
             "installed_launch": launch,
-            "repair": {"same_package_reapplied_after_app_removal": True, "bundle_restored": True},
+            "repair": {
+                "same_package_reapplied_after_app_removal": True,
+                "bundle_restored": True,
+                "protected_bundle_entrypoints_verified": True,
+            },
             "uninstall": {
                 "native_installer_completed": True,
                 "matching_bundle_removed": True,

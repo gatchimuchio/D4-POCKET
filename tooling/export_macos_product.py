@@ -231,6 +231,49 @@ def render_macos_uninstaller_postinstall(
     return template
 
 
+def _build_macos_installer_package(
+    app_bundle: Path,
+    package_path: Path,
+    build_root: Path,
+    manifest_raw: bytes,
+    *,
+    pkgbuild: str,
+    installer_id: str,
+    version: str,
+    environment: dict[str, str],
+) -> Path:
+    payload_root = build_root / "payload"
+    payload_root.mkdir(mode=0o755)
+    install_bundle = payload_root / app_bundle.name
+    shutil.copytree(app_bundle, install_bundle, symlinks=True)
+    payload_manifest = install_bundle / "Contents/Resources/product_manifest.json"
+    if payload_manifest.read_bytes() != manifest_raw:
+        raise ValueError("package staging App BundleがProduct Manifestを保持していない")
+
+    components = build_root / "installer-components.plist"
+    with components.open("xb") as stream:
+        plistlib.dump(
+            [{
+                "RootRelativeBundlePath": app_bundle.name,
+                "BundleIsRelocatable": False,
+                "BundleHasStrictIdentifier": True,
+                "BundleIsVersionChecked": True,
+                "BundleOverwriteAction": "upgrade",
+            }],
+            stream,
+        )
+    _run(
+        [pkgbuild, "--root", str(payload_root), "--component-plist", str(components),
+         "--identifier", installer_id, "--version", version,
+         "--install-location", "/Applications", "--ownership", "recommended",
+         str(package_path)],
+        cwd=build_root,
+        environment=environment,
+    )
+    _require_file(package_path, "macOS package candidate")
+    return payload_manifest
+
+
 def _darwin_build_architecture() -> str:
     machine = platform.machine().lower()
     architecture = DARWIN_ARCHITECTURES.get(machine)
@@ -2120,21 +2163,17 @@ def build_macos_product(
         )
         _require_file(app_archive_path, "macOS App archive")
 
-        payload_root = temporary_root / "payload"
-        install_bundle = payload_root / "Applications" / bundle_name
-        install_bundle.parent.mkdir(parents=True, mode=0o700)
-        shutil.copytree(app_bundle, install_bundle, symlinks=True)
-        if (install_bundle / "Contents/Resources/product_manifest.json").read_bytes() != manifest_raw:
-            raise ValueError("package staging App BundleがProduct Manifestを保持していない")
         package_path = staging_root / f"D4Pocket-{suffix[:12]}.pkg"
-        _run(
-            [tools["pkgbuild"], "--root", str(payload_root), "--identifier", installer_id,
-             "--version", version, "--install-location", "/", "--ownership", "preserve",
-             str(package_path)],
-            cwd=source_root,
+        payload_manifest = _build_macos_installer_package(
+            app_bundle,
+            package_path,
+            temporary_root,
+            manifest_raw,
+            pkgbuild=tools["pkgbuild"],
+            installer_id=installer_id,
+            version=version,
             environment=environment,
         )
-        _require_file(package_path, "macOS package candidate")
 
         uninstaller_template_path = source_root / "installer/macos/uninstall/postinstall.sh.in"
         uninstaller_template = _read_regular_file(
@@ -2162,8 +2201,7 @@ def build_macos_product(
         )
         _require_file(uninstaller_package_path, "macOS uninstaller package candidate")
 
-        package_manifest = (install_bundle / "Contents/Resources/product_manifest.json").read_bytes()
-        if product_manifest.read_bytes() != manifest_raw or package_manifest != manifest_raw:
+        if product_manifest.read_bytes() != manifest_raw or payload_manifest.read_bytes() != manifest_raw:
             raise ValueError("Export Manifestがpackage対象App Bundleから変化した")
         records, regular_files, total_bytes, tree_hash = _macos_artifact_inventory(
             staging_root, app_bundle

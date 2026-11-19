@@ -4,9 +4,9 @@
 
 ## Install, update, repair
 
-- The install package is a macOS flat `.pkg` that places the exported App Bundle under `/Applications` through the native Installer.
+- The macOS flat `.pkg` contains the exported App Bundle and directs Installer to `/Applications`. Its component rules disable relocation, require the same Bundle ID at the install path, and preserve a newer installed version.
 - Its package identifier is derived from the persistent Export App bundle identifier. A later version for the same App identity keeps this identifier so macOS Installer can treat it as the same package.
-- Repair uses the same package to restore the App Bundle payload. The manual hosted smoke will verify reinstall after removing the candidate App Bundle.
+- The package uses macOS system ownership for installed payload files. Installer replaces the App Bundle as a component, which removes files omitted from the new version. Repair uses the same package to restore a missing App Bundle.
 - Packages remain unsigned candidates until the separately controlled Publisher identity and signing work is authorized and completed.
 
 ## Removal
@@ -18,4 +18,4 @@
 
 ## Current evidence boundary
 
-The source recipe and build evidence are implemented. The next manual `workflow_dispatch` is intended to exercise install, repair, and removal on an ephemeral hosted macOS runner, using a fixed test identity and a user-data preservation marker. It does not launch the GUI or validate sandbox, Keychain use, permissions, formal signing/notarization, or public distribution. Those remain separate product requirements and evidence gates.
+The manual `macos_export` workflow installs the candidate on an ephemeral macOS runner, opens the installed app and its Broker, repairs the candidate after removing its App Bundle, and runs the matching uninstaller. The smoke checks root ownership, wheel group, and write permissions for the Bundle entry points after install and repair. A marker checks preservation of user data during removal. Formal signing, notarization, and distribution require separate evidence.

@@ -17,6 +17,7 @@ from tooling.export_macos_product import (
     MACOS_AOT_IMAGE_RELATIVE_PATH,
     MACOS_AOT_REPORT_ROOT,
     FlutterFrameworkReference,
+    _build_macos_installer_package,
     _capture_macos_aot_surface_analysis,
     _load_catalog,
     _macos_bundle_tree_sha256,
@@ -542,6 +543,47 @@ class MacOSProductExportTests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             bundle_identifier_for_app("d4-pocket-app-../outside")
+
+    def test_installer_packages_one_fixed_application_with_system_ownership(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            build = root / "build"
+            build.mkdir()
+            bundle = root / "D4Pocket-333333333333.app"
+            resources = bundle / "Contents/Resources"
+            resources.mkdir(parents=True)
+            manifest = b'{"manifest":"fixture"}\n'
+            (resources / "product_manifest.json").write_bytes(manifest)
+            package = root / "D4Pocket-333333333333.pkg"
+            installer_id = bundle_identifier_for_app(APP_ID) + ".installer"
+
+            def pkgbuild(command, *, cwd, environment):
+                self.assertEqual(cwd, build)
+                self.assertEqual(command[0], "/usr/bin/pkgbuild")
+                arguments = dict(zip(command[1:-1:2], command[2:-1:2], strict=True))
+                self.assertEqual(arguments["--install-location"], "/Applications")
+                self.assertEqual(arguments["--ownership"], "recommended")
+                self.assertEqual(arguments["--identifier"], installer_id)
+                payload = Path(arguments["--root"])
+                self.assertEqual(list(payload.iterdir()), [payload / bundle.name])
+                with Path(arguments["--component-plist"]).open("rb") as stream:
+                    self.assertEqual(plistlib.load(stream), [{
+                        "RootRelativeBundlePath": bundle.name,
+                        "BundleIsRelocatable": False,
+                        "BundleHasStrictIdentifier": True,
+                        "BundleIsVersionChecked": True,
+                        "BundleOverwriteAction": "upgrade",
+                    }])
+                self.assertEqual(Path(command[-1]), package)
+                package.write_bytes(b"package fixture")
+
+            with patch("tooling.export_macos_product._run", side_effect=pkgbuild) as run:
+                staged_manifest = _build_macos_installer_package(
+                    bundle, package, build, manifest, pkgbuild="/usr/bin/pkgbuild",
+                    installer_id=installer_id, version="1.2.3", environment={},
+                )
+            run.assert_called_once()
+            self.assertEqual(staged_manifest.read_bytes(), manifest)
 
     def test_uninstaller_script_is_bound_to_one_export_identity(self) -> None:
         root = Path(__file__).resolve().parents[2]
