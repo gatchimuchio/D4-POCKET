@@ -61,6 +61,10 @@ RUST_PROVIDER_CREDENTIAL_TEST = (
 )
 MCP_PUBLIC_INPUT = "installed-mcp-public-input"
 MCP_RESULT_PREFIX = "D4P_MCP_RESULT_PROBE_"
+MCP_FOLLOWUP_EFFECTS = {
+    "a": ("mcp-result-a.txt", b"action-a\n"),
+    "b": ("mcp-result-b.txt", b"action-b\n"),
+}
 MCP_TEST_CREDENTIAL_ENV = "D4P_MCP_TEST_CREDENTIAL"
 MCP_CREDENTIAL_USE_PREFIX = "MCP資格情報使用:"
 MCP_OWNER_WORKSPACE_LABEL = "Workspace: "
@@ -2407,7 +2411,10 @@ def _write_linux_mcp_fixture(
     acceptance_root: Path,
     *,
     expected_credential_sha256: str | None = None,
+    result_case: str | None = None,
 ) -> tuple[Path, Path, str, str]:
+    if result_case is not None and result_case not in MCP_FOLLOWUP_EFFECTS:
+        raise ValueError("MCP試験結果の条件が不正です")
     workspace = acceptance_root / "mcp-workspace"
     workspace.mkdir(mode=0o700)
     metadata = workspace.lstat()
@@ -2435,7 +2442,8 @@ def _write_linux_mcp_fixture(
         ):
             raise RuntimeError("MCP資格情報の試験用照合fileがprivateではありません")
 
-    fixture = temp_root / "linux-installed-mcp-server.py"
+    fixture_root = acceptance_root if result_case is not None else temp_root
+    fixture = fixture_root / "linux-installed-mcp-server.py"
     if fixture.exists() or fixture.is_symlink():
         raise RuntimeError("実行単位所有のMCP試験用pathが既に使われています")
     source = '''import json
@@ -2548,6 +2556,8 @@ for line in sys.stdin:
         raise RuntimeError("実行単位所有のMCP試験用fileが非公開の通常fileではありません")
 
     seed = secrets.token_hex(16)
+    if result_case is not None:
+        seed = result_case + seed[1:]
     result_marker = MCP_RESULT_PREFIX + seed
     return workspace, fixture, seed, result_marker
 
@@ -4324,7 +4334,7 @@ class _LinuxAgentTaskResponsesServer:
                 mcp_tool_request is not None
                 or not isinstance(required_input_marker, str)
                 or re.fullmatch(
-                    re.escape(MCP_RESULT_PREFIX) + r"[a-f0-9]{32}",
+                    re.escape(MCP_RESULT_PREFIX) + r"[ab][a-f0-9]{31}",
                     required_input_marker,
                 )
                 is None
@@ -4558,10 +4568,8 @@ class _LinuxAgentTaskResponsesServer:
                     )
                 self._rejections.append("unexpected_mcp_proposal_request_sequence")
                 raise RuntimeError("unexpected MCP proposal request sequence")
-            if scenario.get("name") == "mcp_followup":
-                if posts != 1:
-                    self._rejections.append("unexpected_mcp_followup_request_count")
-                    raise RuntimeError("unexpected MCP follow-up request count")
+            is_mcp_followup = scenario.get("name") == "mcp_followup"
+            if is_mcp_followup and posts == 1:
                 serialized_request = json.dumps(
                     request, ensure_ascii=False, sort_keys=True, separators=(",", ":")
                 )
@@ -4569,24 +4577,24 @@ class _LinuxAgentTaskResponsesServer:
                 if "D4P_SYNTHETIC_SECRET_CANARY" in serialized_request:
                     self._rejections.append("synthetic_secret_canary_in_followup_request")
                     raise RuntimeError("secret canary exposed in follow-up input")
-                if (
-                    not isinstance(required_marker, str)
-                    or required_marker not in serialized_request
-                ):
+                input_markers = set(
+                    re.findall(
+                        re.escape(MCP_RESULT_PREFIX) + r"[a-f0-9]{32}\b",
+                        json.dumps(input_items, ensure_ascii=False),
+                    )
+                )
+                if input_markers != {required_marker}:
                     self._rejections.append("mcp_result_marker_missing_from_followup_input")
-                    raise RuntimeError("MCP result marker missing from follow-up input")
+                    raise RuntimeError("MCP result markers do not match the current follow-up input")
+                marker = next(iter(input_markers))
+                effect_file, content = MCP_FOLLOWUP_EFFECTS[marker[len(MCP_RESULT_PREFIX)]]
+                effect_text = content.decode("ascii").rstrip("\n")
+                # 結果は固定の二候補を選ぶ。受信本文はコマンドへ入れない。
+                scenario["command"] = f"printf '%s\\n' '{effect_text}' > {effect_file}"
                 scenario["required_input_marker_observed"] = True
                 scenario["mcp_input_sha256"] = hashlib.sha256(
                     serialized_request.encode("utf-8")
                 ).hexdigest()
-                return _responses_final_message_events(
-                    posts,
-                    message_text=(
-                        scenario.get("final_message")
-                        if isinstance(scenario.get("final_message"), str)
-                        else "D4P installed result-dependent follow-up completed."
-                    ),
-                )
             if posts == 1 and not tool_outputs and offers_exec:
                 scenario["tool_calls"] = 1
                 call_id = "call_d4p_linux_agent_task_1"
@@ -4650,6 +4658,8 @@ class _LinuxAgentTaskResponsesServer:
                     self._rejections.append("tool_output_call_id_mismatch")
                     raise RuntimeError("tool output id mismatch")
                 output_text = output.get("output")
+                if is_mcp_followup:
+                    output_text = _mcp_proposal_function_output_text(output_text)
                 if not isinstance(output_text, str):
                     self._rejections.append("tool_output_not_text")
                     raise RuntimeError("tool output missing")
@@ -4660,7 +4670,11 @@ class _LinuxAgentTaskResponsesServer:
                 scenario["tool_output_sha256"] = hashlib.sha256(
                     output_text.encode("utf-8", errors="replace")
                 ).hexdigest()
-                return _responses_final_message_events(posts)
+                final_message = scenario.get("final_message") if is_mcp_followup else None
+                return _responses_final_message_events(
+                    posts,
+                    message_text=final_message if isinstance(final_message, str) else None,
+                )
             self._rejections.append("unexpected_response_request_shape")
             raise RuntimeError("unexpected request sequence")
 
@@ -5659,7 +5673,6 @@ def _installed_task_response_fixture_diagnostics(
         "tool_output_call_id_mismatch",
         "tool_output_not_text",
         "unexpected_delete",
-        "unexpected_mcp_followup_request_count",
         "unexpected_mcp_proposal_request_sequence",
         "unexpected_post",
         "unexpected_put",
@@ -7643,9 +7656,10 @@ def _run_installed_agent_mcp_followup_acceptance(
     audit_store: Path,
     temp_root: Path,
     acceptance_root: Path,
+    result_case: str,
 ) -> dict[str, object]:
     mcp_workspace, mcp_fixture, mcp_seed, result_marker = _write_linux_mcp_fixture(
-        temp_root, acceptance_root
+        temp_root, acceptance_root, result_case=result_case
     )
     _fixture_root, task_workspace, _outside_file = _write_linux_agent_task_fixture(
         acceptance_root
@@ -7718,9 +7732,9 @@ def _run_installed_agent_mcp_followup_acceptance(
     _wait_for_mcp_group_state(mcp_pgid, True)
 
     task_instruction = (
-        "Use the currently offered D4 Pocket task MCP capability exactly once to request "
-        "the echo Tool with the public input installed-mcp-public-input. Do not use shell "
-        "or filesystem tools. End this Task after submitting the request."
+        "First request MCP echo with installed-mcp-public-input using the proposal Tool. "
+        "On continuation, read the first hex digit of the MCP result. For a or b, write "
+        "action-a or action-b to mcp-result-a.txt or mcp-result-b.txt, respectively. Finish."
     )
     registration = _open_installed_codex_registration(
         environment, window_id=window_id
@@ -7882,7 +7896,7 @@ def _run_installed_agent_mcp_followup_acceptance(
         "",
         task_workspace,
         required_input_marker=result_marker,
-        final_message="The approved follow-up received and evaluated the actual MCP result.",
+        final_message="The approved follow-up wrote the file selected by the MCP result.",
     )
     followup_diagnostic_index = len(
         responses_server.snapshot()["agent_task_diagnostics"]
@@ -7970,6 +7984,20 @@ def _run_installed_agent_mcp_followup_acceptance(
         raise RuntimeError("Agent CenterのMCP source Task/result hash結合が不正です")
     if f"結果hash: {followup_result_hash}" not in followup_snapshot:
         raise RuntimeError("Agent Centerの後続Task結果hashが完了Auditと一致しません")
+    effect_name, expected_content = MCP_FOLLOWUP_EFFECTS[result_case]
+    effect_path = task_workspace / effect_name
+    if not effect_path.is_file() or effect_path.is_symlink():
+        raise RuntimeError(f"MCP結果{result_case.upper()}に対応するWorkspace作用がありません")
+    metadata = effect_path.stat()
+    if metadata.st_nlink != 1 or metadata.st_size != len(expected_content):
+        raise RuntimeError("MCP後続Taskの作用fileの形式またはサイズが不正です")
+    effect_content = effect_path.read_bytes()
+    if effect_content != expected_content:
+        raise RuntimeError("MCP後続Taskの作用file内容が期待した結果と一致しません")
+    for other_case, (other_name, _) in MCP_FOLLOWUP_EFFECTS.items():
+        other_path = task_workspace / other_name
+        if other_case != result_case and (other_path.exists() or other_path.is_symlink()):
+            raise RuntimeError("MCP後続Taskが別の結果に対応するWorkspace作用も実行しました")
 
     if not call_marker.is_file() or call_marker.is_symlink():
         raise RuntimeError("Agent提案に起因する外部MCP Tool callがありません")
@@ -8105,7 +8133,9 @@ def _run_installed_agent_mcp_followup_acceptance(
             for shape in proposal_shapes
         )
         or not isinstance(followup_row, dict)
-        or followup_row.get("posts") != 1
+        or followup_row.get("posts") != 2
+        or followup_row.get("tool_calls") != 1
+        or followup_row.get("tool_outputs") != 1
         or followup_row.get("required_input_marker_observed") is not True
         or followup_row.get("mcp_input_sha256") is None
     ):
@@ -8134,6 +8164,7 @@ def _run_installed_agent_mcp_followup_acceptance(
         "runtime_id": runtime_id,
         "workspace_id": workspace_id,
         "source_task_id": source_task_id,
+        "source_instruction_hash": starts_by_id[source_task_id]["instruction_hash"],
         "source_task_result_hash": source_result_hash,
         "followup_task_id": followup_task_id,
         "followup_result_hash": followup_result_hash,
@@ -8143,6 +8174,11 @@ def _run_installed_agent_mcp_followup_acceptance(
         "external_mcp_tool_call_count": 1,
         "tool_result_hash": tool_result_hashes[0],
         "actual_result_marker_consumed_by_followup": True,
+        "result_case": result_case,
+        "followup_effect": {
+            "name": effect_name,
+            "sha256": hashlib.sha256(effect_content).hexdigest(),
+        },
         "result_body_absent_from_ui_audit_logs_and_codex_home": True,
         "mcp_connect_owner_rejected_then_allowed": True,
         "mcp_tool_owner_approved_once": True,
@@ -10231,6 +10267,7 @@ def run_installed_smoke(
     source_commit: str | None = None,
     update_candidate_package: Path | None = None,
     update_catalog: Path | None = None,
+    mcp_result_case: str = "a",
 ) -> None:
     needs_x11 = acceptance_scope not in {
         "wayland_rendering",
@@ -11498,6 +11535,7 @@ def run_installed_smoke(
                     audit_store=broker_state / "store",
                     temp_root=temp_root,
                     acceptance_root=acceptance_root,
+                    result_case=mcp_result_case,
                 )
                 current_window_id = _visible_product_window(environment)
                 if current_window_id is None:
@@ -12088,10 +12126,13 @@ def run_installed_smoke(
             and acceptance_root.exists()
             and (acceptance_root / "mcp-workspace").is_dir()
         ):
+            mcp_fixture_root = (
+                acceptance_root if acceptance_scope == "agent_mcp_followup" else temp_root
+            )
             _cleanup_mcp_fixture_group(
                 acceptance_root / "mcp-workspace",
                 helper=installed_helper,
-                fixture=temp_root / "linux-installed-mcp-server.py",
+                fixture=mcp_fixture_root / "linux-installed-mcp-server.py",
             )
         if secret_service_process is not None and secret_service_process.poll() is None:
             _terminate_group(secret_service_process)
@@ -12319,7 +12360,10 @@ def main() -> int:
     parser.add_argument("--build-evidence", type=Path)
     parser.add_argument("--bundle-root", type=Path)
     parser.add_argument("--source-commit")
+    parser.add_argument("--mcp-result-case", choices=tuple(MCP_FOLLOWUP_EFFECTS))
     args = parser.parse_args()
+    if args.mcp_result_case is not None and args.acceptance_scope != "agent_mcp_followup":
+        parser.error("--mcp-result-case は agent_mcp_followup 専用です")
     try:
         run_installed_smoke(
             args.package,
@@ -12334,6 +12378,7 @@ def main() -> int:
             args.source_commit,
             args.update_candidate_package,
             args.update_catalog,
+            mcp_result_case=args.mcp_result_case or "a",
         )
     except Exception as error:
         call_path = _safe_exception_call_path(error)

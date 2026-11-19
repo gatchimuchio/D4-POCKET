@@ -5546,37 +5546,70 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
                 self.assertIsNone(_mcp_proposal_function_output_text(value))
 
     def test_fixture_followup_requires_result_marker_and_rejects_secret_input(self) -> None:
-        marker = "D4P_MCP_RESULT_PROBE_0123456789abcdef0123456789abcdef"
-        descriptor = {
-            "type": "function",
-            "namespace": "d4p_task_request",
-            "name": "d4_submit_mcp_tool_request",
-        }
-        server = _LinuxAgentTaskResponsesServer()
-        self.addCleanup(server.close)
-        server.configure(
-            "mcp_followup",
-            "",
-            Path("/tmp/workspace"),
-            required_input_marker=marker,
+        descriptor = {"type": "function", "name": "exec_command"}
+        marker_a = "D4P_MCP_RESULT_PROBE_a" + "1" * 31
+        marker_b = "D4P_MCP_RESULT_PROBE_b" + "2" * 31
+        for marker, case in ((marker_a, "a"), (marker_b, "b")):
+            with self.subTest(case=case):
+                server = _LinuxAgentTaskResponsesServer()
+                self.addCleanup(server.close)
+                server.configure(
+                    "mcp_followup", "", Path("/tmp/workspace"), required_input_marker=marker
+                )
+                events = server._response_events(
+                    {
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [{"type": "input_text", "text": marker}],
+                            }
+                        ],
+                        "tools": [descriptor],
+                    }
+                )
+                call = next(
+                    event["item"]
+                    for event in events
+                    if event["type"] == "response.output_item.done"
+                )
+                self.assertEqual(call["name"], "exec_command")
+                self.assertEqual(
+                    json.loads(call["arguments"])["cmd"],
+                    f"printf '%s\\n' 'action-{case}' > mcp-result-{case}.txt",
+                )
+                self.assertNotIn(marker, call["arguments"])
+                final_events = server._response_events(
+                    {
+                        "input": [
+                            {
+                                "type": "function_call_output",
+                                "call_id": call["call_id"],
+                                "output": "Command finished with exit code 0.",
+                            }
+                        ],
+                        "tools": [descriptor],
+                    }
+                )
+                self.assertIn("response.completed", [event["type"] for event in final_events])
+                snapshot = server.snapshot()
+                scenario = snapshot["scenarios"][0]
+                self.assertEqual(snapshot["rejections"], [])
+                self.assertTrue(scenario["required_input_marker_observed"])
+                self.assertEqual(scenario["tool_calls"], 1)
+                self.assertEqual(scenario["tool_outputs"], 1)
+                self.assertRegex(scenario["mcp_input_sha256"], r"^[0-9a-f]{64}$")
+                self.assertNotIn(marker, json.dumps(snapshot))
+
+        wrong_result_server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(wrong_result_server.close)
+        wrong_result_server.configure(
+            "mcp_followup", "", Path("/tmp/workspace"), required_input_marker=marker_a
         )
-        request = {
-            "input": [
-                {
-                    "role": "user",
-                    "content": [{"type": "input_text", "text": marker}],
-                }
-            ],
-            "tools": [descriptor],
-        }
-        events = server._response_events(request)
-        self.assertIn("response.completed", [event["type"] for event in events])
-        snapshot = server.snapshot()
-        scenario = snapshot["scenarios"][0]
-        self.assertEqual(snapshot["rejections"], [])
-        self.assertTrue(scenario["required_input_marker_observed"])
-        self.assertRegex(scenario["mcp_input_sha256"], r"^[0-9a-f]{64}$")
-        self.assertNotIn(marker, json.dumps(snapshot))
+        with self.assertRaisesRegex(RuntimeError, "markers do not match"):
+            wrong_result_server._response_events(
+                {"input": [{"role": "user", "content": marker_b}], "tools": [descriptor]}
+            )
+        self.assertEqual(wrong_result_server.snapshot()["scenarios"][0]["tool_calls"], 0)
 
         secret_server = _LinuxAgentTaskResponsesServer()
         self.addCleanup(secret_server.close)
@@ -5584,7 +5617,7 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
             "mcp_followup",
             "",
             Path("/tmp/workspace"),
-            required_input_marker=marker,
+            required_input_marker=marker_a,
         )
         with self.assertRaisesRegex(RuntimeError, "secret canary exposed"):
             secret_server._response_events(
@@ -5595,7 +5628,7 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
                             "content": [
                                 {
                                     "type": "input_text",
-                                    "text": marker
+                                    "text": marker_a
                                     + " D4P_SYNTHETIC_SECRET_CANARY=do-not-send",
                                 }
                             ],

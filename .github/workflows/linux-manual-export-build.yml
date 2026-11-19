@@ -615,16 +615,41 @@ jobs:
         run: |
           set -euo pipefail
           test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
-          acceptance_root="$D4P_EXPORT_ROOT/installed-agent_mcp_followup-acceptance"
-          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
-            --package "$test_package" \
-            --temp-root "$D4P_EXPORT_ROOT" \
-            --acceptance-root "$acceptance_root" \
-            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
-            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
-            --acceptance-scope agent_mcp_followup \
-            --codex-cli "$D4P_LINUX_TASK_CODEX_CLI"
-          printf '\n- LIVE_PRODUCT／r2-e2e: installed GTK／BrokerからCodex CLIがtask-scoped MCP requestを提案し、Owner-approved real MCP Tool resultをfresh Permission／Approval付きsame-Agent Taskが実際に受け取る一巡を実行。run-owned synthetic identityとlocal MCP／Responses fixture。normal Releaseやrelease readinessの証拠ではない。\n' >> "$GITHUB_STEP_SUMMARY"
+          for result_case in a b; do
+            dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+              --package "$test_package" \
+              --temp-root "$D4P_EXPORT_ROOT" \
+              --acceptance-root "$D4P_EXPORT_ROOT/agent-mcp-$result_case" \
+              --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+              --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+              --acceptance-scope agent_mcp_followup \
+              --mcp-result-case "$result_case" \
+              --codex-cli "$D4P_LINUX_TASK_CODEX_CLI" \
+              | tee "$D4P_EXPORT_ROOT/agent-mcp-result-$result_case.jsonl"
+          done
+          python3 - "$D4P_EXPORT_ROOT" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          runs = [
+              json.loads((root / f"agent-mcp-result-{case}.jsonl").read_text().splitlines()[-1])
+              for case in ("a", "b")
+          ]
+          first, second = (run["agent_mcp_followup"] for run in runs)
+          if not (
+              runs[0]["package_sha256"] == runs[1]["package_sha256"]
+              and first["source_instruction_hash"] == second["source_instruction_hash"]
+              and first["result_case"] == "a" and second["result_case"] == "b"
+              and first["tool_result_hash"] != second["tool_result_hash"]
+              and first["followup_effect"]["name"] != second["followup_effect"]["name"]
+              and first["followup_effect"]["sha256"] != second["followup_effect"]["sha256"]
+          ):
+              raise SystemExit("installed MCP A/B結果と後続Taskの実作用の対応が不正です")
+          print("installed MCP A/B: same package and Task instruction, distinct Tool results and Workspace effects")
+          PY
+          printf '\n- LIVE_PRODUCT／r2-e2e: 同一package・同一Task指示で、実Codex CLIがMCPの結果A/Bを受け取った後のWorkspace作用差を二つの隔離profileで照合した。独立したPermission／Approval経路と永続Auditを確認。合成データ・local Responses fixtureを使用。\n' >> "$GITHUB_STEP_SUMMARY"
 
       - name: installed GTK UIからSecret Service Provider認証のAgent Taskを受入れる
         if: ${{ inputs.acceptance_scope == 'provider_credential_binding' && steps.codex_sandbox.outputs.available == 'true' }}
