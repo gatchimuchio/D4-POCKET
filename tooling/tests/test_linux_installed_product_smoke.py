@@ -3650,6 +3650,18 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             )
             self.assertFalse(_desktop_entry_targets_fixed_launcher(entry, launcher))
 
+    def test_accepts_fixed_shell_handoff_for_percent_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            launcher = Path(directory) / "product%Q" / "gui_shell_desktop_launcher"
+            entry = Path(directory) / "D4Pocket-test.desktop"
+            launcher_arg = str(launcher).replace("\\", "\\\\\\\\").replace("%", "%%")
+            command = r'/bin/sh -c "exec \\"\\$1\\"" d4-pocket '
+            content = f'[Desktop Entry]\nType=Application\nExec={command}"{launcher_arg}"'
+            entry.write_text(content + "\n", encoding="utf-8")
+            self.assertTrue(_desktop_entry_targets_fixed_launcher(entry, launcher))
+            entry.write_text(content + " unexpected\n", encoding="utf-8")
+            self.assertFalse(_desktop_entry_targets_fixed_launcher(entry, launcher))
+
     def test_rejects_symlink_desktop_entry(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

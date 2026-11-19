@@ -552,9 +552,18 @@ def _desktop_entry_targets_fixed_launcher(entry: Path, launcher: Path) -> bool:
     if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
         return False
     exec_lines = [line[5:] for line in content.splitlines() if line.startswith("Exec=")]
-    escaped = str(launcher).replace("\\", "\\\\").replace('"', '\\"')
-    escaped = escaped.replace("`", "\\`").replace("$", "\\$").replace("%", "%%")
-    return exec_lines == [f'"{escaped}"']
+
+    def quote(argument: str) -> str:
+        escaped = argument.replace("\\", "\\\\").replace('"', '\\"')
+        escaped = escaped.replace("`", "\\`").replace("$", "\\$").replace("%", "%%")
+        return f'"{escaped}"'
+
+    legacy = quote(str(launcher))
+    current = legacy.replace("\\", "\\\\")
+    if "%" in str(launcher):
+        command = quote('exec "$1"').replace("\\", "\\\\")
+        current = f"/bin/sh -c {command} d4-pocket {current}"
+    return exec_lines in ([current], [legacy])
 
 
 def _resolve_regular_package(package: Path) -> Path:
