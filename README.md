@@ -7,7 +7,7 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 名前のとおり目指すのは、異なる能力やRuntimeを必要に応じて取り出し、安全に組み合わせられる**エージェントのための四次元ポケット**。特定のLLMやBLUE-TANUKI専用のフロントエンドではありません。
 
-[現行仕様 v8](docs/QE_2026-11-16/01_D4Pocket_SPEC_v8_LLM_JA.md) · [現行工程 v8](docs/QE_2026-11-16/02_D4Pocket_PLAN_v8_LLM_JA.md) · [現行施工指示 v8](docs/QE_2026-11-16/03_D4Pocket_CODEX_v8_LLM_JA.md) · [現行進捗 v8](docs/QE_2026-11-16/進捗.md) · [v8採用記録](docs/QE_2026-11-16/採用記録.md) · [v5工程履歴](docs/QE_2026-11-14/進捗.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
+[現行仕様 v8](docs/QE_2026-11-16/01_D4Pocket_SPEC_v8_LLM_JA.md) · [現行工程 v8](docs/QE_2026-11-16/02_D4Pocket_PLAN_v8_LLM_JA.md) · [現行施工指示 v8R2](docs/QE_2026-11-16/03_D4Pocket_CODEX_v8R2_LLM_JA.md) · [現行進捗 v8](docs/QE_2026-11-16/進捗.md) · [v8採用記録](docs/QE_2026-11-16/採用記録.md) · [v5工程履歴](docs/QE_2026-11-14/進捗.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
 
 > **開発中 — 製品リリース未宣言。** 現行正本は[2026-11-16採用のv8三点セット](docs/QE_2026-11-16/採用記録.md)です。現在の工程はE0=`CLOSED`、E1=`IN_PROGRESS`、E2/E3=`OPEN`、E4/E5=`NOT_RUN`、E6=`NOT_STARTED`。E1のA〜J本番Source初回一巡と五OSのinstalled製品QAは未完です。Windows、macOS、Linux、Android、iOSはすべて必須対象で、Linux nativeも未受入れ範囲が残っています。Release Registryは18件中16件が未解決で、`release_ready=false`です。以下の2026-11-10時点の表は限定証拠の履歴であり、v8の現行状態を置き換えません。
 

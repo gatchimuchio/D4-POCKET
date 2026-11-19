@@ -689,7 +689,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/03_D4Pocket_CODEX_v5_JA.md",
-      "責任": "履歴：v5のCodex施工範囲・許可・順序・完了条件。現行施工指示はdocs/QE_2026-11-16/03_D4Pocket_CODEX_v8_LLM_JA.md"
+      "責任": "履歴：v5のCodex施工範囲・許可・順序・完了条件。現行施工指示はdocs/QE_2026-11-16/03_D4Pocket_CODEX_v8R2_LLM_JA.md"
     },
     {
       "path": "docs/QE_2026-11-14/進捗.md",
@@ -697,7 +697,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/採用記録.md",
-      "責任": "Ownerによるv8正式投入指示、受領ZIP・三文書のSHA-256、採用基準HEAD、v5履歴境界"
+      "責任": "Ownerによるv8三点およびv8R2施工指示書の正式投入、受領原本のSHA-256、採用時基準HEAD、版の履歴境界"
     },
     {
       "path": "docs/QE_2026-11-16/01_D4Pocket_SPEC_v8_LLM_JA.md",
@@ -709,7 +709,11 @@
     },
     {
       "path": "docs/QE_2026-11-16/03_D4Pocket_CODEX_v8_LLM_JA.md",
-      "責任": "現行v8のCodex施工範囲・Source母集団・順序・受入条件の正確な受領原本"
+      "責任": "履歴：2026-11-16 v8施工指示書の受領原本。2026-11-19のOwner指示でv8R2へ交代"
+    },
+    {
+      "path": "docs/QE_2026-11-16/03_D4Pocket_CODEX_v8R2_LLM_JA.md",
+      "責任": "現行v8R2の施工指示正本。D4-WORK-INSTRUCTION-20261119-V8R2-SELFCONTAINEDの受領原本"
     },
     {
       "path": "docs/QE_2026-11-16/進捗.md",

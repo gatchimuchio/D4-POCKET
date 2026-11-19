@@ -113,7 +113,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "80677a3e209c7f1069e9c5400bec5b6aa8ea82f4c6f2a41022c1bdd73b9902fb"
+      "sha256": "218d1ebf24482e5276f756674cb5e2daef657884d5edeab74c1c4be11d041a85"
     },
     {
       "path": "AUDIT.md",
@@ -177,7 +177,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "57af3878890d342b62ef4def7e85c35435179723e45cc4f3f3ef2cb9a0c0505b"
+      "sha256": "0259fe16fc64e2443c5229250d503ffdacdfe6429304a50ed58b6ebce4e39089"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -185,7 +185,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "d7c411662f9da2e084b19df58f7e48a978e762aef7af016c6df254e7b36ae319"
+      "sha256": "7a0986fe73dacbaadea0c34350176ea06127d940d2a4eb2f3a463893460006a6"
     },
     {
       "path": "SECURITY.md",
@@ -1628,16 +1628,20 @@
       "sha256": "0ce41be5aa48a737ee990e92d05b5a577ad26c218de61f7d485f290ef4efdf5b"
     },
     {
+      "path": "docs/QE_2026-11-16/03_D4Pocket_CODEX_v8R2_LLM_JA.md",
+      "sha256": "83aafd0dd8839f50cfaee6c7ae1d1f5c889e1f1bc685c3ced6fc1c3eeded8a93"
+    },
+    {
       "path": "docs/QE_2026-11-16/03_D4Pocket_CODEX_v8_LLM_JA.md",
       "sha256": "df6fd5f708a67d2aa677ec8bbc4960cb23d6df26f0c15caada74cbd9bce31f27"
     },
     {
       "path": "docs/QE_2026-11-16/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "d0aef214fd130d7295bb8ca4db35185684cdb7a19ba4fed7b6d3bbe4cfbb11c9"
+      "sha256": "61301f37de1136dc5ce664cb3d49fe320a028eeac2097618511a7e7dd84e32b7"
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "a630408e2b9b5af4f7eb9dbf3072ebc6260ab3e316cc30739e6704a1e4cb95e4"
+      "sha256": "83ed114b0a0728b36df2f0b0fca41977a9ae0c49c056e92ba802b41dfa104044"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -6113,7 +6117,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "4d0f1da60642db59794ce3369e41f5864860da856c670c17c9647ca3b8dc2dc3"
+      "sha256": "03a9836050f60a721f2b24593968fa7eef164b3a62080ea35ea17eb74125bd04"
     }
   ]
 }
