@@ -84,6 +84,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_export_manifest,
     _verify_credential_audit,
     _verify_live_audit,
+    _verify_mcp_agent_tool_audit_binding,
     _verify_workspace_projection,
     _update_source_host,
     _same_source_update_ca_environment,
@@ -5005,6 +5006,58 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
 
 
 class AgentTaskAuditAcceptanceTests(unittest.TestCase):
+    def test_agent_mcp_tool_audit_binds_one_approval_source_and_result(self) -> None:
+        source_hash = "sha256:" + "a" * 64
+        tool_hash = "sha256:" + "b" * 64
+        context_hash = "sha256:" + "c" * 64
+        permission = "Permission=mcp-tool-" + "d" * 32
+        invocation = f"{permission} consumed=true Approval=broker-audit-1"
+        request = {
+            "operation": "MCP Tool実行",
+            "request_id": "tool-request",
+            "payload_hash": "sha256:" + "e" * 64,
+            "evidence_source": "INTERNAL_STATE",
+        }
+        approved = {
+            **request,
+            "event_id": "broker-audit-1",
+            "decision": "approved",
+            "reason": f"{permission} Approval=Rust Desktop native Owner",
+        }
+        started = {
+            **request,
+            "event_id": "broker-audit-2",
+            "decision": "started",
+            "reason": f"{invocation} source_task_id=source-task source_task_result_hash={source_hash}",
+        }
+        completed = {
+            **request,
+            "event_id": "broker-audit-3",
+            "decision": "accepted",
+            "evidence_source": "LIVE_RUNTIME",
+            "payload_hash": tool_hash,
+            "reason": (
+                f"{invocation} result_hash={tool_hash} content_count=1 isError=false; "
+                f"本文はBroker内一回限り期限付きcontextとして保持 context_hash={context_hash}"
+            ),
+        }
+        events = [approved, started, completed]
+        _verify_mcp_agent_tool_audit_binding(events, "source-task", source_hash, tool_hash)
+        wrong_source = {**started, "reason": started["reason"].replace("source-task", "another-task")}
+        wrong_approval = {
+            **completed,
+            "reason": completed["reason"].replace("Approval=broker-audit-1", "Approval=broker-audit-8"),
+        }
+        for label, altered in (
+            ("別要求", [approved, started, {**completed, "request_id": "another-request"}]),
+            ("別元Task", [approved, wrong_source, completed]),
+            ("別承認", [approved, started, wrong_approval]),
+            ("別結果", [approved, started, {**completed, "payload_hash": source_hash}]),
+            ("重複完了", [*events, completed]),
+        ):
+            with self.subTest(label=label), self.assertRaises(RuntimeError):
+                _verify_mcp_agent_tool_audit_binding(altered, "source-task", source_hash, tool_hash)
+
     def test_three_independent_terminal_tasks_and_scratch_cleanup_are_audited(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = Path(directory)

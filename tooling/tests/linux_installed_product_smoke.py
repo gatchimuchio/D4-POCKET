@@ -8039,6 +8039,7 @@ def _run_installed_agent_mcp_followup_acceptance(
         audit_store,
         require_export=False,
         require_mcp=True,
+        expected_mcp_agent_binding=(source_task_id, source_result_hash, tool_result_hashes[0]),
         require_agent_task=True,
         expected_agent_task_statuses=("completed", "completed"),
         expected_scratch_cleanup_count=2,
@@ -8048,20 +8049,6 @@ def _run_installed_agent_mcp_followup_acceptance(
         for line in (audit_store / "audit.jsonl").read_text(encoding="utf-8").splitlines()
         if line
     ]
-    mcp_tool_events = [
-        event
-        for event in audit_events
-        if event.get("operation") == "MCP Tool実行"
-        and event.get("decision") == "accepted"
-        and event.get("evidence_source") == "LIVE_RUNTIME"
-    ]
-    if (
-        len(mcp_tool_events) != 1
-        or source_task_id not in str(mcp_tool_events[0].get("reason", ""))
-        or source_result_hash not in str(mcp_tool_events[0].get("reason", ""))
-        or tool_result_hashes[0] not in str(mcp_tool_events[0].get("reason", ""))
-    ):
-        raise RuntimeError("LIVE_RUNTIME MCP Tool Auditがsource／result hashに束縛されていません")
     history_records: list[dict[str, object]] = []
     for event in audit_events:
         reason = event.get("reason")
@@ -9552,11 +9539,50 @@ def _host_registration_audit_evidence(
     }
 
 
+def _verify_mcp_agent_tool_audit_binding(
+    events: list[dict[str, object]],
+    source_task_id: str,
+    source_result_hash: str,
+    tool_result_hash: str,
+) -> None:
+    lifecycle = [
+        event for event in events if event.get("decision") in {"approved", "started", "accepted"}
+    ]
+    if [event.get("decision") for event in lifecycle] != ["approved", "started", "accepted"]:
+        raise RuntimeError("Agent起点MCP Toolの承認・開始・完了Auditが一巡ではありません")
+    approval, started, completed = lifecycle
+    approval_reason = str(approval.get("reason", ""))
+    start_fields = set(str(started.get("reason", "")).split())
+    completion_reason = str(completed.get("reason", ""))
+    completion_fields = set(completion_reason.split())
+    permission = re.search(r"\bPermission=mcp-tool-[0-9a-f]{32}\b", approval_reason)
+    approval_ref = f"Approval={approval.get('event_id')}"
+    request_id = approval.get("request_id")
+    if not (
+        request_id
+        and started.get("request_id") == completed.get("request_id") == request_id
+        and approval.get("payload_hash") == started.get("payload_hash")
+        and completed.get("payload_hash") == tool_result_hash
+        and approval.get("evidence_source") == started.get("evidence_source") == "INTERNAL_STATE"
+        and completed.get("evidence_source") == "LIVE_RUNTIME"
+        and permission
+        and {permission.group(), approval_ref, "consumed=true"} <= start_fields
+        and {permission.group(), approval_ref, "consumed=true"} <= completion_fields
+        and {f"source_task_id={source_task_id}", f"source_task_result_hash={source_result_hash}"}
+        <= start_fields
+        and f"result_hash={tool_result_hash}" in completion_fields
+        and "isError=false;" in completion_fields
+        and re.search(r"\bcontext_hash=sha256:[0-9a-f]{64}\b", completion_reason)
+    ):
+        raise RuntimeError("Agent起点MCP Toolの元Task・一回Permission・完了結果hashのAudit結合が不正です")
+
+
 def _verify_live_audit(
     store: Path,
     *,
     require_export: bool = True,
     require_mcp: bool = False,
+    expected_mcp_agent_binding: tuple[str, str, str] | None = None,
     require_workspace: bool = False,
     require_uninstall: bool = False,
     require_rollback: bool = False,
@@ -9659,10 +9685,13 @@ def _verify_live_audit(
         and "consumed=true" in event.get("reason", "")
         for event in mcp_tool
     )
+    mcp_completion_marker = (
+        "context_hash=" if expected_mcp_agent_binding is not None else "ハッシュだけを含む受領票"
+    )
     mcp_tool_live_completed = sum(
         event.get("decision") == "accepted"
         and event.get("evidence_source") == "LIVE_RUNTIME"
-        and "ハッシュだけを含む受領票" in event.get("reason", "")
+        and mcp_completion_marker in event.get("reason", "")
         for event in mcp_tool
     )
     mcp_disconnect_rejected = sum(
@@ -9690,6 +9719,8 @@ def _verify_live_audit(
         raise RuntimeError(
             "installed MCP connect／Tool one-shot Permission／disconnectのOwner・LIVE_RUNTIME Auditが不足しています"
         )
+    if expected_mcp_agent_binding is not None:
+        _verify_mcp_agent_tool_audit_binding(mcp_tool, *expected_mcp_agent_binding)
     workspace_selection = [
         event for event in events if event.get("operation") == "作業領域OS選択"
     ]
