@@ -7803,25 +7803,39 @@ def _run_installed_agent_mcp_followup_acceptance(
     source_task_id = _wait_for_installed_task_id(
         window, previously_visible_task_ids=previous_task_ids, timeout=15.0
     )
-    source_snapshot = _wait_installed_task_status(
-        environment,
-        window,
-        "completed",
-        task_id=source_task_id,
-        timeout=90.0,
-        diagnostic_audit_path=audit_store / "audit.jsonl",
-        diagnostic_response_fixture=(
-            responses_server,
-            "mcp_proposal",
-            source_diagnostic_index,
-        ),
-    )
-    source_result_hash_match = re.search(
-        r"結果hash:\s*(sha256:[0-9a-f]{64})", source_snapshot
-    )
-    if source_result_hash_match is None:
-        raise RuntimeError("Agent MCP proposal Taskに結果hashがありません")
-    source_result_hash = source_result_hash_match.group(1)
+    audit_path = audit_store / "audit.jsonl"
+    # Task完了直後にnative確認が開く。確認中の親画面にTask終端の再描画を要求しない。
+    try:
+        _wait_for_owner_dialog_window(
+            environment,
+            timeout=90.0,
+            context="Agent MCP提案のTask結果表示",
+            diagnostic_root=window,
+            diagnostic_audit_path=audit_path,
+        )
+    except RuntimeError as error:
+        diagnostics = {
+            "task_history": _installed_task_history_diagnostics(audit_store, source_task_id),
+            "responses_fixture": _installed_task_response_fixture_diagnostics(
+                responses_server, "mcp_proposal", source_diagnostic_index
+            ),
+        }
+        raise RuntimeError(f"{error}; " + json.dumps(diagnostics, ensure_ascii=False)) from error
+    source_events = [
+        json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines() if line
+    ]
+    source_terminals = [
+        record
+        for record in _linux_agent_task_history_records(source_events, source_task_id)
+        if record.get("stage") == "terminal"
+    ]
+    if len(source_terminals) != 1 or source_terminals[0].get("status") != "completed":
+        raise RuntimeError("先行MCP提案Taskに一意の完了Auditがありません")
+    source_result_hash = source_terminals[0].get("result_hash")
+    if not isinstance(source_result_hash, str) or not re.fullmatch(
+        r"sha256:[0-9a-f]{64}", source_result_hash
+    ):
+        raise RuntimeError("先行MCP提案Taskの完了Auditに有効な結果hashがありません")
 
     _answer_owner_dialog(
         environment,
