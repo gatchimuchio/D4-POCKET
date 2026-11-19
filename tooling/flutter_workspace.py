@@ -277,6 +277,15 @@ def _cargo_home_path(source_root: Path, temporary_root: Path) -> tuple[Path, str
     return cargo_home, "shared_outside_source_and_OneDrive"
 
 
+def cargo_output_environment(target: Path) -> dict[str, str]:
+    """Cargoの最終成果物と中間生成物の配置先をそろえる。"""
+    return {
+        "CARGO_TARGET_DIR": str(target),
+        "CARGO_BUILD_TARGET_DIR": str(target),
+        "CARGO_BUILD_BUILD_DIR": str(target),
+    }
+
+
 class IsolatedFlutterWorkspace:
     """Flutter検証と生成物を隔離する一時Git source snapshot。"""
 
@@ -352,27 +361,26 @@ class IsolatedFlutterWorkspace:
 
     def _configure_environment(self) -> None:
         assert self.temporary_root is not None
-        assert self.source_root is not None
+        assert self.root is not None
         environment = os.environ.copy()
         temporary_io = self.temporary_root / "io-temp"
         temporary_io.mkdir()
         app_data = self.temporary_root / "flutter-config"
         app_data.mkdir()
 
+        for variable in ("TEMP", "TMP", "TMPDIR"):
+            environment[variable] = str(temporary_io)
         if os.name == "nt":
             environment["APPDATA"] = str(app_data)
-            environment["TEMP"] = str(temporary_io)
-            environment["TMP"] = str(temporary_io)
         else:
             environment["XDG_CONFIG_HOME"] = str(app_data)
-            environment["TMPDIR"] = str(temporary_io)
 
         cache, cache_mode = _pub_cache_path(self.source_root, self.temporary_root)
         cargo_home, cargo_home_mode = _cargo_home_path(self.source_root, self.temporary_root)
         environment["PUB_CACHE"] = str(cache)
         environment["CARGO_HOME"] = str(cargo_home)
-        environment["CARGO_TARGET_DIR"] = str(
-            self.root / "native" / "rust_helper" / "target"
+        environment.update(
+            cargo_output_environment(self.root / "native" / "rust_helper" / "target")
         )
         environment["FLUTTER_SUPPRESS_ANALYTICS"] = "true"
         gradle_options = environment.get("GRADLE_OPTS", "").strip()

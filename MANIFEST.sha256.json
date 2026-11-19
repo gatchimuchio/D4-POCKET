@@ -177,7 +177,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "0259fe16fc64e2443c5229250d503ffdacdfe6429304a50ed58b6ebce4e39089"
+      "sha256": "fed3566d8edb24de027952baf7bfd5b8cba0ae21bd4fd86f206abede43aed86f"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "9887574b29a0983e4d0315d09c97812190e71975948622b78a448cd8b707ab54"
+      "sha256": "81a285a0491f083c67efe4063b84d038c25a710fd9de60e989d8c1d04a373caf"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5797,7 +5797,7 @@
     },
     {
       "path": "tooling/conformance_tests/test_run_cargo_isolated.py",
-      "sha256": "a27404d30b843f84491539eeb989e13e120214d76b5933e4ec4c426ff37cb583"
+      "sha256": "3ddea0d52b489f6c2c7f25c1aeb27a94a1ff264ddddbfbe9e44d38226bb446cb"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -5845,7 +5845,7 @@
     },
     {
       "path": "tooling/flutter_workspace.py",
-      "sha256": "bccf38f3ee647976e483beef090bca5f83b0b38fb0129651c4e77282a83ab57a"
+      "sha256": "10d62ad972e1dbfda175e21bef239618e291835b29f00791429d370e2f3650c1"
     },
     {
       "path": "tooling/full_regression_validation.py",
@@ -5949,7 +5949,7 @@
     },
     {
       "path": "tooling/run_cargo_isolated.py",
-      "sha256": "18fb17878da570c8b2bf07a7a0d424b8b68a0f9f1c8ba66d0b77730bfd1f5ac2"
+      "sha256": "287a55c2099cbba60e52b9b6eef7be46414deabaf61ff856f4e0d36b7b9a2406"
     },
     {
       "path": "tooling/schema_check/check_schemas.py",

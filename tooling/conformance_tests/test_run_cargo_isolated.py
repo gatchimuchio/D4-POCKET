@@ -25,8 +25,20 @@ class IsolatedCargoRunnerTests(unittest.TestCase):
 
             def fake_run(command, *, cwd, env, check):
                 target = Path(env["CARGO_TARGET_DIR"])
-                observed.update(command=command, cwd=cwd, env=env, check=check, target=target)
-                (target / "generated-artifact").write_bytes(b"test")
+                intermediate = Path(env["CARGO_BUILD_BUILD_DIR"])
+                temporary_io = Path(env["TMPDIR"])
+                observed.update(
+                    command=command,
+                    cwd=cwd,
+                    env=env,
+                    check=check,
+                    target=target,
+                    temporary_io=temporary_io,
+                )
+                self.assertEqual(intermediate, target)
+                self.assertEqual(temporary_io, target / "io-temp")
+                (intermediate / "generated-artifact").write_bytes(b"test")
+                (temporary_io / "compiler-temp").write_bytes(b"test")
                 return SimpleNamespace(returncode=23)
 
             arguments = [
@@ -47,6 +59,8 @@ class IsolatedCargoRunnerTests(unittest.TestCase):
                     {
                         "CARGO_TARGET_DIR": "unsafe-existing-target",
                         "CARGO_BUILD_TARGET_DIR": "unsafe-config-target",
+                        "CARGO_BUILD_BUILD_DIR": str(repository / "intermediate"),
+                        **dict.fromkeys(("TEMP", "TMP", "TMPDIR"), str(repository)),
                     },
                 ),
                 contextlib.redirect_stderr(io.StringIO()),
@@ -64,7 +78,10 @@ class IsolatedCargoRunnerTests(unittest.TestCase):
             self.assertEqual(
                 observed["env"]["CARGO_BUILD_TARGET_DIR"], str(observed["target"])
             )
+            for name in ("TEMP", "TMP", "TMPDIR"):
+                self.assertEqual(observed["env"][name], str(observed["temporary_io"]))
             self.assertFalse(observed["target"].exists())
+            self.assertFalse((repository / "intermediate").exists())
 
     def test_rejects_target_directory_override_without_running_cargo(self) -> None:
         commands = [
@@ -72,6 +89,7 @@ class IsolatedCargoRunnerTests(unittest.TestCase):
             ["test", "--target-dir=outside"],
             ["--config", "build.target-dir=outside", "test"],
             ["test", "--config=build.target-dir=outside"],
+            ["test", "--config=build.build-dir=outside"],
         ]
         with tempfile.TemporaryDirectory(prefix="d4p-cargo-test-") as temporary:
             repository = Path(temporary)

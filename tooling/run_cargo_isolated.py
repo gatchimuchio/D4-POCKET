@@ -11,7 +11,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tooling.flutter_workspace import FlutterWorkspaceError, safe_flutter_temp_parent
+from tooling.flutter_workspace import (
+    FlutterWorkspaceError,
+    cargo_output_environment,
+    safe_flutter_temp_parent,
+)
 
 
 def _cargo_target_override_error(arguments: Sequence[str]) -> str | None:
@@ -64,11 +68,14 @@ def run_cargo(
             prefix="d4p-cargo-target-", dir=temporary_parent
         ) as target_directory:
             target_path = Path(target_directory).resolve(strict=True)
+            temporary_io = target_path / "io-temp"
+            temporary_io.mkdir()
             environment = os.environ.copy()
-            environment["CARGO_TARGET_DIR"] = str(target_path)
-            environment["CARGO_BUILD_TARGET_DIR"] = str(target_path)
+            environment.update(cargo_output_environment(target_path))
+            for variable in ("TEMP", "TMP", "TMPDIR"):
+                environment[variable] = str(temporary_io)
             print(
-                "Cargo targetをRepository／OneDrive外の一時領域へ隔離します。",
+                "Cargoの成果物・中間生成物・一時ファイルをRepository／OneDrive外へ隔離します。",
                 file=sys.stderr,
             )
             result = invoke(
