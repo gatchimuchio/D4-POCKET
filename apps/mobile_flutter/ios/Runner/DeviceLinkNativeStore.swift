@@ -1,21 +1,37 @@
+import CryptoKit
 import Foundation
 import Security
 
 final class DeviceLinkNativeStore {
   private let service: String
   private let account: String
+  private let installationDirectory: URL?
 
   init(service: String = "org.gatchimuchio.gui-shell.device-link.v1",
-       account: String = "native-state") {
+       account: String = "native-state",
+       installationDirectory: URL? = nil) {
     self.service = service
     self.account = account
+    self.installationDirectory = installationDirectory
   }
 
   func loadOrCreate() throws -> DeviceLinkNativeState {
-    if let data = try readData() { return try decode(data) }
+    let marker = try installationMarker()
+    let binding = try readInstallationBinding(marker)
+    if let data = try readData() {
+      let stored = try decode(data)
+      if binding == Self.installationBinding(stored.deviceID) { return stored }
+    }
+    // 現在の導入を確認できない状態から、端末IDや結合資格を引き継がない。
     let initial = DeviceLinkNativeState(deviceID: try Self.randomID(), credential: nil)
+    let initialBinding = Self.installationBinding(initial.deviceID)
+    // 先にKeychainの旧資格を消す。書込途中で終了しても旧資格の採用条件は揃わない。
     try write(initial)
-    guard let verifiedData = try readData() else { throw DeviceLinkJSONError.invalid }
+    try initialBinding.write(to: marker, options: [.atomic, .completeFileProtection])
+    guard let verifiedData = try readData(),
+          try readInstallationBinding(marker) == initialBinding else {
+      throw DeviceLinkJSONError.invalid
+    }
     let verified = try decode(verifiedData)
     guard verified == initial else { throw DeviceLinkJSONError.invalid }
     return verified
@@ -64,12 +80,60 @@ final class DeviceLinkNativeStore {
 
   func readLocalRecoveryAudit() throws -> [[String: Any]] {
     guard let data = try readData() else { return [] }
-    return try decode(data).localRecoveryAudit
+    let stored = try decode(data)
+    let marker = try installationMarker()
+    guard try readInstallationBinding(marker) == Self.installationBinding(stored.deviceID) else {
+      return []
+    }
+    return stored.localRecoveryAudit
   }
 
   func removeForTest() throws {
     let status = SecItemDelete(identityQuery as CFDictionary)
     guard status == errSecSuccess || status == errSecItemNotFound else { throw DeviceLinkJSONError.invalid }
+  }
+
+  private func installationMarker() throws -> URL {
+    let files = FileManager.default
+    var directory = try installationDirectory ?? files
+      .url(for: .applicationSupportDirectory, in: .userDomainMask,
+           appropriateFor: nil, create: true)
+      .appendingPathComponent("DeviceLinkInstallation", isDirectory: true)
+    try files.createDirectory(at: directory, withIntermediateDirectories: true)
+    let keys: Set<URLResourceKey> = [.isSymbolicLinkKey, .isDirectoryKey, .isExcludedFromBackupKey]
+    let current = try directory.resourceValues(forKeys: keys)
+    guard current.isDirectory == true, current.isSymbolicLink == false else {
+      throw DeviceLinkJSONError.invalid
+    }
+    if current.isExcludedFromBackup != true {
+      var values = URLResourceValues()
+      values.isExcludedFromBackup = true
+      try directory.setResourceValues(values)
+      directory.removeAllCachedResourceValues()
+      guard try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        .isExcludedFromBackup == true else { throw DeviceLinkJSONError.invalid }
+    }
+    return directory.appendingPathComponent("binding")
+  }
+
+  private func readInstallationBinding(_ marker: URL) throws -> Data? {
+    let attributes: [FileAttributeKey: Any]
+    do {
+      attributes = try FileManager.default.attributesOfItem(atPath: marker.path)
+    } catch let error as CocoaError where error.code == .fileNoSuchFile || error.code == .fileReadNoSuchFile {
+      return nil
+    }
+    guard attributes[.type] as? FileAttributeType == .typeRegular,
+          (attributes[.size] as? NSNumber)?.intValue == SHA256.Digest.byteCount else {
+      throw DeviceLinkJSONError.invalid
+    }
+    let data = try Data(contentsOf: marker)
+    guard data.count == SHA256.Digest.byteCount else { throw DeviceLinkJSONError.invalid }
+    return data
+  }
+
+  private static func installationBinding(_ deviceID: String) -> Data {
+    Data(SHA256.hash(data: Data(deviceID.utf8)))
   }
 
   private var identityQuery: [String: Any] {

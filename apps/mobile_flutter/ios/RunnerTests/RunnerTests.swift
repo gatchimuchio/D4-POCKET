@@ -170,8 +170,12 @@ class RunnerTests: XCTestCase {
 
   func testThisDeviceOnlyKeychainReadWriteDeleteAndReadback() throws {
     let service = "org.gatchimuchio.gui-shell.device-link.test.\(UUID().uuidString)"
-    let store = DeviceLinkNativeStore(service: service)
-    defer { try? store.removeForTest() }
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let store = DeviceLinkNativeStore(service: service, installationDirectory: directory)
+    defer {
+      try? store.removeForTest()
+      try? FileManager.default.removeItem(at: directory)
+    }
     let initial = try store.loadOrCreate()
     let credential = DeviceLinkCredential(
       hostID: String(repeating: "1", count: 32),
@@ -214,9 +218,15 @@ class RunnerTests: XCTestCase {
 
   func testVersionOneKeychainStateMigratesOnNextWrite() throws {
     let service = "org.gatchimuchio.gui-shell.device-link.migration.\(UUID().uuidString)"
-    let store = DeviceLinkNativeStore(service: service)
-    defer { try? store.removeForTest() }
-    let deviceID = String(repeating: "c", count: 32)
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let store = DeviceLinkNativeStore(service: service, installationDirectory: directory)
+    defer {
+      try? store.removeForTest()
+      try? FileManager.default.removeItem(at: directory)
+    }
+    // 移行を確認する旧形式は現在の導入に対応する端末IDを持つ。
+    let deviceID = try store.loadOrCreate().deviceID
+    try store.removeForTest()
     let legacy = try JSONSerialization.data(withJSONObject: [
       "version": 1,
       "device_id": deviceID,
@@ -257,6 +267,47 @@ class RunnerTests: XCTestCase {
     XCTAssertEqual((upgraded["local_recovery_audit"] as? [[String: Any]])?.count, 0)
   }
 
+  func testInstallationBindingPreservesSameContainerAndRejectsPriorPairing() throws {
+    let files = FileManager.default
+    let root = files.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let current = root.appendingPathComponent("current", isDirectory: true)
+    let replacement = root.appendingPathComponent("replacement", isDirectory: true)
+    let service = "org.gatchimuchio.gui-shell.device-link.installation.\(UUID().uuidString)"
+    let store = DeviceLinkNativeStore(service: service, installationDirectory: current)
+    defer {
+      try? store.removeForTest()
+      try? files.removeItem(at: root)
+    }
+    let initial = try store.loadOrCreate()
+    let credential = DeviceLinkCredential(
+      hostID: String(repeating: "1", count: 32),
+      host: "10.0.0.2",
+      port: 44321,
+      certificateHash: String(repeating: "b", count: 64),
+      deviceID: initial.deviceID,
+      expiresAt: Int64(Date().timeIntervalSince1970) + 3_600,
+      credentialID: String(repeating: "2", count: 32),
+      secret: try XCTUnwrap(randomHex(byteCount: 32)))
+    _ = try store.storeCredential(credential)
+    _ = try store.deleteCredentialWithLocalRecoveryAudit()
+    let paired = try store.storeCredential(credential)
+    XCTAssertEqual(try current.resourceValues(forKeys: [.isExcludedFromBackupKey])
+      .isExcludedFromBackup, true)
+
+    let updated = DeviceLinkNativeStore(service: service, installationDirectory: current)
+    XCTAssertTrue(try updated.loadOrCreate() == paired)
+    XCTAssertEqual(try updated.readLocalRecoveryAudit().count, 1)
+
+    let reinstalled = DeviceLinkNativeStore(service: service, installationDirectory: replacement)
+    XCTAssertTrue(try reinstalled.readLocalRecoveryAudit().isEmpty)
+    let fresh = try reinstalled.loadOrCreate()
+    XCTAssertNotEqual(fresh.deviceID, initial.deviceID)
+    XCTAssertTrue(fresh.credential == nil)
+    XCTAssertTrue(fresh.localRecoveryAudit.isEmpty)
+    XCTAssertThrowsError(try reinstalled.storeCredential(credential))
+    XCTAssertTrue(try reinstalled.loadOrCreate() == fresh)
+  }
+
   private func randomHex(byteCount: Int) -> String? {
     var bytes = [UInt8](repeating: 0, count: byteCount)
     guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { return nil }
@@ -272,12 +323,19 @@ class NativeDeviceLinkLiveTests: XCTestCase {
           let port = UInt16(rawPort), port > 0 else {
       throw XCTSkip("専用native接続harnessからだけ実行する")
     }
-    let store = DeviceLinkNativeStore(service: "org.gatchimuchio.gui-shell.native-live.\(UUID().uuidString)")
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let store = DeviceLinkNativeStore(
+      service: "org.gatchimuchio.gui-shell.native-live.\(UUID().uuidString)",
+      installationDirectory: directory)
     let transport = DeviceLinkTLSClient()
     defer {
       transport.cancelAll()
       do { try store.removeForTest() }
       catch { XCTFail("D4_IOS_NATIVE_LIVE_FAIL keychain_cleanup") }
+      if FileManager.default.fileExists(atPath: directory.path) {
+        do { try FileManager.default.removeItem(at: directory) }
+        catch { XCTFail("D4_IOS_NATIVE_LIVE_FAIL installation_cleanup") }
+      }
     }
     var stage = "keychain_initial"
     do {

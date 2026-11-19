@@ -1257,7 +1257,7 @@
     },
     {
       "path": "apps/mobile_flutter/ios/Runner/DeviceLinkNativeStore.swift",
-      "sha256": "4da97052f8f19a4bc66a850280d7baacacb4e18dcfa40db8ce77d4649a342b5f"
+      "sha256": "69c7e4bbbe42919437dcf87b4ad1985a5e1f40dc97f489333ee6f5ced14de99e"
     },
     {
       "path": "apps/mobile_flutter/ios/Runner/DeviceLinkProductTestInput.swift",
@@ -1289,7 +1289,7 @@
     },
     {
       "path": "apps/mobile_flutter/ios/RunnerTests/RunnerTests.swift",
-      "sha256": "f16286f40183be1fc9794433b5d3a184b7dd43575c9fbdbbf0537839df30a228"
+      "sha256": "79215a803517ddb84b81c4c3364ec5ec2ee0488bee62ba6100ff2117ad23b4d9"
     },
     {
       "path": "apps/mobile_flutter/ios/RunnerUITests/DeviceLinkProductUITests.swift",
@@ -1829,7 +1829,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "fa855d80b3a50ab79bbc24a1b9b984f54d22017790a242f67917905b8969c601"
+      "sha256": "e20b2253f420ea0fc941c75662220cfa7e79ec4ccee1e5bce80667ac97d1632d"
     },
     {
       "path": "docs/specs/evaluation-lab.md",

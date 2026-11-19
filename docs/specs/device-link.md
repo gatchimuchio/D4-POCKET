@@ -66,6 +66,8 @@ MobileはTool接続・呼出しを行わず、能力一覧やTask結果本文も
 
 Mobileは端末ID、Hostの固定情報、結合ID、端末秘密、有効期限だけをAndroidの安全保管／iOS Keychainへ保存する。招待秘密は結合後に消去する。一般設定、標準preferences、log、clipboardへの自動書出し、バックアップからの自動復元へ秘密を置かない。保管失敗時に平文へfallbackしない。
 
+iOSは現在の導入に対応する端末IDのSHA-256を、バックアップ対象外のApplication Support内に保存する。同じ導入でアプリを更新した場合は、Keychainの端末IDと照合できた資格だけを既存の期限・Desktop Brokerの確認に渡す。照合情報がない旧版や別の導入から引き継いだKeychain状態では、新しい端末IDで未結合状態から開始する。旧端末の失効は引き続きDesktop側で行う。照合情報に端末秘密は保存しない。[Appleのデータ保管とバックアップ除外](https://developer.apple.com/documentation/foundation/using-the-file-system-effectively)
+
 起動・復帰は資格の読取後に端末確認を行い、失効・期限切れ・Host不一致では入力と送信を無効にする。background中はpollingと新規送信を停止する。応答待ちは復帰後に同じ要求を照会し、自動再送しない。離脱はserver失効を先に要求する。通信不能時のlocal削除はserver失効と区別し、owner側の失効操作を案内する。
 
 `local_delete`は通信不能時に端末内資格だけを消す回復操作であり、Desktop Rust Brokerの`AuditEvent`を生成・永続化できない。Flutterの確認dialogや成功表示は監査証拠ではない。このためnative OS保護領域内の`mobile_local_recovery`記録を、端末内資格の削除と同じ暗号化状態へ一回の更新で追記する。記録は`mobile_local_credential_delete`、`actor=shell`、`operator_identity=unverified`、結果`success`、`evidence_source=INTERNAL_STATE`、`desktop_revocation=unconfirmed`、`authority_effect=none`に固定し、UI操作から操作者本人を証明せず、資格値、Host、端末ID、自由文を含めない。直近32件を上限に古い記録からrotateし、削除操作のhashは固定の公開操作識別子から計算する。
