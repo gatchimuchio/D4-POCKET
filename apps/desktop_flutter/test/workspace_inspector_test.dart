@@ -1134,6 +1134,91 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('Host表示切替で本文と選択を消去し旧登録の読取を続けない',
+      (tester) async {
+    final broker = TestBroker();
+    final hostGeneration = ValueNotifier<int>(0);
+    addTearDown(hostGeneration.dispose);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: WorkspaceInspectorHostScope(
+          generation: hostGeneration,
+          child: SingleChildScrollView(
+            child: WorkspaceInspector(client: WorkspaceClient(broker)),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    await _scrollRootTo(tester, find.text('file.txt'));
+    await tester.tap(find.text('file.txt'));
+    await tester.pumpAndSettle();
+    expect(find.text('本文'), findsOneWidget);
+    final beforeSwitch = List<String>.of(broker.operations);
+
+    hostGeneration.value++;
+    await tester.pumpAndSettle();
+
+    expect(find.text('本文'), findsNothing);
+    expect(find.text('workspace-a'), findsNothing);
+    expect(find.byType(DropdownButton<String>), findsNothing);
+    expect(broker.operations, beforeSwitch);
+    await tester.ensureVisible(find.text('登録状態を更新'));
+    await tester.tap(find.text('登録状態を更新'));
+    await tester.pumpAndSettle();
+    expect(find.text('workspace-a'), findsOneWidget);
+    expect(find.text('本文'), findsNothing);
+    expect(broker.operations, [...beforeSwitch, '作業領域一覧']);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('旧Brokerの承認完了は同じIDの新しいWorkspace表示を再読込しない',
+      (tester) async {
+    final pendingApproval = Completer<void>();
+    final oldBroker = TestBroker()
+      ..approval = null
+      ..visibility = 'none'
+      ..pendingApproval = pendingApproval;
+    final newBroker = TestBroker();
+
+    Widget harness(WorkspaceClient client) => MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(child: WorkspaceInspector(client: client)),
+          ),
+        );
+
+    await tester.pumpWidget(harness(WorkspaceClient(oldBroker)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    final approve = find.text('native Owner確認でWorkspace読取を許可');
+    await tester.ensureVisible(approve);
+    await tester.tap(approve);
+    await tester.pump();
+    expect(oldBroker.operations.where((op) => op == '作業領域承認'), hasLength(1));
+
+    await tester.pumpWidget(harness(WorkspaceClient(newBroker)));
+    await tester.pumpAndSettle();
+    await _scrollRootTo(tester, find.text('workspace-a'));
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    await _scrollRootTo(tester, find.text('file.txt'));
+    await tester.tap(find.text('file.txt'));
+    await tester.pumpAndSettle();
+    expect(find.text('本文'), findsOneWidget);
+    final currentOperations = List<String>.of(newBroker.operations);
+
+    pendingApproval.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('本文'), findsOneWidget);
+    expect(newBroker.operations, currentOperations);
+    expect(newBroker.operations, isNot(contains('作業領域承認')));
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('画面復帰後に承認応答が失敗してもBroker確定状態だけを再取得する',
       (tester) async {
     final pendingApproval = Completer<void>();

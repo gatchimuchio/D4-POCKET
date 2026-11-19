@@ -1,9 +1,24 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import '../services/workspace_client.dart';
 import 'workspace_diff_panel.dart';
+
+class WorkspaceInspectorHostScope extends InheritedWidget {
+  const WorkspaceInspectorHostScope({
+    super.key,
+    required this.generation,
+    required super.child,
+  });
+
+  final ValueListenable<int> generation;
+
+  @override
+  bool updateShouldNotify(WorkspaceInspectorHostScope oldWidget) =>
+      !identical(generation, oldWidget.generation);
+}
 
 class WorkspaceInspector extends StatefulWidget {
   const WorkspaceInspector({
@@ -33,7 +48,9 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   bool _diffPaired = false;
   String _requestedVisibility = 'hash_only';
   int _generation = 0;
-  int _activeGeneration = 0;
+  int _bindingGeneration = 0;
+  ValueListenable<int>? _hostContextGeneration;
+  bool _hostContextInitialized = false;
   Timer? _viewMaintenanceTimer;
   final _elapsed = Stopwatch()..start();
   int _nextCheck = 0;
@@ -46,12 +63,52 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final generation = context
+        .dependOnInheritedWidgetOfExactType<WorkspaceInspectorHostScope>()
+        ?.generation;
+    if (_hostContextInitialized &&
+        identical(generation, _hostContextGeneration)) {
+      return;
+    }
+    _hostContextGeneration?.removeListener(_hostContextChanged);
+    _hostContextGeneration = generation;
+    generation?.addListener(_hostContextChanged);
+    if (_hostContextInitialized) {
+      _clearForHostContextChange();
+      return;
+    }
+    _hostContextInitialized = true;
     if (_isActive) _refresh();
+  }
+
+  void _hostContextChanged() {
+    if (mounted) setState(_clearForHostContextChange);
+  }
+
+  void _clearForHostContextChange() {
+    _clearBinding('Hostが切り替わったため作業領域の表示を消去しました。登録状態を更新してください。');
+  }
+
+  void _clearBinding(String message) {
+    _bindingGeneration++;
+    _generation++;
+    _cancelViewMaintenance();
+    _view = null;
+    _registrations = [];
+    _selected = null;
+    _busy = false;
+    _diffPaired = false;
+    _requestedVisibility = 'hash_only';
+    _message = message;
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _activeGeneration++;
     _active = state == AppLifecycleState.resumed;
     _generation++;
     _cancelViewMaintenance();
@@ -70,15 +127,10 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     if (oldWidget.client != widget.client ||
         oldWidget.runtimeId != widget.runtimeId ||
         oldWidget.workspaceId != widget.workspaceId) {
-      _cancelViewMaintenance();
-      _generation++;
-      _view = null;
-      _registrations = [];
-      _selected = null;
+      _clearBinding('作業領域の接続先または対象が変わりました。登録状態を更新してください。');
       _refresh();
     } else if (oldWidget.active != widget.active) {
       _cancelViewMaintenance();
-      _activeGeneration++;
       _generation++;
       _view = null;
       _busy = false;
@@ -94,6 +146,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   void dispose() {
     _generation++;
     _cancelViewMaintenance();
+    _hostContextGeneration?.removeListener(_hostContextChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -284,7 +337,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     if (!_isActive || _busy) return;
     _cancelViewMaintenance();
     final generation = ++_generation;
-    final activeGeneration = _activeGeneration;
+    final bindingGeneration = _bindingGeneration;
     setState(() {
       _busy = true;
       _view = null;
@@ -294,8 +347,8 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     try {
       final current = await widget.client
           .approveContent(registration, _requestedVisibility);
-      if (!mounted) return;
-      if (generation != _generation || activeGeneration != _activeGeneration) {
+      if (!mounted || bindingGeneration != _bindingGeneration) return;
+      if (generation != _generation) {
         // Owner確認中の画面切替で一覧取得と承認応答が競合した場合、
         // 選択中Workspaceが同じときだけBrokerの現在状態を再取得する。
         if (_isActive && _selected == registration.id) {
@@ -311,8 +364,8 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         _message = '現在のWorkspace読取Approvalを確認しました。Task実行権は付与していません。';
       });
     } on Object catch (error) {
-      if (!mounted) return;
-      if (generation != _generation || activeGeneration != _activeGeneration) {
+      if (!mounted || bindingGeneration != _bindingGeneration) return;
+      if (generation != _generation) {
         // native Owner確認中に画面が非activeになった後で要求が失敗しても、
         // Brokerが確定した現在状態だけを再取得する。Approvalは再利用・再発行しない。
         if (_isActive && _selected == registration.id) {

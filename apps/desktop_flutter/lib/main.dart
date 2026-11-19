@@ -28,6 +28,7 @@ import 'screens/settings.dart';
 import 'screens/shared.dart';
 import 'screens/setup_doctor.dart';
 import 'screens/trust_center.dart';
+import 'screens/workspace_inspector.dart' show WorkspaceInspectorHostScope;
 import 'services/runtime_resource_client.dart';
 import 'services/runtime_lifecycle_client.dart';
 import 'services/a2a_connection_client.dart' show A2aTaskQueryResult;
@@ -475,16 +476,19 @@ class _ShellHomePageState extends State<ShellHomePage> {
             widget.runtimeLifecycleConnect ?? connectRuntimeLifecycleClient,
       ),
       AuthorityMap(client: widget.client),
-      AgentCenter(
-        client: widget.client,
-        active: selectedIndex == 5,
-        taskExecutionCoordinator: _agentTaskExecutionCoordinator,
-        developerEditProposal: _pendingAiEditProposal,
-        onDeveloperEditProposalPrepared: _consumeAiEditProposal,
-        onDiscardDeveloperEditProposal: _discardAiEditProposal,
-        a2aArtifactHandoffSource: _pendingA2aArtifactHandoff,
-        onA2aArtifactHandoffConsumed: _consumeA2aArtifactHandoff,
-        onDiscardA2aArtifactHandoff: _discardA2aArtifactHandoff,
+      WorkspaceInspectorHostScope(
+        generation: _hostContextGeneration,
+        child: AgentCenter(
+          client: widget.client,
+          active: selectedIndex == 5,
+          taskExecutionCoordinator: _agentTaskExecutionCoordinator,
+          developerEditProposal: _pendingAiEditProposal,
+          onDeveloperEditProposalPrepared: _consumeAiEditProposal,
+          onDiscardDeveloperEditProposal: _discardAiEditProposal,
+          a2aArtifactHandoffSource: _pendingA2aArtifactHandoff,
+          onA2aArtifactHandoffConsumed: _consumeA2aArtifactHandoff,
+          onDiscardA2aArtifactHandoff: _discardA2aArtifactHandoff,
+        ),
       ),
       ApprovalCenter(client: widget.client),
       AuditViewer(client: widget.client),

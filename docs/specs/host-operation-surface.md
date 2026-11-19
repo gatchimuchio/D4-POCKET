@@ -12,6 +12,8 @@ Host metadataの証拠種別は`INTERNAL_STATE`であり、未接続HostのRunti
 
 存在しないHost、未知field、owner control経路からの切替要求は拒否する。Brokerが切替を監査できない場合、UIは切替成功を表示しない。
 
+Desktopは受理済みの表示切替を履歴とWorkspace Inspectorへ通知する。Inspectorは旧登録の選択、取得済み本文・差分、表示範囲の選択を消去し、現在の登録を取得する。旧Brokerまたは旧Host表示の承認応答を理由に、新しいWorkspaceの表示を更新したり操作を再送したりしない。
+
 ## Runtime／Agent一覧
 
 選択Hostを現在のBroker実行Host（local）として扱えるのは、product初期化で受理した`snapshot_source=broker`のホスト能力観測とHost IDが一致する場合だけである。`mock`、fallback、診断、未検証snapshot、表示名、Host metadataだけではlocal／remote区分やlive状態を推定しない。
