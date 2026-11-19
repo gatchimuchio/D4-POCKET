@@ -2487,6 +2487,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
     def test_agent_center_uses_current_navigation_page(self) -> None:
         window = object()
         operation_window = object()
+        rail = object()
         page_window = object()
         destination_window = object()
         selector = object()
@@ -2500,6 +2501,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     window,
                     window,
                     operation_window,
+                    rail,
                     page_window,
                     object(),
                     destination_window,
@@ -2529,9 +2531,8 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 call("運用", root=window, timeout=10, exact=True),
                 call(
                     "エージェントセンター",
-                    root=operation_window,
+                    root=rail,
                     timeout=10,
-                    exact=True,
                 ),
             ],
         )
@@ -2547,11 +2548,16 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             [entry.args[0] for entry in run.call_args_list],
             [["xdotool", "windowactivate", "--sync", "0x42"]],
         )
-        self.assertEqual(find_accessible.call_count, 7)
+        self.assertEqual(find_accessible.call_count, 8)
+        self.assertIn(
+            call("ナビゲーション", root=operation_window, timeout=10),
+            find_accessible.call_args_list,
+        )
 
     def test_wayland_agent_center_uses_accessible_navigation_without_search_input(self) -> None:
         window = object()
         operation_window = object()
+        rail = object()
         page_window = object()
         destination_window = object()
         selector = object()
@@ -2568,6 +2574,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     window,
                     window,
                     operation_window,
+                    rail,
                     page_window,
                     object(),
                     destination_window,
@@ -2599,7 +2606,11 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             ["操作グループ選択", "運用", "エージェントセンター"],
         )
         set_text.assert_not_called()
-        self.assertEqual(find_accessible.call_count, 7)
+        self.assertEqual(find_accessible.call_count, 8)
+        self.assertEqual(
+            find_operable.call_args_list[-1],
+            call("エージェントセンター", root=rail, timeout=10),
+        )
 
     def test_missing_agent_registration_action_reports_broker_unavailable(self) -> None:
         environment = {"DISPLAY": ":99"}

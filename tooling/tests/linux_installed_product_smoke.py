@@ -1545,9 +1545,9 @@ def _open_installed_navigation_page(
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     if page_label is None:
         return window
-    page = _find_operable_accessible(
-        page_label, root=window, timeout=10, exact=True
-    )
+    # NavigationRailは宛先名と位置情報を同じSemanticsノードへ投影する。
+    rail = _find_accessible("ナビゲーション", root=window, timeout=10)
+    page = _find_operable_accessible(page_label, root=rail, timeout=10)
     _activate_accessible(page, page_label, environment)
     return _find_accessible(WINDOW_TITLE, timeout=10)
 
