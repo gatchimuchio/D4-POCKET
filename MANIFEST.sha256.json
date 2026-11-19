@@ -605,7 +605,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "a0180a1dfe7d30513e0eab7d5f667b75097ac055c6f5457f39fc1bf2fe2eb19c"
+      "sha256": "1843abac8d48c2f4e6f3a7acd063fefca602e52c9524a2bc014d220bb00a4df0"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "2eb38ddbf7f7261f3d7978a5aad1ca15b0ec58ae5343a46ac4a8ec0cecb141a5"
+      "sha256": "29f2cb7747c15d0a7eaba23d5f0d486834b9614952587699a516c02601867ae9"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1869,7 +1869,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "00babcec35d53d58ce0281fe7412270e2c123e38dcf49bb2826c391cce564bf0"
+      "sha256": "3dd6cf9602405f2f3b0b2dbdd15e6449f188fbc12f9204a9a1af79cb31ddff39"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -4169,7 +4169,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
-      "sha256": "4af38d3e40e96f32de30951816f6d9dbfe9b8173cfc16d63b8a561ab3bde79cf"
+      "sha256": "ef2276531525b1dd19a4653456ebe831a4576aae124ad59059de2a26d65aaf4d"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -4309,7 +4309,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "0dbbd5d87e3626d065e7218f03124684594de49bd54330eaf472c6abc92d9056"
+      "sha256": "a5adbdc531ac35abaf574aa8ece811c25af2f59d0b93457e4fde0749c0b52afa"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",
@@ -4329,7 +4329,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
-      "sha256": "72b0519f686565199e005224f90c867ca163091cefb79ab8caa6c7ff9c500a5e"
+      "sha256": "2daeffc5b3d47bf58a7a427975dcd7db0f859604d086cc81e8e45c39444b8ab4"
     },
     {
       "path": "native/rust_helper/src/macos_workspace_selection.rs",

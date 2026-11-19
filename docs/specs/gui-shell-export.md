@@ -8,6 +8,8 @@ GUI Shell独立App Manifest書出しは、D4 Pocketの構成から独立App用Ma
 
 `GUI Shell書出し`要求をRust Brokerで再検証する。要求modeは`manifest_file`、対象platformは`windows`／`linux`／`macos`のいずれかとする。任意画面の選択はGUI入力にすぎず、Brokerが機械可読なModule一覧を照合し、必須Moduleと依存閉包を再計算する。任意の保存pathは要求payloadから受け取らない。各Desktop起動器が検査して開いたhost側固定Export directory handleをBrokerへ渡し、Brokerは128-bit新規App IDからfile名を導出する。fileは上限64 KiB、symlink追跡なしの一時fileへ書き、flush後に同一directory内で新規確定する。既存fileを置換しない。Receiptはfile名、絶対path、SHA-256、byte長、Manifest内容を返す。
 
+macOS同梱Rust helperは、固定Broker領域に `exports` を用意して既存Brokerへ開いたディレクトリを渡す。製品別のBroker保存領域を使うビルドでは、その配下に保存する。Linuxと共有する検査で所有UID、利用者専用の権限、実体の一致を確認し、シンボリックリンクは開かない。保存先の検査に失敗した場合は書出しだけを拒否する。macOS Runnerはこの操作を既存のnative Owner確認の待機区分に含める。
+
 Linux Brokerは検査済みの専用state directory内に固定`exports` directoryを作成し、実行UID、group／otherからの非公開mode、symlink不在を確認してからdirectory capabilityを開く。開いた前後のdevice／inodeが一致しなければ拒否し、このcapabilityだけを既存Broker serverへ渡す。製品ビルドの保存先は`$XDG_STATE_HOME/d4-pocket/products/<app_id>/<audit_store_id>/linux-broker/exports`とし、`XDG_STATE_HOME`未設定時の基準は`$HOME/.local/state`とする。識別子を持たない開発ビルドは従来の`d4-pocket/linux-broker/exports`を使う。保存先はBrokerが固定し、製品と開発の保存領域全体をAgent Workspace登録の保護対象にする。Linuxの通常インストールからの動作は別途検証する。
 
 Brokerはfile生成前に要求受理Auditを記録し、file確定後にManifest file hashをpayload hashとして完了Auditへ結ぶ。一時fileの後片付けに失敗しても確定済みManifest fileを失敗扱いせず、Receipt／Auditへ`cleanup_pending`と一時file名、hash照合後にOwnerが確認・削除するRecoveryActionを記録する。完了Auditに失敗した場合は成功Receiptを返さず`Suspended`とし、既に生成された可能性があるfileのpath／hashと照合RecoveryActionをエラーへ示す。自動上書き・削除・再試行は行わない。Flutterはfileやdirectoryへ直接アクセスしない。

@@ -264,6 +264,11 @@ fn serve(
     if session.try_exists()? || session.with_extension("json.tmp").try_exists()? {
         return Err(failure());
     }
+    // 保存先を検査できない場合、Brokerは書出しだけを拒否する。
+    #[cfg(unix)]
+    let export_root = crate::broker::export_center::open_private_export_directory(root).ok();
+    #[cfg(not(unix))]
+    let export_root = None;
     let shutdown = Arc::new(AtomicBool::new(false));
     let stop = Arc::clone(&shutdown);
     let mut config = BrokerServerConfig::new(root.join("store"), session.clone());
@@ -274,7 +279,11 @@ fn serve(
         .name("macos-security-broker".into())
         .spawn(move || {
             run_loopback_server_cancellable_with_owner_operations(
-                config, stop, ready_tx, owner_rx, None,
+                config,
+                stop,
+                ready_tx,
+                owner_rx,
+                export_root,
             )
         })?;
     let mut owned_session = Zeroizing::new(Vec::new());
@@ -417,6 +426,132 @@ mod tests {
     use super::*;
     use crate::broker::protocol::BrokerRequestEnvelope;
     use serde_json::{json, Value};
+
+    #[cfg(unix)]
+    fn export_request(id: &str) -> Value {
+        let mut payload: Value = serde_json::from_str(include_str!(
+            "../../../examples/contracts/gui_shell_export.valid.json"
+        ))
+        .unwrap();
+        payload["target_platform"] = json!("macos");
+        for field in ["runtime_ids", "agent_ids", "capability_requirements"] {
+            payload["compose_manifest"][field] = json!([]);
+        }
+        json!({
+            "request_id": id, "nonce": id, "operation": "GUI Shell書出し",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"},
+            "payload_hash": crate::broker::protocol::canonical_payload_hash(Some(&payload)),
+            "payload": payload,
+        })
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn owner_export_uses_fixed_private_directory_and_preserves_denial() {
+        use std::os::unix::fs::DirBuilderExt;
+
+        let temp = registration_fixture::FixtureTempDirectory::create();
+        let root = temp.path().canonicalize().unwrap().join("broker");
+        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        let denied = export_request("macos-export-denied");
+        let approved = export_request("macos-export-approved");
+        let mut output = Vec::new();
+        let mut confirmations = 0;
+        serve(
+            &root,
+            &VerifiedBundle::default(),
+            &mut io::Cursor::new(format!("{denied}\n{approved}\n")),
+            &mut output,
+            &mut |summary| {
+                assert!(summary.contains("対象platform: macOS"));
+                assert!(summary.contains("固定Export directory"));
+                confirmations += 1;
+                confirmations == 2
+            },
+        )
+        .unwrap();
+        assert_eq!(confirmations, 2);
+        let replies: Vec<Value> = std::str::from_utf8(&output)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(replies.len(), 2);
+        assert_eq!(replies[0]["error"]["code"], "owner_required");
+        assert_eq!(
+            replies[1]["status"], "accepted",
+            "{}",
+            replies[1]["error"]["code"]
+        );
+        let receipt = &replies[1]["body"];
+        assert_eq!(receipt["manifest_file_status"], "written");
+        assert_eq!(receipt["artifact_status"], "not_built");
+        assert_eq!(receipt["authority_strip"], true);
+        assert_eq!(receipt["credential_inherited"], false);
+        let path = Path::new(receipt["manifest_file"]["path"].as_str().unwrap());
+        assert_eq!(path.parent(), Some(root.join("exports").as_path()));
+        assert_eq!(fs::read_dir(root.join("exports")).unwrap().count(), 1);
+        let bytes = fs::read(path).unwrap();
+        assert_eq!(
+            receipt["manifest_file"]["sha256"],
+            crate::audit_hash::sha256_tagged(&bytes)
+        );
+        let manifest: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            manifest["manifest"]["app_identity"]["target_platform"],
+            "macos"
+        );
+        assert_eq!(
+            manifest["manifest"]["inheritance_policy"]["authority"],
+            "none"
+        );
+        let audit = fs::read_to_string(root.join("store/audit.jsonl")).unwrap();
+        assert!(audit.contains(replies[1]["audit_event_id"].as_str().unwrap()));
+        assert!(audit.contains(receipt["manifest_file"]["sha256"].as_str().unwrap()));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn owner_export_rejects_linked_directory_and_leaves_broker_available() {
+        use std::os::unix::fs::{symlink, DirBuilderExt};
+
+        let temp = registration_fixture::FixtureTempDirectory::create();
+        let root = temp.path().canonicalize().unwrap().join("broker");
+        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        let target = temp.path().join("outside");
+        fs::DirBuilder::new().mode(0o700).create(&target).unwrap();
+        symlink(target.canonicalize().unwrap(), root.join("exports")).unwrap();
+        let request = export_request("macos-export-linked");
+        let health = json!({
+            "request_id": "macos-export-health", "nonce": "macos-export-health",
+            "operation": "health",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"},
+            "payload_hash": crate::broker::protocol::canonical_payload_hash(None),
+        });
+        let mut output = Vec::new();
+        serve(
+            &root,
+            &VerifiedBundle::default(),
+            &mut io::Cursor::new(format!("{request}\n{health}\n")),
+            &mut output,
+            &mut |_| true,
+        )
+        .unwrap();
+        let replies: Vec<Value> = std::str::from_utf8(&output)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(
+            replies[0]["error"]["code"],
+            "gui_shell_export_target_unavailable"
+        );
+        assert_eq!(replies[1]["status"], "accepted");
+        assert_eq!(fs::read_dir(target).unwrap().count(), 0);
+        assert!(root.join("exports").is_symlink());
+    }
 
     #[test]
     fn owner_agent_registration_登録だけを承認しtask権限を生成しない() {

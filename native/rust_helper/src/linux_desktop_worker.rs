@@ -1,10 +1,10 @@
 //! Linux Desktop同梱helper。秘密とBroker資格をRust内に保持し、既存Brokerだけへ中継する。
+use crate::broker::export_center::open_private_export_directory;
 use crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations;
 use crate::broker::{BrokerCredentialRole, BrokerEndpoint, BrokerServerConfig};
 use crate::linux_credential_input::LinuxCredentialUi;
 use crate::linux_desktop_launcher::ProductUninstallHandoff;
 use crate::linux_product_bundle::{self, VerifiedBundle};
-use cap_std::fs::Dir;
 use rustix::fs::{flock, FlockOperation};
 use std::fs::{self, File, OpenOptions};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
@@ -263,32 +263,6 @@ fn private_directory(base: &Path, names: &[&str], private_from: usize) -> io::Re
     Ok(path)
 }
 
-/// Broker state配下の固定Export rootを検査し、Broker専用directory capabilityを返す。
-fn open_export_directory(state: &Path) -> io::Result<(PathBuf, Dir)> {
-    let export_dir = private_directory(state, &["exports"], 0)?;
-    let before = fs::symlink_metadata(&export_dir)?;
-    if !before.is_dir()
-        || before.file_type().is_symlink()
-        || before.uid() != rustix::process::geteuid().as_raw()
-        || before.permissions().mode() & 0o077 != 0
-    {
-        return Err(failure());
-    }
-
-    let root =
-        Dir::open_ambient_dir(&export_dir, cap_std::ambient_authority()).map_err(|_| failure())?;
-    let opened = root.dir_metadata().map_err(|_| failure())?;
-    if !opened.is_dir()
-        || opened.file_type().is_symlink()
-        || cap_fs_ext::MetadataExt::dev(&before) != cap_fs_ext::MetadataExt::dev(&opened)
-        || cap_fs_ext::MetadataExt::ino(&before) == 0
-        || cap_fs_ext::MetadataExt::ino(&before) != cap_fs_ext::MetadataExt::ino(&opened)
-    {
-        return Err(failure());
-    }
-    Ok((export_dir, root))
-}
-
 struct RunLock {
     _file: File,
 }
@@ -336,7 +310,7 @@ fn serve(
     let state = &directories.state;
     let runtime = &directories.runtime;
     let _lock = RunLock::acquire(runtime)?;
-    let export_root = open_export_directory(state)?;
+    let export_root = open_private_export_directory(state).map_err(|_| failure())?;
     let store = private_directory(state, &["store"], 0)?;
     let session = runtime.join("normal-session.json");
     remove_stale_private_file(&session)?;
@@ -917,7 +891,7 @@ mod tests {
         fs::create_dir(&state).unwrap();
         fs::set_permissions(&state, fs::Permissions::from_mode(0o700)).unwrap();
 
-        let (export_path, capability) = open_export_directory(&state).unwrap();
+        let (export_path, capability) = open_private_export_directory(&state).unwrap();
         assert_eq!(export_path, state.join("exports"));
         assert!(capability.dir_metadata().unwrap().is_dir());
         let metadata = fs::symlink_metadata(&export_path).unwrap();
@@ -926,7 +900,7 @@ mod tests {
         drop(capability);
 
         fs::set_permissions(&export_path, fs::Permissions::from_mode(0o777)).unwrap();
-        assert!(open_export_directory(&state).is_err());
+        assert!(open_private_export_directory(&state).is_err());
         fs::set_permissions(&export_path, fs::Permissions::from_mode(0o700)).unwrap();
         fs::remove_dir(&export_path).unwrap();
 
@@ -934,7 +908,7 @@ mod tests {
         fs::create_dir(&outside).unwrap();
         fs::set_permissions(&outside, fs::Permissions::from_mode(0o700)).unwrap();
         symlink(&outside, &export_path).unwrap();
-        assert!(open_export_directory(&state).is_err());
+        assert!(open_private_export_directory(&state).is_err());
 
         fs::remove_file(&export_path).unwrap();
         fs::remove_dir(&outside).unwrap();

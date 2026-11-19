@@ -125,7 +125,7 @@ final class BrokerProcessChannel {
     let envelope = frame.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
     let operation = envelope?["operation"] as? String
     let ownerOperations: Set<String> = ["作業領域承認", "作業領域失効", "作業領域全体基準点保存", "Host登録", "アダプター導入", "アダプター更新", "アダプター検証",
-      "アダプター有効化", "アダプター無効化", "アダプター隔離", "アダプター削除"]
+      "アダプター有効化", "アダプター無効化", "アダプター隔離", "アダプター削除", "GUI Shell書出し"]
     let mcpOperation = ["MCP接続", "MCP切断", "MCP Tool実行"].contains(operation ?? "")
     let a2aOperation = ["A2A接続", "A2Aメッセージ送信"].contains(operation ?? "")
     let osSelection = operation == "作業領域OS選択" || operation == "AgentCLI実行fileOS選択"

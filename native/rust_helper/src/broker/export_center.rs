@@ -1,4 +1,4 @@
-//! Windows向けGUI Shell書出しの独立manifestを生成するBroker境界。
+//! GUI Shell書出しの独立manifestを生成するBroker境界。
 //!
 //! 現行単位は新規identity、監査store、設定、Runtime／Adapter manifestと配布
 //! metadataを固定Export directoryへ保存するまでであり、実build、installer、process、
@@ -18,13 +18,60 @@ use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::path::Path;
-#[cfg(test)]
+#[cfg(any(unix, test))]
 use std::path::PathBuf;
 use unicode_normalization::UnicodeNormalization;
 
 const VERSION: u64 = 1;
 const MAX_MANIFEST_FILE_BYTES: usize = 64 * 1024;
 const OPERATION: &str = "GUI Shell書出し";
+
+/// 検査済みのBroker領域内にだけ固定書出し先を用意し、開いたdirectoryを返す。
+#[cfg(unix)]
+pub(crate) fn open_private_export_directory(state: &Path) -> std::io::Result<(PathBuf, Dir)> {
+    use cap_fs_ext::DirExt;
+    use cap_std::fs::{DirBuilder, DirBuilderExt, MetadataExt};
+    use std::os::unix::fs::MetadataExt as StdMetadataExt;
+
+    let rejected = || std::io::Error::other("Brokerの固定書出し先を安全に開けません");
+    let uid = rustix::process::geteuid().as_raw();
+    let observed = std::fs::symlink_metadata(state)?;
+    if !observed.is_dir() || observed.uid() != uid || observed.mode() & 0o077 != 0 {
+        return Err(rejected());
+    }
+    let parent = Dir::open_ambient_dir(state, cap_std::ambient_authority())?;
+    let opened = parent.dir_metadata()?;
+    if opened.uid() != uid
+        || opened.mode() & 0o077 != 0
+        || opened.dev() != observed.dev()
+        || opened.ino() == 0
+        || opened.ino() != observed.ino()
+    {
+        return Err(rejected());
+    }
+
+    let mut builder = DirBuilder::new();
+    builder.mode(0o700);
+    match parent.create_dir_with("exports", &builder) {
+        Ok(()) => (),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => (),
+        Err(error) => return Err(error),
+    }
+    let directory = parent.open_dir_nofollow("exports")?;
+    let metadata = directory.dir_metadata()?;
+    let entry = parent.symlink_metadata("exports")?;
+    if !entry.is_dir()
+        || metadata.uid() != uid
+        || metadata.mode() & 0o077 != 0
+        || metadata.dev() != entry.dev()
+        || metadata.ino() == 0
+        || metadata.ino() != entry.ino()
+    {
+        return Err(rejected());
+    }
+    Ok((state.join("exports"), directory))
+}
+
 const UNPRUNABLE_CORE_IDS: [&str; 8] = [
     "core.security_broker",
     "core.cryptography",
