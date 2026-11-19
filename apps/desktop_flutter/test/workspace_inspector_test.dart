@@ -115,6 +115,22 @@ class TestBroker implements BrokerTransport {
       evidence = 'LIVE_RUNTIME';
       mutate?.call(body);
       if (revokeAfterRead) approval = null;
+    } else if (operation == workspaceEditApplyOperation) {
+      final prepared = payload!['target_request'] as Map;
+      final binding = prepared['review_binding'] as Map;
+      body = {
+        'version': 1,
+        'operation': operation,
+        'request_hash': brokerPayloadHash(payload),
+        'workspace_id': prepared['workspace_id'],
+        'review_audit_id': prepared['review_audit_id'],
+        'diff_hash': binding['diff_hash'],
+        'transaction_id': 'a' * 64,
+        'changed_files': (binding['files'] as List).length,
+        'status': 'applied',
+      };
+      evidence = 'LIVE_RUNTIME';
+      mutate?.call(body);
     } else if (operation == '作業領域全体基準点保存') {
       evidence = baselineEvidence;
       body = {
@@ -411,7 +427,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(broker.operations, contains(workspaceEditApplyTargetOperation));
     expect(find.text('適用先 workspace-target'), findsOneWidget);
-    expect(find.text('書込みには別の認可が必要です。'), findsOneWidget);
+    final apply = find.text('Owner確認して適用');
+    expect(broker.operations, isNot(contains(workspaceEditApplyOperation)));
+    await tester.ensureVisible(apply);
+    await tester.tap(apply);
+    await tester.pumpAndSettle();
+    expect(broker.operations, contains(workspaceEditApplyOperation));
+    expect(find.text('適用済み 1件'), findsOneWidget);
 
     history.value++;
     await tester.pumpAndSettle();

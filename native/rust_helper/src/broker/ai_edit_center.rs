@@ -12,6 +12,7 @@ const VERSION: u64 = 1;
 const OPERATION: &str = "GUI Shell編集提案";
 pub(super) const REVIEW_OPERATION: &str = "GUI Shell編集提案審査";
 pub(super) const APPLY_TARGET_OPERATION: &str = "GUI Shell編集適用先照合";
+pub(super) const APPLY_OPERATION: &str = "GUI Shell編集適用";
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -145,6 +146,74 @@ impl ApplyTargetRequest {
     }
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ApplyRequest {
+    version: u64,
+    pub(super) target_audit_id: String,
+    pub(super) target_request: Value,
+}
+
+impl ApplyRequest {
+    pub(super) fn parse(
+        payload: &Value,
+    ) -> Result<(Self, ApplyTargetRequest, ApplyBinding), &'static str> {
+        let request: Self =
+            serde_json::from_value(payload.clone()).map_err(|_| "編集適用の入力が不正")?;
+        if request.version != VERSION || !valid_identifier(&request.target_audit_id) {
+            return Err("編集適用の版または適用先監査参照が不正");
+        }
+        let target = ApplyTargetRequest::parse(&request.target_request)?;
+        let binding = target.binding()?;
+        if !valid_identifier(&binding.proposal_id)
+            || !valid_hash(&binding.diff_hash)
+            || binding.files.iter().any(|file| {
+                file.path.len() > 200
+                    || crate::workspace_reader::WorkspaceReader::validate_registered_secret_path(
+                        &file.path,
+                    )
+                    .is_err()
+                    || file
+                        .path
+                        .chars()
+                        .any(|c| matches!(c, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}'))
+                    || file.before_hash == file.after_hash
+                    || [file.before_hash.as_deref(), file.after_hash.as_deref()]
+                        .into_iter()
+                        .flatten()
+                        .any(|hash| !valid_hash(hash))
+            })
+        {
+            return Err("編集適用の差分結合または対象版が不正");
+        }
+        Ok((request, target, binding))
+    }
+}
+
+pub(crate) fn apply_confirmation_summary(payload: &Value, request_hash: &str) -> Option<String> {
+    let (_, target, binding) = ApplyRequest::parse(payload).ok()?;
+    if !valid_hash(request_hash) {
+        return None;
+    }
+    let files = binding
+        .files
+        .iter()
+        .map(|file| {
+            let effect = match (&file.before_hash, &file.after_hash) {
+                (None, _) => "追加",
+                (_, None) => "削除",
+                _ => "置換",
+            };
+            format!("{effect}  {}", file.path)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    Some(format!(
+        "審査済み差分を作業領域へ一回適用します。\n作業領域 {}\n提案 {}\n差分hash {}\n対象 {}件\n{}\n要求hash {}",
+        target.workspace_id, binding.proposal_id, binding.diff_hash, binding.files.len(), files, request_hash,
+    ))
+}
+
 pub(super) fn review_binding(body: &Value, changes: &[Value]) -> Value {
     let review = &body["projection"];
     let files: Vec<Value> = changes
@@ -172,7 +241,7 @@ pub(super) fn review_binding_reason(binding: &Value) -> String {
     )
 }
 
-fn current_host_receipt(
+pub(super) fn current_host_receipt(
     broker: &Broker,
     audit_id: &str,
 ) -> Result<super::audit::BrokerAuditEvent, &'static str> {

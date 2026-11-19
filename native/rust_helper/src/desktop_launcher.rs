@@ -71,6 +71,7 @@ const AGENT_CLI_REGISTRATION_NOTICE: &str = "この登録操作ではTaskを実�
 enum DesktopOwnerOperationSummary {
     GuiShellExport(ExportConfirmationSummary),
     GuiShellEditProposal(String),
+    GuiShellEditApply(String),
     AgentTaskWorkspacePermission {
         runtime_id: String,
         session_id: String,
@@ -1978,6 +1979,9 @@ fn owner_operation_candidate_with_product_identity(
                 crate::broker::ai_edit_center::owner_confirmation_summary(payload, &payload_hash)?,
             )
         }
+        BrokerOperation::GuiShell編集適用 => DesktopOwnerOperationSummary::GuiShellEditApply(
+            crate::broker::ai_edit_center::apply_confirmation_summary(payload, &payload_hash)?,
+        ),
         BrokerOperation::AgentCLI実行系作業領域登録 => {
             let request: AgentCliRuntimeWorkspaceRegistrationRequest =
                 serde_json::from_value(payload.clone()).ok()?;
@@ -2939,6 +2943,7 @@ fn owner_confirmation_text_for_identity(
 ) -> String {
     match summary {
         DesktopOwnerOperationSummary::GuiShellEditProposal(text) => text.clone(),
+        DesktopOwnerOperationSummary::GuiShellEditApply(text) => text.clone(),
         DesktopOwnerOperationSummary::GuiShellExport(summary) => {
             let target_platform = export_center::target_platform_label(&summary.target_platform)
                 .unwrap_or("不明");

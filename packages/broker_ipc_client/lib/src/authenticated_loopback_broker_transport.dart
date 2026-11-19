@@ -22,6 +22,7 @@ const _endpointFields = <String>{
 };
 const _nativeConfirmationOperations = <String>{
   'GUI Shell編集提案',
+  'GUI Shell編集適用',
   'GUI Shell書出し',
   '回帰Case登録',
   '回帰Case削除',

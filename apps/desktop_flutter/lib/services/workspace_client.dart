@@ -8,6 +8,7 @@ import 'broker_client.dart';
 const _visibilities = {'none', 'hash_only', 'summary', 'redacted', 'full'};
 const workspaceEditReviewOperation = 'GUI Shell編集提案審査';
 const workspaceEditApplyTargetOperation = 'GUI Shell編集適用先照合';
+const workspaceEditApplyOperation = 'GUI Shell編集適用';
 final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
 final _id = RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$');
 final _auditEventId = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$');
@@ -21,6 +22,7 @@ const _workspaceFailureCodes = {
   '作業領域期限超過',
   'ai_edit_review_provenance_invalid',
   'ai_edit_apply_binding_invalid',
+  'ai_edit_apply_rejected',
 };
 Never _invalid() => throw const BrokerClientException('作業領域の応答を確認できません');
 Map<String, Object?> _map(Object? value) {
@@ -199,12 +201,13 @@ class WorkspaceRegistration {
 class WorkspaceView {
   WorkspaceView(this.registration, this.operation, this.path, this.projection,
       this.auditId,
-      [this.baselineHash, this.sourceRegistration]);
+      [this.baselineHash, this.sourceRegistration, this.editTargetRequest]);
   final WorkspaceRegistration registration;
   final String operation, path, auditId;
   final String? baselineHash;
   final WorkspaceRegistration? sourceRegistration;
   final Map<String, Object?>? projection;
+  final Map<String, Object?>? editTargetRequest;
 }
 
 /// Brokerのprojectionだけを消費する。owner資格と権限付与を保持しない。
@@ -550,7 +553,54 @@ class WorkspaceClient {
         !current.any((entry) => entry.sameGrant(target))) {
       _invalid();
     }
-    return WorkspaceView(target, operation, '', projection, auditId, null, source);
+    return WorkspaceView(target, operation, '', projection, auditId, null,
+        source, Map<String, Object?>.unmodifiable(payload));
+  }
+
+  Future<WorkspaceView> applyReviewedEdit(WorkspaceView prepared) async {
+    const operation = workspaceEditApplyOperation;
+    final targetRequest = prepared.editTargetRequest;
+    final projection = _map(prepared.projection);
+    final files = projection['files'];
+    final now = DateTime.now();
+    if (prepared.operation != workspaceEditApplyTargetOperation ||
+        targetRequest == null ||
+        !prepared.registration.current(now) ||
+        prepared.sourceRegistration?.current(now) != true ||
+        files is! List ||
+        files.isEmpty ||
+        files.length > 32 ||
+        !_auditEventId.hasMatch(prepared.auditId) ||
+        prepared.auditId == _unavailableAuditEventId) {
+      _invalid();
+    }
+    final payload = {
+      'version': 1,
+      'target_audit_id': prepared.auditId,
+      'target_request': targetRequest,
+    };
+    final response = await _request(operation, payload);
+    final body = _map(response['body']);
+    _keys(body, [
+      'version', 'operation', 'request_hash', 'workspace_id', 'review_audit_id',
+      'diff_hash', 'transaction_id', 'changed_files', 'status',
+    ]);
+    final auditId = _string(response['audit_event_id']);
+    if (response['evidence_source'] != 'LIVE_RUNTIME' ||
+        !_auditEventId.hasMatch(auditId) ||
+        auditId == _unavailableAuditEventId ||
+        body['version'] != 1 ||
+        body['operation'] != operation ||
+        body['request_hash'] != brokerPayloadHash(payload) ||
+        body['workspace_id'] != prepared.registration.id ||
+        body['review_audit_id'] != projection['review_audit_id'] ||
+        body['diff_hash'] != projection['diff_hash'] ||
+        !RegExp(r'^[a-f0-9]{64}$').hasMatch(_string(body['transaction_id'])) ||
+        body['changed_files'] != files.length ||
+        body['status'] != 'applied') {
+      _invalid();
+    }
+    return WorkspaceView(prepared.registration, operation, '', body, auditId);
   }
 
   Future<WorkspaceView> read(WorkspaceRegistration selected, String path,

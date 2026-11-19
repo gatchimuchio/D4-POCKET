@@ -945,4 +945,135 @@ impl WorkspaceRegistry {
             }
         }))
     }
+
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    pub(super) fn edit_workspace_identity(
+        &self,
+        id: &str,
+    ) -> Option<super::dialogue::AgentTaskWorkspaceIdentity> {
+        let entry = self.entries.get(id)?;
+        Some(super::dialogue::AgentTaskWorkspaceIdentity::new(
+            entry.root_device,
+            entry.root_file_id,
+        ))
+    }
+
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    pub(super) fn apply_reviewed_edit(
+        &mut self,
+        request: super::ai_edit_center::ApplyRequest,
+        target_request: super::ai_edit_center::ApplyTargetRequest,
+        binding: super::ai_edit_center::ApplyBinding,
+        checked_target_hash: &str,
+        plan_hash: &str,
+        now: i64,
+        store: &super::store::BrokerPersistentStore,
+        audit: &mut dyn FnMut(&str, &str, &str) -> Result<String, &'static str>,
+    ) -> Result<(Value, String), &'static str> {
+        use super::ai_edit_center::APPLY_OPERATION;
+        use super::ai_edit_transaction::{EditStatus, EditTransaction};
+        use cap_fs_ext::DirExt;
+        use cap_std::fs::DirBuilder;
+
+        let checked = self.operate(
+            APPLY_TARGET_OPERATION,
+            &request.target_request,
+            false,
+            now,
+            &mut |_, _| Ok(()),
+        )?;
+        if digest(&checked) != checked_target_hash {
+            return Err("適用先照合の監査と現在の照合結果が不一致");
+        }
+        let source = self
+            .entries
+            .get(&binding.workspace_id)
+            .ok_or("審査元が未登録")?;
+        let target = self
+            .entries
+            .get(&target_request.workspace_id)
+            .ok_or("適用先が未登録")?;
+        let source_grant = source.grant.as_ref().ok_or("審査元の承認が期限超過")?;
+        let target_grant = target.grant.as_ref().ok_or("適用先の承認が期限超過")?;
+        let current =
+            || Instant::now() < source_grant.deadline && Instant::now() < target_grant.deadline;
+
+        let (store_root, _, store_ancestry) =
+            super::workspace_root::open_isolated_root_with_ancestry(store.root(), &[])?;
+        let store_identity = store_ancestry.last().ok_or("退避先の実体を確認できない")?;
+        if store_identity.device != target.root_device {
+            return Err("適用先と同じvolumeにBrokerの保護された退避先が必要");
+        }
+        for workspace in [source, target] {
+            let identity = super::workspace_root::DirectoryIdentity {
+                device: workspace.root_device,
+                file_id: workspace.root_file_id,
+            };
+            if store_ancestry.contains(&identity)
+                || workspace.root_ancestry.contains(store_identity)
+            {
+                return Err("Brokerの退避先と作業領域の重複を拒否");
+            }
+        }
+        let key = digest(&json!({
+            "review_audit_id": target_request.review_audit_id,
+            "target_device": target.root_device,
+            "target_file_id": target.root_file_id,
+        }));
+        let transaction_id = key
+            .strip_prefix("sha256:")
+            .ok_or("編集適用IDの生成に失敗")?;
+        if store.read_workspace_edit_record(transaction_id)?.is_some() || !current() {
+            return Err("同じ審査の適用は使用済み、または現在の読取承認が失効");
+        }
+        let vault_name = format!("edit-files-{transaction_id}");
+        let mut builder = DirBuilder::new();
+        #[cfg(unix)]
+        {
+            use cap_std::fs::DirBuilderExt;
+            builder.mode(0o700);
+        }
+        #[cfg(not(unix))]
+        builder.recursive(false);
+        // 適用先・審査に固有の未使用名だけを確保し、確認と適用の二重実行を拒否する。
+        let reason = format!("編集適用の一回認可を消費。復旧記録 {transaction_id}");
+        audit("recorded", &reason, plan_hash)?;
+        store_root
+            .create_dir_with(&vault_name, &builder)
+            .map_err(|_| "適用が使用済みか退避先を新規確保できない")?;
+        let vault = WorkspaceReader::from_registered_dir(
+            store_root
+                .open_dir_nofollow(&vault_name)
+                .map_err(|_| "退避先を開けない")?,
+            &[],
+        )
+        .map_err(|_| "退避先の実体が不正")?;
+        let transaction = EditTransaction {
+            store,
+            target: &target.reader,
+            vault: &vault,
+        };
+        match transaction.apply(
+            transaction_id,
+            plan_hash,
+            &binding.files,
+            &source.reader,
+            current,
+        )? {
+            EditStatus::Applied => (),
+            EditStatus::Reverted => return Err("編集を適用できなかったため元の版へ戻した"),
+            _ => return Err("編集を停止した。保護した版の復旧記録を確認"),
+        }
+        let body = json!({
+            "version": 1, "operation": APPLY_OPERATION, "request_hash": plan_hash,
+            "workspace_id": target_request.workspace_id, "review_audit_id": target_request.review_audit_id,
+            "diff_hash": binding.diff_hash, "transaction_id": transaction_id,
+            "changed_files": binding.files.len(), "status": "applied"
+        });
+        let terminal = audit("accepted", "編集適用と復旧記録の耐久確定", &digest(&body));
+        if terminal.is_err() {
+            let _result = transaction.rollback(transaction_id, plan_hash, || true);
+        }
+        terminal.map(|event_id| (body, event_id))
+    }
 }

@@ -651,6 +651,8 @@ pub enum BrokerOperation {
     GuiShell編集提案審査,
     #[serde(rename = "GUI Shell編集適用先照合")]
     GuiShell編集適用先照合,
+    #[serde(rename = "GUI Shell編集適用")]
+    GuiShell編集適用,
     #[serde(rename = "GUI Shell書出し")]
     GuiShell書出し,
     #[serde(rename = "更新一覧")]
@@ -843,6 +845,7 @@ impl BrokerOperation {
             BrokerOperation::GuiShell編集適用先照合 => {
                 super::ai_edit_center::APPLY_TARGET_OPERATION
             }
+            BrokerOperation::GuiShell編集適用 => super::ai_edit_center::APPLY_OPERATION,
             BrokerOperation::GuiShell書出し => "GUI Shell書出し",
             BrokerOperation::更新一覧 => "更新一覧",
             BrokerOperation::更新候補取得 => "更新候補取得",
@@ -2074,6 +2077,7 @@ impl Broker {
             Some(
                 BrokerOperation::GuiShell書出し
                     | BrokerOperation::GuiShell編集提案
+                    | BrokerOperation::GuiShell編集適用
                     | BrokerOperation::A2A接続
                     | BrokerOperation::A2Aメッセージ送信
                     | BrokerOperation::A2Aタスク状態取得
@@ -2259,6 +2263,19 @@ impl Broker {
                 &operation,
                 "desktop_native_owner_confirmation_required",
                 "GUI Shell書出しはRust Desktop起動器のnative Owner確認だけで許可します",
+                true,
+                envelope.payload_hash.as_deref().unwrap_or("unknown"),
+            );
+        }
+
+        if envelope.operation == Some(BrokerOperation::GuiShell編集適用)
+            && (!owner || export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation)
+        {
+            return self.reject_with_payload_hash(
+                &request_id,
+                &operation,
+                "desktop_native_owner_confirmation_required",
+                "編集適用には現在のRust DesktopネイティブOwner確認が必要",
                 true,
                 envelope.payload_hash.as_deref().unwrap_or("unknown"),
             );
@@ -2885,6 +2902,11 @@ impl Broker {
                 owner,
                 &payload_hash,
             ),
+            BrokerOperation::GuiShell編集適用 => self.apply_reviewed_ai_edit(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &payload_hash,
+            ),
             BrokerOperation::GuiShell書出し => super::export_center::export(
                 self,
                 &request_id,
@@ -3484,6 +3506,122 @@ impl Broker {
             self.作業領域 = registry;
         }
         result
+    }
+
+    fn apply_reviewed_ai_edit(&mut self, id: &str, payload: &Value, hash: &str) -> BrokerResponse {
+        use super::ai_edit_center::APPLY_OPERATION;
+        #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+        {
+            let _ = payload;
+            self.reject_with_payload_hash(
+                id,
+                APPLY_OPERATION,
+                "ai_edit_apply_unsupported",
+                "編集適用はDesktopで実行します",
+                false,
+                hash,
+            )
+        }
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+        {
+            use super::ai_edit_center::{
+                current_host_receipt, ApplyRequest, APPLY_TARGET_OPERATION,
+            };
+            let candidate = (|| {
+                let (request, target, binding) = ApplyRequest::parse(payload)?;
+                target.verify_receipt(self)?;
+                let event = current_host_receipt(self, &request.target_audit_id)?;
+                if event.operation != APPLY_TARGET_OPERATION
+                    || event.decision != "accepted"
+                    || event.evidence_source != EVIDENCE_SOURCE_LIVE_RUNTIME
+                {
+                    return Err("現在Hostの適用先照合監査が必要");
+                }
+                for id in [&binding.workspace_id, &target.workspace_id] {
+                    let root = self
+                        .作業領域
+                        .edit_workspace_identity(id)
+                        .ok_or("編集元または適用先の作業領域が未登録")?;
+                    if self.対話.workspace_has_running_agent_task(root) {
+                        return Err("作業領域で実行中のAgent Taskがある");
+                    }
+                }
+                let store = self
+                    .state_store
+                    .persistent_store
+                    .clone()
+                    .ok_or("編集適用には永続保管先が必要")?;
+                Ok((request, target, binding, event.payload_hash, store))
+            })();
+            let (request, target, binding, verified, store) = match candidate {
+                Ok(value) => value,
+                Err(reason) => {
+                    return self.reject_with_payload_hash(
+                        id,
+                        APPLY_OPERATION,
+                        "ai_edit_apply_binding_invalid",
+                        reason,
+                        true,
+                        hash,
+                    )
+                }
+            };
+            let mut registry = std::mem::take(&mut self.作業領域);
+            let mut audit_failed = false;
+            let now = self.current_epoch_seconds();
+            let result = registry.apply_reviewed_edit(
+                request,
+                target,
+                binding,
+                &verified,
+                hash,
+                now,
+                &store,
+                &mut |decision, reason, digest| {
+                    let evidence = if decision == "accepted" {
+                        EVIDENCE_SOURCE_LIVE_RUNTIME
+                    } else {
+                        EVIDENCE_SOURCE_INTERNAL_STATE
+                    };
+                    self.append_audit(id, APPLY_OPERATION, decision, reason, evidence, digest)
+                        .map(|event| event.event_id)
+                        .map_err(|_| {
+                            audit_failed = true;
+                            "編集適用の監査を確定できない"
+                        })
+                },
+            );
+            if audit_failed {
+                return self.audit_store_failed_response(
+                    id,
+                    APPLY_OPERATION,
+                    "編集適用の監査を確定できない",
+                    "復旧記録と現在版を確認",
+                );
+            }
+            self.作業領域 = registry;
+            match result {
+                Ok((body, audit_event_id)) => BrokerResponse {
+                    request_id: id.into(),
+                    operation: APPLY_OPERATION.into(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.into(),
+                    audit_event_id,
+                    error: None,
+                    health: None,
+                    body: Some(body),
+                    shutdown_requested: false,
+                },
+                Err(reason) => self.reject_with_payload_hash(
+                    id,
+                    APPLY_OPERATION,
+                    "ai_edit_apply_rejected",
+                    reason,
+                    true,
+                    hash,
+                ),
+            }
+        }
     }
 
     fn 作業領域要求処理(
@@ -8218,6 +8356,77 @@ mod tests {
             b"intervening edit\n"
         );
 
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+        let apply_input = {
+            let apply = json!({
+                "version": 1, "target_audit_id": prepared.audit_event_id, "target_request": prepare,
+            });
+            let apply_input = |request_id: &str, payload: &Value| {
+                json!({
+                "request_id": request_id, "session_id": "session-1",
+                "operation": "GUI Shell編集適用", "issued_at": "2026-06-01T00:00:30Z",
+                "nonce": format!("nonce-{request_id}"), "metadata": {"client": "desktop_flutter"},
+                "payload": payload, "payload_hash": canonical_payload_hash(Some(payload)),
+            }).to_string()
+            };
+            let normal = broker.handle(
+                BrokerRequestEnvelope::from_json_str(&apply_input("apply-ordinary", &apply))
+                    .unwrap(),
+            );
+            assert_eq!(
+                normal.error.unwrap().code,
+                "desktop_native_owner_confirmation_required"
+            );
+            let denied = broker.desktop_owner_operation_json(&apply_input("apply-changed", &apply));
+            assert_eq!(denied.status, BrokerStatus::Rejected);
+            assert_eq!(
+                fs::read(target.join("docs/allowed.txt")).unwrap(),
+                b"intervening edit\n"
+            );
+
+            fs::write(target.join("docs/allowed.txt"), b"before\n").unwrap();
+            let mut forged_apply = apply.clone();
+            forged_apply["target_audit_id"] = json!(response.audit_event_id);
+            let denied =
+                broker.desktop_owner_operation_json(&apply_input("apply-forged", &forged_apply));
+            assert_eq!(denied.error.unwrap().code, "ai_edit_apply_binding_invalid");
+            let confirmed =
+                broker.desktop_owner_operation_json(&apply_input("apply-confirmed", &apply));
+            assert_eq!(
+                confirmed.status,
+                BrokerStatus::Accepted,
+                "{:?}",
+                confirmed.error
+            );
+            let receipt = confirmed.body.unwrap();
+            assert_eq!(receipt["status"], "applied");
+            assert_eq!(receipt["changed_files"], 1);
+            assert_eq!(
+                fs::read(target.join("docs/allowed.txt")).unwrap(),
+                b"after\n"
+            );
+            let durable = broker.state_store.verified_audit_log().unwrap().unwrap();
+            assert!(durable
+                .events()
+                .iter()
+                .any(|event| event.event_id == confirmed.audit_event_id
+                    && event.operation == "GUI Shell編集適用"
+                    && event.decision == "accepted"));
+            fs::write(target.join("docs/allowed.txt"), b"before\n").unwrap();
+            let duplicate =
+                broker.desktop_owner_operation_json(&apply_input("apply-duplicate", &apply));
+            assert_eq!(duplicate.status, BrokerStatus::Rejected);
+            assert_eq!(
+                duplicate.error.unwrap().message,
+                "同じ審査の適用は使用済み、または現在の読取承認が失効"
+            );
+            assert_eq!(
+                fs::read(target.join("docs/allowed.txt")).unwrap(),
+                b"before\n"
+            );
+            apply_input("apply-old-host", &apply)
+        };
+
         broker
             .append_audit(
                 "switch-host",
@@ -8235,6 +8444,15 @@ mod tests {
         assert_eq!(
             broker
                 .handle(prepare_request("target-old-host", &prepare))
+                .error
+                .unwrap()
+                .code,
+            "ai_edit_apply_binding_invalid"
+        );
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+        assert_eq!(
+            broker
+                .desktop_owner_operation_json(&apply_input)
                 .error
                 .unwrap()
                 .code,

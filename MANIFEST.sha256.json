@@ -349,7 +349,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/workspace_inspector.dart",
-      "sha256": "a75047fd5b36efd95a13a667a0262cce039b336cb9ac452435ae39db0301ee91"
+      "sha256": "aea337bc52c1bb81a61aae41cd43a613bbaa155b7774ac73df86fc5a3154414d"
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart",
@@ -385,7 +385,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "9f3f2b4a2ab59fc6400ce7d49b9041ec9ccfc2368215b949637d3a5e4974439f"
+      "sha256": "2f14aac3501f16ef49b0ea456677ff7783e021c0cd03dc7b277a21db51b20ce1"
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_health_client.dart",
@@ -457,7 +457,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
-      "sha256": "2f9a3d3e3376e363a83b84988a3a975e14d18b594bb1a1ce1f7e2a84c230a03c"
+      "sha256": "f75c9463807d8c2f2ce5c76481d4f4c2879378819bd7d28470b70048ca9ea1fa"
     },
     {
       "path": "apps/desktop_flutter/linux/.gitignore",
@@ -605,7 +605,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "c7b37448fa5322c8df459d5d12e9da9716a8a80c5d152cf0a1646e4a0457be72"
+      "sha256": "81b6e1c14c80d249d6ab56749bb0125403f07ed3ab513fabe32ec0da1dfb8a00"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -693,7 +693,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/authenticated_loopback_broker_transport_test.dart",
-      "sha256": "cfac5b964ecc5cf91e5332e4f47bcabb44a36002b4d22037d870cc721cf38f85"
+      "sha256": "c667137e98b87afd83f5e141d8c824db4f47a16410c6fbbc51975ffb631a42ae"
     },
     {
       "path": "apps/desktop_flutter/test/broker_client_payload_hash_test.dart",
@@ -869,7 +869,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
-      "sha256": "cddd04613182edcee595e7a2ffeb944bc33a7b24adeb81b5478605064721a6f0"
+      "sha256": "a61c8b94143503be19911ef5c6f0fff31ed8f7a9364573483829ca214e9a51a8"
     },
     {
       "path": "apps/desktop_flutter/tool/content_live_client.dart",
@@ -917,7 +917,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp",
-      "sha256": "94e5568efdc3a350561e1a9292fce070da5698e0e80dde6797be5bfe863d2229"
+      "sha256": "c5a2b31d715a13b2865115f0249ab4a71607c7e0130fe3986ca6dc3f3d4c8a3a"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.h",
@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "6810c34b05a6276aa479c3f4f8714ac6f997cfd2c10092dfe7d169e3ead623e1"
+      "sha256": "1152d139b1696fe01cc10139a566478809dcc2079e2a4ebd95b4333bef31b4d6"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "docs/specs/gui-shell-ai-edit.md",
-      "sha256": "c09a689f364bd91c7a8960246223921fc0d637e4e49b813767a6466fafe1b927"
+      "sha256": "ca8803b440cccd7a2dac8af51d9d0ca273c34dc62ce543eca7b27e4deba38897"
     },
     {
       "path": "docs/specs/gui-shell-compose.md",
@@ -4093,7 +4093,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ai_edit_center.rs",
-      "sha256": "ef256c8c10f7a8a65c71acaafe765731ea57bd1ac5e492e515e3406f3fafde4f"
+      "sha256": "246543f5aa2e1939f39a9e60c4849303ed523574e1b5e4577865d41a26d1b2e4"
     },
     {
       "path": "native/rust_helper/src/broker/ai_edit_transaction.rs",
@@ -4157,7 +4157,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "e2d97dfb4d55c3c54518a009cc99774861b73a7fda25f143347559ab53fed9c7"
+      "sha256": "19083de86c0e00829916fc079a67015844495784107bea4a2f1e873d50d77a38"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -4225,7 +4225,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "434ce870c0d55f0a4fa59b14149b71c546477d143870d75893a91a3f8d623498"
+      "sha256": "e61e1520928021e37bace9b8ad7ce35c606ffe7b3ce10d2d21bd786a19150b75"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -4265,7 +4265,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "ac68b2bebb6b9bb81dce95d0f792df3a617ccc80350eacf55c0d33ac5debeab6"
+      "sha256": "7e2af3201a83a2cff7ad203c1f062d9f1a76cdb400126fe3de4b91806e3205b9"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -4281,7 +4281,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "37957580ec57a5924001ccc0a26772fd95829bfcadd55c2025f49b7f61e17861"
+      "sha256": "a4df3c14417c74aabb68ff97905846b59f689972350859208bf047c5c47f9e69"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4329,7 +4329,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "3e63c0a8380201b266a5db3dfbefa3b187dcf02b04a0174a38d123e8f0033b21"
+      "sha256": "fc0b3e035610fc4f38ed566690f438ec9fef9d21363ec0dcb522121eff51bf53"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4753,7 +4753,7 @@
     },
     {
       "path": "packages/broker_ipc_client/lib/src/authenticated_loopback_broker_transport.dart",
-      "sha256": "cd6b4487641d221ea4e417a5f7382f017dbff25e47273c704d74c671368c3c29"
+      "sha256": "2fa0be0ebd3bc692276be68cfc7466d0aba31ffe754cacef0e3125958185e407"
     },
     {
       "path": "packages/broker_ipc_client/pubspec.yaml",
@@ -5401,11 +5401,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "2ec4bb6739ed419e81b2c2b2d83ef82ff08193d89af8f263d9940bc5e58443a1"
+      "sha256": "38a95ca61541ea3ed4b24cd82342db210b6fc8d6aec1955f0ac0798c8de9c8e2"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "c33bd4d800c49682bf522ab595e1feca7809a9ce878912f8dc83ac3b5ae5bd41"
+      "sha256": "56192a84e66d487eb30a0caeac66dfe3d4492311af385d7b31c9d2c34cfdb126"
     },
     {
       "path": "specs/linux_workspace_selection.schema.json",
@@ -5741,11 +5741,11 @@
     },
     {
       "path": "specs/workspace_inspection_request.schema.json",
-      "sha256": "5b0ddfcf14a443f5b7d017727012f21a5646f3dc103d62bdc1e18cb3fdf6c7ff"
+      "sha256": "3e632cba0181550a0bd8ee879c3eb9a75ecc95482c262ea55af04bf8586583e8"
     },
     {
       "path": "specs/workspace_inspection_response.schema.json",
-      "sha256": "4ddbf4acae84fcfc7372f4b4460c2084d10fec60d7a454520322f06ec5e7256b"
+      "sha256": "391bb3b240b78289124afd3737be31390e5d5dc8e85b27b50021e1dc266de473"
     },
     {
       "path": "specs/workspace_startup.schema.json",
@@ -5801,7 +5801,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "0aa627b22b2c3948463ceb8ae46c7c9ca41fc835e3b7f9c603d4ccd516a71573"
+      "sha256": "18467fcc95df9c62600905e7872e3dae1c917bac6fbef8369fa4f09572b19be8"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",

@@ -32,16 +32,24 @@ Map<String, Object?> _endpoint(
       'max_request_bytes': maxRequestBytes,
     };
 
-Future<List<String>> _readRequestLines(Socket socket) async {
-  final lines = <String>[];
-  await for (final line in socket
+Future<void> _readRequestAndReply(
+  Socket socket,
+  Future<void> Function(String, Map<String, Object?>) reply,
+) async {
+  final lines = StreamIterator(socket
       .cast<List<int>>()
       .transform(utf8.decoder)
-      .transform(const LineSplitter())) {
-    lines.add(line);
-    if (lines.length == 2) break;
+      .transform(const LineSplitter()));
+  try {
+    if (!await lines.moveNext()) throw StateError('認証行がありません');
+    final auth = lines.current;
+    if (!await lines.moveNext()) throw StateError('要求行がありません');
+    final request = Map<String, Object?>.from(jsonDecode(lines.current) as Map);
+    // 応答のflushとcloseが終わるまでsocketの購読を保持する。
+    await reply(auth, request);
+  } finally {
+    await lines.cancel();
   }
-  return lines;
 }
 
 Future<void> _reply(
@@ -77,10 +85,10 @@ void main() {
     final captured = Completer<(String, Map<String, Object?>)>();
     final subscription = server.listen((socket) async {
       try {
-        final lines = await _readRequestLines(socket);
-        final request = Map<String, Object?>.from(jsonDecode(lines[1]) as Map);
-        captured.complete((lines[0], request));
-        await _reply(socket, request, body: const {'status': 'running'});
+        await _readRequestAndReply(socket, (auth, request) async {
+          captured.complete((auth, request));
+          await _reply(socket, request, body: const {'status': 'running'});
+        });
       } on Object catch (error, stack) {
         if (!captured.isCompleted) captured.completeError(error, stack);
         socket.destroy();
@@ -174,6 +182,7 @@ void main() {
     try {
       for (final operation in <String>[
         'GUI Shell編集提案',
+        'GUI Shell編集適用',
         'GUI Shell書出し',
         '回帰Case登録',
         '回帰Case削除',
@@ -260,15 +269,10 @@ void main() {
 
   test('要求IDの異なるBroker応答を拒否しsecretをerrorへ含めない', () async {
     final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
-    final subscription = server.listen((socket) async {
-      final lines = await _readRequestLines(socket);
-      final request = Map<String, Object?>.from(jsonDecode(lines[1]) as Map);
-      await _reply(
+    final subscription = server.listen((socket) => _readRequestAndReply(
         socket,
-        request,
-        requestId: 'runtime-host-stale-response',
-      );
-    });
+        (_, request) => _reply(socket, request,
+            requestId: 'runtime-host-stale-response')));
     final endpoint = AuthenticatedLoopbackBrokerEndpoint.fromJson(
       _endpoint(server.port),
     );
@@ -292,15 +296,10 @@ void main() {
 
   test('Broker応答byte上限を超えたframeを拒否する', () async {
     final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
-    final subscription = server.listen((socket) async {
-      final lines = await _readRequestLines(socket);
-      final request = Map<String, Object?>.from(jsonDecode(lines[1]) as Map);
-      await _reply(
+    final subscription = server.listen((socket) => _readRequestAndReply(
         socket,
-        request,
-        body: {'padding': List<String>.filled(256, 'x').join()},
-      );
-    });
+        (_, request) => _reply(socket, request,
+            body: {'padding': List<String>.filled(256, 'x').join()})));
     final endpoint = AuthenticatedLoopbackBrokerEndpoint.fromJson(
       _endpoint(server.port),
     );

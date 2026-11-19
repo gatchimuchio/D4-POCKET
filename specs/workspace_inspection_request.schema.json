@@ -18,6 +18,22 @@
         }
       }
     },
+    "editApplyTargetRequest": {
+      "type": "object",
+      "required": [
+        "version", "review_audit_id", "review_binding", "workspace_id",
+        "registration_hash", "approval_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {"const": 1},
+        "review_audit_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+        "review_binding": {"$ref": "#/$defs/editApplyBinding"},
+        "workspace_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+        "registration_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "approval_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"}
+      }
+    },
     "editApplyBinding": {
       "type": "object",
       "required": [
@@ -43,23 +59,28 @@
       "required": ["operation", "payload"],
       "additionalProperties": false,
       "properties": {
-        "operation": {"const": "GUI Shell編集適用先照合"},
+        "operation": {"const": "GUI Shell編集適用"},
         "payload": {
           "type": "object",
           "required": [
-            "version", "review_audit_id", "review_binding", "workspace_id",
-            "registration_hash", "approval_id"
+            "version", "target_audit_id", "target_request"
           ],
           "additionalProperties": false,
           "properties": {
             "version": {"const": 1},
-            "review_audit_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
-            "review_binding": {"$ref": "#/$defs/editApplyBinding"},
-            "workspace_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
-            "registration_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
-            "approval_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"}
+            "target_audit_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+            "target_request": {"$ref": "#/$defs/editApplyTargetRequest"}
           }
         }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["operation", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {"const": "GUI Shell編集適用先照合"},
+        "payload": {"$ref": "#/$defs/editApplyTargetRequest"}
       }
     },
     {

@@ -7,6 +7,25 @@
     {
       "type": "object",
       "required": [
+        "version", "operation", "request_hash", "workspace_id", "review_audit_id",
+        "diff_hash", "transaction_id", "changed_files", "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {"const": 1},
+        "operation": {"const": "GUI Shell編集適用"},
+        "request_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "workspace_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+        "review_audit_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+        "diff_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "transaction_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "changed_files": {"type": "integer", "minimum": 1, "maximum": 32},
+        "status": {"const": "applied"}
+      }
+    },
+    {
+      "type": "object",
+      "required": [
         "version", "operation", "要求hash", "作業領域ID", "実行系ID",
         "登録hash", "approval_id", "有効期限", "表示範囲", "projection"
       ],

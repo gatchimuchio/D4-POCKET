@@ -313,6 +313,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       bool preview = false,
       bool review = false,
       WorkspaceView? prepareTargetFor,
+      WorkspaceView? applyTarget,
       String? baselineHash}) async {
     if (!_isActive) return;
     _cancelViewMaintenance();
@@ -323,11 +324,13 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       _view = null;
       _busy = true;
       _selected = registration.id;
-      _message = '承認済み範囲を取得中';
+      _message = applyTarget == null ? '承認済み範囲を取得中' : 'Owner確認と適用の結果を待っています。';
     });
     try {
       final WorkspaceView view;
-      if (prepareTargetFor != null) {
+      if (applyTarget != null) {
+        view = await widget.client.applyReviewedEdit(applyTarget);
+      } else if (prepareTargetFor != null) {
         view = await widget.client.prepareEditTarget(prepareTargetFor, registration);
       } else if (review) {
         view = await widget.client.reviewEditProposal(
@@ -344,7 +347,9 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       setState(() {
         _view = view;
         _viewLimit = _elapsed.elapsedMilliseconds + 300000;
-        _message = '取得時点の表示です。承認状態を定期確認しています。';
+        _message = applyTarget == null
+            ? '取得時点の表示です。承認状態を定期確認しています。'
+            : '審査済みの差分を適用しました。';
       });
     } catch (error) {
       if (!mounted || generation != _generation) return;
@@ -352,7 +357,9 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         _view = null;
         _message = _failureMessage(
           error,
-          '取得または現在の承認を確認できません。登録状態を更新してください。',
+          applyTarget == null
+              ? '取得または現在の承認を確認できません。登録状態を更新してください。'
+              : '適用結果を確認できません。再実行の前に監査と現在の差分を確認してください。',
         );
       });
     } finally {
@@ -770,7 +777,16 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
           Text('適用先 ${view.registration.id}'),
           Text('審査差分 ${projection!['diff_hash']}'),
           Text('変更前後の版を照合した対象 ${(projection['files'] as List).length}件'),
-          const Text('書込みには別の認可が必要です。'),
+          OutlinedButton(
+            onPressed: _busy
+                ? null
+                : () => _read(view.registration, '', false, applyTarget: view),
+            child: const Text('Owner確認して適用'),
+          ),
+        ],
+        if (view.operation == workspaceEditApplyOperation) ...[
+          Text('適用済み ${projection!['changed_files']}件'),
+          Text('復旧記録 ${projection['transaction_id']}'),
         ],
         if (view.registration.visibility == 'full' &&
             (view.operation == '作業領域差分' ||

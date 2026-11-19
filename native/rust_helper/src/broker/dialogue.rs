@@ -1083,6 +1083,15 @@ pub(crate) fn 要求hash(要求: &対話要求) -> String {
 }
 
 impl 対話制御 {
+    pub(super) fn workspace_has_running_agent_task(
+        &self,
+        root: AgentTaskWorkspaceIdentity,
+    ) -> bool {
+        self.agent_tasks
+            .values()
+            .any(|task| task.workspace_root_identity == root && task.status == "running")
+    }
+
     pub(crate) fn for_broker_session(session_id: &str) -> Self {
         let mut control = Self::default();
         control.broker_session_id = Some(session_id.to_owned());
