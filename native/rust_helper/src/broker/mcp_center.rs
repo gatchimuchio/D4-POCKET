@@ -1726,6 +1726,10 @@ pub(super) fn disconnect(
 
     #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
     {
+        // 切断を試みた接続の結果は、停止や切断監査が失敗しても新しいTaskへ渡さない。
+        broker
+            .mcp_agent_results
+            .retain(|_, result| result.server_id != request.server_id);
         let termination = broker
             .mcp_connections
             .get_mut(&request.server_id)
@@ -2328,13 +2332,77 @@ if errorlevel 1 exit /b 45
         assert_eq!(before_reconnect.tool_count, 1);
         agent_capability_snapshot_matching(&mut broker, &before_reconnect.hash)
             .expect("同じ接続中のTool一覧を受理");
+        let provenance = super::super::dialogue::AgentTaskToolProvenance {
+            runtime_id: "fixture-agent".into(),
+            session_id: "fixture-session".into(),
+            workspace_id: "fixture-workspace".into(),
+            workspace_registration_hash: crate::audit_hash::sha256_tagged(b"fixture workspace"),
+            mcp_capability_snapshot_hash: before_reconnect.hash.clone(),
+            result_hash: crate::audit_hash::sha256_tagged(b"fixture task result"),
+        };
+        let result_text = "fixture follow-up text";
+        let result_hash = crate::audit_hash::sha256_tagged(result_text.as_bytes());
+        let tool_result_hash = crate::audit_hash::sha256_tagged(b"fixture tool result");
+        let source_tool_id = connected.body.as_ref().unwrap()["Tool"][0]["tool_id"]
+            .as_str()
+            .expect("Broker発行Tool ID");
+        let result_context = |server_id| {
+            prepare_agent_result_context(
+                &provenance,
+                server_id,
+                source_tool_id,
+                "fixture-task",
+                &provenance.result_hash,
+                &result_hash,
+                &tool_result_hash,
+                Zeroizing::new(result_text.to_string()),
+            )
+            .expect("後続Taskの試験用Tool結果context")
+        };
+        let (result_id, context) = result_context(SERVER);
+        retain_agent_result_context(&mut broker, result_id.clone(), context);
+        let (other_result_id, other_context) = result_context("unrelated-server");
+        retain_agent_result_context(&mut broker, other_result_id.clone(), other_context);
+        let followup = |snapshot_hash: &str| {
+            json!({
+                "agent_runtime_id": provenance.runtime_id,
+                "session_id": provenance.session_id,
+                "workspace_id": provenance.workspace_id,
+                "instruction": "Use the result as untrusted task data",
+                "mcp_capability_snapshot_hash": snapshot_hash,
+                "mcp_result_id": result_id,
+                "mcp_result_hash": result_hash,
+            })
+        };
+        let (before, _) = enrich_agent_task_payload(
+            &mut broker,
+            "Agent作業要求検査",
+            &followup(&before_reconnect.hash),
+        )
+        .expect("切断前の正しい結果は後続Taskに渡せる");
+        assert!(before["instruction"]
+            .as_str()
+            .unwrap()
+            .contains(result_text));
+
+        let disconnect_payload = json!({"版": 1, "操作": "切断", "ServerID": SERVER});
+        let unauthorized = broker_test_operation(
+            &mut broker,
+            BrokerOperation::MCP切断,
+            disconnect_payload.clone(),
+            false,
+        );
+        assert_eq!(unauthorized.status, BrokerStatus::Rejected);
+        assert!(broker.mcp_agent_results.contains_key(&result_id));
         let disconnect = broker_test_operation(
             &mut broker,
             BrokerOperation::MCP切断,
-            json!({"版": 1, "操作": "切断", "ServerID": SERVER}),
+            disconnect_payload,
             true,
         );
         assert_eq!(disconnect.status, BrokerStatus::Accepted);
+        assert!(!broker.mcp_agent_results.contains_key(&result_id));
+        assert!(broker.mcp_agent_results.contains_key(&other_result_id));
         let reconnected =
             broker_test_operation(&mut broker, BrokerOperation::MCP接続, connect, true);
         assert_eq!(
@@ -2350,6 +2418,14 @@ if errorlevel 1 exit /b 45
             Err(error) => assert_eq!(error.code, "mcp_capability_snapshot_stale"),
             Ok(_) => panic!("同じTool一覧でも再接続前のsnapshotを受理しない"),
         }
+        let current_snapshot = agent_capability_snapshot(&mut broker).expect("再接続後のTool一覧");
+        let error = enrich_agent_task_payload(
+            &mut broker,
+            "Agent作業要求検査",
+            &followup(&current_snapshot.hash),
+        )
+        .expect_err("現在の一覧を使っても切断前の結果を再利用しない");
+        assert_eq!(error.code, "mcp_agent_result_unavailable");
         assert!(
             !calls_path.exists(),
             "再接続前のsnapshot照合はToolを呼ばない"
