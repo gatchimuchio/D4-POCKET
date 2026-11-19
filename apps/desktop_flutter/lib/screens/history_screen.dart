@@ -398,19 +398,30 @@ class _HistoryScreenState extends State<HistoryScreen>
         grant == null ||
         !grant.current ||
         entry.runtimeId != grant.runtime ||
-        !const {'completed', 'failed', 'cancelled', 'suspended'}
-            .contains(entry.status)) {
+        !const {
+          'completed',
+          'failed',
+          'cancelled',
+          'suspended',
+        }.contains(entry.status)) {
       return;
     }
+    final sourceGeneration = _contentSourceGeneration.value;
     await showDialog<void>(
       context: context,
       builder: (_) => AgentTaskHistoryBranchDialog(
         client: client,
         grant: grant,
         source: entry,
+        sourceGeneration: _contentSourceGeneration,
+        generationAtOpen: sourceGeneration,
       ),
     );
-    if (mounted && _active) _load(after: 0);
+    if (mounted &&
+        _active &&
+        _contentSourceGeneration.value == sourceGeneration) {
+      _load(after: 0);
+    }
   }
 
   @override

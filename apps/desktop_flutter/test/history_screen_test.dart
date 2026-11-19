@@ -22,6 +22,8 @@ class Fixture implements BrokerTransport {
   void Function(Map<String, Object?>)? alterTaskRecord;
   String state = '成功';
   Completer<void>? gate;
+  String? delayedOperation;
+  Completer<void>? delayedResponse;
   final operations = <String>[];
   final taskRequests = <String, Map<String, Object?>>{};
   int expiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 290;
@@ -55,6 +57,7 @@ class Fixture implements BrokerTransport {
   Future<Map<String, Object?>> request(String op,
       {Map<String, Object?>? payload}) async {
     operations.add(op);
+    if (op == delayedOperation) await delayedResponse!.future;
     if (op == '対話履歴閲覧状態' && failStatus) {
       throw const BrokerClientException('fixture failure');
     }
@@ -758,6 +761,91 @@ void main() {
     expect(find.text('Runtime: broker-a ／ 1件の要求'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
+
+  for (final delay in ['対話履歴閲覧状態', '対話分岐', 'AgentTaskOwnerApprovalGrant']) {
+    testWidgets('分岐中の接続切替で $delay の遅延応答から後続要求を送らない', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final first = Fixture();
+      final second = Fixture();
+      final hostGeneration = ValueNotifier<int>(0);
+      Widget screen(Fixture fixture) => MaterialApp(
+        home: Scaffold(
+          body: HistoryScreen(
+            client: HistoryClient(fixture),
+            hostContextGeneration: hostGeneration,
+          ),
+        ),
+      );
+      Future<void> press(String label, {bool wait = true}) async {
+        final button = find.text(label);
+        await tester.ensureVisible(button);
+        await tester.pump();
+        await tester.tap(button);
+        if (wait) {
+          await tester.pumpAndSettle();
+        } else {
+          await tester.pump();
+        }
+      }
+
+      await tester.pumpWidget(screen(first));
+      await tester.pumpAndSettle();
+      await press('Agent Task履歴');
+      await tester.tap(find.byKey(ValueKey('agent-task-${'a' * 32}')));
+      await tester.pumpAndSettle();
+      await press('新しいAgent Taskへ分岐');
+      await tester.enterText(
+        find.byKey(const ValueKey('agent-task-history-branch-input')),
+        '新しいTaskの指示',
+      );
+
+      final duringApproval = delay == 'AgentTaskOwnerApprovalGrant';
+      if (duringApproval) {
+        await press('新しいSessionを作成して事前検査');
+        await press('新しいWorkspace Permissionを発行');
+      }
+      final priorCount = first.operations.length;
+      first.delayedResponse = Completer<void>();
+      first.delayedOperation = delay;
+      await press(
+        duringApproval ? '新しいOwner Approvalを発行' : '新しいSessionを作成して事前検査',
+        wait: false,
+      );
+      expect(first.operations.skip(priorCount), contains(delay));
+
+      if (delay == '対話分岐') {
+        await tester.pumpWidget(screen(second));
+      } else {
+        hostGeneration.value++;
+      }
+      await tester.pump();
+      final oldOperations = first.operations.toList();
+      first.delayedResponse!.complete();
+      await tester.pumpAndSettle();
+
+      if (duringApproval &&
+          find.text('新しいAgent Taskを開始').evaluate().isNotEmpty) {
+        await press('新しいAgent Taskを開始');
+      }
+
+      expect(first.operations, oldOperations);
+      expect(first.operations, isNot(contains('AgentTask実行')));
+      if (delay == '対話履歴閲覧状態') {
+        expect(first.operations, isNot(contains('対話分岐')));
+      } else if (delay == '対話分岐') {
+        expect(first.operations, isNot(contains('Agent作業要求検査')));
+      }
+      expect(second.operations, isNot(contains('AgentTask実行')));
+      expect(find.text('分岐画面の接続が失効しました'), findsOneWidget);
+      expect(find.textContaining('分岐Audit:'), findsNothing);
+      expect(find.text('新しいTaskの指示'), findsNothing);
+      expect(find.text('新しいAgent Taskを開始'), findsNothing);
+      await press('閉じる');
+      await tester.pumpWidget(const SizedBox());
+      hostGeneration.dispose();
+    });
+  }
 
   testWidgets('実履歴表示と失効時の破棄', (tester) async {
     final f = Fixture();

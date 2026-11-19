@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:gui_shell_ui/gui_shell_ui.dart';
 
@@ -10,11 +11,15 @@ class AgentTaskHistoryBranchDialog extends StatefulWidget {
     required this.client,
     required this.grant,
     required this.source,
+    required this.sourceGeneration,
+    required this.generationAtOpen,
   });
 
   final HistoryClient client;
   final HistoryGrant grant;
   final AgentTaskHistoryEntry source;
+  final ValueListenable<int> sourceGeneration;
+  final int generationAtOpen;
 
   @override
   State<AgentTaskHistoryBranchDialog> createState() =>
@@ -22,14 +27,18 @@ class AgentTaskHistoryBranchDialog extends StatefulWidget {
 }
 
 class _AgentTaskHistoryBranchDialogState
-    extends State<AgentTaskHistoryBranchDialog> with WidgetsBindingObserver {
+    extends State<AgentTaskHistoryBranchDialog>
+    with WidgetsBindingObserver {
   final _instruction = TextEditingController();
+  late final HistoryClient _historyClient;
+  late final AgentTaskClient _tasks;
   Map<String, Object?>? _branch;
   AgentTaskRequest? _request;
   AgentTaskPreflight? _preflight;
   AgentTaskRecord? _task;
   bool _busy = false;
   bool _active = true;
+  bool _invalidated = false;
   bool _branchAttempted = false;
   bool _permissionAttempted = false;
   bool _permissionGranted = false;
@@ -38,14 +47,57 @@ class _AgentTaskHistoryBranchDialogState
   bool _startAttempted = false;
   String _status = '元Taskの本文・結果本文・権限は引き継ぎません。新しい指示を入力してください。';
 
+  bool get _scopeCurrent =>
+      mounted &&
+      !_invalidated &&
+      widget.sourceGeneration.value == widget.generationAtOpen;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final transport = _BranchTransport(
+      widget.client.transport,
+      () => _scopeCurrent && _active,
+    );
+    _historyClient = HistoryClient(transport);
+    _tasks = AgentTaskClient(transport);
+    widget.sourceGeneration.addListener(_sourceChanged);
+    _sourceChanged();
+  }
+
+  void _sourceChanged() {
+    if (widget.sourceGeneration.value != widget.generationAtOpen) {
+      _invalidate();
+    }
+  }
+
+  void _invalidate() {
+    if (_invalidated) return;
+    _invalidated = true;
+    _branch = null;
+    _request = null;
+    _preflight = null;
+    _task = null;
+    _busy = false;
+    _permissionGranted = false;
+    _approvalGranted = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _instruction.clear();
+      setState(() {});
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _invalidate();
+      return;
+    }
     final active = state == AppLifecycleState.resumed;
     if (!mounted || active == _active) return;
     setState(() {
@@ -60,13 +112,17 @@ class _AgentTaskHistoryBranchDialogState
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    widget.sourceGeneration.removeListener(_sourceChanged);
     _instruction.dispose();
     super.dispose();
   }
 
   Future<void> _run(
-      String pending, String failure, Future<void> Function() action) async {
-    if (_busy || !_active) return;
+    String pending,
+    String failure,
+    Future<void> Function() action,
+  ) async {
+    if (_busy || !_active || !_scopeCurrent) return;
     setState(() {
       _busy = true;
       _status = pending;
@@ -74,9 +130,9 @@ class _AgentTaskHistoryBranchDialogState
     try {
       await action();
     } on Object {
-      if (mounted) setState(() => _status = failure);
+      if (_scopeCurrent) setState(() => _status = failure);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (_scopeCurrent) setState(() => _busy = false);
     }
   }
 
@@ -92,11 +148,12 @@ class _AgentTaskHistoryBranchDialogState
       '現在の履歴承認を確認し、新しいSessionと分岐Auditを作成しています。',
       '分岐結果を確認できません。再送せず、履歴・Audit・Recoveryを確認してください。',
       () async {
-        final branch = await widget.client.branchAgentTask(
+        final branch = await _historyClient.branchAgentTask(
           widget.grant,
           widget.source,
           text,
         );
+        if (!_scopeCurrent) return;
         final request = AgentTaskRequest(
           runtimeId: branch['実行系ID']! as String,
           sessionId: branch['対話セッションID']! as String,
@@ -104,7 +161,6 @@ class _AgentTaskHistoryBranchDialogState
           instruction: text,
           requireUnusedTaskSession: true,
         );
-        if (!mounted) return;
         setState(() {
           _branch = branch;
           _request = request;
@@ -113,7 +169,7 @@ class _AgentTaskHistoryBranchDialogState
         });
       },
     );
-    if (mounted && _branch != null) await _inspectCreatedBranch();
+    if (_scopeCurrent && _branch != null) await _inspectCreatedBranch();
   }
 
   Future<void> _inspectCreatedBranch() async {
@@ -124,9 +180,8 @@ class _AgentTaskHistoryBranchDialogState
       'Brokerが新TaskのRuntime／Workspace／指示を事前検査しています。',
       'Sessionと分岐Auditは作成済みです。Taskを開始せず、事前検査を再取得してください。',
       () async {
-        final preflight =
-            await AgentTaskClient(widget.client.transport).inspect(request);
-        if (!mounted) return;
+        final preflight = await _tasks.inspect(request);
+        if (!_scopeCurrent) return;
         if (preflight.instructionHash != branch['要求hash'] ||
             preflight.permissionStatus != '未付与' ||
             preflight.approvalStatus != '未取得') {
@@ -152,9 +207,8 @@ class _AgentTaskHistoryBranchDialogState
       '現在のWorkspaceに一回限りのTask Permissionを要求しています。',
       'Permission結果を確認できません。重ねて要求せず、Broker状態とAuditを確認してください。',
       () async {
-        await AgentTaskClient(widget.client.transport)
-            .grantWorkspacePermission(request);
-        if (!mounted) return;
+        await _tasks.grantWorkspacePermission(request);
+        if (!_scopeCurrent) return;
         setState(() {
           _permissionGranted = true;
           _status =
@@ -172,9 +226,8 @@ class _AgentTaskHistoryBranchDialogState
       '新しいTask指示hashに対する一回限りのOwner Approvalを要求しています。',
       'Owner Approval結果を確認できません。重ねて要求せず、Broker状態とAuditを確認してください。',
       () async {
-        await AgentTaskClient(widget.client.transport)
-            .grantOwnerApproval(request);
-        if (!mounted) return;
+        await _tasks.grantOwnerApproval(request);
+        if (!_scopeCurrent) return;
         setState(() {
           _approvalGranted = true;
           _status = '新TaskのPermissionとOwner Approvalを個別に確認しました。';
@@ -198,16 +251,17 @@ class _AgentTaskHistoryBranchDialogState
       '新しいAgent TaskをBrokerから開始しています。',
       '開始結果が不明です。再送せず、Task履歴とRecoveryを確認してください。',
       () async {
-        final task =
-            await AgentTaskClient(widget.client.transport).start(request);
-        if (!mounted) return;
+        final task = await _tasks.start(request);
+        if (!_scopeCurrent) return;
         if (task.taskId == widget.source.taskId ||
             !task.isBoundTo(
               request,
               expectedInstructionHash: preflight.instructionHash,
             )) {
-          setState(() => _status =
-              '開始応答のTask／Session／Workspace／hashが一致しません。結果を再送せず隔離して確認してください。');
+          setState(
+            () => _status =
+                '開始応答のTask／Session／Workspace／hashが一致しません。結果を再送せず隔離して確認してください。',
+          );
           return;
         }
         setState(() {
@@ -228,8 +282,7 @@ class _AgentTaskHistoryBranchDialogState
       'BrokerからTask状態を再取得しています。',
       'Task状態を確認できません。Task IDとAuditを使ってRecoveryを確認してください。',
       () async {
-        final updated =
-            await AgentTaskClient(widget.client.transport).state(task.taskId);
+        final updated = await _tasks.state(task.taskId);
         if (!updated.isBoundTo(
           request,
           expectedInstructionHash: preflight.instructionHash,
@@ -237,7 +290,7 @@ class _AgentTaskHistoryBranchDialogState
         )) {
           throw StateError('Task binding mismatch');
         }
-        if (mounted) setState(() => _task = updated);
+        if (_scopeCurrent) setState(() => _task = updated);
       },
     );
   }
@@ -256,8 +309,7 @@ class _AgentTaskHistoryBranchDialogState
       'BrokerへこのTaskの停止を要求しています。',
       '停止結果を確認できません。Task状態とRecoveryを再取得してください。',
       () async {
-        final updated =
-            await AgentTaskClient(widget.client.transport).cancel(task.taskId);
+        final updated = await _tasks.cancel(task.taskId);
         if (!updated.isBoundTo(
           request,
           expectedInstructionHash: preflight.instructionHash,
@@ -265,18 +317,34 @@ class _AgentTaskHistoryBranchDialogState
         )) {
           throw StateError('Task binding mismatch');
         }
-        if (mounted) setState(() => _task = updated);
+        if (_scopeCurrent) setState(() => _task = updated);
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_scopeCurrent) {
+      return AlertDialog(
+        title: const Text('分岐画面の接続が失効しました'),
+        content: const Text('現在の履歴から開き直してください。送信済みの操作は履歴と監査で確認してください。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('閉じる'),
+          ),
+        ],
+      );
+    }
     final branch = _branch;
     final preflight = _preflight;
     final task = _task;
-    final terminal = const {'completed', 'failed', 'cancelled', 'suspended'}
-        .contains(widget.source.status);
+    final terminal = const {
+      'completed',
+      'failed',
+      'cancelled',
+      'suspended',
+    }.contains(widget.source.status);
     return AlertDialog(
       title: const Text('Agent Task履歴から新Taskへ分岐'),
       scrollable: true,
@@ -328,7 +396,8 @@ class _AgentTaskHistoryBranchDialogState
                   'Approval: ${preflight.approvalStatus}',
                 ),
                 OutlinedButton(
-                  onPressed: !_active ||
+                  onPressed:
+                      !_active ||
                           _busy ||
                           _permissionAttempted ||
                           _permissionGranted
@@ -337,7 +406,8 @@ class _AgentTaskHistoryBranchDialogState
                   child: const Text('新しいWorkspace Permissionを発行'),
                 ),
                 OutlinedButton(
-                  onPressed: !_active ||
+                  onPressed:
+                      !_active ||
                           _busy ||
                           !_permissionGranted ||
                           _approvalAttempted ||
@@ -347,7 +417,8 @@ class _AgentTaskHistoryBranchDialogState
                   child: const Text('新しいOwner Approvalを発行'),
                 ),
                 FilledButton(
-                  onPressed: !_active ||
+                  onPressed:
+                      !_active ||
                           _busy ||
                           !_permissionGranted ||
                           !_approvalGranted ||
@@ -395,5 +466,24 @@ class _AgentTaskHistoryBranchDialogState
         ),
       ],
     );
+  }
+}
+
+/// 分岐の前後に行う閲覧承認照会も、直前に同じ接続条件を確認する。
+class _BranchTransport implements BrokerTransport {
+  const _BranchTransport(this._transport, this._maySend);
+
+  final BrokerTransport _transport;
+  final bool Function() _maySend;
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) {
+    if (!_maySend()) {
+      throw const BrokerClientException('分岐画面の接続が失効しました');
+    }
+    return _transport.request(operation, payload: payload);
   }
 }
