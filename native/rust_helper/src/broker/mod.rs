@@ -2,6 +2,8 @@ pub(crate) mod a2a_center;
 pub(crate) mod adapter_center;
 pub(crate) mod agent_task_scratch;
 pub(crate) mod ai_edit_center;
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+mod ai_edit_transaction;
 pub mod audit;
 pub mod authority;
 pub(crate) mod compose_center;

@@ -17,6 +17,8 @@ const MAX_A2A_STATE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_HOST_STATE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_ADAPTER_STATE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_AGENT_TASK_SCRATCH_STATE_BYTES: usize = 512 * 1024;
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+const MAX_WORKSPACE_EDIT_RECORD_BYTES: usize = 96 * 1024;
 #[cfg(feature = "module_setup_doctor")]
 const MAX_SETUP_DOCTOR_REPORT_BYTES: usize = 64 * 1024;
 const MAX_FIRST_RUN_CONFIGURATION_BYTES: usize = 16 * 1024;
@@ -121,7 +123,7 @@ struct AuditAnchorRecord {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct SignedAgentTaskScratchState {
+struct SignedRecoveryState {
     version: u8,
     state: Value,
     hmac: String,
@@ -542,7 +544,7 @@ impl BrokerPersistentStore {
                 "Agent Task scratch回復記録のJSONが不正: {error}"
             ))
         })?;
-        let signed: SignedAgentTaskScratchState = serde_json::from_value(value).map_err(|_| {
+        let signed: SignedRecoveryState = serde_json::from_value(value).map_err(|_| {
             BrokerStoreError::MalformedAgentTaskScratchState(
                 "Agent Task scratch回復記録の構造が不正".to_string(),
             )
@@ -565,7 +567,7 @@ impl BrokerPersistentStore {
         &self,
         state: &Value,
     ) -> Result<(), BrokerStoreError> {
-        let signed = SignedAgentTaskScratchState {
+        let signed = SignedRecoveryState {
             version: 1,
             state: state.clone(),
             hmac: agent_task_scratch_state_hmac(&self.audit_anchor_key, state),
@@ -585,6 +587,115 @@ impl BrokerPersistentStore {
                 "Agent Task scratch回復記録を耐久保存できない: {error}"
             ))
         })
+    }
+
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    pub(super) fn read_workspace_edit_record(
+        &self,
+        id: &str,
+    ) -> Result<Option<Value>, &'static str> {
+        let path = self.workspace_edit_record_path(id)?;
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => return Err("編集復旧記録の実体を確認できない"),
+        };
+        if !metadata.is_file()
+            || metadata.file_type().is_symlink()
+            || is_reparse_point(&metadata)
+            || metadata.len() > MAX_WORKSPACE_EDIT_RECORD_BYTES as u64
+        {
+            return Err("編集復旧記録の種類または容量が不正");
+        }
+        let mut raw = String::new();
+        File::open(path)
+            .and_then(|file| {
+                file.take(MAX_WORKSPACE_EDIT_RECORD_BYTES as u64 + 1)
+                    .read_to_string(&mut raw)
+            })
+            .map_err(|_| "編集復旧記録を読めない")?;
+        if raw.len() > MAX_WORKSPACE_EDIT_RECORD_BYTES {
+            return Err("編集復旧記録が容量上限を超過");
+        }
+        let value =
+            crate::broker::json_input::read_unique(&raw).map_err(|_| "編集復旧記録のJSONが不正")?;
+        let signed: SignedRecoveryState =
+            serde_json::from_value(value).map_err(|_| "編集復旧記録の形式が不正")?;
+        let expected = self.workspace_edit_record_hmac(id, &signed.state);
+        if signed.version != 1 || !constant_time_equal(expected.as_bytes(), signed.hmac.as_bytes())
+        {
+            return Err("編集復旧記録の認証に失敗");
+        }
+        Ok(Some(signed.state))
+    }
+
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    pub(super) fn write_workspace_edit_record(
+        &self,
+        id: &str,
+        state: &Value,
+        initialize: bool,
+    ) -> Result<(), &'static str> {
+        let path = self.workspace_edit_record_path(id)?;
+        let signed = SignedRecoveryState {
+            version: 1,
+            hmac: self.workspace_edit_record_hmac(id, state),
+            state: state.clone(),
+        };
+        let bytes = serde_json::to_vec(&signed).map_err(|_| "編集復旧記録を正本化できない")?;
+        if bytes.len() > MAX_WORKSPACE_EDIT_RECORD_BYTES {
+            return Err("編集復旧記録が容量上限を超過");
+        }
+        let mut nonce = [0u8; 16];
+        getrandom::getrandom(&mut nonce).map_err(|_| "編集復旧記録の一時名を生成できない")?;
+        let temporary = self
+            .root
+            .join(format!(".workspace-edit-{}.tmp", hex::encode(nonce)));
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|_| "編集復旧記録の一時fileを作成できない")?;
+        let written = file.write_all(&bytes).and_then(|_| file.sync_all());
+        drop(file);
+        let published = written.and_then(|_| {
+            if initialize {
+                fs::hard_link(&temporary, &path)?;
+                fs::remove_file(&temporary)
+            } else {
+                fs::rename(&temporary, &path)
+            }
+        });
+        if published.is_err() {
+            let _ = fs::remove_file(temporary);
+            return Err("編集復旧記録を確定できない");
+        }
+        #[cfg(unix)]
+        File::open(&self.root)
+            .and_then(|dir| dir.sync_all())
+            .map_err(|_| "編集復旧記録の親directoryを同期できない")?;
+        Ok(())
+    }
+
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    fn workspace_edit_record_path(&self, id: &str) -> Result<PathBuf, &'static str> {
+        if id.len() != 64 || !id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+            return Err("編集復旧記録の識別子が不正");
+        }
+        Ok(self.root.join(format!("workspace-edit-{id}.json")))
+    }
+
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    fn workspace_edit_record_hmac(&self, id: &str, state: &Value) -> String {
+        let state = state.to_string();
+        let input = [
+            b"workspace-edit-v1|id=".as_slice(),
+            id.as_bytes(),
+            b"|state=",
+            state.as_bytes(),
+        ]
+        .concat();
+        hmac_sha256_tagged(&self.audit_anchor_key, &input)
     }
 
     #[cfg(feature = "module_setup_doctor")]

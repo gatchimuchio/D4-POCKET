@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "632c3d0c36ae38d6a05cc4d95eb8871d05925e21a6671a02262527eecc24ef18"
+      "sha256": "6810c34b05a6276aa479c3f4f8714ac6f997cfd2c10092dfe7d169e3ead623e1"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "docs/specs/gui-shell-ai-edit.md",
-      "sha256": "1fb0c45fb9b37b22600ea5a87fd91750d0b6ab6363087f5d3ca9d95d0a2080d7"
+      "sha256": "c09a689f364bd91c7a8960246223921fc0d637e4e49b813767a6466fafe1b927"
     },
     {
       "path": "docs/specs/gui-shell-compose.md",
@@ -4096,6 +4096,10 @@
       "sha256": "ef256c8c10f7a8a65c71acaafe765731ea57bd1ac5e492e515e3406f3fafde4f"
     },
     {
+      "path": "native/rust_helper/src/broker/ai_edit_transaction.rs",
+      "sha256": "3b33d8afd95529a0d98fa9352e8fe0d2318665d3f24739fd2011134a4782b108"
+    },
+    {
       "path": "native/rust_helper/src/broker/audit.rs",
       "sha256": "190043332367375266b8cd9b043ca38fc860d1e9a79ecd51351a0ce8d95c4499"
     },
@@ -4197,7 +4201,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "bae4b9f3c369a207f6e266ceb0caa933c996e408e2b4f196d376ade52566c4bc"
+      "sha256": "d8db6ebbde2cce8dc923ed833b7d142dd99ca5bcc25eab84ac2ff8451cbeb277"
     },
     {
       "path": "native/rust_helper/src/broker/module_pruning.rs",
@@ -4245,7 +4249,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
-      "sha256": "8e5c2cbcfccd0a461489f8cf4fc8e4317d7ab455a1aed4b9b889cb6022f66da1"
+      "sha256": "0474ad319ab0f30338382fffad2950ce890f99af68ac8e8a54c506e1921adc1c"
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
@@ -4389,11 +4393,11 @@
     },
     {
       "path": "native/rust_helper/src/workspace_reader.rs",
-      "sha256": "9964fb0c001acfb5ef8499f9aad5760f67965384afe291163fe79bcaa1414b25"
+      "sha256": "7e74cee0079c948e8df9e64b8efffbd97a6b2afea19bb8b734941d87081ba398"
     },
     {
       "path": "native/rust_helper/src/workspace_reader/edit.rs",
-      "sha256": "16e1eeb72c07c34d5b3e280f3b84077182a73471175eba45883fcf6f015336e5"
+      "sha256": "cc7a160f06d473774e24accbc771d0abf0aa07032b957d853bcd2c394e8388ff"
     },
     {
       "path": "native/rust_helper/tests/agent_task_crash_recovery_e2e.rs",

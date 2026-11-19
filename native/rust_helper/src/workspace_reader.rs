@@ -10,7 +10,7 @@ use unicode_normalization::UnicodeNormalization;
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 mod edit;
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
-pub use edit::EditMoveError;
+pub use edit::{EditFileVersion, EditMoveError};
 
 const MAX_BYTES: u64 = 65_536;
 pub const MAX_COMPARISON_BYTES: u64 = 128 * 1024 * 1024;
@@ -20,6 +20,7 @@ pub struct ComparedFile {
     pub bytes: usize,
     pub sha256: String,
     pub(crate) content: Option<Vec<u8>>,
+    pub(crate) file_id: u64,
 }
 /// 比較対象の探索結果。secret subtreeの内部件数や名前は含めない。
 #[derive(Debug, PartialEq, Eq)]
@@ -566,6 +567,16 @@ impl WorkspaceReader {
         limit: u64,
         after_open: impl FnOnce(),
     ) -> Result<ComparedFile, ReadError> {
+        self.read_file_to(path, limit, after_open, |_| Ok(()))
+    }
+
+    fn read_file_to(
+        &self,
+        path: &str,
+        limit: u64,
+        after_open: impl FnOnce(),
+        mut consume: impl FnMut(&[u8]) -> Result<(), ReadError>,
+    ) -> Result<ComparedFile, ReadError> {
         let parts = self.allowed(path)?;
         let parent = self.directory(&parts[..parts.len() - 1])?;
         let name = parts[parts.len() - 1];
@@ -598,6 +609,7 @@ impl WorkspaceReader {
                 return Err(ReadError::TooLarge(count));
             }
             hasher.update(&buffer[..read]);
+            consume(&buffer[..read])?;
             if count <= MAX_BYTES {
                 if let Some(bytes) = content.as_mut() {
                     bytes.extend_from_slice(&buffer[..read]);
@@ -630,6 +642,7 @@ impl WorkspaceReader {
             bytes: count as usize,
             sha256: format!("sha256:{}", hex::encode(hasher.finalize())),
             content,
+            file_id: cap_fs_ext::MetadataExt::ino(&before),
         })
     }
 }
