@@ -648,15 +648,20 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         page_window = object()
         selector = object()
         settings_group = object()
-        settings_page = object()
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
-                side_effect=(window, window, window, page_window, object()),
+                side_effect=(
+                    window,
+                    window,
+                    page_window,
+                    RuntimeError("MCP panel is below the viewport"),
+                    object(),
+                ),
             ) as find_accessible,
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
-                side_effect=(selector, settings_group, settings_page),
+                side_effect=(selector, settings_group),
             ) as find_operable,
             patch(
                 "tooling.tests.linux_installed_product_smoke._activate_accessible"
@@ -664,6 +669,9 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             patch(
                 "tooling.tests.linux_installed_product_smoke._activate_named_control_by_keyboard"
             ) as activate_keyboard,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._scroll_product_page_down"
+            ) as scroll,
             patch(
                 "tooling.tests.linux_installed_product_smoke.subprocess.run"
             ) as run,
@@ -678,15 +686,14 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                 call("D4 Pocket powered by GUI Shell", timeout=10),
                 call("D4 Pocket powered by GUI Shell", timeout=10),
                 call("D4 Pocket powered by GUI Shell", timeout=10),
-                call("D4 Pocket powered by GUI Shell", timeout=10),
-                call("MCP接続センター", root=page_window, timeout=10),
+                call("MCP接続センター", root=page_window, timeout=1),
+                call("MCP接続センター", root=page_window, timeout=1),
             ],
         )
         self.assertEqual(
             find_operable.call_args_list,
             [
                 call("操作グループ選択", root=window, timeout=10),
-                call("設定", root=window, timeout=10, exact=True),
                 call("設定", root=window, timeout=10, exact=True),
             ],
         )
@@ -695,10 +702,10 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             [
                 call(selector, "操作グループ選択", {}),
                 call(settings_group, "設定", {}),
-                call(settings_page, "設定", {}),
             ],
         )
         activate_keyboard.assert_not_called()
+        scroll.assert_called_once_with({}, "0x42")
         self.assertEqual(run.call_args.args[0], ["xdotool", "windowactivate", "--sync", "0x42"])
 
     def test_keyboard_activation_sends_enter_only_after_target_focus(self) -> None:

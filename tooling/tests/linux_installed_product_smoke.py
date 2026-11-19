@@ -1505,11 +1505,11 @@ def _open_installed_navigation_page(
     window_id: str | None,
     *,
     group: str,
-    page_label: str,
+    page_label: str | None,
 ):
     if group not in {"運用", "安全", "開発", "設定"}:
         raise RuntimeError("installed navigation group is not supported")
-    if not page_label or len(page_label) > 64:
+    if page_label is not None and (not page_label or len(page_label) > 64):
         raise RuntimeError("installed navigation page label is invalid")
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     if window_id is not None and not _is_wayland_environment(environment):
@@ -1543,6 +1543,8 @@ def _open_installed_navigation_page(
     )
     _activate_accessible(group_option, group, environment)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
+    if page_label is None:
+        return window
     page = _find_operable_accessible(
         page_label, root=window, timeout=10, exact=True
     )
@@ -1572,10 +1574,17 @@ def _open_update_center_from_installed_ui(
 def _open_mcp_center_from_installed_ui(
     environment: dict[str, str], window_id: str
 ):
+    # 設定はこのグループ唯一の画面。グループ選択後に同名の操作を探し直さない。
     window = _open_installed_navigation_page(
-        environment, window_id, group="設定", page_label="設定"
+        environment, window_id, group="設定", page_label=None
     )
-    _find_accessible("MCP接続センター", root=window, timeout=10)
+    for _ in range(6):
+        try:
+            _find_accessible("MCP接続センター", root=window, timeout=1)
+            return window
+        except RuntimeError:
+            _scroll_product_page_down(environment, window_id)
+    _find_accessible("MCP接続センター", root=window, timeout=2)
     return window
 
 
