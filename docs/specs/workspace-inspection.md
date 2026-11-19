@@ -114,6 +114,8 @@ owner CLIは `作業領域制御 --session-file <owner資格file> 作業領域�
 
 Desktopは基準点の対象fileから差分を要求し、同一登録・現在承認・要求hash・基準点hash、差分の構造を確認してから描画する。統合差分と左右比較を切り替え、binary/oversized/unchangedはmetadataと状態を表示する。比較元の保存はowner制御経路のままとし、画面の操作から承認を自己生成しない。表示中の再確認では現在の基準点も照合し、置換済み比較元を旧基準点として維持しない。
 
+Desktopはfullのテキスト読取で、受け取った本文のUTF-8バイト数とSHA-256をBrokerの版情報に照合する。テキスト差分と復旧プレビューでは左右比較の各行から改行を含む両版を復元して版情報を照合し、固定headerと全体hunkから復元した統合差分の両版も一致する場合だけ表示する。不一致時は表示を停止し、現在の登録と承認の確認を案内する。
+
 表示する一覧は「基準点の対象file」であり、全workspaceの変更file一覧ではない。全体探索・巨大file比較・履歴・rollback preview・native画面検証はrelease_blockerとして続く。
 
 ## 巨大fileの比較metadata

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:broker_contract/broker_request_envelope.dart' show brokerTextHash;
+
 import 'broker_client.dart';
 
 const _visibilities = {'none', 'hash_only', 'summary', 'redacted', 'full'};
@@ -568,7 +570,8 @@ class WorkspaceClient {
             } else if (projection['binary'] == false) {
               final text = _string(projection['text']);
               if (text.contains(String.fromCharCode(0)) ||
-                  utf8.encode(text).length != count) {
+                  utf8.encode(text).length != count ||
+                  brokerTextHash(text) != projection['sha256']) {
                 _invalid();
               }
             } else {
@@ -631,6 +634,7 @@ void _validateDiff(Object? raw) {
   var totalBytes = 0;
   final sizes = <String, int>{'before': 0, 'after': 0};
   final ended = <String, bool>{'before': false, 'after': false};
+  final contents = {'before': StringBuffer(), 'after': StringBuffer()};
   for (final rawRow in rows) {
     final row = _map(rawRow);
     _keys(row, ['kind', 'before', 'after']);
@@ -659,14 +663,16 @@ void _validateDiff(Object? raw) {
       if (text.contains('\n') || text.contains(String.fromCharCode(0))) {
         _invalid();
       }
-      sizes[side] = sizes[side]! +
-          utf8.encode(text).length +
-          (line['newline'] == true ? 1 : 0);
-      ended[side] = line['newline'] == false;
-      totalBytes += utf8.encode(text).length;
+      final bytes = utf8.encode(text).length;
+      final hasNewline = line['newline'] == true;
+      sizes[side] = sizes[side]! + bytes + (hasNewline ? 1 : 0);
+      ended[side] = !hasNewline;
+      totalBytes += bytes;
       if (totalBytes > 131072) {
         _invalid();
       }
+      contents[side]!.write(text);
+      if (hasNewline) contents[side]!.write('\n');
     }
     if (row['kind'] == 'same' &&
         ((row['before'] as Map)['text'] != (row['after'] as Map)['text'] ||
@@ -676,14 +682,77 @@ void _validateDiff(Object? raw) {
     }
   }
   for (final side in ['before', 'after']) {
-    final version = diff[side];
+    final version = diff[side] as Map?;
     if (version == null
         ? numbers[side] != 0
-        : (version as Map)['bytes'] != sizes[side]) {
+        : version['bytes'] != sizes[side] ||
+            version['sha256'] != brokerTextHash(contents[side]!.toString())) {
       _invalid();
     }
     if (numbers[side]! > 2000 || sizes[side]! > 65536) {
       _invalid();
     }
+  }
+  _validateUnifiedDiff(
+    unified,
+    beforeExists: diff['before'] != null,
+    afterExists: diff['after'] != null,
+    beforeLines: numbers['before']!,
+    afterLines: numbers['after']!,
+    beforeText: contents['before']!.toString(),
+    afterText: contents['after']!.toString(),
+  );
+}
+
+/// Brokerの固定headerと全体hunkを照合し、両版を復元する。
+void _validateUnifiedDiff(
+  String unified, {
+  required bool beforeExists,
+  required bool afterExists,
+  required int beforeLines,
+  required int afterLines,
+  required String beforeText,
+  required String afterText,
+}) {
+  final header = StringBuffer('diff --git a/file b/file\n');
+  if (!beforeExists) header.writeln('new file mode 100644');
+  if (!afterExists) header.writeln('deleted file mode 100644');
+  if (beforeLines != 0 || afterLines != 0) {
+    header.writeln('--- ${beforeExists ? 'a/file' : '/dev/null'}');
+    header.writeln('+++ ${afterExists ? 'b/file' : '/dev/null'}');
+    header.writeln('@@ -${beforeLines == 0 ? 0 : 1},$beforeLines '
+        '+${afterLines == 0 ? 0 : 1},$afterLines @@');
+  }
+  final prefix = header.toString();
+  if (!unified.startsWith(prefix)) _invalid();
+
+  final lines = unified.substring(prefix.length).split('\n');
+  if (lines.last.isNotEmpty) _invalid();
+  final before = StringBuffer();
+  final after = StringBuffer();
+  var beforeCount = 0;
+  var afterCount = 0;
+  for (var index = 0; index < lines.length - 1; index++) {
+    final line = lines[index];
+    if (line.isEmpty || !{' ', '-', '+'}.contains(line[0])) _invalid();
+    final noNewline = lines[index + 1] == r'\ No newline at end of file';
+    final text = line.substring(1) + (noNewline ? '' : '\n');
+    if (line[0] != '+') {
+      if (noNewline && beforeCount != beforeLines - 1) _invalid();
+      beforeCount++;
+      before.write(text);
+    }
+    if (line[0] != '-') {
+      if (noNewline && afterCount != afterLines - 1) _invalid();
+      afterCount++;
+      after.write(text);
+    }
+    if (noNewline) index++;
+  }
+  if (beforeCount != beforeLines ||
+      afterCount != afterLines ||
+      before.toString() != beforeText ||
+      after.toString() != afterText) {
+    _invalid();
   }
 }

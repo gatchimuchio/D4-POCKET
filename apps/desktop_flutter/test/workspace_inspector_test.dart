@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show SemanticsAction;
 
+import 'package:broker_contract/broker_request_envelope.dart' show brokerTextHash;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/workspace_inspector.dart';
@@ -120,7 +121,7 @@ class TestBroker implements BrokerTransport {
               : {
                   'path': payload!['相対path'],
                   'bytes': utf8.encode('本文').length,
-                  'sha256': 'sha256:${'b' * 64}',
+                  'sha256': brokerTextHash('本文'),
                   'binary': false,
                   'text': '本文'
                 };
@@ -171,10 +172,11 @@ class TestBroker implements BrokerTransport {
           'diff': {
             'version': 1,
             'kind': diffKind,
-            'before': {'bytes': 4, 'sha256': 'sha256:${'a' * 64}'},
-            'after': {'bytes': 4, 'sha256': 'sha256:${'b' * 64}'},
+            'before': {'bytes': 4, 'sha256': brokerTextHash('前\n')},
+            'after': {'bytes': 4, 'sha256': brokerTextHash('後\n')},
             'unified': diffKind == 'text'
-                ? '--- a/file\n+++ b/file\n@@ -1,1 +1,1 @@\n-前\n+後\n'
+                ? 'diff --git a/file b/file\n'
+                    '--- a/file\n+++ b/file\n@@ -1,1 +1,1 @@\n-前\n+後\n'
                 : null,
             'rows': diffKind == 'text'
                 ? [
@@ -752,6 +754,71 @@ void main() {
         client.read(selected, 'file.txt',
             tree: false, baselineHash: broker.baselineHash),
         throwsA(isA<BrokerClientException>()));
+  });
+
+  test('現在のWorkspace応答は本文・左右比較・統合差分を版hashに結び付ける', () async {
+    final broker = TestBroker();
+    final client = WorkspaceClient(broker);
+    final selected = (await client.list()).single;
+    for (final operation in ['作業領域読取', '作業領域差分', '作業領域復旧プレビュー']) {
+      Future<WorkspaceView> read() => client.read(selected, 'file.txt',
+          tree: false,
+          preview: operation == '作業領域復旧プレビュー',
+          baselineHash: operation == '作業領域読取' ? null : broker.baselineHash);
+      broker.mutate = null;
+      expect((await read()).operation, operation);
+      for (final alterUnified in [false, true]) {
+        if (alterUnified && operation == '作業領域読取') continue;
+        broker.mutate = (body) {
+          if (body['operation'] != operation) return;
+          final projection = body['projection'] as Map;
+          if (operation == '作業領域読取') {
+            projection['text'] = '別文';
+          } else {
+            final diff = projection['diff'] as Map;
+            if (alterUnified) {
+              diff['unified'] = (diff['unified'] as String).replaceFirst('+後', '+別');
+            } else {
+              ((diff['rows'] as List).single['after'] as Map)['text'] = '別';
+            }
+          }
+        };
+        await expectLater(read(), throwsA(isA<BrokerClientException>()),
+            reason: operation);
+      }
+    }
+  });
+
+  test('統合差分はCRLF・終端改行なし・空file追加を区別する', () async {
+    final broker = TestBroker();
+    final client = WorkspaceClient(broker);
+    final selected = (await client.list()).single;
+    broker.mutate = (body) {
+      if (body['operation'] != '作業領域差分') return;
+      final diff = (body['projection'] as Map)['diff'] as Map;
+      diff['before'] = {'bytes': 5, 'sha256': brokerTextHash('前\r\n')};
+      diff['after'] = {'bytes': 3, 'sha256': brokerTextHash('後')};
+      diff['unified'] = 'diff --git a/file b/file\n'
+          '--- a/file\n+++ b/file\n@@ -1,1 +1,1 @@\n-前\r\n+後\n'
+          '\\ No newline at end of file\n';
+      final row = (diff['rows'] as List).single as Map;
+      (row['before'] as Map)['text'] = '前\r';
+      (row['after'] as Map)['newline'] = false;
+    };
+    final changed = await client.read(selected, 'file.txt',
+        tree: false, baselineHash: broker.baselineHash);
+    expect((changed.projection!['diff'] as Map)['kind'], 'text');
+    broker.mutate = (body) {
+      if (body['operation'] != '作業領域差分') return;
+      final diff = (body['projection'] as Map)['diff'] as Map;
+      diff['before'] = null;
+      diff['after'] = {'bytes': 0, 'sha256': brokerTextHash('')};
+      diff['rows'] = [];
+      diff['unified'] = 'diff --git a/file b/file\nnew file mode 100644\n';
+    };
+    final added = await client.read(selected, 'file.txt',
+        tree: false, baselineHash: broker.baselineHash);
+    expect((added.projection!['diff'] as Map)['before'], isNull);
   });
 
   test('復旧プレビューの実行許可・候補矛盾・本文保持矛盾を拒否する', () async {
