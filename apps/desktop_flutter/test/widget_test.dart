@@ -730,7 +730,6 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final transport = _FakeBrokerTransport([
-      _brokerHealthResponse(),
       _brokerHostCapabilityResponse(),
       _brokerHostListResponse(),
       _brokerAdapterListResponse(),
@@ -941,7 +940,10 @@ void main() {
         'grant': historyGrant,
         'page': null,
       }),
-    ], onRequest: (operation) {
+    ], responseForOperation: (operation, _) {
+      if (operation == 'health') return _brokerHealthResponse();
+      return null;
+    }, onRequest: (operation) {
       if (operation == 'AgentTask結果表示承認') {
         tester.binding.handleAppLifecycleStateChanged(
           AppLifecycleState.inactive,

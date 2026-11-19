@@ -45,8 +45,8 @@ class RuntimeDialogueClient {
           ? '操作を拒否しました: $code'
           : 'brokerが操作を拒否または保留しました');
     }
-    if (response['body'] is! Map) {
-      throw const BrokerClientException('対話応答の本文が不正です');
+    if (response['error'] != null || response['body'] is! Map) {
+      throw const BrokerClientException('対話応答の状態または本文が不正です');
     }
     return Map<String, Object?>.from(response['body'] as Map);
   }

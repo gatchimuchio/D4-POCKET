@@ -18,6 +18,8 @@
 
 このWorkspace参照はBroker登録とのID対応であり、Agent専用実行Session、Runtimeが実際に使用した作業directory、読み書き権限、Workspace分離・書込み隔離、Task実行を証明しない。Session開始Audit hashの既存射影は互換維持し、別AuditEventへSession ID、Runtime ID、Workspace ID、登録hashを結合する。通常IPC一覧は作成監査IDとWorkspace結合監査IDを別fieldで返す。Session一覧からroot path、secret path、Permission、Approvalは返さない。Workspace結合は読取Approvalや実行権限を生成しない。
 
+対話の利用側は、成功状態とエラー情報が同居する応答を不正として扱う。本文にセッションIDがあっても採用せず、応答内の自由記述や本文を利用者に表示しない。
+
 実行系列挙は一意な実行系IDの一覧とする。消費側は重複IDを選択欄へ渡さず応答不正として拒否し、黙って重複排除して正常応答にしない。空一覧を許容し、一意な一覧の返却順序を保持する。
 
 セッションの状態は `利用中`、`終了`、`中止後隔離`。終了・中止後隔離からの再利用を拒否する。再起動で保持する場合は、履歴だけで権限を復元せず承認と実行系結合を再検証する。

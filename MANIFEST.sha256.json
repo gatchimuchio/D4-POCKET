@@ -861,7 +861,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "766ead948f01c4dc60dd9d0516ef5d187542c351e4d9d71956bca7933ed2120c"
+      "sha256": "22d66b44530100920834a35e743291ae1fbbdf1971ec9b663600c0b814c4f96b"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "c3eb6c5406b681e347b64815d71c228ca7f39e7a7a396e3a00e3a0a303f9b30d"
+      "sha256": "2eb38ddbf7f7261f3d7978a5aad1ca15b0ec58ae5343a46ac4a8ec0cecb141a5"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1989,7 +1989,7 @@
     },
     {
       "path": "docs/specs/runtime-dialogue.md",
-      "sha256": "9c945bee0e0e2e9ce88b7c6d90c006b738c9798380397961f66ea4b384a700f4"
+      "sha256": "872254207623ba587a53085313a1e56ef51fb1a4d07ca0b38a6a4151ea6057b5"
     },
     {
       "path": "docs/specs/runtime-lifecycle.md",
@@ -4809,7 +4809,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/src/runtime_dialogue_client.dart",
-      "sha256": "fcecff1d467a7d89e6d25c112facfed719e9efa9557d558d44073198433ecbb5"
+      "sha256": "59cf00e33f7b9873ebac9e4387f119acc71b3c36a1748e364e388d3d9018002c"
     },
     {
       "path": "packages/gui_shell_ui/lib/src/runtime_lifecycle_client.dart",
@@ -4841,7 +4841,7 @@
     },
     {
       "path": "packages/gui_shell_ui/test/runtime_dialogue_test.dart",
-      "sha256": "251a9fd051115376b32d70cd0435bb0ba9a4c299ff7619e162dbffdcd52220a4"
+      "sha256": "1a51053a5c05224e08b19a50b42411f32b90d2275ffb7c83c475d7c1636bbdca"
     },
     {
       "path": "packages/gui_shell_ui/test/runtime_lifecycle_client_test.dart",

@@ -58,6 +58,7 @@ class DialogueFixture implements BrokerTransport {
   bool failRight = false;
   bool swap = false;
   String? failOperation;
+  String? conflictingErrorOperation;
   String? progressState;
   String? sendHashOverride;
   bool omitSendHash = false;
@@ -143,7 +144,9 @@ class DialogueFixture implements BrokerTransport {
       'audit_event_id': 'fixture-audit',
       'status': 'accepted',
       'evidence_source': 'INTERNAL_STATE',
-      'error': null,
+      'error': operation == conflictingErrorOperation
+          ? {'code': '監査失敗', 'message': '試験用の非公開詳細'}
+          : null,
       'health': null,
       'body': body,
       'shutdown_requested': false,
@@ -227,6 +230,20 @@ void main() {
       ).workspaceIdsByRuntime(),
       throwsA(isA<BrokerClientException>()),
     );
+  });
+
+  test('対話開始は成功とエラーが混在する応答からSessionを採用しない', () async {
+    final fixture = DialogueFixture()..conflictingErrorOperation = '対話開始';
+    final client = RuntimeDialogueClient(fixture);
+    await expectLater(
+      client.start('left', workspaceId: 'workspace-left'),
+      throwsA(isA<BrokerClientException>().having(
+        (error) => error.message,
+        'message',
+        '対話応答の状態または本文が不正です',
+      )),
+    );
+    expect(fixture.calls, ['対話開始']);
   });
 
   test('対話開始は選択したWorkspace IDだけを追加し未指定Runtimeの互換性を保つ', () async {
