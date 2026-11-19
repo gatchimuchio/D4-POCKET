@@ -7951,6 +7951,12 @@ def _run_installed_agent_mcp_followup_acceptance(
         raise RuntimeError("Agent CenterにMCP実結果のhash-only receiptが一つありません")
     if f"MCP要求元Task: {source_task_id} / {source_result_hash}" not in followup_snapshot:
         raise RuntimeError("Agent CenterのMCP source Task/result hash結合が不正です")
+    followup_result_hash_match = re.search(
+        r"結果hash:\s*(sha256:[0-9a-f]{64})", followup_snapshot
+    )
+    if followup_result_hash_match is None:
+        raise RuntimeError("Agent Centerに後続Taskの完了結果hashがありません")
+    followup_result_hash = followup_result_hash_match.group(1)
 
     if not call_marker.is_file() or call_marker.is_symlink():
         raise RuntimeError("Agent提案に起因する外部MCP Tool callがありません")
@@ -7962,6 +7968,28 @@ def _run_installed_agent_mcp_followup_acceptance(
         raise RuntimeError("Agent起点の外部MCP Tool実行回数が一回ではありません")
     _find_accessible(
         "MCP Tool result hash: " + tool_result_hashes[0],
+        root=_find_accessible(WINDOW_TITLE, timeout=10),
+        timeout=10,
+    )
+
+    # MCP能力を保持した後続Taskの結果を読み、追加提案がないことを確認してから移動する。
+    _answer_owner_dialog(
+        environment,
+        "許可",
+        context="MCP後続Taskの最終結果表示",
+        diagnostic_root=window,
+        diagnostic_audit_path=audit_path,
+        expected_summary_markers=(
+            "完了したAgent Taskの結果を一回だけ表示するApprovalを発行しますか？",
+            f"Task ID: {followup_task_id}",
+            f"確定結果hash: {followup_result_hash}",
+            "Content Exposure: full",
+            "Auditへ本文を保存しません。",
+        ),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    _find_accessible(
+        "Task結果にMCP Tool要求はありません。",
         root=_find_accessible(WINDOW_TITLE, timeout=10),
         timeout=10,
     )
@@ -8118,9 +8146,7 @@ def _run_installed_agent_mcp_followup_acceptance(
         "source_task_id": source_task_id,
         "source_task_result_hash": source_result_hash,
         "followup_task_id": followup_task_id,
-        "followup_result_hash": re.search(
-            r"結果hash:\s*(sha256:[0-9a-f]{64})", followup_snapshot
-        ).group(1),
+        "followup_result_hash": followup_result_hash,
         "same_agent_session_and_workspace": True,
         "fresh_permission_and_approval_per_task": True,
         "task_mcp_capability_offered_and_called_once": True,
