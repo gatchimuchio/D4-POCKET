@@ -329,6 +329,68 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('一覧の再取得中と取得失敗時は旧導入操作を表示せず、Broker一覧だけを再試行できる', (tester) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final operationGates = <String, Completer<void>>{};
+    final transport = _InstallFlowTransport(
+      installed: true,
+      operationGates: operationGates,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SettingsScreen(
+            client: ShellCoreClient.mock(transport: transport),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final repairButton = find.widgetWithText(OutlinedButton, '起動項目を修復');
+    final uninstallButton = find.widgetWithText(
+      OutlinedButton,
+      'D4 Pocketをアンインストール',
+    );
+    expect(uninstallButton, findsOneWidget);
+    final staleUninstall = tester
+        .widget<OutlinedButton>(uninstallButton)
+        .onPressed!;
+    final refresh = Completer<void>();
+    operationGates['更新一覧'] = refresh;
+    await tester.ensureVisible(repairButton);
+    await tester.tap(repairButton);
+    await tester.pump();
+    await tester.pump();
+
+    expect(repairButton, findsNothing);
+    expect(uninstallButton, findsNothing);
+    expect(find.text('有効版を修復'), findsNothing);
+    staleUninstall();
+    expect(transport.operations, isNot(contains('製品アンインストール要求')));
+
+    refresh.completeError(StateError('更新一覧通信不可'));
+    await tester.pumpAndSettle();
+    expect(repairButton, findsNothing);
+    expect(uninstallButton, findsNothing);
+
+    operationGates.remove('更新一覧');
+    transport.uninstallAvailable = false;
+    final retryButton = find.widgetWithText(OutlinedButton, '更新一覧を再取得');
+    await tester.ensureVisible(retryButton);
+    final beforeRetry = transport.operations.length;
+    await tester.tap(retryButton);
+    await tester.pumpAndSettle();
+    expect(transport.operations.skip(beforeRetry), ['更新一覧']);
+    expect(repairButton, findsOneWidget);
+    expect(uninstallButton, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('起動項目修復はBrokerへ一度だけ要求し、修復結果を表示する', (
     tester,
   ) async {
@@ -380,7 +442,7 @@ class _InstallFlowTransport implements BrokerTransport {
   final Completer<void>? repairGate;
   final Map<String, Completer<void>> operationGates;
   final bool rollbackCurrentVersionAvailable;
-  final bool uninstallAvailable;
+  bool uninstallAvailable;
 
   static const _packageHash =
       'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';

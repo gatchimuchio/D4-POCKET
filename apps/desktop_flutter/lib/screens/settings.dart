@@ -1846,11 +1846,15 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         child: Text('更新センター: Broker接続がないため操作できません。snapshotは更新権限の根拠ではありません。'),
       );
     }
+    final listing = _updatesFuture;
     return BorderedPanel(
       child: FutureBuilder<Map<String, Object?>>(
-        future: _updatesFuture,
+        future: listing,
         builder: (context, snapshot) {
-          final body = snapshot.data ?? const <String, Object?>{};
+          final body = widget.active &&
+                  snapshot.connectionState == ConnectionState.done
+              ? snapshot.data ?? const <String, Object?>{}
+              : const <String, Object?>{};
           final updates = body['更新一覧'] is List
               ? (body['更新一覧']! as List)
                   .whereType<Map>()
@@ -1893,7 +1897,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                 OutlinedButton.icon(
                   onPressed: _updateOperationInProgress
                       ? null
-                      : () => _requestProductRepair(client),
+                      : () => _requestProductRepair(client, listing),
                   icon: const Icon(Icons.build_circle_outlined),
                   label: const Text('起動項目を修復'),
                 ),
@@ -1906,7 +1910,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                 OutlinedButton.icon(
                   onPressed: _updateOperationInProgress
                       ? null
-                      : () => _requestProductUninstall(client),
+                      : () => _requestProductUninstall(client, listing),
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('D4 Pocketをアンインストール'),
                 ),
@@ -1920,14 +1924,23 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
               ],
               if (snapshot.connectionState == ConnectionState.waiting)
                 const LinearProgressIndicator()
-              else if (snapshot.hasError)
-                const Text('更新一覧を取得できません。Broker接続と更新状態を確認してください。')
+              else if (snapshot.hasError) ...[
+                const Text('更新一覧を取得できません。Broker接続と更新状態を確認してください。'),
+                OutlinedButton.icon(
+                  onPressed: widget.active && !_updateOperationInProgress
+                      ? _loadUpdates
+                      : null,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('更新一覧を再取得'),
+                ),
+              ]
               else if (updates.isEmpty)
                 const Text('署名検査済みの更新候補はありません。')
               else
                 for (final update in updates)
                   _updateRow(
                     client,
+                    listing,
                     update,
                     downloadAvailable: downloadAvailable,
                     downloadJob: downloadJob,
@@ -1942,6 +1955,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
 
   Widget _updateRow(
     UpdateClient client,
+    Future<Map<String, Object?>>? listing,
     Map<String, Object?> update, {
     required bool downloadAvailable,
     required Map<String, Object?>? downloadJob,
@@ -2036,6 +2050,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
             onPressed: canDownload
                 ? () => _runUpdateRequest(
                       client,
+                      listing,
                       () => client.requestDownload(
                         updateId: updateId,
                         candidateHash: candidateHash,
@@ -2049,6 +2064,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
             onPressed: canApply || canRepair
                 ? () => _runUpdateRequest(
                       client,
+                      listing,
                       () async {
                         final body = await client.requestApply(
                           updateId: updateId,
@@ -2073,6 +2089,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
             onPressed: canRequestActivation && !_updateOperationInProgress
                 ? () => _runUpdateRequest(
                       client,
+                      listing,
                       () => client.requestActivation(
                         updateId: updateId,
                         candidateHash: candidateHash,
@@ -2087,6 +2104,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                 ? null
                 : () => _runUpdateRequest(
                       client,
+                      listing,
                       () => client.defer(
                         updateId: updateId,
                         candidateHash: candidateHash,
@@ -2103,6 +2121,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
             TextButton(
               onPressed: () => _runUpdateRequest(
                 client,
+                listing,
                 () => client.requestRollback(
                   updateId: updateId,
                   candidateHash: candidateHash,
@@ -2153,16 +2172,24 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     });
   }
 
+  bool _canUseUpdateList(
+    UpdateClient client,
+    Future<Map<String, Object?>>? listing,
+  ) =>
+      mounted &&
+      widget.active &&
+      identical(client, _updateClient) &&
+      listing != null &&
+      identical(listing, _updatesFuture) &&
+      !_updateOperationInProgress;
+
   Future<void> _runUpdateRequest(
     UpdateClient client,
+    Future<Map<String, Object?>>? listing,
     Future<Map<String, Object?>> Function() request,
     String success,
   ) async {
-    if (!mounted ||
-        !identical(client, _updateClient) ||
-        _updateOperationInProgress) {
-      return;
-    }
+    if (!_canUseUpdateList(client, listing)) return;
     setState(() => _updateOperationInProgress = true);
     _updateMutationInProgress = true;
     var initialInstallAccepted = false;
@@ -2217,12 +2244,11 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     return response == ui.AppExitResponse.exit;
   }
 
-  Future<void> _requestProductUninstall(UpdateClient client) async {
-    if (!mounted ||
-        !identical(client, _updateClient) ||
-        _updateOperationInProgress) {
-      return;
-    }
+  Future<void> _requestProductUninstall(
+    UpdateClient client,
+    Future<Map<String, Object?>>? listing,
+  ) async {
+    if (!_canUseUpdateList(client, listing)) return;
     setState(() => _updateOperationInProgress = true);
     _updateMutationInProgress = true;
     var uninstallAuthorized = false;
@@ -2279,12 +2305,11 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     if (!applicationExitAccepted) _loadUpdates();
   }
 
-  Future<void> _requestProductRepair(UpdateClient client) async {
-    if (!mounted ||
-        !identical(client, _updateClient) ||
-        _updateOperationInProgress) {
-      return;
-    }
+  Future<void> _requestProductRepair(
+    UpdateClient client,
+    Future<Map<String, Object?>>? listing,
+  ) async {
+    if (!_canUseUpdateList(client, listing)) return;
     setState(() => _updateOperationInProgress = true);
     _updateMutationInProgress = true;
     try {
