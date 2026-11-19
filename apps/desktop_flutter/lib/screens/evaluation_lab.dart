@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../services/broker_client.dart';
 import '../services/evaluation_client.dart';
 import '../services/regression_case_client.dart';
 import '../services/shell_core_client.dart';
@@ -14,21 +16,23 @@ class EvaluationLab extends StatefulWidget {
   const EvaluationLab({
     super.key,
     this.client,
-    this.connect = connectEvaluationClient,
+    this.connect,
     this.shellCoreClient,
+    this.hostContextGeneration,
     this.regressionCaseClient,
-    this.connectRegressionCases = connectRegressionCaseClient,
+    this.connectRegressionCases,
     this.regressionCaseOwnerClient,
-    this.connectRegressionCaseOwner = connectRegressionCaseOwnerClient,
+    this.connectRegressionCaseOwner,
   });
 
   final EvaluationClient? client;
-  final EvaluationClientConnector connect;
+  final EvaluationClientConnector? connect;
   final ShellCoreClient? shellCoreClient;
+  final ValueListenable<int>? hostContextGeneration;
   final RegressionCaseClient? regressionCaseClient;
-  final RegressionCaseClientConnector connectRegressionCases;
+  final RegressionCaseClientConnector? connectRegressionCases;
   final RegressionCaseOwnerClient? regressionCaseOwnerClient;
-  final RegressionCaseOwnerClientConnector connectRegressionCaseOwner;
+  final RegressionCaseOwnerClientConnector? connectRegressionCaseOwner;
 
   @override
   State<EvaluationLab> createState() => _EvaluationLabState();
@@ -77,12 +81,20 @@ class _EvaluationLabState extends State<EvaluationLab>
     _regressionOwnerClient = widget.regressionCaseOwnerClient;
     _tabs = TabController(length: 5, vsync: this);
     _tabs.addListener(_handleTabSelection);
+    widget.hostContextGeneration?.addListener(_hostContextChanged);
   }
 
   @override
   void didUpdateWidget(covariant EvaluationLab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.client != widget.client ||
+    final hostScopeChanged =
+        oldWidget.hostContextGeneration != widget.hostContextGeneration;
+    if (hostScopeChanged) {
+      oldWidget.hostContextGeneration?.removeListener(_hostContextChanged);
+      widget.hostContextGeneration?.addListener(_hostContextChanged);
+    }
+    if (hostScopeChanged ||
+        oldWidget.client != widget.client ||
         oldWidget.connect != widget.connect ||
         oldWidget.shellCoreClient != widget.shellCoreClient ||
         oldWidget.regressionCaseClient != widget.regressionCaseClient ||
@@ -91,37 +103,48 @@ class _EvaluationLabState extends State<EvaluationLab>
             widget.regressionCaseOwnerClient ||
         oldWidget.connectRegressionCaseOwner !=
             widget.connectRegressionCaseOwner) {
-      _generation += 1;
-      _client = widget.client;
-      _regressionClient = widget.regressionCaseClient;
-      _regressionOwnerClient = widget.regressionCaseOwnerClient;
-      _datasets = null;
-      _regressionCases = const [];
-      _regressionNextCursor = null;
-      _regressionTotalCount = 0;
-      _regressionAuditId = null;
-      _runtimeCatalogGeneration++;
-      _runRuntimeCatalog = null;
-      _selectedRunRuntimeIds.clear();
-      _runtimeCatalogBusy = false;
-      _runtimeCatalogMessage = '接続条件が変わりました。Runtime一覧を再取得してください。';
-      _startedExperiment = null;
-      _status = null;
-      _comparison = null;
-      _busy = false;
-      _datasetMessage = '接続条件が変わりました。Dataset一覧を更新してください。';
-      _regressionMessage = '接続条件が変わりました。回帰Case一覧を更新してください。';
-      _regressionOwnerActionMessage = '接続条件が変わりました。';
-      _runMessage = '接続条件が変わりました。実験要求を作成し直してください。';
-      _resultMessage = '接続条件が変わりました。結果を更新してください。';
-      _comparisonMessage = '接続条件が変わりました。比較を更新してください。';
+      _resetForContextChange();
     }
+  }
+
+  void _hostContextChanged() => setState(_resetForContextChange);
+
+  void _resetForContextChange() {
+    _generation++;
+    _client = widget.client;
+    _regressionClient = widget.regressionCaseClient;
+    _regressionOwnerClient = widget.regressionCaseOwnerClient;
+    _runDatasetId.clear();
+    _resultExperimentId.clear();
+    _comparisonExperimentId.clear();
+    _recoveryCaseId.clear();
+    _datasets = null;
+    _regressionCases = const [];
+    _regressionNextCursor = null;
+    _regressionTotalCount = 0;
+    _regressionAuditId = null;
+    _runtimeCatalogGeneration++;
+    _runRuntimeCatalog = null;
+    _selectedRunRuntimeIds.clear();
+    _runtimeCatalogBusy = false;
+    _runtimeCatalogMessage = '接続条件が変わりました。Runtime一覧を再取得してください。';
+    _startedExperiment = null;
+    _status = null;
+    _comparison = null;
+    _busy = false;
+    _datasetMessage = '接続条件が変わりました。Dataset一覧を更新してください。';
+    _regressionMessage = '接続条件が変わりました。回帰Case一覧を更新してください。';
+    _regressionOwnerActionMessage = '接続条件が変わりました。';
+    _runMessage = '接続条件が変わりました。実験要求を作成し直してください。';
+    _resultMessage = '接続条件が変わりました。結果を更新してください。';
+    _comparisonMessage = '接続条件が変わりました。比較を更新してください。';
   }
 
   @override
   void dispose() {
     _generation += 1;
     _runtimeCatalogGeneration++;
+    widget.hostContextGeneration?.removeListener(_hostContextChanged);
     _tabs.removeListener(_handleTabSelection);
     _tabs.dispose();
     _runDatasetId.dispose();
@@ -565,17 +588,57 @@ class _EvaluationLabState extends State<EvaluationLab>
     );
   }
 
-  Future<EvaluationClient> _clientForRequest() async {
-    return _client ??= widget.client ?? await widget.connect();
+  bool _isCurrent(int generation) => mounted && generation == _generation;
+
+  Future<T> _resolveClient<T>({
+    required T? cached,
+    required Future<T> Function()? connect,
+    required Future<T> Function() connectStandalone,
+    required T Function(BrokerTransport) bind,
+    required void Function(T) cache,
+  }) async {
+    if (cached != null) return cached;
+    final generation = _generation;
+    final shell = widget.shellCoreClient;
+    final T client;
+    if (connect != null || shell == null) {
+      client = await (connect ?? connectStandalone)();
+    } else {
+      final transport = shell.brokerTransport;
+      if (transport == null) {
+        throw const BrokerClientException('評価ラボの現在Brokerに接続できません。');
+      }
+      client = bind(transport);
+    }
+    if (_isCurrent(generation)) cache(client);
+    return client;
   }
 
-  Future<RegressionCaseClient> _regressionClientForRequest() async =>
-      _regressionClient ??=
-          widget.regressionCaseClient ?? await widget.connectRegressionCases();
+  Future<EvaluationClient> _clientForRequest() => _resolveClient(
+        cached: _client,
+        connect: widget.connect,
+        connectStandalone: connectEvaluationClient,
+        bind: EvaluationClient.new,
+        cache: (value) => _client = value,
+      );
 
-  Future<RegressionCaseOwnerClient> _regressionOwnerClientForRequest() async =>
-      _regressionOwnerClient ??= widget.regressionCaseOwnerClient ??
-          await widget.connectRegressionCaseOwner();
+  Future<RegressionCaseClient> _regressionClientForRequest() async =>
+      _resolveClient(
+        cached: _regressionClient,
+        connect: widget.connectRegressionCases,
+        connectStandalone: connectRegressionCaseClient,
+        bind: RegressionCaseClient.new,
+        cache: (value) => _regressionClient = value,
+      );
+
+  Future<RegressionCaseOwnerClient> _regressionOwnerClientForRequest() =>
+      _resolveClient(
+        cached: _regressionOwnerClient,
+        connect: widget.connectRegressionCaseOwner,
+        connectStandalone: connectRegressionCaseOwnerClient,
+        bind: RegressionCaseOwnerClient.new,
+        cache: (value) => _regressionOwnerClient = value,
+      );
 
   Future<void> _deleteRegressionCase(RegressionCaseSummary item) async {
     final generation = ++_generation;
@@ -585,7 +648,9 @@ class _EvaluationLabState extends State<EvaluationLab>
           'Windows native確認を待っています。拒否・期限切れなら操作は成立しません。';
     });
     try {
-      final receipt = await (await _regressionOwnerClientForRequest()).delete(
+      final client = await _regressionOwnerClientForRequest();
+      if (!_isCurrent(generation)) return;
+      final receipt = await client.delete(
         caseId: item.caseId,
         definitionHash: item.definitionHash,
         ciphertextHash: item.ciphertextHash,
@@ -624,8 +689,9 @@ class _EvaluationLabState extends State<EvaluationLab>
       _regressionOwnerActionMessage = 'Windows native確認後に、指定Caseの現在状態だけを照合します。';
     });
     try {
-      final receipt = await (await _regressionOwnerClientForRequest())
-          .recover(caseId: caseId);
+      final client = await _regressionOwnerClientForRequest();
+      if (!_isCurrent(generation)) return;
+      final receipt = await client.recover(caseId: caseId);
       if (!mounted || generation != _generation) return;
       setState(() {
         _regressionOwnerActionMessage =
@@ -660,7 +726,9 @@ class _EvaluationLabState extends State<EvaluationLab>
       _regressionMessage = 'Brokerへ回帰Case metadata一覧を要求しています。';
     });
     try {
-      final page = await (await _regressionClientForRequest()).list(
+      final client = await _regressionClientForRequest();
+      if (!_isCurrent(generation)) return;
+      final page = await client.list(
         after: after,
         limit: 50,
       );
@@ -700,7 +768,9 @@ class _EvaluationLabState extends State<EvaluationLab>
       _datasetMessage = 'BrokerへDataset一覧を要求しています。';
     });
     try {
-      final listing = await (await _clientForRequest()).listDatasets();
+      final client = await _clientForRequest();
+      if (!_isCurrent(generation)) return;
+      final listing = await client.listDatasets();
       if (!mounted || generation != _generation) return;
       setState(() {
         _datasets = listing;
@@ -843,7 +913,9 @@ class _EvaluationLabState extends State<EvaluationLab>
       _runMessage = 'Brokerへ評価実験の要求を作成しています。owner承認は代理しません。';
     });
     try {
-      final experiment = await (await _clientForRequest()).startExperiment(
+      final client = await _clientForRequest();
+      if (!_isCurrent(generation)) return;
+      final experiment = await client.startExperiment(
         datasetId,
         runtimeIds,
       );
@@ -882,9 +954,9 @@ class _EvaluationLabState extends State<EvaluationLab>
       _resultMessage = 'Brokerへ評価実験状態を要求しています。';
     });
     try {
-      final status = await (await _clientForRequest()).experimentStatus(
-        experimentId,
-      );
+      final client = await _clientForRequest();
+      if (!_isCurrent(generation)) return;
+      final status = await client.experimentStatus(experimentId);
       if (!mounted || generation != _generation) return;
       setState(() {
         _status = status;
@@ -917,9 +989,9 @@ class _EvaluationLabState extends State<EvaluationLab>
       _comparisonMessage = 'Brokerへ評価比較を要求しています。';
     });
     try {
-      final comparison = await (await _clientForRequest()).compare(
-        experimentId,
-      );
+      final client = await _clientForRequest();
+      if (!_isCurrent(generation)) return;
+      final comparison = await client.compare(experimentId);
       if (!mounted || generation != _generation) return;
       setState(() {
         _comparison = comparison;

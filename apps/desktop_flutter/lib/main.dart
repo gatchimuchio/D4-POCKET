@@ -522,8 +522,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
       if (kGuiShellModuleEvaluationLab)
         EvaluationLab(
           client: widget.evaluationClient,
-          connect: widget.evaluationConnect ?? connectEvaluationClient,
+          connect: widget.evaluationConnect,
           shellCoreClient: widget.client,
+          hostContextGeneration: _hostContextGeneration,
         )
       else
         const SizedBox.shrink(),

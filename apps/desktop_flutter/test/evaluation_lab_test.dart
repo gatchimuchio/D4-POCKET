@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/evaluation_lab.dart';
@@ -34,7 +36,7 @@ void main() {
     });
     await tester.pumpWidget(
       _testApp(
-        EvaluationClient(transport),
+        null,
         shellCoreClient: ShellCoreClient.mock(transport: transport),
       ),
     );
@@ -113,6 +115,47 @@ void main() {
       selectableTextContaining('計画監査ID: audit.evaluation.experiment.plan.1'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Host切替前に開始した接続では評価要求を送信しない', (tester) async {
+    final deferred = Completer<EvaluationClient>();
+    final hostGeneration = ValueNotifier<int>(0);
+    final oldTransport = _FixtureTransport({});
+    final currentTransport = _FixtureTransport({
+      '評価Dataset一覧': [
+        _accepted('評価Dataset一覧', {'版': 1, '評価Dataset一覧': []}),
+      ],
+    });
+    var connections = 0;
+    await tester.pumpWidget(_testApp(
+      null,
+      connect: () {
+        connections++;
+        return connections == 1
+            ? deferred.future
+            : Future.value(EvaluationClient(currentTransport));
+      },
+      hostContextGeneration: hostGeneration,
+    ));
+
+    final refresh = find.byKey(const ValueKey('evaluation-dataset-refresh'));
+    await tester.tap(refresh);
+    await tester.pump();
+    expect(connections, 1);
+
+    hostGeneration.value++;
+    await tester.pump();
+    deferred.complete(EvaluationClient(oldTransport));
+    await tester.pumpAndSettle();
+    expect(oldTransport.requests, isEmpty);
+    expect(find.textContaining('接続条件が変わりました。Dataset一覧'), findsOneWidget);
+
+    await tester.tap(refresh);
+    await tester.pumpAndSettle();
+    expect(connections, 2);
+    expect(currentTransport.requests.single.operation, '評価Dataset一覧');
+    await tester.pumpWidget(const SizedBox.shrink());
+    hostGeneration.dispose();
   });
 
   testWidgets('Broker Runtime一覧を確認できなければ評価実験を送らない', (tester) async {
@@ -195,9 +238,8 @@ void main() {
       ],
     });
     await tester.pumpWidget(_testApp(
-      EvaluationClient(transport),
-      regressionCaseClient: RegressionCaseClient(transport),
-      regressionCaseOwnerClient: RegressionCaseOwnerClient(transport),
+      null,
+      shellCoreClient: ShellCoreClient.mock(transport: transport),
     ));
     await tester.tap(find.text('回帰Case'));
     await tester.pumpAndSettle();
@@ -342,16 +384,20 @@ void main() {
 }
 
 Widget _testApp(
-  EvaluationClient client, {
+  EvaluationClient? client, {
+  EvaluationClientConnector? connect,
   RegressionCaseClient? regressionCaseClient,
   RegressionCaseOwnerClient? regressionCaseOwnerClient,
   ShellCoreClient? shellCoreClient,
+  ValueNotifier<int>? hostContextGeneration,
 }) =>
     MaterialApp(
       home: Scaffold(
         body: EvaluationLab(
           client: client,
+          connect: connect,
           shellCoreClient: shellCoreClient,
+          hostContextGeneration: hostContextGeneration,
           regressionCaseClient: regressionCaseClient,
           regressionCaseOwnerClient: regressionCaseOwnerClient,
         ),
