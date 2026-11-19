@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:broker_contract/broker_request_envelope.dart'
+    show brokerTextHash;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/models/generated_contracts.dart';
 import 'package:gui_shell_desktop/services/agent_handoff.dart';
@@ -10,10 +12,18 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart'
 const _sourceSession = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const _targetSession = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const _sourceTask = 'cccccccccccccccccccccccccccccccc';
-const _resultHash =
-    'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
 const _differentHash =
     'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+final _resultText = jsonEncode({
+  'result_summary': '実装を更新した',
+  'artifacts': [
+    {'name': 'patch.txt', 'content': 'diff --git ...'},
+  ],
+  'changed_files': ['lib/example.dart'],
+  'diff': '+new line',
+  'test_result': 'Agent申告: test passed（未検証）',
+});
+final _resultHash = brokerTextHash(_resultText);
 
 AgentSessionRecord _session({
   required String sessionId,
@@ -37,55 +47,39 @@ AgentSessionRecord _session({
       auditEventId: 'audit-session',
     );
 
-AgentTaskRecord _task({String status = 'completed'}) => AgentTaskRecord(
+AgentTaskRecord _task({String status = 'completed', String? resultHash}) =>
+    AgentTaskRecord(
       taskId: _sourceTask,
       runtimeId: 'codex-a',
       sessionId: _sourceSession,
       workspaceId: 'workspace-a',
-      instructionHash: _resultHash,
+      instructionHash: _differentHash,
       status: status,
       auditEventId: 'audit-source-complete',
-      resultHash: _resultHash,
+      resultHash: resultHash ?? _resultHash,
       resultContentAvailable: true,
     );
 
 AgentTaskResultProjection _result({
   String visibility = 'full',
   String? text,
-}) =>
-    AgentTaskResultProjection(
-      taskId: _sourceTask,
-      resultHash: _resultHash,
-      visibility: visibility,
-      projection: {
-        'result_hash': _resultHash,
-        'text': text ??
-            jsonEncode({
-              'result_summary': '実装を更新した',
-              'artifacts': [
-                {'name': 'patch.txt', 'content': 'diff --git ...'},
-              ],
-              'changed_files': ['lib/example.dart'],
-              'diff': '+new line',
-              'test_result': 'Agent申告: test passed（未検証）',
-            }),
-      },
-    );
+  String? resultHash,
+}) {
+  final resultText = text ?? _resultText;
+  final hash = resultHash ?? brokerTextHash(resultText);
+  return AgentTaskResultProjection(
+    taskId: _sourceTask,
+    resultHash: hash,
+    visibility: visibility,
+    projection: {'result_hash': hash, 'text': resultText},
+  );
+}
 
 void main() {
   test('Compareのtest申告はfull結果の標準形式だけから未検証値として投影する', () {
-    expect(
-      _result().agentClaimedTestResult,
-      'Agent申告: test passed（未検証）',
-    );
-    expect(
-      _result(visibility: 'hash_only').agentClaimedTestResult,
-      isNull,
-    );
-    expect(
-      _result(text: 'not-json').agentClaimedTestResult,
-      isNull,
-    );
+    expect(_result().agentClaimedTestResult, 'Agent申告: test passed（未検証）');
+    expect(_result(visibility: 'hash_only').agentClaimedTestResult, isNull);
+    expect(_result(text: 'not-json').agentClaimedTestResult, isNull);
     expect(
       AgentTaskResultProjection(
         taskId: _sourceTask,
@@ -151,7 +145,7 @@ void main() {
         runtimeId: 'codex-a',
         sessionId: _targetSession,
         workspaceId: 'workspace-b',
-        instructionHash: _resultHash,
+        instructionHash: _differentHash,
         status: 'running',
         auditEventId: 'audit-target-task-start',
       ),
@@ -167,30 +161,37 @@ void main() {
       AgentTaskRecord? task,
       AgentTaskResultProjection? result,
       AgentSessionRecord? target,
-    }) =>
-        AgentHandoffPackage.fromSource(
-          source: _session(
-            sessionId: _sourceSession,
-            runtimeId: 'codex-a',
-            workspace: 'workspace-a',
-          ),
-          task: task ?? _task(),
-          taskContext: '公開文書を更新する',
-          result: result ?? _result(),
-          target: target ??
-              _session(
-                sessionId: _targetSession,
-                runtimeId: 'codex-b',
-                workspace: 'workspace-b',
-              ),
-        );
+    }) {
+      final projection = result ?? _result();
+      return AgentHandoffPackage.fromSource(
+        source: _session(
+          sessionId: _sourceSession,
+          runtimeId: 'codex-a',
+          workspace: 'workspace-a',
+        ),
+        task: task ?? _task(resultHash: projection.resultHash),
+        taskContext: '公開文書を更新する',
+        result: projection,
+        target: target ??
+            _session(
+              sessionId: _targetSession,
+              runtimeId: 'codex-b',
+              workspace: 'workspace-b',
+            ),
+      );
+    }
 
-    expect(() => create(task: _task(status: 'running')),
-        throwsA(isA<BrokerClientException>()));
-    expect(() => create(result: _result(visibility: 'summary')),
-        throwsA(isA<BrokerClientException>()));
+    expect(
+      () => create(task: _task(status: 'running')),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(
+      () => create(result: _result(visibility: 'summary')),
+      throwsA(isA<BrokerClientException>()),
+    );
     expect(
       () => create(
+        task: _task(),
         result: AgentTaskResultProjection(
           taskId: _sourceTask,
           resultHash: _differentHash,
@@ -251,6 +252,35 @@ void main() {
     expect(
       () => create(result: _result(text: oversized)),
       throwsA(isA<BrokerClientException>()),
+    );
+  });
+
+  test('承認済みハッシュを付けた等長の差し替え本文を引継ぎ前に拒否する', () {
+    final changedText = _resultText.replaceFirst('+new line', '+old line');
+    expect(utf8.encode(changedText).length, utf8.encode(_resultText).length);
+    expect(
+      () => AgentHandoffPackage.fromSource(
+        source: _session(
+          sessionId: _sourceSession,
+          runtimeId: 'codex-a',
+          workspace: 'workspace-a',
+        ),
+        task: _task(),
+        taskContext: '公開文書を更新する',
+        result: _result(text: changedText, resultHash: _resultHash),
+        target: _session(
+          sessionId: _targetSession,
+          runtimeId: 'codex-b',
+          workspace: 'workspace-b',
+        ),
+      ),
+      throwsA(
+        isA<BrokerClientException>().having(
+          (error) => error.message,
+          'message',
+          '結果本文が承認済みのハッシュと一致しません',
+        ),
+      ),
     );
   });
 }

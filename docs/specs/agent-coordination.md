@@ -38,6 +38,8 @@ Brokerの`Agent一覧`はAdapterが返すmetadataを未信頼の宣言として�
 
 権限、Permission、Approval、Credential実値、Trust、hidden runtime stateはpackageへ含めない。`agent_handoff.schema.json`のreceiptは受信Task start responseから生成し、そのAudit IDは受信Task開始Auditを指す。現在は独立したHandoff Broker operation／AuditEventを定義していない。Brokerによる受信Taskの新規事前検査・Permission・Approval・Task開始経路がreceipt生成に先行し、target Agent側で再評価する。
 
+引継ぎの入力を作る前に、取得した結果本文のUTF-8バイト列からSHA-256を計算し、Brokerが完了時に記録した結果ハッシュと照合する。ハッシュが一致しない本文は表示形式を解釈する前に拒否し、受信先の新規Taskに渡さない。
+
 ## UI責任
 
 Desktop Agent Centerはproduct modeでBrokerが返したAgent対話Session metadataを表示し、Task結果本文は専用Content Exposure経路とnative Owner確認後だけ表示する。Task開始／状態、Handoff元候補、受信先候補はBroker識別子と現在のUI状態を照合する。Handoffは完了Taskのfull結果と、その結果が持つ厳密形式を必要とし、独立Workspaceへ新規Taskを事前検査する。`local`／`mock` snapshotをHandoff実績として表示しない。fixture値、架空の0件、実値らしい合成内容を表示しない。保留中のApprovalが未取得であることをApprovalがない証拠として扱わない。FlutterはAgentを直接起動せず、Workspace、Permission、Approval、Credential、process、networkを直接操作しない。同一Session／Runtime／Workspaceを検出した場合はfail-closedでHandoff候補を拒否する。

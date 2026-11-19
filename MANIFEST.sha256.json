@@ -365,7 +365,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_handoff.dart",
-      "sha256": "19b11df907d850046dde97c5715f2c979054b5f8e84aa1270abdf84179638ce6"
+      "sha256": "d7b4e1393c3c1c0d32fe4d282e717b07502cbac66bf3cdb71c46176f7c65a43a"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_mcp_task_controller.dart",
@@ -673,7 +673,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_handoff_test.dart",
-      "sha256": "b769dc9900b7689bd07ffa92da013ed7a90aadae5279a112cb1cb5daaa6da7e0"
+      "sha256": "7909a7391e92f143a8911d4e811c86ef7434b2e452be46561837f1628a9058d5"
     },
     {
       "path": "apps/desktop_flutter/test/agent_mcp_task_controller_test.dart",
@@ -861,7 +861,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "0c93c19400e8cb1f2568330cb2a8b2238f5aac1dc0b6efe504b531487fc86058"
+      "sha256": "766ead948f01c4dc60dd9d0516ef5d187542c351e4d9d71956bca7933ed2120c"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "d811124a91bf22674e77b16d9c9c004542adac39127b556cc8c92a7126e51ff8"
+      "sha256": "c3eb6c5406b681e347b64815d71c228ca7f39e7a7a396e3a00e3a0a303f9b30d"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1777,7 +1777,7 @@
     },
     {
       "path": "docs/specs/agent-coordination.md",
-      "sha256": "e316868a134d425a7d05f5cac7fb45179f2d58929f3b0a0a6c5c6af692715f5e"
+      "sha256": "c24cf025f48d9bd874571f541fcceee5851ba7f70e4d1d68201860d8cfb34c22"
     },
     {
       "path": "docs/specs/agent-runtime.md",

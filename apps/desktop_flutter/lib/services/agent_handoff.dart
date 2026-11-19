@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'package:broker_contract/broker_request_envelope.dart'
+    show brokerTextHash;
+
 import 'agent_task_client.dart';
 import '../models/generated_contracts.dart';
 import 'broker_client.dart' show BrokerClientException;
@@ -73,6 +76,9 @@ class AgentHandoffPackage {
     final resultText = result.text;
     if (resultText == null || utf8.encode(resultText).length > 1048576) {
       throw const BrokerClientException('承認済みAgent結果を取得できません');
+    }
+    if (brokerTextHash(resultText) != task.resultHash) {
+      throw const BrokerClientException('結果本文が承認済みのハッシュと一致しません');
     }
     final Object? decoded;
     try {

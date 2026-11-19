@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:broker_contract/broker_request_envelope.dart' show brokerTextHash;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -684,8 +685,6 @@ void main() {
     const taskId = 'd2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2';
     const instructionHash =
         'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-    const resultHash =
-        'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const bufferRecordHash =
         'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
     const resultSummary = 'P12で承認済み結果を受信Taskへ渡す';
@@ -721,6 +720,7 @@ void main() {
       'diff': '+# Agent申告diff',
       'test_result': 'Agent申告test結果（独立検証なし）',
     });
+    final resultHash = brokerTextHash(approvedResult);
     final exposureApprovalRequested = Completer<void>();
     final releaseExposureApproval = Completer<void>();
     var failNextHandoffPreflight = true;
@@ -3762,10 +3762,9 @@ void main() {
     const targetTask = 'dddddddddddddddddddddddddddddddd';
     const instructionHash =
         'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-    const resultHash =
-        'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const resultText =
         r'{"result_summary":"公開文書を更新した","artifacts":[{"name":"patch.txt","content":"patch body"}],"changed_files":["README.md"],"diff":"+## 更新","test_result":"Agent申告: test passed（独立検証なし）"}';
+    final resultHash = brokerTextHash(resultText);
 
     Map<String, Object?> taskRecord({
       required String taskId,
