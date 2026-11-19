@@ -4061,11 +4061,21 @@ impl Broker {
                     .get("申請ID")
                     .and_then(Value::as_str)
                     .ok_or("要求不正")?;
-                let draft = self
+                let mut draft = self
                     .端末
                     .as_mut()
                     .ok_or("端末経路が未設定")?
                     .AgentTask申請取得(credential_id, request_id, now)?;
+                if draft.TaskID.is_none() {
+                    let fields = draft
+                        .要求
+                        .as_object_mut()
+                        .ok_or("AgentTask申請の形式不正")?;
+                    fields.insert(
+                        "mobile_task_request_id".to_owned(),
+                        Value::String(draft.申請ID),
+                    );
+                }
                 if operation == "AgentTask端末状態" {
                     if let Some(task_id) = draft.TaskID {
                         let response = self.対話要求処理(
@@ -4135,18 +4145,10 @@ impl Broker {
                 if draft.TaskID.is_some() {
                     return Err("AgentTask申請は既に使用済み");
                 }
-                let mut execution_payload = draft.要求.clone();
-                let execution_fields = execution_payload
-                    .as_object_mut()
-                    .ok_or("AgentTask申請の形式不正")?;
-                execution_fields.insert(
-                    "mobile_task_request_id".to_owned(),
-                    Value::String(request_id.to_owned()),
-                );
                 let start = self.対話要求処理(
                     id,
                     BrokerOperation::AgentTask実行,
-                    &execution_payload,
+                    &draft.要求,
                     false,
                     EVIDENCE_SOURCE_INTERNAL_STATE,
                     hash,
@@ -11344,10 +11346,7 @@ mod 端末統治試験 {
             BrokerStatus::Rejected
         );
     }
-    #[test]
-    #[allow(non_snake_case)]
-    fn AI_Edit適用Taskは未使用Sessionを耐久Task履歴で再確認し本文を露出しない() {
-        let mut e = 環境生成();
+    fn agent_task_workspace(e: &mut 環境) {
         let mut metadata: Value = serde_json::from_str(include_str!(
             "../../../../examples/contracts/agent_adapter.valid.json"
         ))
@@ -11383,6 +11382,108 @@ mod 端末統治試験 {
                 Some(ancestry),
             )
             .unwrap();
+    }
+
+    #[test]
+    fn mobile_agent_task_readiness_requires_approval_for_the_same_draft() {
+        let mut e = 環境生成();
+        agent_task_workspace(&mut e);
+        let pair = |broker: &mut Broker, device_id: &str| {
+            let invitation = 制御(
+                broker,
+                "端末招待",
+                json!({"端末ID":device_id,"接続先Host":"127.0.0.1"}),
+            )
+            .body
+            .expect("端末招待");
+            通信(broker, &invitation, "端末結合", json!({}))
+                .body
+                .expect("端末結合")
+        };
+        let credential = pair(&mut e.broker, &"c".repeat(32));
+        let other_credential = pair(&mut e.broker, &"d".repeat(32));
+        let session = 通信(
+            &mut e.broker,
+            &credential,
+            "対話開始",
+            json!({"実行系ID":"fixture-agent","作業領域ID":"fixture-task-workspace"}),
+        )
+        .body
+        .expect("申請端末の作業領域Session");
+        let mut request = json!({
+            "agent_runtime_id":"fixture-agent",
+            "session_id":session["対話セッションID"],
+            "workspace_id":"fixture-task-workspace",
+            "instruction":"端末申請の承認結合を確認する合成Task",
+        });
+        let submit = |broker: &mut Broker| {
+            通信(broker, &credential, "AgentTask端末申請", request.clone())
+                .body
+                .expect("端末申請")["申請ID"]
+                .clone()
+        };
+        let draft = submit(&mut e.broker);
+        let other_draft = submit(&mut e.broker);
+        assert_ne!(draft, other_draft);
+        let status = |broker: &mut Broker, draft: &Value| {
+            通信(
+                broker,
+                &credential,
+                "AgentTask端末状態",
+                json!({"申請ID":draft}),
+            )
+            .body
+            .expect("同じ端末の申請状態")
+        };
+        assert_eq!(status(&mut e.broker, &draft)["状態"], "Owner確認待ち");
+
+        let grant = |broker: &mut Broker, operation: &str, payload: &Value| {
+            let id = 識別子生成().unwrap();
+            let request = json!({
+                "request_id":id,"nonce":id,"session_id":"device-test","operation":operation,
+                "payload":payload,"payload_hash":canonical_payload_hash(Some(payload)),
+                "issued_at":BrokerRequestEnvelope::current_issued_at(),"metadata":{"client":"desktop_flutter"},
+            });
+            let response = broker.desktop_owner_operation_json(&request.to_string());
+            assert_eq!(response.status, BrokerStatus::Accepted, "{response:?}");
+        };
+        grant(
+            &mut e.broker,
+            "AgentTaskWorkspacePermissionGrant",
+            &json!({
+                "agent_runtime_id":request["agent_runtime_id"],
+                "session_id":request["session_id"],
+                "workspace_id":request["workspace_id"],
+            }),
+        );
+        assert_eq!(status(&mut e.broker, &draft)["状態"], "Owner確認待ち");
+        request["mobile_task_request_id"] = draft.clone();
+        grant(&mut e.broker, "AgentTaskOwnerApprovalGrant", &request);
+
+        let ready = json!({"申請ID":draft,"状態":"開始候補"});
+        assert_eq!(status(&mut e.broker, &draft), ready);
+        assert_eq!(status(&mut e.broker, &other_draft)["状態"], "Owner確認待ち");
+        assert_eq!(status(&mut e.broker, &draft), ready);
+        let foreign_status = 通信(
+            &mut e.broker,
+            &other_credential,
+            "AgentTask端末状態",
+            json!({"申請ID":draft}),
+        );
+        assert_eq!(foreign_status.status, BrokerStatus::Rejected);
+        assert!(foreign_status.body.is_none());
+        assert!(!e
+            .broker
+            .audit_events()
+            .iter()
+            .any(|event| event.operation == "AgentTask実行"));
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn AI_Edit適用Taskは未使用Sessionを耐久Task履歴で再確認し本文を露出しない() {
+        let mut e = 環境生成();
+        agent_task_workspace(&mut e);
         let started = 通常要求(
             &mut e.broker,
             BrokerOperation::対話開始,
