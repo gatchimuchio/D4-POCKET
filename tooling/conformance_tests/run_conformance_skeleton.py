@@ -1,3 +1,4 @@
+import ast
 import base64
 import copy
 import hashlib
@@ -13388,6 +13389,52 @@ def test_linux_rust_workflow_is_manual_and_scoped() -> list[str]:
     return [f"Linux Rust手動workflowに必須検査／scope／cleanupがない: {token}" for token in missing]
 
 
+def _linux_installed_smoke_navigation_and_scratch_gaps(source: str) -> list[str]:
+    try:
+        module = ast.parse(source)
+    except SyntaxError:
+        return ["installed Linux smokeのPython構文が不正"]
+    functions = {node.name: node for node in module.body if isinstance(node, ast.FunctionDef)}
+
+    def calls(function: str, callee: str) -> list[ast.Call]:
+        if function not in functions:
+            return []
+        return [
+            node
+            for node in ast.walk(functions[function])
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == callee
+        ]
+
+    gaps = []
+    if not any(
+        call.args
+        and isinstance(call.args[0], ast.Constant)
+        and call.args[0].value == "操作グループ選択"
+        and any(
+            keyword.arg == "root" and ast.unparse(keyword.value) == "window"
+            for keyword in call.keywords
+        )
+        for call in calls("_open_installed_navigation_page", "_find_operable_accessible")
+    ):
+        gaps.append("installed Linux操作グループを現在の製品windowから取得しない")
+
+    for function, count in (
+        ("_run_installed_agent_mcp_followup_acceptance", "len(task_ids)"),
+        ("run_installed_smoke", "mcp_tool_calls + 1"),
+    ):
+        required = {"require_agent_task": "True", "expected_scratch_cleanup_count": count}
+        if not any(
+            required.items() <= {
+                keyword.arg: ast.unparse(keyword.value) for keyword in call.keywords
+            }.items()
+            for call in calls(function, "_verify_live_audit")
+        ):
+            gaps.append(f"{function}: 全Agent Taskのscratch回収を永続Auditへ照合しない")
+    return gaps
+
+
 def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]:
     workflow_path = ROOT / ".github/workflows/linux-manual-export-build.yml"
     if workflow_path.is_symlink() or not workflow_path.is_file():
@@ -13438,6 +13485,7 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     if smoke_path.is_symlink() or not smoke_path.is_file():
         return ["Linux installed-product smoke acceptanceが通常fileではない"]
     smoke = smoke_path.read_text(encoding="utf-8")
+    missing.extend(_linux_installed_smoke_navigation_and_scratch_gaps(smoke))
     required = (
         "'on':\n  workflow_dispatch:",
         "runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_mcp_followup' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding') && 'ubuntu-22.04' || 'ubuntu-24.04' }}",
@@ -13519,7 +13567,6 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "result_body_absent_from_ui_audit_logs_and_acceptance_files",
         "_cleanup_mcp_fixture_group(",
         "def _open_installed_navigation_page(",
-        'group_selector = _find_operable_accessible(\n        "操作グループ選択"',
         "def _open_agent_center_from_installed_ui(",
         'group="運用", page_label="エージェントセンター"',
         '_find_accessible("Codex実行系をBrokerへ登録", root=window, timeout=10)',
@@ -13556,7 +13603,6 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。",
         'f"CLI実行file: {codex_cli}"',
         'f"Workspace root: {task_workspace}"',
-        "expected_scratch_cleanup_count=2",
         "required_input_marker_observed",
         "def _write_normal_release_codex_config(",
         'CODEX_SYSTEM_CONFIG_PATH = Path("/etc/codex/config.toml")',
