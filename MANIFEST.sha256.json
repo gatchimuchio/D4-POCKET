@@ -89,7 +89,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "d4333ebe2dd99310cbf4859bc7537a5c67dba2a572c930a20565dbf233b6c20f"
+      "sha256": "f9bcac03be13fb7f8b4fa2f3bdca191bb9062c8698ac9b65faf6aa44534f2bdd"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -1645,7 +1645,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "eb71f7231d061ce5690ecface41866033e360e1340cda178ac5814c75ed560f6"
+      "sha256": "da60077804f768f5def84154a3673a6dec224528de7b68a860f9a84f960b4598"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5993,7 +5993,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "1a598084ff5c2988e70af72d483982a871871b7492569e13fd12a652b601e53c"
+      "sha256": "58585ec03b2d5db059e72ac7edb560bacfb9b9d1898070559a7a30916da484f6"
     },
     {
       "path": "tooling/tests/linux_status_notifier_test.cc",
@@ -6049,7 +6049,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "85eb82a90085291829c9f6dbb5fc0636d14b7ae6d3c2ef3dcf1c05e6789ca515"
+      "sha256": "58e1a26f4a4a816ede8451af52a6fd51e8ccc119cc8be3d4ac9c988d3eed80e6"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",

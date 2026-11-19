@@ -29,6 +29,10 @@ name: Linux manual product build and installed acceptance
           - debian_setup_first_install
           - debian_setup_lifecycle
         default: update_lifecycle
+      mcp_chain:
+        description: Verify two consecutive Tool calls in the agent_mcp_followup scope
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -612,10 +616,12 @@ jobs:
           GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
           GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
           D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+          D4P_MCP_CHAIN: ${{ inputs.mcp_chain }}
         run: |
           set -euo pipefail
           test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
-          for result_case in a b; do
+          run_mcp_case() {
+            local result_case="$1" tool_calls="$2"
             dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
               --package "$test_package" \
               --temp-root "$D4P_EXPORT_ROOT" \
@@ -624,8 +630,16 @@ jobs:
               --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
               --acceptance-scope agent_mcp_followup \
               --mcp-result-case "$result_case" \
-              --codex-cli "$D4P_LINUX_TASK_CODEX_CLI" \
-              | tee "$D4P_EXPORT_ROOT/agent-mcp-result-$result_case.jsonl"
+              --mcp-tool-calls "$tool_calls" \
+              --codex-cli "$D4P_LINUX_TASK_CODEX_CLI"
+          }
+          if [ "$D4P_MCP_CHAIN" = true ]; then
+            run_mcp_case a 2
+            printf '\n- LIVE_PRODUCT／r2-e2e: 同一Agentの独立した三つのTaskで、連続した二回のMCP Toolと新規承認、実結果入力、最終Workspace作用、正常終了後の永続Auditを検証した。合成データ・local Responses fixtureを使用。\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          for result_case in a b; do
+            run_mcp_case "$result_case" 1 | tee "$D4P_EXPORT_ROOT/agent-mcp-result-$result_case.jsonl"
           done
           python3 - "$D4P_EXPORT_ROOT" <<'PY'
           import json

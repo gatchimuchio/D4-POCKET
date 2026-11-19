@@ -60,6 +60,7 @@ RUST_PROVIDER_CREDENTIAL_TEST = (
     "broker::credential_storage::linux_storage_tests::linux_provider_credential_use_is_secret_service_backed_audited_and_revocable"
 )
 MCP_PUBLIC_INPUT = "installed-mcp-public-input"
+MCP_FOLLOWUP_PUBLIC_INPUT = "installed-mcp-public-followup"
 MCP_RESULT_PREFIX = "D4P_MCP_RESULT_PROBE_"
 MCP_FOLLOWUP_EFFECTS = {
     "a": ("mcp-result-a.txt", b"action-a\n"),
@@ -2452,7 +2453,11 @@ import hmac
 import os
 import sys
 
-seed = sys.argv[1]
+seeds = sys.argv[1:]
+if len(seeds) not in (1, 2):
+    raise SystemExit(73)
+public_inputs = ["installed-mcp-public-input", "installed-mcp-public-followup"]
+call_index = 0
 
 credential_verifier = ".d4p-expected-credential.sha256"
 if os.path.exists(credential_verifier):
@@ -2521,21 +2526,27 @@ for line in sys.stdin:
         }
     elif method == "tools/call":
         arguments = request.get("params", {}).get("arguments", {})
-        if request.get("params", {}).get("name") != "echo" or arguments != {"text": "installed-mcp-public-input"}:
+        if (
+            call_index >= len(seeds)
+            or request.get("params", {}).get("name") != "echo"
+            or arguments != {"text": public_inputs[call_index]}
+        ):
             raise SystemExit(73)
         call_marker = {"method": method, "count": 1}
         if credential_verified:
             call_marker["credential_verified"] = True
-        write_private("mcp-tool-called.json", call_marker)
+        marker_name = "mcp-tool-called.json" if call_index == 0 else "mcp-second-tool-called.json"
+        write_private(marker_name, call_marker)
         response = {
             "jsonrpc": "2.0",
             "id": request_id,
             "result": {
                 "resultType": "complete",
-                "content": [{"type": "text", "text": "D4P_MCP_RESULT_PROBE_" + seed}],
+                "content": [{"type": "text", "text": "D4P_MCP_RESULT_PROBE_" + seeds[call_index]}],
                 "isError": False,
             },
         }
+        call_index += 1
     else:
         response = {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": "method not found"}}
     sys.stdout.write(json.dumps(response, separators=(",", ":")) + "\\n")
@@ -4313,6 +4324,15 @@ class _LinuxAgentTaskResponsesServer:
             "mcp_followup",
         }:
             raise ValueError("Agent Task loopback scenario is not supported")
+        if required_input_marker is not None and (
+            not isinstance(required_input_marker, str)
+            or re.fullmatch(
+                re.escape(MCP_RESULT_PREFIX) + r"[ab][a-f0-9]{31}",
+                required_input_marker,
+            )
+            is None
+        ):
+            raise ValueError("Agent MCP follow-up fixture marker is invalid")
         if scenario == "mcp_proposal":
             required_fields = {"server_id", "tool_id", "name", "arguments"}
             if (
@@ -4326,19 +4346,10 @@ class _LinuxAgentTaskResponsesServer:
                     r"tool-[a-f0-9]{142}", str(mcp_tool_request.get("tool_id"))
                 )
                 is None
-                or required_input_marker is not None
             ):
                 raise ValueError("Agent MCP proposal fixture request is invalid")
         elif scenario == "mcp_followup":
-            if (
-                mcp_tool_request is not None
-                or not isinstance(required_input_marker, str)
-                or re.fullmatch(
-                    re.escape(MCP_RESULT_PREFIX) + r"[ab][a-f0-9]{31}",
-                    required_input_marker,
-                )
-                is None
-            ):
+            if mcp_tool_request is not None or required_input_marker is None:
                 raise ValueError("Agent MCP follow-up fixture marker is invalid")
         elif mcp_tool_request is not None or required_input_marker is not None:
             raise ValueError("MCP fixture inputs are not valid for this scenario")
@@ -4516,6 +4527,27 @@ class _LinuxAgentTaskResponsesServer:
                     "task_mcp_tool_descriptors": task_tool_descriptors[:4],
                 }
             )
+            required_marker = scenario.get("required_input_marker")
+            if required_marker is not None and posts == 1:
+                serialized_request = json.dumps(
+                    request, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                )
+                if "D4P_SYNTHETIC_SECRET_CANARY" in serialized_request:
+                    self._rejections.append("synthetic_secret_canary_in_followup_request")
+                    raise RuntimeError("secret canary exposed in follow-up input")
+                input_markers = set(
+                    re.findall(
+                        re.escape(MCP_RESULT_PREFIX) + r"[a-f0-9]{32}\b",
+                        json.dumps(input_items, ensure_ascii=False),
+                    )
+                )
+                if input_markers != {required_marker}:
+                    self._rejections.append("mcp_result_marker_missing_from_followup_input")
+                    raise RuntimeError("MCP result markers do not match the current follow-up input")
+                scenario["required_input_marker_observed"] = True
+                scenario["mcp_input_sha256"] = hashlib.sha256(
+                    serialized_request.encode("utf-8")
+                ).hexdigest()
             if scenario.get("name") == "mcp_proposal":
                 if posts == 1:
                     if tool_outputs or not offers_task_mcp_tool:
@@ -4570,31 +4602,11 @@ class _LinuxAgentTaskResponsesServer:
                 raise RuntimeError("unexpected MCP proposal request sequence")
             is_mcp_followup = scenario.get("name") == "mcp_followup"
             if is_mcp_followup and posts == 1:
-                serialized_request = json.dumps(
-                    request, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-                )
-                required_marker = scenario.get("required_input_marker")
-                if "D4P_SYNTHETIC_SECRET_CANARY" in serialized_request:
-                    self._rejections.append("synthetic_secret_canary_in_followup_request")
-                    raise RuntimeError("secret canary exposed in follow-up input")
-                input_markers = set(
-                    re.findall(
-                        re.escape(MCP_RESULT_PREFIX) + r"[a-f0-9]{32}\b",
-                        json.dumps(input_items, ensure_ascii=False),
-                    )
-                )
-                if input_markers != {required_marker}:
-                    self._rejections.append("mcp_result_marker_missing_from_followup_input")
-                    raise RuntimeError("MCP result markers do not match the current follow-up input")
-                marker = next(iter(input_markers))
-                effect_file, content = MCP_FOLLOWUP_EFFECTS[marker[len(MCP_RESULT_PREFIX)]]
+                assert isinstance(required_marker, str)
+                effect_file, content = MCP_FOLLOWUP_EFFECTS[required_marker[len(MCP_RESULT_PREFIX)]]
                 effect_text = content.decode("ascii").rstrip("\n")
                 # 結果は固定の二候補を選ぶ。受信本文はコマンドへ入れない。
                 scenario["command"] = f"printf '%s\\n' '{effect_text}' > {effect_file}"
-                scenario["required_input_marker_observed"] = True
-                scenario["mcp_input_sha256"] = hashlib.sha256(
-                    serialized_request.encode("utf-8")
-                ).hexdigest()
             if posts == 1 and not tool_outputs and offers_exec:
                 scenario["tool_calls"] = 1
                 call_id = "call_d4p_linux_agent_task_1"
@@ -7657,10 +7669,19 @@ def _run_installed_agent_mcp_followup_acceptance(
     temp_root: Path,
     acceptance_root: Path,
     result_case: str,
+    tool_calls: int,
 ) -> dict[str, object]:
-    mcp_workspace, mcp_fixture, mcp_seed, result_marker = _write_linux_mcp_fixture(
+    mcp_workspace, mcp_fixture, mcp_seed, _ = _write_linux_mcp_fixture(
         temp_root, acceptance_root, result_case=result_case
     )
+    mcp_arguments = [MCP_PUBLIC_INPUT]
+    mcp_seeds = [mcp_seed]
+    call_markers = [mcp_workspace / "mcp-tool-called.json"]
+    if tool_calls == 2:
+        mcp_arguments.append(MCP_FOLLOWUP_PUBLIC_INPUT)
+        mcp_seeds.append(result_case + secrets.token_hex(16)[1:])
+        call_markers.append(mcp_workspace / "mcp-second-tool-called.json")
+    result_markers = [MCP_RESULT_PREFIX + seed for seed in mcp_seeds]
     _fixture_root, task_workspace, _outside_file = _write_linux_agent_task_fixture(
         acceptance_root
     )
@@ -7671,14 +7692,13 @@ def _run_installed_agent_mcp_followup_acceptance(
     workspace_id = "workspace-linux-agent-mcp-followup"
     runtime_id = "runtime-linux-agent-mcp-followup"
     start_marker = mcp_workspace / "mcp-child-started.json"
-    call_marker = mcp_workspace / "mcp-tool-called.json"
 
     window = _open_mcp_center_from_installed_ui(environment, window_id)
     for label, value in (
         ("サーバー識別子", server_id),
         ("実行ファイルの絶対パス", str(python_executable)),
         ("作業フォルダーの絶対パス", str(mcp_workspace)),
-        ("起動引数（1行に1項目、最大32項目）", f"{mcp_fixture}\n{mcp_seed}"),
+        ("起動引数（1行に1項目、最大32項目）", "\n".join([str(mcp_fixture), *mcp_seeds])),
     ):
         _set_public_text_by_keyboard(window, label, value, environment, window_id)
 
@@ -7701,7 +7721,7 @@ def _run_installed_agent_mcp_followup_acceptance(
     _wait_for_owner_dialog_closed(environment)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("MCP接続は確定していません", root=window, timeout=15)
-    if start_marker.exists() or call_marker.exists():
+    if start_marker.exists() or any(marker.exists() for marker in call_markers):
         raise RuntimeError("Owner拒否後にAgent MCP fixture processまたはTool作用が発生しました")
 
     _activate_named_control_by_keyboard("MCP接続を開始", environment, window_id)
@@ -7736,6 +7756,12 @@ def _run_installed_agent_mcp_followup_acceptance(
         "On continuation, read the first hex digit of the MCP result. For a or b, write "
         "action-a or action-b to mcp-result-a.txt or mcp-result-b.txt, respectively. Finish."
     )
+    if tool_calls == 2:
+        task_instruction = (
+            "First propose MCP echo with installed-mcp-public-input. With its result propose "
+            "echo with installed-mcp-public-followup. After the second result use its a/b "
+            "prefix to write action-a/action-b to mcp-result-a.txt/mcp-result-b.txt and finish."
+        )
     registration = _open_installed_codex_registration(
         environment, window_id=window_id
     )
@@ -7786,22 +7812,23 @@ def _run_installed_agent_mcp_followup_acceptance(
     tool_id = "tool-" + (
         "sha256:" + hashlib.sha256(b"echo").hexdigest()
     ).encode("ascii").hex()
-    proposal = {
-        "server_id": server_id,
-        "tool_id": tool_id,
-        "name": "echo",
-        "arguments": {"text": MCP_PUBLIC_INPUT},
-    }
-    responses_server.configure(
-        "mcp_proposal",
-        "",
-        task_workspace,
-        mcp_tool_request=proposal,
-        final_message="Task MCP request was submitted; no external tool result is included.",
-    )
-    source_diagnostic_index = len(
-        responses_server.snapshot()["agent_task_diagnostics"]
-    )
+    def configure_proposal(argument: str, input_marker: str | None = None) -> None:
+        responses_server.configure(
+            "mcp_proposal",
+            "",
+            task_workspace,
+            mcp_tool_request={
+                "server_id": server_id,
+                "tool_id": tool_id,
+                "name": "echo",
+                "arguments": {"text": argument},
+            },
+            required_input_marker=input_marker,
+            final_message="Task MCP request was submitted; no external tool result is included.",
+        )
+
+    configure_proposal(mcp_arguments[0])
+    diagnostic_index = len(responses_server.snapshot()["agent_task_diagnostics"])
     audit_path = audit_store / "audit.jsonl"
 
     def approve_result_view(
@@ -7875,88 +7902,88 @@ def _run_installed_agent_mcp_followup_acceptance(
     source_task_id = _wait_for_installed_task_id(
         window, previously_visible_task_ids=previous_task_ids, timeout=15.0
     )
-    source_result_hash = approve_result_view(
-        source_task_id, "mcp_proposal", source_diagnostic_index, "Agent MCP提案のTask結果表示"
-    )
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
-    _find_accessible(
-        f"表示範囲: full・Task {source_task_id}",
-        root=window,
-        timeout=15,
-    )
-    proposal_snapshot = _accessible_snapshot(window)
-    for value in (server_id, tool_id, MCP_PUBLIC_INPUT):
-        if value not in proposal_snapshot:
+    task_ids = [source_task_id]
+    proposal_result_hashes = []
+    for index, (argument, marker) in enumerate(zip(mcp_arguments, result_markers)):
+        task_id = task_ids[-1]
+        task_result_hash = approve_result_view(
+            task_id, "mcp_proposal", diagnostic_index, f"MCP提案 {index + 1} の結果表示"
+        )
+        proposal_result_hashes.append(task_result_hash)
+        window = _find_accessible(WINDOW_TITLE, timeout=10)
+        _find_accessible(f"表示範囲: full・Task {task_id}", root=window, timeout=15)
+        proposal_snapshot = _accessible_snapshot(window)
+        if any(value not in proposal_snapshot for value in (server_id, tool_id, argument)):
             raise RuntimeError("Task MCP提案の承認済み表示にTool要求の値がありません")
-    if result_marker in proposal_snapshot:
-        raise RuntimeError("Task MCP提案表示へ外部Tool結果が混入しました")
+        if any(value in proposal_snapshot for value in result_markers):
+            raise RuntimeError("Task MCP提案表示へ外部Tool結果が混入しました")
 
-    responses_server.configure(
-        "mcp_followup",
-        "",
-        task_workspace,
-        required_input_marker=result_marker,
-        final_message="The approved follow-up wrote the file selected by the MCP result.",
-    )
-    followup_diagnostic_index = len(
-        responses_server.snapshot()["agent_task_diagnostics"]
-    )
-    _answer_owner_dialog(
-        environment,
-        "許可",
-        context="Agent起点MCP Toolのfresh Owner Approval",
-        diagnostic_root=window,
-        diagnostic_audit_path=audit_store / "audit.jsonl",
-        expected_summary_markers=(
-            MCP_OWNER_TOOL_CALL_MARKER,
-            f"Server ID: {server_id}",
-            f"Tool: echo ({tool_id})",
-            f"Agent source Task: {source_task_id}",
-            f"Agent result hash: {source_result_hash}",
-            MCP_OWNER_ARGUMENT_HASH_MARKER,
-        ),
-    )
-    _wait_for_owner_dialog_closed(environment)
+        if index + 1 < tool_calls:
+            configure_proposal(mcp_arguments[index + 1], input_marker=marker)
+        else:
+            responses_server.configure(
+                "mcp_followup",
+                "",
+                task_workspace,
+                required_input_marker=marker,
+                final_message="The approved follow-up wrote the file selected by the MCP result.",
+            )
+        diagnostic_index = len(responses_server.snapshot()["agent_task_diagnostics"])
+        _answer_owner_dialog(
+            environment,
+            "許可",
+            context=f"Agent起点MCP Tool {index + 1} のfresh Owner Approval",
+            diagnostic_root=window,
+            diagnostic_audit_path=audit_path,
+            expected_summary_markers=(
+                MCP_OWNER_TOOL_CALL_MARKER,
+                f"Server ID: {server_id}",
+                f"Tool: echo ({tool_id})",
+                f"Agent source Task: {task_id}",
+                f"Agent result hash: {task_result_hash}",
+                MCP_OWNER_ARGUMENT_HASH_MARKER,
+            ),
+        )
+        _wait_for_owner_dialog_closed(environment)
 
-    _answer_owner_dialog(
-        environment,
-        "許可",
-        context="実MCP結果依存Taskのfresh Workspace Permission",
-        expected_summary_markers=(
-            AGENT_TASK_PERMISSION_OWNER_MARKER,
-            f"Runtime ID: {runtime_id}",
-            "Session ID:",
-            f"Workspace ID: {workspace_id}",
-            "許可operation: agent_task.execute",
-        ),
-    )
-    _wait_for_owner_dialog_closed(environment)
-    _answer_owner_dialog(
-        environment,
-        "許可",
-        context="実MCP結果依存Taskのfresh Owner Approval",
-        diagnostic_root=window,
-        diagnostic_audit_path=audit_store / "audit.jsonl",
-        expected_summary_markers=(
-            AGENT_TASK_APPROVAL_OWNER_MARKER,
-            f"Runtime ID: {runtime_id}",
-            "Session ID:",
-            f"Workspace ID: {workspace_id}",
-            "指示hash:",
-            "実行上限: 最大15分",
-            "Approvalは本文hashと現在の実行条件に束縛され",
-        ),
-    )
-    _wait_for_owner_dialog_closed(environment)
-    followup_task_id = _wait_for_installed_task_id(
-        window,
-        previously_visible_task_ids={source_task_id, *previous_task_ids},
-        timeout=20.0,
-    )
-    if followup_task_id == source_task_id:
-        raise RuntimeError("実MCP結果を受け取る後続Taskがfresh Task IDではありません")
+        _answer_owner_dialog(
+            environment,
+            "許可",
+            context="実MCP結果依存Taskのfresh Workspace Permission",
+            expected_summary_markers=(
+                AGENT_TASK_PERMISSION_OWNER_MARKER,
+                f"Runtime ID: {runtime_id}",
+                "Session ID:",
+                f"Workspace ID: {workspace_id}",
+                "許可operation: agent_task.execute",
+            ),
+        )
+        _wait_for_owner_dialog_closed(environment)
+        _answer_owner_dialog(
+            environment,
+            "許可",
+            context="実MCP結果依存Taskのfresh Owner Approval",
+            diagnostic_root=window,
+            diagnostic_audit_path=audit_path,
+            expected_summary_markers=(
+                AGENT_TASK_APPROVAL_OWNER_MARKER,
+                f"Runtime ID: {runtime_id}",
+                "Session ID:",
+                f"Workspace ID: {workspace_id}",
+                "指示hash:",
+                "実行上限: 最大15分",
+                "Approvalは本文hashと現在の実行条件に束縛され",
+            ),
+        )
+        _wait_for_owner_dialog_closed(environment)
+        task_ids.append(
+            _wait_for_installed_task_id(
+                window, previously_visible_task_ids=previous_task_ids | set(task_ids), timeout=20.0
+            )
+        )
+    followup_task_id = task_ids[-1]
     followup_result_hash = approve_result_view(
-        followup_task_id, "mcp_followup", followup_diagnostic_index, "MCP後続Taskの最終結果表示"
+        followup_task_id, "mcp_followup", diagnostic_index, "MCP後続Taskの最終結果表示"
     )
     followup_snapshot = _wait_installed_task_status(
         environment,
@@ -7968,10 +7995,11 @@ def _run_installed_agent_mcp_followup_acceptance(
         diagnostic_response_fixture=(
             responses_server,
             "mcp_followup",
-            followup_diagnostic_index,
+            diagnostic_index,
         ),
     )
-    if result_marker in _accessible_snapshot(_find_accessible(WINDOW_TITLE, timeout=10)):
+    full_snapshot = _accessible_snapshot(_find_accessible(WINDOW_TITLE, timeout=10))
+    if any(marker in full_snapshot for marker in result_markers):
         raise RuntimeError("実MCP結果本文がAgent Centerのaccessibility projectionへ露出しました")
     if f"結果依存の後続Task: {followup_task_id}" not in followup_snapshot:
         raise RuntimeError("Agent CenterにMCP結果依存のfollow-up Task IDが結合されていません")
@@ -7980,7 +8008,7 @@ def _run_installed_agent_mcp_followup_acceptance(
     )
     if len(tool_result_hashes) != 1:
         raise RuntimeError("Agent CenterにMCP実結果のhash-only receiptが一つありません")
-    if f"MCP要求元Task: {source_task_id} / {source_result_hash}" not in followup_snapshot:
+    if f"MCP要求元Task: {task_ids[-2]} / {proposal_result_hashes[-1]}" not in followup_snapshot:
         raise RuntimeError("Agent CenterのMCP source Task/result hash結合が不正です")
     if f"結果hash: {followup_result_hash}" not in followup_snapshot:
         raise RuntimeError("Agent Centerの後続Task結果hashが完了Auditと一致しません")
@@ -7999,14 +8027,15 @@ def _run_installed_agent_mcp_followup_acceptance(
         if other_case != result_case and (other_path.exists() or other_path.is_symlink()):
             raise RuntimeError("MCP後続Taskが別の結果に対応するWorkspace作用も実行しました")
 
-    if not call_marker.is_file() or call_marker.is_symlink():
-        raise RuntimeError("Agent提案に起因する外部MCP Tool callがありません")
-    try:
-        call_document = json.loads(call_marker.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as error:
-        raise RuntimeError("Agent起点MCP tools/call markerが不正です") from error
-    if call_document != {"method": "tools/call", "count": 1}:
-        raise RuntimeError("Agent起点の外部MCP Tool実行回数が一回ではありません")
+    for call_marker in call_markers:
+        if not call_marker.is_file() or call_marker.is_symlink():
+            raise RuntimeError("Agent提案に起因する外部MCP Tool callがありません")
+        try:
+            call_document = json.loads(call_marker.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise RuntimeError("Agent起点MCP tools/call markerが不正です") from error
+        if call_document != {"method": "tools/call", "count": 1}:
+            raise RuntimeError("Agent起点の外部MCP Toolが各提案につき一回ではありません")
     _find_accessible(
         "MCP Tool result hash: " + tool_result_hashes[0],
         root=_find_accessible(WINDOW_TITLE, timeout=10),
@@ -8060,20 +8089,36 @@ def _run_installed_agent_mcp_followup_acceptance(
     _wait_for_mcp_group_state(mcp_pgid, False)
     _find_accessible("Brokerが保持するMCP接続はありません。", root=mcp_window, timeout=10)
 
-    audit_evidence = _verify_live_audit(
-        audit_store,
-        require_export=False,
-        require_mcp=True,
-        expected_mcp_agent_binding=(source_task_id, source_result_hash, tool_result_hashes[0]),
-        require_agent_task=True,
-        expected_agent_task_statuses=("completed", "completed"),
-        expected_scratch_cleanup_count=2,
-    )
     audit_events = [
         json.loads(line)
         for line in (audit_store / "audit.jsonl").read_text(encoding="utf-8").splitlines()
         if line
     ]
+    audited_tool_hashes = [
+        event["payload_hash"]
+        for event in audit_events
+        if event.get("operation") == "MCP Tool実行"
+        and event.get("decision") == "accepted"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+    ]
+    if (
+        len(audited_tool_hashes) != tool_calls
+        or len(set(audited_tool_hashes)) != tool_calls
+        or audited_tool_hashes[-1] != tool_result_hashes[0]
+    ):
+        raise RuntimeError("Agent起点MCP Toolの実結果と最新の画面受領票が一致しません")
+    tool_audit_bindings = tuple(
+        zip(task_ids[:-1], proposal_result_hashes, audited_tool_hashes, strict=True)
+    )
+    audit_evidence = _verify_live_audit(
+        audit_store,
+        require_export=False,
+        require_mcp=True,
+        expected_mcp_agent_bindings=tool_audit_bindings,
+        require_agent_task=True,
+        expected_agent_task_statuses=("completed",) * len(task_ids),
+        expected_scratch_cleanup_count=len(task_ids),
+    )
     history_records: list[dict[str, object]] = []
     for event in audit_events:
         reason = event.get("reason")
@@ -8102,8 +8147,8 @@ def _run_installed_agent_mcp_followup_acceptance(
         if isinstance(record.get("task_id"), str)
     }
     if (
-        set(starts_by_id) != {source_task_id, followup_task_id}
-        or set(terminals_by_id) != {source_task_id, followup_task_id}
+        set(starts_by_id) != set(task_ids)
+        or set(terminals_by_id) != set(task_ids)
         or any(record.get("status") != "completed" for record in terminals_by_id.values())
         or any(record.get("runtime_id") != runtime_id for record in starts_by_id.values())
         or len({record.get("session_id") for record in starts_by_id.values()}) != 1
@@ -8113,26 +8158,30 @@ def _run_installed_agent_mcp_followup_acceptance(
 
     loopback = responses_server.snapshot()
     scenarios = loopback.get("scenarios")
-    if not isinstance(scenarios, list) or len(scenarios) != 2 or loopback.get("rejections"):
+    if not isinstance(scenarios, list) or len(scenarios) != len(task_ids) or loopback.get("rejections"):
         raise RuntimeError("installed MCP follow-up Responses fixtureに拒否または想定外Taskがあります")
-    scenarios_by_name = {
-        row.get("name"): row for row in scenarios if isinstance(row, dict)
-    }
-    proposal_row = scenarios_by_name.get("mcp_proposal")
-    followup_row = scenarios_by_name.get("mcp_followup")
-    proposal_shapes = proposal_row.get("request_shapes") if isinstance(proposal_row, dict) else None
+    for index, proposal_row in enumerate(scenarios[:-1]):
+        proposal_shapes = proposal_row.get("request_shapes")
+        if (
+            proposal_row.get("name") != "mcp_proposal"
+            or proposal_row.get("posts") != 2
+            or proposal_row.get("mcp_function_calls") != 1
+            or proposal_row.get("mcp_function_outputs") != 1
+            or not isinstance(proposal_shapes, list)
+            or len(proposal_shapes) != 2
+            or any(shape.get("task_mcp_tool_offered") is not True for shape in proposal_shapes)
+            or (
+                index > 0
+                and (
+                    proposal_row.get("required_input_marker_observed") is not True
+                    or proposal_row.get("mcp_input_sha256") is None
+                )
+            )
+        ):
+            raise RuntimeError("CodexのMCP提案と直前の実結果入力の証拠が不足しています")
+    followup_row = scenarios[-1]
     if (
-        not isinstance(proposal_row, dict)
-        or proposal_row.get("posts") != 2
-        or proposal_row.get("mcp_function_calls") != 1
-        or proposal_row.get("mcp_function_outputs") != 1
-        or not isinstance(proposal_shapes, list)
-        or len(proposal_shapes) != 2
-        or any(
-            not isinstance(shape, dict) or shape.get("task_mcp_tool_offered") is not True
-            for shape in proposal_shapes
-        )
-        or not isinstance(followup_row, dict)
+        followup_row.get("name") != "mcp_followup"
         or followup_row.get("posts") != 2
         or followup_row.get("tool_calls") != 1
         or followup_row.get("tool_outputs") != 1
@@ -8141,20 +8190,22 @@ def _run_installed_agent_mcp_followup_acceptance(
     ):
         raise RuntimeError("Codex MCP proposal／actual-result follow-up fixture evidence is incomplete")
 
-    _assert_secret_absent_from_files(audit_store, result_marker)
     codex_home_value = environment.get("CODEX_HOME") or environment.get(
         "GUI_SHELL_R2_E2E_CODEX_HOME"
     )
     if not codex_home_value:
         raise RuntimeError("MCP follow-up acceptanceに隔離CODEX_HOMEがありません")
-    _assert_secret_absent_from_files(Path(codex_home_value), result_marker)
-    _assert_secret_absent_from_files(mcp_workspace, result_marker)
     app_log = acceptance_root / "installed-app.log"
-    if app_log.is_file() and result_marker.encode("utf-8") in app_log.read_bytes():
-        raise RuntimeError("MCP実結果本文がinstalled product logへ漏えいしました")
+    app_log_bytes = app_log.read_bytes() if app_log.is_file() else b""
+    for marker in result_markers:
+        _assert_secret_absent_from_files(audit_store, marker)
+        _assert_secret_absent_from_files(Path(codex_home_value), marker)
+        _assert_secret_absent_from_files(mcp_workspace, marker)
+        if marker.encode("utf-8") in app_log_bytes:
+            raise RuntimeError("MCP実結果本文がinstalled product logへ漏えいしました")
     _assert_secret_absent_from_files(audit_store, "D4P_SYNTHETIC_SECRET_CANARY")
     _assert_secret_absent_from_files(Path(codex_home_value), "D4P_SYNTHETIC_SECRET_CANARY")
-    if app_log.is_file() and b"D4P_SYNTHETIC_SECRET_CANARY" in app_log.read_bytes():
+    if b"D4P_SYNTHETIC_SECRET_CANARY" in app_log_bytes:
         raise RuntimeError("synthetic secret canaryがinstalled product logへ漏えいしました")
     if list(task_workspace.glob(".d4p-tmp-*")):
         raise RuntimeError("MCP follow-up Task完了後にWorkspaceTaskScratchが残っています")
@@ -8165,13 +8216,15 @@ def _run_installed_agent_mcp_followup_acceptance(
         "workspace_id": workspace_id,
         "source_task_id": source_task_id,
         "source_instruction_hash": starts_by_id[source_task_id]["instruction_hash"],
-        "source_task_result_hash": source_result_hash,
+        "source_task_result_hash": proposal_result_hashes[0],
+        "task_ids": task_ids,
+        "tool_audit_bindings": tool_audit_bindings,
         "followup_task_id": followup_task_id,
         "followup_result_hash": followup_result_hash,
         "same_agent_session_and_workspace": True,
         "fresh_permission_and_approval_per_task": True,
         "task_mcp_capability_offered_and_called_once": True,
-        "external_mcp_tool_call_count": 1,
+        "external_mcp_tool_call_count": tool_calls,
         "tool_result_hash": tool_result_hashes[0],
         "actual_result_marker_consumed_by_followup": True,
         "result_case": result_case,
@@ -8186,10 +8239,11 @@ def _run_installed_agent_mcp_followup_acceptance(
         "owned_mcp_process_group_stopped": True,
         "audit": audit_evidence,
         "responses_fixture": {
-            "proposal_posts": proposal_row["posts"],
-            "task_tool_offered": proposal_shapes[0]["task_mcp_tool_offered"],
-            "task_tool_calls": proposal_row["mcp_function_calls"],
-            "task_tool_outputs": proposal_row["mcp_function_outputs"],
+            "proposal_posts": sum(row["posts"] for row in scenarios[:-1]),
+            "task_tool_offered": True,
+            "task_tool_calls": tool_calls,
+            "task_tool_outputs": tool_calls,
+            "result_inputs_verified": tool_calls,
             "followup_input_observed": followup_row["required_input_marker_observed"],
             "followup_input_sha256": followup_row["mcp_input_sha256"],
             "raw_input_retained": False,
@@ -9583,7 +9637,7 @@ def _verify_mcp_agent_tool_audit_binding(
     source_task_id: str,
     source_result_hash: str,
     tool_result_hash: str,
-) -> None:
+) -> str:
     lifecycle = [
         event for event in events if event.get("decision") in {"approved", "started", "accepted"}
     ]
@@ -9614,6 +9668,26 @@ def _verify_mcp_agent_tool_audit_binding(
         and re.search(r"\bcontext_hash=sha256:[0-9a-f]{64}\b", completion_reason)
     ):
         raise RuntimeError("Agent起点MCP Toolの元Task・一回Permission・完了結果hashのAudit結合が不正です")
+    return permission.group()
+
+
+def _verify_mcp_agent_tool_audit_chain(
+    events: list[dict[str, object]], bindings: tuple[tuple[str, str, str], ...]
+) -> None:
+    lifecycle = [
+        event for event in events if event.get("decision") in {"approved", "started", "accepted"}
+    ]
+    if len(lifecycle) != 3 * len(bindings):
+        raise RuntimeError("MCP Tool連鎖の承認・開始・完了Audit件数が一致しません")
+    permissions = {
+        _verify_mcp_agent_tool_audit_binding(lifecycle[index * 3 : index * 3 + 3], *binding)
+        for index, binding in enumerate(bindings)
+    }
+    if (
+        len({event.get("request_id") for event in lifecycle[::3]}) != len(bindings)
+        or len(permissions) != len(bindings)
+    ):
+        raise RuntimeError("MCP Tool連鎖で要求または一回Permissionが再利用されました")
 
 
 def _verify_live_audit(
@@ -9621,7 +9695,7 @@ def _verify_live_audit(
     *,
     require_export: bool = True,
     require_mcp: bool = False,
-    expected_mcp_agent_binding: tuple[str, str, str] | None = None,
+    expected_mcp_agent_bindings: tuple[tuple[str, str, str], ...] = (),
     require_workspace: bool = False,
     require_uninstall: bool = False,
     require_rollback: bool = False,
@@ -9725,7 +9799,7 @@ def _verify_live_audit(
         for event in mcp_tool
     )
     mcp_completion_marker = (
-        "context_hash=" if expected_mcp_agent_binding is not None else "ハッシュだけを含む受領票"
+        "context_hash=" if expected_mcp_agent_bindings else "ハッシュだけを含む受領票"
     )
     mcp_tool_live_completed = sum(
         event.get("decision") == "accepted"
@@ -9744,13 +9818,14 @@ def _verify_live_audit(
         and event.get("evidence_source") == "LIVE_RUNTIME"
         for event in mcp_disconnect
     )
+    expected_tool_count = len(expected_mcp_agent_bindings) or 1
     if require_mcp and not all(
         (
             mcp_connect_rejected >= 1,
             mcp_connect_accepted >= 1,
-            mcp_tool_approved == 1,
-            mcp_tool_started == 1,
-            mcp_tool_live_completed == 1,
+            mcp_tool_approved == expected_tool_count,
+            mcp_tool_started == expected_tool_count,
+            mcp_tool_live_completed == expected_tool_count,
             mcp_disconnect_rejected >= 1,
             mcp_disconnect_live_completed >= 1,
         )
@@ -9758,8 +9833,8 @@ def _verify_live_audit(
         raise RuntimeError(
             "installed MCP connect／Tool one-shot Permission／disconnectのOwner・LIVE_RUNTIME Auditが不足しています"
         )
-    if expected_mcp_agent_binding is not None:
-        _verify_mcp_agent_tool_audit_binding(mcp_tool, *expected_mcp_agent_binding)
+    if expected_mcp_agent_bindings:
+        _verify_mcp_agent_tool_audit_chain(mcp_tool, expected_mcp_agent_bindings)
     workspace_selection = [
         event for event in events if event.get("operation") == "作業領域OS選択"
     ]
@@ -10268,6 +10343,7 @@ def run_installed_smoke(
     update_candidate_package: Path | None = None,
     update_catalog: Path | None = None,
     mcp_result_case: str = "a",
+    mcp_tool_calls: int = 1,
 ) -> None:
     needs_x11 = acceptance_scope not in {
         "wayland_rendering",
@@ -11536,6 +11612,7 @@ def run_installed_smoke(
                     temp_root=temp_root,
                     acceptance_root=acceptance_root,
                     result_case=mcp_result_case,
+                    tool_calls=mcp_tool_calls,
                 )
                 current_window_id = _visible_product_window(environment)
                 if current_window_id is None:
@@ -11556,14 +11633,10 @@ def run_installed_smoke(
                     broker_state / "store",
                     require_export=False,
                     require_mcp=True,
-                    expected_mcp_agent_binding=(
-                        str(agent_mcp_evidence["source_task_id"]),
-                        str(agent_mcp_evidence["source_task_result_hash"]),
-                        str(agent_mcp_evidence["tool_result_hash"]),
-                    ),
+                    expected_mcp_agent_bindings=agent_mcp_evidence["tool_audit_bindings"],
                     require_agent_task=True,
-                    expected_agent_task_statuses=("completed", "completed"),
-                    expected_scratch_cleanup_count=2,
+                    expected_agent_task_statuses=("completed",) * (mcp_tool_calls + 1),
+                    expected_scratch_cleanup_count=mcp_tool_calls + 1,
                 )
                 print(
                     json.dumps(
@@ -12361,9 +12434,10 @@ def main() -> int:
     parser.add_argument("--bundle-root", type=Path)
     parser.add_argument("--source-commit")
     parser.add_argument("--mcp-result-case", choices=tuple(MCP_FOLLOWUP_EFFECTS))
+    parser.add_argument("--mcp-tool-calls", type=int, choices=(1, 2), default=1)
     args = parser.parse_args()
-    if args.mcp_result_case is not None and args.acceptance_scope != "agent_mcp_followup":
-        parser.error("--mcp-result-case は agent_mcp_followup 専用です")
+    if (args.mcp_result_case is not None or args.mcp_tool_calls != 1) and args.acceptance_scope != "agent_mcp_followup":
+        parser.error("MCP継続の検証引数は agent_mcp_followup 専用です")
     try:
         run_installed_smoke(
             args.package,
@@ -12379,6 +12453,7 @@ def main() -> int:
             args.update_candidate_package,
             args.update_catalog,
             mcp_result_case=args.mcp_result_case or "a",
+            mcp_tool_calls=args.mcp_tool_calls,
         )
     except Exception as error:
         call_path = _safe_exception_call_path(error)

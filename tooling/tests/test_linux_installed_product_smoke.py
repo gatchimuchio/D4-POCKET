@@ -85,6 +85,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_credential_audit,
     _verify_live_audit,
     _verify_mcp_agent_tool_audit_binding,
+    _verify_mcp_agent_tool_audit_chain,
     _verify_workspace_projection,
     _update_source_host,
     _same_source_update_ca_environment,
@@ -5058,6 +5059,35 @@ class AgentTaskAuditAcceptanceTests(unittest.TestCase):
             with self.subTest(label=label), self.assertRaises(RuntimeError):
                 _verify_mcp_agent_tool_audit_binding(altered, "source-task", source_hash, tool_hash)
 
+        second_permission = "Permission=mcp-tool-" + "f" * 32
+        second_tool_hash = "sha256:" + "2" * 64
+        second_events = [
+            {
+                **event,
+                "request_id": "second-tool-request",
+                "event_id": f"broker-audit-{index}",
+                "reason": event["reason"]
+                .replace(permission, second_permission)
+                .replace("Approval=broker-audit-1", "Approval=broker-audit-4")
+                .replace("source-task", "followup-task")
+                .replace(source_hash, tool_hash)
+                .replace(f"result_hash={tool_hash} content_count", f"result_hash={second_tool_hash} content_count"),
+            }
+            for index, event in enumerate(events, start=4)
+        ]
+        second_events[-1]["payload_hash"] = second_tool_hash
+        bindings = (
+            ("source-task", source_hash, tool_hash),
+            ("followup-task", tool_hash, second_tool_hash),
+        )
+        _verify_mcp_agent_tool_audit_chain([*events, *second_events], bindings)
+        replayed_permission = [
+            {**event, "reason": event["reason"].replace(second_permission, permission)}
+            for event in second_events
+        ]
+        with self.assertRaisesRegex(RuntimeError, "一回Permissionが再利用"):
+            _verify_mcp_agent_tool_audit_chain([*events, *replayed_permission], bindings)
+
     def test_three_independent_terminal_tasks_and_scratch_cleanup_are_audited(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = Path(directory)
@@ -5534,6 +5564,32 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
         self.assertTrue(scenario["request_shapes"][0]["task_mcp_tool_offered"])
         self.assertNotIn(public_request_receipt, json.dumps(snapshot))
         self.assertNotIn("installed-mcp-public-input", json.dumps(snapshot))
+
+        marker = "D4P_MCP_RESULT_PROBE_a" + "1" * 31
+        server.configure(
+            "mcp_proposal",
+            "",
+            Path("/tmp/workspace"),
+            mcp_tool_request={
+                **proposal,
+                "arguments": {"text": "installed-mcp-public-followup"},
+            },
+            required_input_marker=marker,
+        )
+        next_events = server._response_events(
+            {"input": [{"role": "user", "content": marker}], "tools": [descriptor]}
+        )
+        next_call = next(
+            event["item"]
+            for event in next_events
+            if event["type"] == "response.output_item.done"
+        )
+        self.assertEqual(
+            json.loads(next_call["arguments"])["arguments"],
+            {"text": "installed-mcp-public-followup"},
+        )
+        self.assertTrue(server.snapshot()["scenarios"][1]["required_input_marker_observed"])
+        self.assertNotIn(marker, json.dumps(server.snapshot()))
 
     def test_mcp_proposal_output_accepts_bounded_text_only(self) -> None:
         self.assertEqual(_mcp_proposal_function_output_text("receipt"), "receipt")
