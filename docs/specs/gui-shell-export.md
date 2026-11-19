@@ -32,6 +32,8 @@ Ubuntu 24.04 amd64用の初回Setup `.deb`を `tooling/package_linux_deb_setup.p
 
 通常のLinux書き出しで `tooling/export_linux_product.py --debian-package-revision 1` を指定すると、同じRelease bundleから `debian-setup/` に独立Setup `.deb` を生成する。出力を公開する前に、ビルド記録へ追加した `debian_setup` の製品ID、ファイル名、サイズ、SHA-256を照合する。失敗時は書き出し先を公開しない。この指定はUbuntu 24.04 amd64の通常Release構成で利用できる。記録は未署名の初回Setup作成を示す。
 
+導入後も独立Setupのメニュー項目から、その製品の有効版を起動できる。起動器は埋め込みApp IDから導出した固定 `/opt/d4-pocket/exports/<app_id>/setup`、root所有と書込権限、起動器とManifest、有効版記録を照合する。条件が揃えば有効版へ引き継ぎ、旧版のSetup UIを開かない。未導入時は従来の初回画面を開く。任意の展開先にある旧launcherからの起動は引き続き拒否する。
+
 ## 開発専用Windows bundle build
 
 `tooling/export_windows_product.py`はWindows専用の開発用build pathである。clean `main`を要求し、GitHub `origin/main`の読取専用照会で同一commitを確認してから、そのcommitを`git archive`でRepository／OneDrive外の短い一時pathへ展開する。展開器はroot外path、Windows上のcase衝突、file／directory衝突、symlink等を拒否する。Flutter／PubとCargoへ渡す環境変数はallowlist化し、Pub cache、Cargo home、Cargo targetを一時領域へ分離する。

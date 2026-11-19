@@ -374,6 +374,8 @@ fn resolve_launch_plan(
         identity,
         product_data_home,
         EMBEDDED_PRODUCT_MANIFEST_SHA256,
+        Path::new("/"),
+        0,
     )
 }
 
@@ -382,6 +384,8 @@ fn resolve_launch_plan_with_manifest_pin(
     identity: Option<&(String, String)>,
     product_data_home: Option<&Path>,
     manifest_pin: Option<&str>,
+    system_root: &Path,
+    package_owner: u32,
 ) -> Result<LaunchPlan, LinuxLaunchError> {
     match (identity, manifest_pin) {
         (None, None) => {}
@@ -401,11 +405,21 @@ fn resolve_launch_plan_with_manifest_pin(
         audit_store_id,
     )
     .map_err(|_| failure("D4 Pocketの導入状態を安全に確認できません。"))?;
-    if crate::product_bootstrapper::is_fixed_installed_entrypoint(
-        current_launcher,
-        data_home,
-        app_id,
-    ) {
+    let from_debian_setup = active_launcher.is_some()
+        && is_debian_export_setup_entrypoint(current_launcher, app_id, system_root, package_owner);
+    if from_debian_setup
+        || crate::product_bootstrapper::is_fixed_installed_entrypoint(
+            current_launcher,
+            data_home,
+            app_id,
+        )
+    {
+        if from_debian_setup {
+            let setup = current_launcher
+                .parent()
+                .ok_or_else(|| failure("Debian Setupの配置を確認できません。"))?;
+            verify_product_manifest(setup, app_id, audit_store_id, manifest_pin)?;
+        }
         let active_launcher = active_launcher.ok_or_else(|| {
             failure("D4 Pocketの有効版を確認できません。導入状態を確認してください。")
         })?;
@@ -437,6 +451,37 @@ fn resolve_launch_plan_with_manifest_pin(
         }
         None => Err(failure("初回導入bundleに固定Linux launcherがありません。")),
     }
+}
+
+fn is_debian_export_setup_entrypoint(
+    launcher: &Path,
+    app_id: &str,
+    system_root: &Path,
+    package_owner: u32,
+) -> bool {
+    let setup = system_root
+        .join("opt/d4-pocket/exports")
+        .join(app_id)
+        .join("setup");
+    if launcher != setup.join("gui_shell_desktop_launcher") {
+        return false;
+    }
+    let Ok(file) = fs::symlink_metadata(launcher) else {
+        return false;
+    };
+    file.is_file()
+        && file.uid() == package_owner
+        && file.nlink() == 1
+        && file.mode() & 0o7022 == 0
+        && file.mode() & 0o100 != 0
+        && setup
+            .ancestors()
+            .take_while(|path| path.starts_with(system_root))
+            .all(|path| {
+                fs::symlink_metadata(path).is_ok_and(|dir| {
+                    dir.is_dir() && dir.uid() == package_owner && dir.mode() & 0o022 == 0
+                })
+            })
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -933,6 +978,22 @@ mod tests {
     const APP_ID: &str = "d4-pocket-app-11111111111111111111111111111111";
     const AUDIT_ID: &str = "audit-store-22222222222222222222222222222222";
 
+    fn resolve_test_launch_plan(
+        launcher: &Path,
+        identity: Option<&(String, String)>,
+        product_data_home: Option<&Path>,
+        manifest_pin: Option<&str>,
+    ) -> Result<LaunchPlan, LinuxLaunchError> {
+        resolve_launch_plan_with_manifest_pin(
+            launcher,
+            identity,
+            product_data_home,
+            manifest_pin,
+            Path::new("/"),
+            0,
+        )
+    }
+
     fn unique_root(label: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
             "d4-linux-launcher-{label}-{}-{}",
@@ -1021,7 +1082,7 @@ mod tests {
         let manifest_pin = write_bundle(&portable_root);
         let identity = (APP_ID.to_owned(), AUDIT_ID.to_owned());
         assert!(matches!(
-            resolve_launch_plan_with_manifest_pin(
+            resolve_test_launch_plan(
                 &portable_root.join("gui_shell_desktop_launcher"),
                 Some(&identity),
                 Some(&local_app_data),
@@ -1037,7 +1098,7 @@ mod tests {
             b"{\"invalid\":true}",
         )
         .unwrap();
-        assert!(resolve_launch_plan_with_manifest_pin(
+        assert!(resolve_test_launch_plan(
             &portable_root.join("gui_shell_desktop_launcher"),
             Some(&identity),
             Some(&local_app_data),
@@ -1108,7 +1169,7 @@ mod tests {
 
         let identity = (APP_ID.to_owned(), AUDIT_ID.to_owned());
         let older_root_manifest_pin = "c".repeat(64);
-        let plan = resolve_launch_plan_with_manifest_pin(
+        let plan = resolve_test_launch_plan(
             &product_root.join("gui_shell_desktop_launcher"),
             Some(&identity),
             Some(&local_app_data),
@@ -1116,7 +1177,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(plan, LaunchPlan::DispatchToActiveVersion(_)));
-        assert!(resolve_launch_plan_with_manifest_pin(
+        assert!(resolve_test_launch_plan(
             &product_root.join("gui_shell_desktop_launcher"),
             Some(&(
                 APP_ID.to_owned(),
@@ -1126,6 +1187,55 @@ mod tests {
             Some(&older_root_manifest_pin),
         )
         .is_err());
+
+        let system_root = local_app_data.join("system");
+        let exports = system_root.join("opt/d4-pocket/exports");
+        let setup = exports.join(APP_ID).join("setup");
+        let setup_pin = write_bundle(&setup);
+        let setup_launcher = setup.join("gui_shell_desktop_launcher");
+        let uid = rustix::process::geteuid().as_raw();
+        let resolve_setup = |launcher: &Path, pin: &str| {
+            resolve_launch_plan_with_manifest_pin(
+                launcher,
+                Some(&identity),
+                Some(&local_app_data),
+                Some(pin),
+                &system_root,
+                uid,
+            )
+        };
+        assert!(matches!(
+            resolve_setup(&setup_launcher, &setup_pin),
+            Ok(LaunchPlan::DispatchToActiveVersion(bundle))
+                if bundle.root == fs::canonicalize(&version_root).unwrap()
+        ));
+        assert!(resolve_setup(&setup_launcher, &older_root_manifest_pin).is_err());
+        assert!(!is_debian_export_setup_entrypoint(
+            &setup_launcher,
+            APP_ID,
+            &system_root,
+            uid.wrapping_add(1),
+        ));
+        assert!(!is_debian_export_setup_entrypoint(
+            &setup_launcher,
+            "d4-pocket-app-33333333333333333333333333333333",
+            &system_root,
+            uid,
+        ));
+
+        let copied_launcher = setup.join("copy");
+        fs::hard_link(&setup_launcher, &copied_launcher).unwrap();
+        assert!(resolve_setup(&setup_launcher, &setup_pin).is_err());
+        fs::remove_file(copied_launcher).unwrap();
+
+        fs::set_permissions(&exports, fs::Permissions::from_mode(0o775)).unwrap();
+        assert!(resolve_setup(&setup_launcher, &setup_pin).is_err());
+        fs::set_permissions(&exports, fs::Permissions::from_mode(0o755)).unwrap();
+        let displaced_exports = exports.with_extension("displaced");
+        fs::rename(&exports, &displaced_exports).unwrap();
+        std::os::unix::fs::symlink(&displaced_exports, &exports).unwrap();
+        assert!(resolve_setup(&setup_launcher, &setup_pin).is_err());
+
         fs::remove_dir_all(local_app_data).unwrap();
     }
 
@@ -1159,7 +1269,7 @@ mod tests {
         let identity = (APP_ID.to_owned(), AUDIT_ID.to_owned());
         let active_launcher = version_root.join("gui_shell_desktop_launcher");
         assert!(matches!(
-            resolve_launch_plan_with_manifest_pin(
+            resolve_test_launch_plan(
                 &active_launcher,
                 Some(&identity),
                 Some(&local_app_data),
@@ -1169,7 +1279,7 @@ mod tests {
         ));
         let portable_root = unique_root("stale-portable");
         let stale_manifest_pin = write_bundle(&portable_root);
-        assert!(resolve_launch_plan_with_manifest_pin(
+        assert!(resolve_test_launch_plan(
             &portable_root.join("gui_shell_desktop_launcher"),
             Some(&identity),
             Some(&local_app_data),
@@ -1179,7 +1289,7 @@ mod tests {
         fs::remove_dir_all(portable_root).unwrap();
         let other_root = unique_root("other-data");
         fs::create_dir_all(&other_root).unwrap();
-        assert!(resolve_launch_plan_with_manifest_pin(
+        assert!(resolve_test_launch_plan(
             &active_launcher,
             Some(&identity),
             Some(&other_root),
@@ -1198,18 +1308,11 @@ mod tests {
         let manifest_pin = write_bundle(&root);
         let identity = (APP_ID.to_owned(), AUDIT_ID.to_owned());
         let launcher = root.join("gui_shell_desktop_launcher");
-        assert!(resolve_launch_plan_with_manifest_pin(
-            &launcher,
-            Some(&identity),
-            Some(&data_home),
-            None,
-        )
-        .is_err());
         assert!(
-            resolve_launch_plan_with_manifest_pin(&launcher, None, None, Some(&manifest_pin),)
-                .is_err()
+            resolve_test_launch_plan(&launcher, Some(&identity), Some(&data_home), None,).is_err()
         );
-        assert!(resolve_launch_plan_with_manifest_pin(
+        assert!(resolve_test_launch_plan(&launcher, None, None, Some(&manifest_pin),).is_err());
+        assert!(resolve_test_launch_plan(
             &launcher,
             Some(&identity),
             Some(&data_home),
@@ -1217,7 +1320,7 @@ mod tests {
         )
         .is_err());
         assert!(matches!(
-            resolve_launch_plan_with_manifest_pin(
+            resolve_test_launch_plan(
                 &launcher,
                 Some(&identity),
                 Some(&data_home),
@@ -1228,7 +1331,7 @@ mod tests {
         let mut changed = fs::read(root.join("product_manifest.json")).unwrap();
         changed.push(b' ');
         fs::write(root.join("product_manifest.json"), changed).unwrap();
-        assert!(resolve_launch_plan_with_manifest_pin(
+        assert!(resolve_test_launch_plan(
             &launcher,
             Some(&identity),
             Some(&data_home),

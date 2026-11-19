@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "414ce0233e6e5cd5286bedcf0d1bfae4ca00ae52c86787248ba7d74d8885a5a0"
+      "sha256": "9123a811691b796283415f567d38ebc64cb8ff4c9b769c04ffa43cf0f520acda"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "c4f8e6be495e307c836ac58c8f93771b4ccd4b96ab726562fbd6c0a7f0550989"
+      "sha256": "6c84ea1955a1bd8f57be9bd07ba1e1df49fb0eec9ea3ce7edd07df79cea24a08"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -4297,7 +4297,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_launcher.rs",
-      "sha256": "44062b5b81fe835e519cd44ffa37de683a032b875cdb8997155d434ddaed3178"
+      "sha256": "4e4f81ab42cdeca6b760dae6990627502fb362da83d02e2a1d95f971014cf1f9"
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
@@ -6037,7 +6037,7 @@
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",
-      "sha256": "5c7e17f190b74c2049df88fcdcd68de656f6f5ee5601d4a5d11d7750681a497d"
+      "sha256": "cda542a8cb95dd85aa096ceacdee64c6d75ec105d8b38b4f7166cca0b22167ab"
     },
     {
       "path": "tooling/tests/test_linux_gtk_bundle_smoke.py",

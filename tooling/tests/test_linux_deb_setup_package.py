@@ -218,14 +218,18 @@ class LinuxDebSetupPackageTests(unittest.TestCase):
             for suffix, audit_suffix, display_name in (("1", "2", "青い製品"), ("3", "4", "緑の製品\\作業用")):
                 app_id = f"d4-pocket-app-{suffix * 32}"
                 audit_store_id = f"audit-store-{audit_suffix * 32}"
-                package, result = self.build_package(
-                    root / suffix,
-                    1,
-                    app_id=app_id,
-                    audit_store_id=audit_store_id,
-                    display_name=display_name,
-                    independent_export=True,
-                )
+                original_umask = os.umask(0o002)
+                try:
+                    package, result = self.build_package(
+                        root / suffix,
+                        1,
+                        app_id=app_id,
+                        audit_store_id=audit_store_id,
+                        display_name=display_name,
+                        independent_export=True,
+                    )
+                finally:
+                    os.umask(original_umask)
                 package_name = f"d4-pocket-setup-{suffix * 32}"
                 self.assertEqual(self.dpkg_field(package, "Package").strip(), package_name)
                 self.assertEqual(result["package_name"], package_name)
@@ -240,6 +244,10 @@ class LinuxDebSetupPackageTests(unittest.TestCase):
                 files = next_files
                 launcher = extracted / install_root.lstrip("/") / "gui_shell_desktop_launcher"
                 self.assertTrue(os.access(launcher, os.X_OK))
+                for parent in launcher.parents:
+                    if parent == extracted:
+                        break
+                    self.assertEqual(stat.S_IMODE(parent.stat().st_mode), 0o755, parent)
                 entry = (extracted / desktop_entry.lstrip("/")).read_text(encoding="utf-8").splitlines()
                 self.assertIn(f"Exec={install_root}/gui_shell_desktop_launcher", entry)
                 escaped_name = display_name.replace("\\", "\\\\")
