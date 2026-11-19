@@ -9,6 +9,36 @@ const _comparisonId = '88888888888888888888888888888888';
 const _evaluatorId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 void main() {
+  test('版指定付きの開始は異なる定義hashの受付結果を拒否する', () async {
+    final transport = _FixtureTransport({
+      '評価実験開始': [
+        _accepted(
+          '評価実験開始',
+          _experiment(),
+          auditId: 'audit.evaluation.experiment.1',
+        ),
+      ],
+    });
+    final client = EvaluationClient(transport);
+    const runtimes = ['runtime-a', 'runtime-b'];
+    await expectLater(
+      client.startExperiment(
+        _datasetId, runtimes, expectedDatasetDefinitionHash: 'invalid',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.requests, isEmpty);
+
+    final selectedHash = 'sha256:${'1' * 64}';
+    await expectLater(
+      client.startExperiment(
+        _datasetId, runtimes, expectedDatasetDefinitionHash: selectedHash,
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.requests.single.payload['Dataset定義hash'], selectedHash);
+  });
+
   test('通常操作だけが安全なpayloadでBrokerへ渡る', () async {
     final transport = _FixtureTransport({
       '評価Dataset一覧': [_accepted('評価Dataset一覧', _listingBody())],

@@ -261,7 +261,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
-      "sha256": "5734893678e76253b1a96d572a7aa67b67751a8bfc93c19fb9632509ab2ee791"
+      "sha256": "9ae1d80e8ed53c13195a89b790b2afcf6c326cccf916257d1add47eaf62dd85f"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/evidence_center.dart",
@@ -397,7 +397,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/evaluation_client.dart",
-      "sha256": "24d1e51e5ff3a275183efdf6d9a72f768857826dd812def406b362741e608e8c"
+      "sha256": "3d609a8d89fe5aa6a2d877e40b7491738000209fd7edeea76692e8b6a5e15fb0"
     },
     {
       "path": "apps/desktop_flutter/lib/services/export_client.dart",
@@ -713,7 +713,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/evaluation_lab_test.dart",
-      "sha256": "cfca5310b3794008123145f034ddb7179082fa0b277fadaae49ca9a2fba39c95"
+      "sha256": "c264f9ef56bdf2739b67e7bf7e53b12d890f3136ae6bb80b6f035e0cc7914026"
     },
     {
       "path": "apps/desktop_flutter/test/evidence_center_test.dart",
@@ -1645,7 +1645,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "e82e045d49bd92d4d77c344611988c445772e562442f60bdcca711f3b260d935"
+      "sha256": "c7e726c581f3066374691235d0893c71c757cec4794ded166e60915d520a558a"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1833,7 +1833,7 @@
     },
     {
       "path": "docs/specs/evaluation-lab.md",
-      "sha256": "99bcee362c942112f38bb03522d2d19f7085be281992a349e721919874dc40ec"
+      "sha256": "8d7a14f3f39970dfcb2cb5b40792a1dd0415ec192eaf5baeba95647ff7ffa57f"
     },
     {
       "path": "docs/specs/failure-injection-validation.md",
@@ -4153,7 +4153,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
-      "sha256": "6c4c20482dd4bba63ec7d2bb3fb2d2109e1b27c2229fdad8652057c2b6d56882"
+      "sha256": "5465717da4ef440cf961842c5a1591834a0a8a169db6df6525b8ea7cb3867cb9"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_lab.rs",
@@ -4785,7 +4785,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/src/evaluation_client.dart",
-      "sha256": "9c53d9026266de7e1a44a76fd42e2e22777d7c6fdc5112270710317fe304bc38"
+      "sha256": "120b029e013ae60bde65f4fbd7cd50ceee74153a42e3114785f3f6600099859f"
     },
     {
       "path": "packages/gui_shell_ui/lib/src/history_client.dart",
@@ -4821,7 +4821,7 @@
     },
     {
       "path": "packages/gui_shell_ui/test/evaluation_client_test.dart",
-      "sha256": "8e9b6f834d6d4a69d28800169d77a78c977f9d143d446308c12ef5cf4b5f78bc"
+      "sha256": "393c924096eb9c11afb1c426aca6a1dabe1d22a37ddba023cdaab6debfee8b4f"
     },
     {
       "path": "packages/gui_shell_ui/test/regression_case_client_test.dart",
@@ -5385,7 +5385,7 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "e7f45e846e9eb3f43707f5e23fbd4a9898081bc6e937e58223d1bb19fe8bded8"
+      "sha256": "bc3a147d4b32bb354b50423a05caae35a2e586a8d1dc220244e3cec20d19736c"
     },
     {
       "path": "specs/ipc_response.schema.json",

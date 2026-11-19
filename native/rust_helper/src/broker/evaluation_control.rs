@@ -469,7 +469,7 @@ impl Broker {
         payload_hash: &str,
     ) -> BrokerResponse {
         const OPERATION: &str = "評価実験開始";
-        let (dataset_id, runtimes) = match start_request(payload) {
+        let (dataset_id, runtimes, expected_definition_hash) = match start_request(payload) {
             Ok(value) => value,
             Err(reason) => {
                 return self.reject_with_payload_hash(
@@ -519,6 +519,16 @@ impl Broker {
                 payload_hash,
             );
         };
+        if expected_definition_hash.is_some_and(|expected| expected != manifest.definition_hash) {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "評価Dataset版変更",
+                "評価Dataset一覧を更新し、使用する版を選び直してください",
+                true,
+                payload_hash,
+            );
+        }
         let registration = match self.評価privateDataset読取(&manifest) {
             Ok(value) => value,
             Err(reason) => {
@@ -3382,8 +3392,24 @@ fn parse_manifest(value: Value) -> Result<DatasetManifest, &'static str> {
     })
 }
 
-fn start_request(value: &Value) -> Result<(String, Vec<String>), &'static str> {
-    let object = exact_object(value, &["版", "評価DatasetID", "対象Runtime一覧"])?;
+fn start_request(value: &Value) -> Result<(String, Vec<String>, Option<&str>), &'static str> {
+    let definition_hash = value.get("Dataset定義hash");
+    let object = if definition_hash.is_some() {
+        exact_object(
+            value,
+            &["版", "評価DatasetID", "対象Runtime一覧", "Dataset定義hash"],
+        )?
+    } else {
+        exact_object(value, &["版", "評価DatasetID", "対象Runtime一覧"])?
+    };
+    let expected_definition_hash = definition_hash
+        .map(|value| {
+            value
+                .as_str()
+                .filter(|value| valid_hash(value))
+                .ok_or("評価Dataset定義hashが不正です")
+        })
+        .transpose()?;
     if object.get("版").and_then(Value::as_u64) != Some(EVALUATION_VERSION) {
         return Err("評価実験開始の版が不正です");
     }
@@ -3405,7 +3431,7 @@ fn start_request(value: &Value) -> Result<(String, Vec<String>), &'static str> {
         }
         output.push(runtime.to_owned());
     }
-    Ok((id, output))
+    Ok((id, output, expected_definition_hash))
 }
 
 fn experiment_request(value: &Value) -> Result<String, &'static str> {
@@ -5734,7 +5760,7 @@ mod tests {
     #[test]
     fn dataset_revision_must_increase_and_normal_list_returns_only_current_revision() {
         let root = test_root("revision");
-        let (mut broker, _) = test_broker(&root);
+        let (mut broker, adapter_calls) = test_broker(&root);
         let revision_one = accepted(call(
             &mut broker,
             1,
@@ -5784,6 +5810,46 @@ mod tests {
             .expect("評価用データ集合一覧がある");
         assert_eq!(datasets.len(), 1);
         assert_eq!(datasets[0]["revision"], 3);
+
+        let available_before = broker.対話.評価要求可能数();
+        let audit_before = broker.audit_log.events().len();
+        let stale = call(
+            &mut broker,
+            5,
+            BrokerOperation::評価実験開始,
+            json!({
+                "版": 1,
+                "評価DatasetID": revision_one["評価DatasetID"],
+                "対象Runtime一覧": ["fixture-a"],
+                "Dataset定義hash": revision_one["定義hash"],
+            }),
+            false,
+        );
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        let rejection = stale.error.expect("改版後の旧版指定を拒否する");
+        assert_eq!(rejection.code, "評価Dataset版変更");
+        assert_eq!(broker.対話.評価要求可能数(), available_before);
+        let events = &broker.audit_log.events()[audit_before..];
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].operation, "評価実験開始");
+        assert_eq!(events[0].decision, "rejected");
+
+        let current = accepted(call(
+            &mut broker,
+            6,
+            BrokerOperation::評価実験開始,
+            json!({
+                "版": 1,
+                "評価DatasetID": revision_three["評価DatasetID"],
+                "対象Runtime一覧": ["fixture-a"],
+                "Dataset定義hash": revision_three["定義hash"],
+            }),
+            false,
+        ));
+        assert_eq!(current["Dataset定義hash"], revision_three["定義hash"]);
+        assert_eq!(current["状態"], "承認待ち");
+        assert_eq!(broker.対話.評価要求可能数(), available_before - 1);
+        assert_eq!(adapter_calls.load(Ordering::SeqCst), 0);
         drop(broker);
         std::fs::remove_dir_all(root).expect("cleanup");
     }

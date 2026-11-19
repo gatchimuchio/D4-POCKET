@@ -176,5 +176,33 @@
       "description": "スキーマ形状を持つ操作内容です。ブローカーは操作固有の意味を検証し、これを権限として信頼してはなりません。",
       "additionalProperties": true
     }
+  },
+  "if": {
+    "properties": {
+      "operation": {"const": "評価実験開始"}
+    },
+    "required": ["operation"]
+  },
+  "then": {
+    "required": ["payload"],
+    "properties": {
+      "payload": {
+        "type": "object",
+        "required": ["版", "評価DatasetID", "対象Runtime一覧"],
+        "additionalProperties": false,
+        "properties": {
+          "版": {"const": 1},
+          "評価DatasetID": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+          "対象Runtime一覧": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+          },
+          "Dataset定義hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+        }
+      }
+    }
   }
 }

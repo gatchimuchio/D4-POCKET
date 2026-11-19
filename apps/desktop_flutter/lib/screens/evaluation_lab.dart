@@ -50,6 +50,7 @@ class _EvaluationLabState extends State<EvaluationLab>
   RegressionCaseClient? _regressionClient;
   RegressionCaseOwnerClient? _regressionOwnerClient;
   EvaluationDatasetListing? _datasets;
+  EvaluationDataset? _selectedRunDataset;
   List<RegressionCaseSummary> _regressionCases = const [];
   int? _regressionNextCursor;
   int _regressionTotalCount = 0;
@@ -119,6 +120,7 @@ class _EvaluationLabState extends State<EvaluationLab>
     _comparisonExperimentId.clear();
     _recoveryCaseId.clear();
     _datasets = null;
+    _selectedRunDataset = null;
     _regressionCases = const [];
     _regressionNextCursor = null;
     _regressionTotalCount = 0;
@@ -260,7 +262,7 @@ class _EvaluationLabState extends State<EvaluationLab>
               _DatasetSummaryPanel(
                 dataset: dataset,
                 enabled: !_busy,
-                onUseForRun: () => _useDatasetForRun(dataset.datasetId),
+                onUseForRun: () => _useDatasetForRun(dataset),
               ),
               const SizedBox(height: 12),
             ],
@@ -375,6 +377,7 @@ class _EvaluationLabState extends State<EvaluationLab>
 
   Widget _runPanel() {
     final experiment = _startedExperiment;
+    final selectedDataset = _selectedRunDataset;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -394,15 +397,34 @@ class _EvaluationLabState extends State<EvaluationLab>
                   key: const ValueKey('evaluation-run-dataset-id'),
                   controller: _runDatasetId,
                   enabled: !_busy,
+                  readOnly: selectedDataset != null,
                   autocorrect: false,
                   enableSuggestions: false,
                   maxLength: 32,
-                  decoration: const InputDecoration(
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
                     labelText: '評価Dataset ID',
-                    helperText: '32桁の小文字hex IDだけを指定します。',
+                    helperText: selectedDataset == null
+                        ? 'IDを直接入力すると、開始時点の現行版を使用します。'
+                        : '一覧で選んだ版を使用します。',
                   ),
                 ),
               ),
+              if (selectedDataset != null) ...[
+                SelectableText(
+                  '使用する版: ${selectedDataset.revision}\n'
+                  '定義hash: ${selectedDataset.definitionHash}',
+                ),
+                TextButton(
+                  onPressed: _busy
+                      ? null
+                      : () => setState(() {
+                            _runDatasetId.clear();
+                            _selectedRunDataset = null;
+                          }),
+                  child: const Text('Dataset選択を解除'),
+                ),
+              ],
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -880,7 +902,11 @@ class _EvaluationLabState extends State<EvaluationLab>
 
   bool get _canStartExperiment {
     final runtimeCatalog = _runRuntimeCatalog;
-    if (runtimeCatalog == null || _runtimeCatalogBusy) return false;
+    if (!EvaluationClient.validDatasetId(_runDatasetId.text.trim()) ||
+        runtimeCatalog == null ||
+        _runtimeCatalogBusy) {
+      return false;
+    }
     final selected = runtimeCatalog
         .where(_selectedRunRuntimeIds.contains)
         .toList(growable: false);
@@ -890,6 +916,7 @@ class _EvaluationLabState extends State<EvaluationLab>
 
   Future<void> _startExperiment() async {
     final datasetId = _runDatasetId.text.trim();
+    final selectedDataset = _selectedRunDataset;
     final runtimeCatalog = _runRuntimeCatalog;
     final runtimeIds = runtimeCatalog == null
         ? <String>[]
@@ -918,6 +945,7 @@ class _EvaluationLabState extends State<EvaluationLab>
       final experiment = await client.startExperiment(
         datasetId,
         runtimeIds,
+        expectedDatasetDefinitionHash: selectedDataset?.definitionHash,
       );
       if (!mounted || generation != _generation) return;
       setState(() {
@@ -927,6 +955,17 @@ class _EvaluationLabState extends State<EvaluationLab>
         _runMessage =
             '評価Experiment ${experiment.experimentId} の要求を作成しました。各Case/Runtimeの送信には既存owner対話承認が個別に必要です。';
       });
+    } on EvaluationDatasetRevisionChanged catch (error) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _runDatasetId.clear();
+          _selectedRunDataset = null;
+          _datasets = null;
+          _datasetMessage = 'Dataset一覧を更新し、使用する版を選び直してください。';
+          _runMessage = '選択後にDatasetの版が変わりました。'
+              '一覧を更新して選び直してください。拒否監査ID: ${error.auditId}';
+        });
+      }
     } catch (_) {
       if (mounted && generation == _generation) {
         setState(() => _runMessage = '評価実験の監査記録、結合状態、または応答を確認できません。');
@@ -1008,9 +1047,10 @@ class _EvaluationLabState extends State<EvaluationLab>
     }
   }
 
-  void _useDatasetForRun(String datasetId) {
+  void _useDatasetForRun(EvaluationDataset dataset) {
     setState(() {
-      _runDatasetId.text = datasetId;
+      _selectedRunDataset = dataset;
+      _runDatasetId.text = dataset.datasetId;
       _tabs.animateTo(1);
     });
   }
@@ -1093,7 +1133,7 @@ class _DatasetSummaryPanel extends StatelessWidget {
           const SizedBox(height: 8),
           TextButton(
             onPressed: enabled ? onUseForRun : null,
-            child: const Text('このDataset IDでRunを作成'),
+            child: const Text('この版で評価実験を設定'),
           ),
         ],
       ),

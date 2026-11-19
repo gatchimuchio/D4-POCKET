@@ -117,6 +117,76 @@ void main() {
     );
   });
 
+  testWidgets('一覧で選んだDataset版を固定し、改版後は再選択を求める', (tester) async {
+    final oldHash = _hash('0');
+    final newHash = _hash('1');
+    final runtimeList = _accepted('実行系列挙', {
+      '実行系': ['runtime-a', 'runtime-b'],
+    });
+    final transport = _FixtureTransport({
+      '評価Dataset一覧': [
+        _accepted('評価Dataset一覧', _listingBody()),
+        _accepted('評価Dataset一覧', {
+          ..._listingBody(),
+          '評価Dataset一覧': [
+            {..._dataset(), 'revision': 2, '定義hash': newHash},
+          ],
+        }),
+      ],
+      '実行系列挙': [runtimeList, runtimeList],
+      '評価実験開始': [
+        {
+          ..._accepted('評価実験開始', {}, auditId: 'audit.dataset.changed'),
+          'status': 'rejected',
+          'error': {'code': '評価Dataset版変更', 'message': 'PRIVATE_FIXTURE_DETAIL'},
+          'body': null,
+        },
+        _accepted(
+          '評価実験開始',
+          {..._experiment(), 'Dataset定義hash': newHash},
+          auditId: 'audit.evaluation.experiment.1',
+        ),
+      ],
+    });
+    await tester.pumpWidget(_testApp(
+      null,
+      shellCoreClient: ShellCoreClient.mock(transport: transport),
+    ));
+
+    Future<void> press(Finder target) async {
+      await tester.ensureVisible(target);
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+    }
+
+    final refresh = find.byKey(const ValueKey('evaluation-dataset-refresh'));
+    final choose = find.text('この版で評価実験を設定');
+    final submit = find.byKey(const ValueKey('evaluation-run-submit'));
+    await press(refresh);
+    await press(choose);
+    expect(selectableTextContaining('使用する版: 1'), findsOneWidget);
+    final datasetField = find.byKey(const ValueKey('evaluation-run-dataset-id'));
+    expect(tester.widget<TextField>(datasetField).readOnly, isTrue);
+    for (final runtime in ['runtime-a', 'runtime-b']) {
+      await press(find.byKey(ValueKey('evaluation-run-runtime-$runtime')));
+    }
+    await press(submit);
+    expect(transport.requests.last.payload['Dataset定義hash'], oldHash);
+    expect(find.textContaining('audit.dataset.changed'), findsOneWidget);
+    expect(find.textContaining('PRIVATE_FIXTURE_DETAIL'), findsNothing);
+    expect(tester.widget<FilledButton>(submit).onPressed, isNull);
+    expect(selectableTextContaining('計画監査ID:'), findsNothing);
+
+    await press(find.text('Dataset'));
+    expect(choose, findsNothing);
+    await press(refresh);
+    await press(choose);
+    expect(selectableTextContaining('使用する版: 2'), findsOneWidget);
+    await press(submit);
+    expect(transport.requests.last.payload['Dataset定義hash'], newHash);
+    expect(selectableTextContaining('計画監査ID:'), findsOneWidget);
+  });
+
   testWidgets('Host切替前に開始した接続では評価要求を送信しない', (tester) async {
     final deferred = Completer<EvaluationClient>();
     final hostGeneration = ValueNotifier<int>(0);

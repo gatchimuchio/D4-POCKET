@@ -14,6 +14,8 @@ LLM-as-judgeは未実装である。将来参考表示を追加しても、`評�
 
 評価Datasetは`評価DatasetID`、単調増加する`revision`、`定義hash`で識別するimmutable revisionである。Case、Evaluator、Experiment、Result、Comparisonは対象DatasetIDとDataset定義hashを明示する。Case内容、Evaluator設定、順序、公開範囲を変えるときは既存revisionを上書きせず、新revisionを登録する。過去のExperimentやResultが参照するDataset定義hashは変更しない。
 
+一覧から選んだDatasetで実験を開始する場合、Flutterは選択時の定義hashを `評価実験開始` の `Dataset定義hash` に渡す。Brokerは検証済み監査から取得した現行版の定義hashを照合し、不一致は非公開Datasetの読取・対話作成前に `評価Dataset版変更` として拒否する。正常応答の定義hashもFlutterが照合する。Dataset IDだけを指定する既存の要求は開始時点の現行版を使用する。定義hashは版の照合に使い、実行権限を生成しない。
+
 owner登録時、Brokerは検証済みのaccepted Dataset manifestを永続監査の順序で照合する。同一の`評価DatasetID`では、後続revisionは既存の確定revisionより厳密に大きくなければならない。同じ`(評価DatasetID, revision)`の再登録、または既存revision以下への巻戻しはrejectする。revision番号の欠番は、この単調増加規則だけでは拒否しない。単一recordしか見ないJSON Schemaはこの履歴関係を表せないため、`tooling/evaluation_contract_check.py`の`Dataset改版列検査`とBrokerがfail-closedに検査する。
 
 normal IPCで返す公開Dataset manifestには、DatasetID、revision、定義hash、非公開保管ID、暗号文hash、表示名、Case数、CaseIDと定義hashだけを置く。非公開保管IDはDatasetID/revisionに対応するprivate payloadの保管位置を照合するための識別子であり、raw inputを示さない。暗号文hashは再起動後にprotected payloadを監査manifestと照合するためだけに使う。`evaluation_case.schema.json`と`evaluation_evaluator.schema.json`は、owner登録payloadから導く静的なhash_only contractであり、normal IPCのruntime API responseではない。したがってruntime manifestは入力hash、Evaluator ID、種類、設定hashを出さない。これらの静的contractも入力本文や設定本文を持たず、hashや件数から原文を復元できるとは主張しない。

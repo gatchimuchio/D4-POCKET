@@ -134,19 +134,26 @@ class EvaluationClient {
 
   Future<EvaluationExperiment> startExperiment(
     String datasetId,
-    List<String> runtimeIds,
-  ) async {
-    if (!validDatasetId(datasetId) || !validRuntimeIds(runtimeIds)) {
+    List<String> runtimeIds, {
+    String? expectedDatasetDefinitionHash,
+  }) async {
+    if (!validDatasetId(datasetId) ||
+        !validRuntimeIds(runtimeIds) ||
+        (expectedDatasetDefinitionHash != null &&
+            !_isHash(expectedDatasetDefinitionHash))) {
       _reject();
     }
     final response = await _accepted(_experimentStartOperation, {
       '版': 1,
       '評価DatasetID': datasetId,
       '対象Runtime一覧': List<String>.unmodifiable(runtimeIds),
+      if (expectedDatasetDefinitionHash != null)
+        'Dataset定義hash': expectedDatasetDefinitionHash,
     });
     return EvaluationExperiment._parse(
       response.body,
       expectedDatasetId: datasetId,
+      expectedDatasetDefinitionHash: expectedDatasetDefinitionHash,
       expectedRuntimeIds: runtimeIds,
       expectedAuditId: response.auditId,
     );
@@ -204,16 +211,31 @@ class EvaluationClient {
     final auditId = response['audit_event_id'];
     if (!_safeText(response['request_id'], maxLength: 256) ||
         response['operation'] != operation ||
-        response['status'] != 'accepted' ||
         !_isAuditId(auditId) ||
         response['evidence_source'] != 'INTERNAL_STATE' ||
-        response['error'] != null ||
         response['health'] != null ||
         response['shutdown_requested'] != false) {
       _reject();
     }
+    final error = response['error'];
+    if (operation == _experimentStartOperation &&
+        payload.containsKey('Dataset定義hash') &&
+        response['status'] == 'rejected' &&
+        response['body'] == null &&
+        error is Map &&
+        error['code'] == '評価Dataset版変更') {
+      throw EvaluationDatasetRevisionChanged(auditId as String);
+    }
+    if (response['status'] != 'accepted' || error != null) _reject();
     return _AcceptedEnvelope(_object(response['body']), auditId as String);
   }
+}
+
+class EvaluationDatasetRevisionChanged extends BrokerClientException {
+  const EvaluationDatasetRevisionChanged(this.auditId)
+    : super('評価Dataset一覧を更新し、使用する版を選び直してください。');
+
+  final String auditId;
 }
 
 class _AcceptedEnvelope {
@@ -390,6 +412,7 @@ class EvaluationExperiment {
   static EvaluationExperiment _parse(
     Object? raw, {
     String? expectedDatasetId,
+    String? expectedDatasetDefinitionHash,
     List<String>? expectedRuntimeIds,
     String? expectedAuditId,
   }) {
@@ -446,6 +469,8 @@ class EvaluationExperiment {
         !_isAuditId(auditId) ||
         value['証拠種別'] != 'INTERNAL_STATE' ||
         (expectedDatasetId != null && datasetId != expectedDatasetId) ||
+        (expectedDatasetDefinitionHash != null &&
+            definitionHash != expectedDatasetDefinitionHash) ||
         (expectedRuntimeIds != null &&
             !_sameStrings(rawRuntimes.cast<String>(), expectedRuntimeIds)) ||
         (expectedAuditId != null && auditId != expectedAuditId)) {
@@ -850,7 +875,12 @@ class EvaluationComparisonExperiment {
 bool _safePayload(String operation, Map<String, Object?> payload) {
   final expected = switch (operation) {
     _datasetListOperation => const {'版'},
-    _experimentStartOperation => const {'版', '評価DatasetID', '対象Runtime一覧'},
+    _experimentStartOperation => {
+      '版',
+      '評価DatasetID',
+      '対象Runtime一覧',
+      if (payload.containsKey('Dataset定義hash')) 'Dataset定義hash',
+    },
     _experimentStatusOperation ||
     _comparisonOperation => const {'版', '評価ExperimentID'},
     _ => const <String>{},
@@ -864,6 +894,8 @@ bool _safePayload(String operation, Map<String, Object?> payload) {
     _datasetListOperation => true,
     _experimentStartOperation =>
       _isOpaqueId(payload['評価DatasetID']) &&
+          (!payload.containsKey('Dataset定義hash') ||
+              _isHash(payload['Dataset定義hash'])) &&
           EvaluationClient.validRuntimeIds(payload['対象Runtime一覧']),
     _experimentStatusOperation ||
     _comparisonOperation => _isOpaqueId(payload['評価ExperimentID']),

@@ -10,6 +10,7 @@ export 'package:gui_shell_ui/evaluation_client.dart'
         EvaluationComparisonExperiment,
         EvaluationDataset,
         EvaluationDatasetListing,
+        EvaluationDatasetRevisionChanged,
         EvaluationEvaluatorJudgement,
         EvaluationExperiment,
         EvaluationExperimentStatus,
