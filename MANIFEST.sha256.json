@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "10ba4623de68e649a40c7d85ab076bdd089a676b4feb4dcc7899fccb0b71acef"
+      "sha256": "375a9fc52d3781df5faaff8e330eaa50b2015b68efb13be01340e46422b7fee8"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3905,7 +3905,7 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "d34d4cc320acf2fcd6dd3eafbd9cc568bf26b087f10e30647a6e76e072f9a884"
+      "sha256": "d4da4e17061fe15e0dc493dd7fb2d0d9ae042e0bd80c1f50cc8dcf30675f0a00"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
@@ -3925,7 +3925,7 @@
     },
     {
       "path": "installer/windows/d4_pocket_bootstrap_setup.iss",
-      "sha256": "7f3f3cada0d764201d1a65d241d53bfeb1b76972b35aa0a2f5daeba63b9ddbf9"
+      "sha256": "b905ca2d7fd0779266cd09705a63acc3a20f7814088c98d978eccc43e571a38f"
     },
     {
       "path": "installer/windows/stage_installed_app.ps1",
@@ -6081,7 +6081,7 @@
     },
     {
       "path": "tooling/tests/test_windows_bootstrap_setup.py",
-      "sha256": "ba6ab48d863ce034e6cd797099dfc19c51e5305edfc4489b9d5d7fdc9529fec9"
+      "sha256": "bec2137b64f8862afa4616338922d3a185400ef1e99179c903aaeb23a83b7ea8"
     },
     {
       "path": "tooling/tests/test_windows_export_setup_pipeline.py",

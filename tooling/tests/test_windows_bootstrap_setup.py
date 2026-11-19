@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -374,59 +375,125 @@ class WindowsBootstrapSetupTests(unittest.TestCase):
         self.assertIn("CreateUninstallRegKey=no", script)
         self.assertNotIn("AppPublisher=", script)
         self.assertIn("DefaultDirName={tmp}\\D4PocketBootstrap-", script)
-        self.assertIn("Flags: waituntilterminated runasoriginaluser", script)
+        self.assertIn("ExecAsOriginalUser(", script)
+        self.assertIn("ewWaitUntilTerminated", script)
+        self.assertNotIn("[Run]", script)
         self.assertNotIn("{localappdata}", script.lower())
         self.assertNotIn("[Registry]", script)
+
+    def compile_fixture_setup(
+        self,
+        root: Path,
+        *,
+        launcher: bytes = b"fixture payload",
+        launcher_exit: int = 0,
+    ) -> Path:
+        bundle = root / "bundle path with spaces"
+        output = root / "output"
+        bundle.mkdir()
+        output.mkdir()
+        payloads = {
+            "app/gui_shell_desktop.exe": b"fixture payload",
+            "app/flutter_windows.dll": b"fixture payload",
+            "app/data/app.so": b"fixture payload",
+            "app/data/icudtl.dat": b"fixture payload",
+            "app/data/flutter_assets/AssetManifest.bin": b"fixture payload",
+            "broker/gui_shell_rust_helper.exe": b"fixture payload",
+            "gui_shell_desktop_launcher.exe": launcher,
+            "product_manifest.json": str(launcher_exit).encode("ascii"),
+        }
+        for relative, content in payloads.items():
+            target = bundle / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(content)
+        wrapper = root / "D4Pocket-Setup.iss"
+        wrapper.write_text(
+            "\n".join(
+                (
+                    f"#define BundleDir {setup_builder._ispp_string(str(bundle))}",
+                    f"#define ProductAppId {setup_builder._ispp_string(APP_ID)}",
+                    f"#define ProductVersion {setup_builder._ispp_string('1.2.3+4')}",
+                    f'#include "{setup_builder.ISS_SCRIPT.as_posix()}"',
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [str(setup_builder._find_iscc(None)), f"-O{output}", str(wrapper)],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        return output / "D4Pocket-Setup-1.2.3+4.exe"
 
     @unittest.skipUnless(_has_iscc(), "Inno Setup 6 ISCC is required")
     def test_inno_setup_compiles_temp_bootstrap_bundle(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-setup-compile-") as temporary:
-            root = Path(temporary)
-            bundle = root / "bundle path with spaces"
-            output = root / "output"
-            bundle.mkdir()
-            output.mkdir()
-            files = (
-                "app/gui_shell_desktop.exe",
-                "app/flutter_windows.dll",
-                "app/data/app.so",
-                "app/data/icudtl.dat",
-                "app/data/flutter_assets/AssetManifest.bin",
-                "broker/gui_shell_rust_helper.exe",
-                "gui_shell_desktop_launcher.exe",
-                "product_manifest.json",
-            )
-            for relative in files:
-                target = bundle / relative
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(b"fixture payload")
-            wrapper = root / "D4Pocket-Setup.iss"
-            wrapper.write_text(
-                "\n".join(
-                    (
-                        f"#define BundleDir {setup_builder._ispp_string(str(bundle))}",
-                        f"#define ProductAppId {setup_builder._ispp_string(APP_ID)}",
-                        f"#define ProductVersion {setup_builder._ispp_string('1.2.3+4')}",
-                        f'#include "{setup_builder.ISS_SCRIPT.as_posix()}"',
-                        "",
-                    )
-                ),
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [str(setup_builder._find_iscc(None)), f"-O{output}", str(wrapper)],
-                check=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout)
-            setup_exe = output / "D4Pocket-Setup-1.2.3+4.exe"
+            setup_exe = self.compile_fixture_setup(Path(temporary))
             self.assertTrue(setup_exe.is_file())
             self.assertGreater(setup_exe.stat().st_size, 1024)
+
+    @unittest.skipUnless(
+        _has_iscc() and shutil.which("rustc") is not None,
+        "Inno Setup 6 ISCC and Rust are required",
+    )
+    def test_setup_reports_launcher_exit_and_cleans_temporary_payload(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-setup-launch-") as temporary:
+            root = Path(temporary).resolve()
+            fixture_source = root / "fixture_launcher.rs"
+            fixture_source.write_text(
+                '#![windows_subsystem = "windows"]\n'
+                'fn main() {\n'
+                '    let value = std::fs::read_to_string("product_manifest.json").unwrap();\n'
+                '    std::process::exit(value.parse().unwrap());\n'
+                '}\n',
+                encoding="utf-8",
+            )
+            fixture_exe = root / "fixture_launcher.exe"
+            subprocess.run(
+                ["rustc", str(fixture_source), "-o", str(fixture_exe)],
+                cwd=root,
+                check=True,
+                timeout=60,
+            )
+            launcher = fixture_exe.read_bytes()
+            cases = (
+                ("normal", launcher, 0, 0, "D4 Pocket 起動器の終了コード=0"),
+                ("failed", launcher, 23, 21, "D4 Pocket 起動器の終了コード=23"),
+                ("not started", b"invalid executable", 0, 20, "D4 Pocket 起動器を実行できません。"),
+            )
+            for name, executable, launcher_exit, setup_exit, message in cases:
+                with self.subTest(name=name):
+                    case_root = root / name
+                    temp_root = case_root / "setup temp"
+                    temp_root.mkdir(parents=True)
+                    setup_exe = self.compile_fixture_setup(
+                        case_root, launcher=executable, launcher_exit=launcher_exit
+                    )
+                    log = case_root / "setup.log"
+                    result = subprocess.run(
+                        [
+                            str(setup_exe),
+                            "/VERYSILENT",
+                            "/SUPPRESSMSGBOXES",
+                            "/NORESTART",
+                            f"/LOG={log}",
+                        ],
+                        cwd=case_root,
+                        env={**os.environ, "TEMP": str(temp_root), "TMP": str(temp_root)},
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                        timeout=60,
+                    )
+                    setup_log = log.read_text(encoding="utf-8-sig")
+                    self.assertEqual(result.returncode, setup_exit, setup_log)
+                    self.assertEqual(setup_log.count(message), 1, setup_log)
+                    self.assertEqual(list(temp_root.iterdir()), [])
 
 
 if __name__ == "__main__":

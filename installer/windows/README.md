@@ -41,6 +41,8 @@ python -X utf8 tooling/export_windows_product.py `
 
 Setupは`PrivilegesRequired=lowest`で動き、payloadをInno Setup自身のrun固有`{tmp}`下へ展開してRust Desktop Launcherを通常起動する。Launcherが終了するまでSetupは待機し、Setup終了時にその一時rootをInno Setupが削除する。Setupは固定製品root、Start Menu、registry、AppDataへ直接書き込まず、別uninstallerも登録しない。初回導入・更新・修復・rollback・アンインストールは、起動後のD4 Pocket UIから既存Brokerの署名検証・native Owner確認・Audit経路へ接続する。インストール後のStart Menu shortcutと削除はBrokerの既存管理経路が所有する。
 
+Setupの完了画面は起動器の結果を表示する。起動を確認できなかった場合の終了コードは`20`、起動器が異常終了した場合は`21`、正常に終了した場合は`0`。起動できなかった場合は取得できたWindowsエラーを、起動器が終了した場合はその終了コードをSetupログへ記録する。Setup自体の取消と致命的エラーにはInno Setup標準の終了コードを使う。製品の導入状態はD4 Pocketの更新センターで確認する。
+
 現行mainのclean Broker Export Receiptと、そのReceiptが束縛するManifestから、portable bundle生成とbootstrap Setup compileを一続きで行うには、Repository／OneDrive外の**未作成output directory**を指定して次を実行する。Builderは一時bundleでExport evidence／Setup evidenceを照合し、署名なしSetup.exeと`d4_pocket_windows_setup_export.json`だけを同一directoryへ原子的に公開する。中間portable bundleは保持しない。実行する開発機にはPython、Cargo／Rust、Flutter、Inno Setup 6が必要だが、生成Setupの利用者には要求しない。
 
 ```powershell
