@@ -575,8 +575,12 @@ fn linux_product_uninstall_owner_candidate(
         crate::broker::product_install::product_install_root(&data_home, &app_id).ok()?;
     let desktop_entry_path =
         crate::broker::product_install::plan_linux_desktop_entry(&data_home, &app_id).ok()?;
-    crate::broker::product_install::validate_linux_product_uninstall_targets(&data_home, &app_id)
-        .ok()?;
+    crate::broker::product_install::validate_linux_product_uninstall_targets(
+        &data_home,
+        &app_id,
+        &audit_store_id,
+    )
+    .ok()?;
 
     Some(LinuxProductUninstallOwnerCandidate {
         summary: format!(

@@ -1003,8 +1003,12 @@ fn request_product_uninstall(
                 payload_hash,
             );
         }
-        if super::product_install::validate_linux_product_uninstall_targets(&local_app_data, app_id)
-            .is_err()
+        if super::product_install::validate_linux_product_uninstall_targets(
+            &local_app_data,
+            app_id,
+            audit_store_id,
+        )
+        .is_err()
         {
             return reject(
                 broker,

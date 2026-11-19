@@ -31,6 +31,9 @@ struct ActiveVersionRecord {
     package_sha256: String,
     launcher_sha256: String,
     product_manifest_sha256: String,
+    #[cfg(target_os = "linux")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    linux_desktop_name: Option<String>,
     #[serde(default)]
     update_id: String,
     #[serde(default)]
@@ -242,10 +245,20 @@ pub(crate) fn activate_staged_version(
     let stage_name = format!("{product_version}-{package_sha256}");
     let stage = open_existing_directory(versions, &stage_name, root_device)?;
     let launcher_sha256 = hash_regular_file(&stage, VERSIONED_LAUNCHER, MAX_LAUNCHER_BYTES)?;
+    #[cfg(target_os = "linux")]
+    let manifest = read_regular_file(&stage, PRODUCT_MANIFEST, MAX_PRODUCT_MANIFEST_BYTES)?;
+    #[cfg(target_os = "linux")]
+    let product_manifest_sha256 = hex::encode(Sha256::digest(&manifest));
+    #[cfg(not(target_os = "linux"))]
     let product_manifest_sha256 =
         hash_regular_file(&stage, PRODUCT_MANIFEST, MAX_PRODUCT_MANIFEST_BYTES)?;
 
     let existing = read_existing_active_record(product_root)?;
+    #[cfg(target_os = "linux")]
+    let linux_desktop_name = match existing.as_ref() {
+        Some(record) => record.linux_desktop_name.clone(),
+        None => linux_desktop_name_from_manifest(&manifest, app_id, audit_store_id),
+    };
     let previous = match existing {
         Some(existing) => {
             if !valid_record(&existing, app_id, audit_store_id) {
@@ -302,6 +315,8 @@ pub(crate) fn activate_staged_version(
         package_sha256: package_sha256.to_owned(),
         launcher_sha256,
         product_manifest_sha256,
+        #[cfg(target_os = "linux")]
+        linux_desktop_name,
         update_id: update_id.to_owned(),
         candidate_hash: candidate_hash.to_owned(),
         previous,
@@ -544,6 +559,50 @@ fn read_existing_active_record(
     }
 }
 
+#[cfg(target_os = "linux")]
+pub(crate) fn installed_linux_desktop_name(
+    product_root: &Dir,
+    app_id: &str,
+    audit_store_id: &str,
+) -> Result<Option<String>, BootstrapperError> {
+    match read_existing_active_record(product_root)? {
+        Some(record) if valid_record(&record, app_id, audit_store_id) => {
+            Ok(record.linux_desktop_name)
+        }
+        Some(_) => Err(BootstrapperError("active_version_record_invalid")),
+        None => Ok(None),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn linux_desktop_name_from_manifest(
+    bytes: &[u8],
+    app_id: &str,
+    audit_store_id: &str,
+) -> Option<String> {
+    let manifest: serde_json::Value = serde_json::from_slice(bytes).ok()?;
+    let content = manifest.get("manifest")?;
+    let identity = content.get("app_identity")?;
+    if identity.get("app_id")?.as_str()? != app_id
+        || content.pointer("/audit_store/store_id")?.as_str()? != audit_store_id
+    {
+        return None;
+    }
+    let name = identity.get("display_name")?.as_str()?.trim();
+    (name != "D4 Pocket" && valid_linux_desktop_name(name)).then(|| name.to_owned())
+}
+
+#[cfg(target_os = "linux")]
+fn valid_linux_desktop_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.trim() == name
+        && name.chars().count() <= 128
+        && !name.chars().any(|character| {
+            character.is_control()
+                || matches!(character, '\u{200b}'..='\u{200d}' | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{feff}')
+        })
+}
+
 fn descriptor_from_record(record: &ActiveVersionRecord) -> ActiveVersionDescriptor {
     ActiveVersionDescriptor {
         product_version: record.product_version.clone(),
@@ -556,6 +615,14 @@ fn descriptor_from_record(record: &ActiveVersionRecord) -> ActiveVersionDescript
 }
 
 fn valid_record(record: &ActiveVersionRecord, app_id: &str, audit_store_id: &str) -> bool {
+    #[cfg(target_os = "linux")]
+    if record
+        .linux_desktop_name
+        .as_deref()
+        .is_some_and(|name| !valid_linux_desktop_name(name))
+    {
+        return false;
+    }
     record.version == 1
         && record.product == "D4 Pocket"
         && record.app_id == app_id
@@ -1128,6 +1195,63 @@ mod tests {
         drop(versions_dir);
         drop(root_dir);
         fs::remove_dir_all(local).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn legacy_linux_record_stays_compatible_after_a_named_update() {
+        let (local, root) = fixture("linux-name-legacy");
+        let root_dir = Dir::open_ambient_dir(&root, cap_std::ambient_authority()).unwrap();
+        let versions_path = root.join("versions");
+        let versions = Dir::open_ambient_dir(&versions_path, cap_std::ambient_authority()).unwrap();
+        let hash = "b".repeat(64);
+        let stage = versions_path.join(format!("2.0.0-{hash}"));
+        fs::create_dir(&stage).unwrap();
+        fs::write(stage.join(VERSIONED_LAUNCHER), b"new launcher").unwrap();
+        let manifest = serde_json::json!({"manifest": {
+            "app_identity": {"app_id": APP_ID, "display_name": "独立製品"},
+            "audit_store": {"store_id": AUDIT_ID}
+        }});
+        fs::write(stage.join("product_manifest.json"), manifest.to_string()).unwrap();
+        activate_staged_version(
+            &root_dir,
+            &versions,
+            "2.0.0",
+            APP_ID,
+            AUDIT_ID,
+            &hash,
+            "update-named",
+            &format!("sha256:{}", "c".repeat(64)),
+            &"d".repeat(32),
+        )
+        .unwrap();
+        assert_eq!(
+            super::installed_linux_desktop_name(&root_dir, APP_ID, AUDIT_ID).unwrap(),
+            None
+        );
+        let active: serde_json::Value =
+            serde_json::from_slice(&fs::read(root.join(ACTIVE_VERSION_FILE)).unwrap()).unwrap();
+        assert!(active.get("linux_desktop_name").is_none());
+        fs::remove_dir_all(local).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_name_rejects_injected_lines_and_mismatched_identity() {
+        let manifest = |app, name| {
+            serde_json::to_vec(&serde_json::json!({"manifest": {
+                "app_identity": {"app_id": app, "display_name": name},
+                "audit_store": {"store_id": AUDIT_ID}
+            }}))
+            .unwrap()
+        };
+        for bytes in [
+            manifest(APP_ID, "名\nExec=other"),
+            manifest(APP_ID, "名\u{202e}称"),
+            manifest("foreign", "製品"),
+        ] {
+            assert!(super::linux_desktop_name_from_manifest(&bytes, APP_ID, AUDIT_ID).is_none());
+        }
     }
 
     #[test]

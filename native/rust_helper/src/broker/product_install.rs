@@ -586,8 +586,9 @@ pub(crate) fn remove_installed_product(
 pub(crate) fn remove_installed_linux_product(
     data_home: &Path,
     app_id: &str,
+    audit_store_id: &str,
 ) -> Result<(), ProductInstallPlanError> {
-    let targets = linux_product_uninstall_targets(data_home, app_id)?;
+    let targets = linux_product_uninstall_targets(data_home, app_id, audit_store_id)?;
     if let Some(applications) = targets.applications.as_ref() {
         match applications.symlink_metadata(&targets.entry_name) {
             Ok(_) => applications
@@ -625,8 +626,9 @@ pub(crate) fn remove_installed_linux_product(
 pub(crate) fn validate_linux_product_uninstall_targets(
     data_home: &Path,
     app_id: &str,
+    audit_store_id: &str,
 ) -> Result<(), ProductInstallPlanError> {
-    linux_product_uninstall_targets(data_home, app_id).map(|_| ())
+    linux_product_uninstall_targets(data_home, app_id, audit_store_id).map(|_| ())
 }
 
 #[cfg(target_os = "linux")]
@@ -643,6 +645,7 @@ struct LinuxProductUninstallTargets {
 fn linux_product_uninstall_targets(
     data_home: &Path,
     app_id: &str,
+    audit_store_id: &str,
 ) -> Result<LinuxProductUninstallTargets, ProductInstallPlanError> {
     let (product_root, product_directory) = open_existing_product_root(data_home, app_id)?;
     let product_metadata = std::fs::symlink_metadata(&product_root)
@@ -665,8 +668,16 @@ fn linux_product_uninstall_targets(
         return Err(ProductInstallPlanError("product_install_root_invalid"));
     }
     let entry_path = plan_linux_desktop_entry(data_home, app_id)?;
-    let expected_entry =
-        linux_desktop_entry_content(&product_root.join("gui_shell_desktop_launcher"))?;
+    let display_name = crate::product_bootstrapper::installed_linux_desktop_name(
+        &product_directory,
+        app_id,
+        audit_store_id,
+    )
+    .map_err(|error| ProductInstallPlanError(error.0))?;
+    let expected_entry = linux_desktop_entry_content(
+        &product_root.join("gui_shell_desktop_launcher"),
+        display_name.as_deref(),
+    )?;
 
     let data_metadata = std::fs::symlink_metadata(data_home)
         .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
@@ -1262,7 +1273,10 @@ pub(crate) fn register_linux_desktop_entry(
         ));
     }
 
-    let expected = linux_desktop_entry_content(&launcher_path)?;
+    let display_name =
+        crate::product_bootstrapper::installed_linux_desktop_name(&root, app_id, audit_store_id)
+            .map_err(|error| ProductInstallPlanError(error.0))?;
+    let expected = linux_desktop_entry_content(&launcher_path, display_name.as_deref())?;
     let entry_name = linux_desktop_entry_name(app_id)?;
     match applications.symlink_metadata(&entry_name) {
         Ok(_) => {
@@ -1393,6 +1407,7 @@ fn linux_exec_argument(value: &str) -> String {
 #[cfg(target_os = "linux")]
 fn linux_desktop_entry_content(
     launcher: &Path,
+    display_name: Option<&str>,
 ) -> Result<LinuxDesktopEntryContent, ProductInstallPlanError> {
     if !launcher.is_absolute()
         || launcher
@@ -1422,9 +1437,10 @@ fn linux_desktop_entry_content(
         launcher_argument
     };
     let try_exec = launcher.replace('\\', "\\\\");
+    let name = display_name.unwrap_or("D4 Pocket").replace('\\', "\\\\");
     let render = |exec| {
         format!(
-            "[Desktop Entry]\nType=Application\nName=D4 Pocket\nExec={exec}\nTryExec={try_exec}\nTerminal=false\nCategories=Utility;Development;\nStartupWMClass=d4-pocket\n"
+            "[Desktop Entry]\nType=Application\nName={name}\nExec={exec}\nTryExec={try_exec}\nTerminal=false\nCategories=Utility;Development;\nStartupWMClass=d4-pocket\n"
         )
         .into_bytes()
     };
@@ -1553,6 +1569,8 @@ mod tests {
     use std::path::Path;
 
     const APP_ID: &str = "d4-pocket-app-11111111111111111111111111111111";
+    #[cfg(target_os = "linux")]
+    const AUDIT_ID: &str = "audit-store-22222222222222222222222222222222";
     const HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
     #[cfg(windows)]
@@ -1828,11 +1846,23 @@ mod tests {
             std::fs::Permissions::from_mode(0o755),
         )
         .unwrap();
-        std::fs::write(version_directory.join("product_manifest.json"), b"{}").unwrap();
+        let first_name = "独立した\\製品";
+        let write_manifest = |directory: &Path, name: &str| {
+            let manifest = serde_json::json!({"manifest": {
+                "app_identity": {"app_id": APP_ID, "display_name": name},
+                "audit_store": {"store_id": AUDIT_ID}
+            }});
+            std::fs::write(
+                directory.join("product_manifest.json"),
+                manifest.to_string(),
+            )
+            .unwrap();
+        };
+        write_manifest(&version_directory, first_name);
         let data_home = std::fs::canonicalize(data_home).unwrap();
         let product_root = std::fs::canonicalize(product_root).unwrap();
         assert_eq!(
-            super::linux_desktop_entry_content(&product_root.join("bad\nlauncher"))
+            super::linux_desktop_entry_content(&product_root.join("bad\nlauncher"), None)
                 .unwrap_err()
                 .0,
             "product_desktop_entry_launcher_invalid"
@@ -1872,11 +1902,7 @@ mod tests {
             std::fs::Permissions::from_mode(0o755),
         )
         .unwrap();
-        std::fs::write(
-            next_version_directory.join("product_manifest.json"),
-            b"{\"v\":2}",
-        )
-        .unwrap();
+        write_manifest(&next_version_directory, "更新候補の表示名");
         crate::product_bootstrapper::activate_staged_version(
             &root_directory,
             &versions_directory,
@@ -1919,7 +1945,7 @@ mod tests {
         assert_eq!(registered, planned);
         let content = std::fs::read(&registered).unwrap();
         let content = String::from_utf8(content).unwrap();
-        assert!(content.contains("Name=D4 Pocket\n"));
+        assert!(content.contains("Name=独立した\\\\製品\n"));
         assert!(content.contains("Exec=/bin/sh -c "));
         assert!(content.contains(&format!(
             "TryExec={}\n",
@@ -1941,9 +1967,31 @@ mod tests {
             registered
         );
 
-        let expected =
-            super::linux_desktop_entry_content(&product_root.join("gui_shell_desktop_launcher"))
-                .unwrap();
+        crate::product_bootstrapper::toggle_previous_active_version(
+            &root_directory,
+            &versions_directory,
+            APP_ID,
+            AUDIT_ID,
+            "linux-entry-test-update-2",
+            &format!("sha256:{}", "e".repeat(64)),
+            "linux-entry-test-update",
+            &format!("sha256:{}", "b".repeat(64)),
+            &"9".repeat(32),
+        )
+        .unwrap();
+        super::validate_linux_product_uninstall_targets(&data_home, APP_ID, AUDIT_ID).unwrap();
+        assert!(super::validate_linux_product_uninstall_targets(
+            &data_home,
+            APP_ID,
+            "audit-store-33333333333333333333333333333333"
+        )
+        .is_err());
+        let expected = super::linux_desktop_entry_content(
+            &product_root.join("gui_shell_desktop_launcher"),
+            Some(first_name),
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(&registered).unwrap(), expected.current);
         assert_ne!(expected.current, expected.legacy);
         std::fs::write(&registered, &expected.legacy).unwrap();
         assert_eq!(
@@ -1982,6 +2030,12 @@ mod tests {
         )
         .is_err());
         assert_eq!(std::fs::read(target).unwrap(), b"attacker target\n");
+        std::fs::remove_file(&registered).unwrap();
+        let repaired =
+            register_linux_desktop_entry(&data_home, APP_ID, AUDIT_ID, &product_root).unwrap();
+        assert_eq!(std::fs::read(&repaired).unwrap(), expected.current);
+        super::remove_installed_linux_product(&data_home, APP_ID, AUDIT_ID).unwrap();
+        assert!(!repaired.exists() && !product_root.exists());
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -2017,7 +2071,9 @@ mod tests {
         std::fs::create_dir_all(entry.parent().unwrap()).unwrap();
         std::fs::write(
             &entry,
-            linux_desktop_entry_content(&launcher).unwrap().current,
+            linux_desktop_entry_content(&launcher, None)
+                .unwrap()
+                .current,
         )
         .unwrap();
         std::fs::write(entry.parent().unwrap().join("unrelated.desktop"), b"keep").unwrap();
@@ -2026,8 +2082,8 @@ mod tests {
             0o644
         );
 
-        validate_linux_product_uninstall_targets(&data_home, APP_ID).unwrap();
-        remove_installed_linux_product(&data_home, APP_ID).unwrap();
+        validate_linux_product_uninstall_targets(&data_home, APP_ID, AUDIT_ID).unwrap();
+        remove_installed_linux_product(&data_home, APP_ID, AUDIT_ID).unwrap();
 
         assert!(!product_root.exists());
         assert!(!entry.exists());
@@ -2070,7 +2126,7 @@ mod tests {
         std::fs::write(&entry, b"unrelated content").unwrap();
 
         assert_eq!(
-            remove_installed_linux_product(&data_home, APP_ID)
+            remove_installed_linux_product(&data_home, APP_ID, AUDIT_ID)
                 .unwrap_err()
                 .0,
             "product_desktop_entry_conflict"

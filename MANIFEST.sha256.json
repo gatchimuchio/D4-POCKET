@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "7cfcb1302485a9bcb9f3f51a3b93f45a171f4acf5ffb231efe3cac54461f303b"
+      "sha256": "23ac798cad6570303dcee9e9f19a0c8097947f645974eb9e64a72bc4875707d1"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "4622879df917fded4b41eaf8adad0ff1a023de6d68eee1c3efdac7b89a5c9b3f"
+      "sha256": "e85db3da4ef1df06c35bf9725dcd0d592d3301e3d717673530d4602b42fb632a"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -4205,7 +4205,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "b90067b8d83930d542b88d5667c6fdd3bba4913066284a00d48859706b5c2c0d"
+      "sha256": "c19bc992f656c460f667d67854166d1d9066f83634efdd4615b9525ad5fc26d2"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -4241,7 +4241,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "901609887a292c3e23dcd3861ba9aa7b5f0ba9269c13e22c05884be3fbac76e3"
+      "sha256": "1a826a5d95c55d8b8c3d1af0eba807be66c47c09db3efac771de6d86ff8432d5"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -4297,7 +4297,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_launcher.rs",
-      "sha256": "4e4f81ab42cdeca6b760dae6990627502fb362da83d02e2a1d95f971014cf1f9"
+      "sha256": "4dbe004566e049931a4b155671f41e9658ddc86eb7674357168cb4ee21c4e37a"
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
@@ -4317,7 +4317,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "fb46048d84d0bce9e23430469ba7978b6dc6f303ba22f86500e07c444bee2804"
+      "sha256": "32f0ea2d628c62af309812abc9c4c674d9c36f4dad59b7321728b8528dfd66b0"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4357,7 +4357,7 @@
     },
     {
       "path": "native/rust_helper/src/product_bootstrapper.rs",
-      "sha256": "f0c2e8af5297b8fe50ceef99eecd909c98f1a8970bdc3301e40c55cd9b9f9c90"
+      "sha256": "03a96e9c3753afd26b57cf353343eb39fe2c7296ea8eb62e2d252f1c8173babf"
     },
     {
       "path": "native/rust_helper/src/product_package.rs",

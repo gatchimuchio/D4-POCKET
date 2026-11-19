@@ -854,6 +854,7 @@ fn finalize_linux_product_uninstall(
     crate::broker::product_install::validate_linux_product_uninstall_targets(
         data_home,
         &identity.0,
+        &identity.1,
     )
     .map_err(|_| failure("固定製品rootを安全に確認できません。製品を削除しません。"))?;
     verify_audit_store_outside_product_root(data_home, &identity.0, &store)?;
@@ -869,7 +870,11 @@ fn finalize_linux_product_uninstall(
     let ticket_hash = broker
         .begin_product_uninstall_finalization(&ticket)
         .map_err(|_| failure("削除ticketが無効または使用済みです。製品は変更していません。"))?;
-    match crate::broker::product_install::remove_installed_linux_product(data_home, &identity.0) {
+    match crate::broker::product_install::remove_installed_linux_product(
+        data_home,
+        &identity.0,
+        &identity.1,
+    ) {
         Ok(()) => broker
             .finish_product_uninstall_finalization(&ticket_hash, true, None)
             .map_err(|_| {
