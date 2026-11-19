@@ -11518,6 +11518,11 @@ def run_installed_smoke(
                     broker_state / "store",
                     require_export=False,
                     require_mcp=True,
+                    expected_mcp_agent_binding=(
+                        str(agent_mcp_evidence["source_task_id"]),
+                        str(agent_mcp_evidence["source_task_result_hash"]),
+                        str(agent_mcp_evidence["tool_result_hash"]),
+                    ),
                     require_agent_task=True,
                     expected_agent_task_statuses=("completed", "completed"),
                     expected_scratch_cleanup_count=2,
