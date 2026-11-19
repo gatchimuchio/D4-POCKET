@@ -115,7 +115,10 @@ from tooling.tests.linux_installed_product_smoke import (
     LINUX_AGENT_TASK_INITIAL_TOOL_YIELD_MS,
     MCP_OWNER_ARGUMENT_HASH_MARKER,
     MCP_OWNER_NO_CREDENTIAL_MARKER,
+    MCP_OWNER_TOOL_CALL_MARKER,
     MCP_OWNER_WORKSPACE_LABEL,
+    AGENT_TASK_APPROVAL_OWNER_MARKER,
+    AGENT_TASK_PERMISSION_OWNER_MARKER,
     _owner_dialog_timeout_diagnostics,
     _wait_for_owner_dialog_window,
     WINDOW_TITLE,
@@ -682,7 +685,7 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         self.assertEqual(
             find_operable.call_args_list,
             [
-                call("操作グループ選択", root=window, timeout=10, exact=True),
+                call("操作グループ選択", root=window, timeout=10),
                 call("設定", root=window, timeout=10, exact=True),
                 call("設定", root=window, timeout=10, exact=True),
             ],
@@ -1060,9 +1063,20 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
         self.assertIn(f"{MCP_OWNER_WORKSPACE_LABEL}{{}}", broker)
         self.assertIn(MCP_OWNER_ARGUMENT_HASH_MARKER, broker)
         self.assertIn(MCP_OWNER_NO_CREDENTIAL_MARKER, broker)
+        self.assertIn(MCP_OWNER_TOOL_CALL_MARKER, broker)
         self.assertIn('f"{MCP_OWNER_WORKSPACE_LABEL}{workspace}"', acceptance)
         self.assertIn("MCP_OWNER_ARGUMENT_HASH_MARKER,", acceptance)
         self.assertIn("MCP_OWNER_NO_CREDENTIAL_MARKER,", acceptance)
+        self.assertIn("MCP_OWNER_TOOL_CALL_MARKER,", acceptance)
+
+        task_owner = (root / "native/rust_helper/src/macos_desktop_owner.rs").read_text(
+            encoding="utf-8"
+        )
+        for marker in (
+            AGENT_TASK_PERMISSION_OWNER_MARKER,
+            AGENT_TASK_APPROVAL_OWNER_MARKER,
+        ):
+            self.assertIn(marker, task_owner)
 
     def test_installed_mcp_owner_summary_is_accepted_before_decision(self) -> None:
         server_id = "linux-installed-mcp-fixture"
@@ -2504,7 +2518,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         self.assertEqual(
             find_operable.call_args_list,
             [
-                call("操作グループ選択", root=window, timeout=10, exact=True),
+                call("操作グループ選択", root=window, timeout=10),
                 call("運用", root=window, timeout=10, exact=True),
                 call(
                     "エージェントセンター",

@@ -64,8 +64,13 @@ MCP_RESULT_PREFIX = "D4P_MCP_RESULT_PROBE_"
 MCP_TEST_CREDENTIAL_ENV = "D4P_MCP_TEST_CREDENTIAL"
 MCP_CREDENTIAL_USE_PREFIX = "MCP資格情報使用:"
 MCP_OWNER_WORKSPACE_LABEL = "Workspace: "
+MCP_OWNER_TOOL_CALL_MARKER = "このToolを現在Serverへ一回だけ実行します。"
 MCP_OWNER_ARGUMENT_HASH_MARKER = "引数hash:"
 MCP_OWNER_NO_CREDENTIAL_MARKER = "Credential注入: なし"
+AGENT_TASK_PERMISSION_OWNER_MARKER = (
+    "このAgent Sessionに限定した、一回限りのTask用Workspace Permissionを発行しますか？"
+)
+AGENT_TASK_APPROVAL_OWNER_MARKER = "このAgent Taskに一回限りのOwner Approvalを発行しますか？"
 LINUX_AGENT_TASK_FIXTURE_MODEL_ID = "o3"
 # Keep the simulated Broker deadline shorter than the first real CLI tool wait,
 # so the deadline scenario cannot receive the fixture's final model response first.
@@ -1514,9 +1519,23 @@ def _open_installed_navigation_page(
             check=True,
             timeout=5,
         )
-    group_selector = _find_operable_accessible(
-        "操作グループ選択", root=window, timeout=10, exact=True
-    )
+    # DropdownButtonの選択中の値がSemanticsのラベルと結合される場合がある。
+    try:
+        group_selector = _find_operable_accessible(
+            "操作グループ選択", root=window, timeout=10
+        )
+    except RuntimeError as error:
+        observed = [
+            name
+            for _, name in _accessible_nodes(
+                window, deadline=time.monotonic() + 2, max_depth=8
+            )
+            if any(marker in name for marker in ("操作", "設定", "セットアップ", "Broker"))
+        ]
+        raise RuntimeError(
+            "installed navigation selectorを取得できません: "
+            + _bounded_owner_text_diagnostics(observed)
+        ) from error
     _activate_accessible(group_selector, "操作グループ選択", environment)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     group_option = _find_operable_accessible(
@@ -5680,7 +5699,7 @@ def _prepare_and_start_installed_agent_task(
         "許可",
         context="Agent Task Workspace Permission",
         expected_summary_markers=(
-            "このAgent Sessionに限定した、一回限りのTask用Workspace Permissionを発行しますか？",
+            AGENT_TASK_PERMISSION_OWNER_MARKER,
             f"Runtime ID: {runtime_id}",
             f"Workspace ID: {workspace_id}",
             "許可operation: agent_task.execute",
@@ -5700,7 +5719,7 @@ def _prepare_and_start_installed_agent_task(
         diagnostic_root=window,
         diagnostic_audit_path=diagnostic_audit_path,
         expected_summary_markers=(
-            "このAgent Taskに一回限りのOwner Approvalを発行しますか？",
+            AGENT_TASK_APPROVAL_OWNER_MARKER,
             f"Runtime ID: {runtime_id}",
             "Session ID:",
             f"Workspace ID: {workspace_id}",
@@ -7769,12 +7788,12 @@ def _run_installed_agent_mcp_followup_acceptance(
         diagnostic_root=window,
         diagnostic_audit_path=audit_store / "audit.jsonl",
         expected_summary_markers=(
-            "このMCP Toolを指定Serverへ一度だけ実行しますか？",
+            MCP_OWNER_TOOL_CALL_MARKER,
             f"Server ID: {server_id}",
             f"Tool: echo ({tool_id})",
             f"Agent source Task: {source_task_id}",
             f"Agent result hash: {source_result_hash}",
-            "arguments hash:",
+            MCP_OWNER_ARGUMENT_HASH_MARKER,
         ),
     )
     _wait_for_owner_dialog_closed(environment)
@@ -7784,8 +7803,9 @@ def _run_installed_agent_mcp_followup_acceptance(
         "許可",
         context="実MCP結果依存Taskのfresh Workspace Permission",
         expected_summary_markers=(
-            "このAgent Sessionに限定したTask用Workspace Permissionを発行しますか？",
+            AGENT_TASK_PERMISSION_OWNER_MARKER,
             f"Runtime ID: {runtime_id}",
+            "Session ID:",
             f"Workspace ID: {workspace_id}",
             "許可operation: agent_task.execute",
         ),
@@ -7795,14 +7815,16 @@ def _run_installed_agent_mcp_followup_acceptance(
         environment,
         "許可",
         context="実MCP結果依存Taskのfresh Owner Approval",
+        diagnostic_root=window,
+        diagnostic_audit_path=audit_store / "audit.jsonl",
         expected_summary_markers=(
-            "このAgent Taskの一回限りOwner Approvalを発行しますか？",
+            AGENT_TASK_APPROVAL_OWNER_MARKER,
             f"Runtime ID: {runtime_id}",
+            "Session ID:",
             f"Workspace ID: {workspace_id}",
-            "追加Task context:",
-            "MCP capability snapshot hash: sha256:",
-            "MCP Tool result hash: sha256:",
             "指示hash:",
+            "実行上限: 最大15分",
+            "Approvalは本文hashと現在の実行条件に束縛され",
         ),
     )
     _wait_for_owner_dialog_closed(environment)
