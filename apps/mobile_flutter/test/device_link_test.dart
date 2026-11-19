@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,6 +56,9 @@ class _FakeNativePort implements DeviceLinkNativePort {
           );
 
   DeviceLinkSnapshot state;
+  Future<DeviceLinkSnapshot>? pendingReadState;
+  Future<DeviceLinkSnapshot>? pendingPair;
+  Future<Map<String, Object?>>? nextRequest;
   final calls = <String>[];
   final requests = <String>[];
   final recoveryAudit = <DeviceLinkLocalRecoveryAuditEvent>[];
@@ -61,7 +66,9 @@ class _FakeNativePort implements DeviceLinkNativePort {
   @override
   Future<DeviceLinkSnapshot> readState() async {
     calls.add('read_state');
-    return state;
+    final pending = pendingReadState;
+    pendingReadState = null;
+    return pending == null ? state : await pending;
   }
 
   @override
@@ -81,7 +88,8 @@ class _FakeNativePort implements DeviceLinkNativePort {
       foreground: true,
       status: 'native結合を確認しました',
     );
-    return state;
+    final pending = pendingPair;
+    return pending == null ? state : await pending;
   }
 
   @override
@@ -116,6 +124,9 @@ class _FakeNativePort implements DeviceLinkNativePort {
     Map<String, Object?>? payload,
   }) async {
     requests.add(operation);
+    final pending = nextRequest;
+    nextRequest = null;
+    if (pending != null) return pending;
     if (operation == '実行系列挙') {
       return _accepted(operation, {
         '実行系': ['runtime-a'],
@@ -331,6 +342,84 @@ void main() {
     expect(native.calls, ['read_state', 'read_state', 'read_state']);
     expect(controller.ready, isTrue);
   });
+
+  test('起動時のnative応答は背景状態を解除しない', () async {
+    final pending = Completer<DeviceLinkSnapshot>();
+    final native = _FakeNativePort()..pendingReadState = pending.future;
+    final controller = DeviceLinkController(nativePort: native);
+    addTearDown(controller.dispose);
+
+    final starting = controller.initialize();
+    controller.setForeground(false);
+    pending.complete(DeviceLinkSnapshot.fromNative(_snapshot));
+    await starting;
+
+    expect(controller.foreground, isFalse);
+    expect(controller.ready, isFalse);
+    expect(native.requests, isEmpty);
+
+    controller.setForeground(true);
+    await Future<void>.delayed(Duration.zero);
+    expect(native.calls, ['read_state', 'read_state']);
+    expect(controller.storageReady, isTrue);
+    expect(controller.hasStoredCredential, isFalse);
+    expect(controller.ready, isFalse);
+  });
+
+  test('中断した結合の応答は復帰時にnativeから読み直す', () async {
+    final pending = Completer<DeviceLinkSnapshot>();
+    final native = _FakeNativePort()..pendingPair = pending.future;
+    final controller = DeviceLinkController(nativePort: native);
+    addTearDown(controller.dispose);
+    await controller.initialize();
+
+    final pairing = controller.pair();
+    controller.setForeground(false);
+    controller.setForeground(true);
+    pending.complete(native.state);
+    await pairing;
+    await Future<void>.delayed(Duration.zero);
+
+    expect(native.calls, ['read_state', 'pair', 'read_state']);
+    expect(controller.ready, isTrue);
+    expect(controller.runtimes, ['runtime-a']);
+    expect(native.requests, ['実行系列挙']);
+  });
+
+  for (final resume in [false, true]) {
+    test(resume ? '復帰後の新接続を旧要求の失敗で停止しない' : '再確認前の要求の成功を新接続へ採用しない', () async {
+      final native = _FakeNativePort(
+        initial: DeviceLinkSnapshot.fromNative(_snapshot),
+      );
+      final controller = DeviceLinkController(nativePort: native);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+      final previousGeneration = controller.connectionGeneration;
+      final pending = Completer<Map<String, Object?>>();
+      native.nextRequest = pending.future;
+
+      final rejected = expectLater(
+        controller.request('対話送信', payload: {'入力': '再送しない'}),
+        throwsA(isA<BrokerClientException>()),
+      );
+      if (resume) {
+        controller.setForeground(false);
+        controller.setForeground(true);
+        await Future<void>.delayed(Duration.zero);
+        pending.completeError(const BrokerClientException('旧要求は中断されました'));
+      } else {
+        await controller.verify();
+        pending.complete(_accepted('対話送信'));
+      }
+      await rejected;
+
+      expect(controller.connectionGeneration, previousGeneration + 1);
+      expect(controller.ready, isTrue);
+      expect(controller.runtimes, ['runtime-a']);
+      expect(controller.status, _snapshot['status']);
+      expect(native.requests, ['実行系列挙', '対話送信', '実行系列挙']);
+    });
+  }
 
   test('履歴承認参照はboundedな履歴閲覧要求だけに許可する', () async {
     const channel = MethodChannel('test/gui_shell/mobile_device_link');

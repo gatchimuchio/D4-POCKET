@@ -13,7 +13,9 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
   final DeviceLinkNativePort _native;
   bool busy = false;
   bool ready = false;
-  bool foreground = true;
+  bool _uiForeground = true;
+  bool _nativeForeground = true;
+  bool get foreground => _uiForeground && _nativeForeground;
   bool storageReady = false;
   bool hasStoredCredential = false;
   bool _resumePending = false;
@@ -34,13 +36,12 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
   }
 
   void _apply(DeviceLinkSnapshot snapshot) {
-    final wasReady = ready;
     storageReady = snapshot.storageReady;
     hasStoredCredential = snapshot.paired;
-    foreground = snapshot.foreground;
-    ready = snapshot.connected && snapshot.foreground;
+    _nativeForeground = snapshot.foreground;
+    ready = snapshot.connected && foreground;
     status = snapshot.status;
-    if (!wasReady && ready) connectionGeneration++;
+    if (ready) connectionGeneration++;
     if (events.isEmpty || events.first != status) {
       events.insert(0, status);
       if (events.length > 20) events.removeLast();
@@ -48,47 +49,64 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
     if (!_disposed) notifyListeners();
   }
 
-  Future<void> initialize() async {
-    if (busy || storageReady || _disposed) return;
+  bool _isCurrentForeground(int generation) =>
+      !_disposed && _uiForeground && generation == _foregroundGeneration;
+
+  Future<void> _runStateOperation(
+    Future<DeviceLinkSnapshot> Function() operation,
+    String failureMessage, {
+    String? progressMessage,
+    bool refreshRuntimes = true,
+  }) async {
+    final generation = _foregroundGeneration;
     busy = true;
-    notifyListeners();
+    ready = false;
+    runtimes = [];
+    if (progressMessage == null) {
+      notifyListeners();
+    } else {
+      _report(progressMessage);
+    }
     try {
-      _apply(await _native.readState());
-      if (ready) await _refreshRuntimes();
+      if (!_isCurrentForeground(generation)) return;
+      final snapshot = await operation();
+      if (!_isCurrentForeground(generation)) return;
+      _apply(snapshot);
+      if (refreshRuntimes && ready) {
+        final values = await dialogue.runtimes();
+        if (_isCurrentForeground(generation) && ready) runtimes = values;
+      }
     } catch (_) {
-      ready = false;
-      runtimes = [];
-      _report('native安全保管またはDesktop接続を確認できません。通信を停止しました。');
+      if (_isCurrentForeground(generation)) {
+        ready = false;
+        runtimes = [];
+        _report(failureMessage);
+      }
     } finally {
       _finish();
     }
   }
 
-  Future<void> _refreshRuntimes() async {
-    final values = await dialogue.runtimes();
-    if (!ready || !foreground || _disposed) return;
-    runtimes = values;
+  Future<void> initialize() async {
+    if (busy || storageReady || !_uiForeground || _disposed) return;
+    await _runStateOperation(
+      _native.readState,
+      'native安全保管またはDesktop接続を確認できません。通信を停止しました。',
+    );
   }
 
   Future<void> verify() async {
-    if (busy || !foreground || !storageReady || !hasStoredCredential) return;
-    busy = true;
-    ready = false;
-    notifyListeners();
-    final generation = _foregroundGeneration;
-    try {
-      final snapshot = await _native.readState();
-      if (generation != _foregroundGeneration || !foreground || _disposed)
-        return;
-      _apply(snapshot);
-      if (ready) await _refreshRuntimes();
-    } catch (_) {
-      ready = false;
-      runtimes = [];
-      _report('資格・期限・証明書またはDesktop接続を確認できません。操作を停止しました。');
-    } finally {
-      _finish();
+    if (busy ||
+        !foreground ||
+        !storageReady ||
+        !hasStoredCredential ||
+        _disposed) {
+      return;
     }
+    await _runStateOperation(
+      _native.readState,
+      '資格・期限・証明書またはDesktop接続を確認できません。操作を停止しました。',
+    );
   }
 
   Future<void> pair() async {
@@ -99,24 +117,19 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
         _disposed) {
       return;
     }
-    busy = true;
-    _report('端末結合をnative画面で確認しています');
-    try {
-      final snapshot = await _native.pair();
-      _apply(snapshot);
-      if (ready) await _refreshRuntimes();
-    } catch (_) {
-      ready = false;
-      runtimes = [];
-      _report('結合を確認できません。招待を再利用せず、Desktop側で端末状態を確認してください。');
-    } finally {
-      _finish();
-    }
+    await _runStateOperation(
+      _native.pair,
+      '結合を確認できません。招待を再利用せず、Desktop側で端末状態を確認してください。',
+      progressMessage: '端末結合をnative画面で確認しています',
+    );
   }
 
   void setForeground(bool value) {
-    if (_disposed || foreground == value) return;
-    foreground = value;
+    if (_disposed ||
+        (value == _uiForeground && (!value || _nativeForeground))) {
+      return;
+    }
+    _uiForeground = value;
     _foregroundGeneration++;
     if (!value) {
       ready = false;
@@ -127,52 +140,29 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
       _resumePending = value;
       return;
     }
-    if (value && storageReady && hasStoredCredential) {
+    if (value) {
       unawaited(_resumeNativeConnection());
-    } else if (!_disposed) {
-      notifyListeners();
     }
   }
 
-  Future<void> _resumeNativeConnection() async {
-    busy = true;
-    notifyListeners();
-    final generation = _foregroundGeneration;
-    try {
-      final snapshot = await _native.readState();
-      if (generation != _foregroundGeneration || !foreground || _disposed)
-        return;
-      _apply(snapshot);
-      if (ready) await _refreshRuntimes();
-    } catch (_) {
-      ready = false;
-      runtimes = [];
-      _report('復帰後のnative通信を確認できません。操作を停止しました。');
-    } finally {
-      _finish();
-    }
-  }
+  Future<void> _resumeNativeConnection() =>
+      _runStateOperation(_native.readState, '復帰後のnative通信を確認できません。操作を停止しました。');
 
   Future<void> disconnect({bool localOnly = false}) async {
-    if (busy || !storageReady || !hasStoredCredential) return;
-    busy = true;
-    ready = false;
-    runtimes = [];
-    notifyListeners();
-    try {
-      _apply(
-        localOnly ? await _native.localDelete() : await _native.disconnect(),
-      );
-    } catch (_) {
-      ready = false;
-      _report(
-        localOnly
-            ? '端末内資格の削除を確認できません。通信を停止しました。'
-            : 'Desktop失効または端末内資格の削除を確認できません。owner側の失効を確認してください。',
-      );
-    } finally {
-      _finish();
+    if (busy ||
+        !foreground ||
+        !storageReady ||
+        !hasStoredCredential ||
+        _disposed) {
+      return;
     }
+    await _runStateOperation(
+      localOnly ? _native.localDelete : _native.disconnect,
+      localOnly
+          ? '端末内資格の削除を確認できません。通信を停止しました。'
+          : 'Desktop失効または端末内資格の削除を確認できません。owner側の失効を確認してください。',
+      refreshRuntimes: false,
+    );
   }
 
   Future<List<DeviceLinkLocalRecoveryAuditEvent>>
@@ -192,16 +182,24 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
       throw const BrokerClientException('接続の確認待ちです。');
     }
     final generation = _foregroundGeneration;
+    final connection = connectionGeneration;
+    bool isCurrentConnection() =>
+        _isCurrentForeground(generation) &&
+        foreground &&
+        ready &&
+        connection == connectionGeneration;
     try {
       final response = await _native.request(operation, payload: payload);
-      if (generation != _foregroundGeneration || !foreground || !ready) {
+      if (!isCurrentConnection()) {
         throw const BrokerClientException('画面状態が変化したため操作を停止しました。');
       }
       return response;
     } catch (_) {
-      ready = false;
-      runtimes = [];
-      _report('操作結果を確認できません。自動再送せず、接続先と監査状態を確認してください。');
+      if (isCurrentConnection()) {
+        ready = false;
+        runtimes = [];
+        _report('操作結果を確認できません。自動再送せず、接続先と監査状態を確認してください。');
+      }
       rethrow;
     }
   }
@@ -209,7 +207,7 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
   @override
   void dispose() {
     _disposed = true;
-    foreground = false;
+    _uiForeground = false;
     _foregroundGeneration++;
     ready = false;
     runtimes = [];
@@ -218,14 +216,13 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
 
   void _finish() {
     busy = false;
-    if (!_disposed) {
+    if (_disposed) return;
+    final resumePending = _resumePending && _uiForeground;
+    _resumePending = false;
+    if (resumePending) {
+      unawaited(_resumeNativeConnection());
+    } else {
       notifyListeners();
-      if (_resumePending && foreground && storageReady && hasStoredCredential) {
-        _resumePending = false;
-        unawaited(_resumeNativeConnection());
-      } else {
-        _resumePending = false;
-      }
     }
   }
 }

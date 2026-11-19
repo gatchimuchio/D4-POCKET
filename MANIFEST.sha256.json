@@ -1353,7 +1353,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/services/device_link_controller.dart",
-      "sha256": "cb24896a3bd7748132a61a01a21fa3728c07044900b4df59c0e0cde6e5223796"
+      "sha256": "8c00b6c1b642dcf8bc2b6bb063fe6a07a52e98aa99ef455dab212f3b96c12048"
     },
     {
       "path": "apps/mobile_flutter/lib/services/mobile_projection_client.dart",
@@ -1365,7 +1365,7 @@
     },
     {
       "path": "apps/mobile_flutter/test/device_link_test.dart",
-      "sha256": "20be3bfb5300cebd542a7629959ca86ac4e5aad49b244b4ec17923b86c05afb0"
+      "sha256": "0c8e98d3b1c2efe1e144489f2261aded78c5b1a31a4b54a0727e94fd56ee0d92"
     },
     {
       "path": "apps/mobile_flutter/test/mobile_agent_task_screen_test.dart",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "991ed722067db3efc49a39921ec0fd137c7cb9542ac23e2dd91bec8dde6f83ff"
+      "sha256": "ef014e71c484365357d0a1fa2f28aed8c5f96e573bf9b49de9794f197fb7864d"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1825,7 +1825,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "4d64208f9a817db321e135f48d65d8d45a1d240ca0ffe0d5b95ea3f08487ee24"
+      "sha256": "f53712a8c2411826edb39b2c34f9dd3508536e47740b29d753bd62b1004e4e15"
     },
     {
       "path": "docs/specs/evaluation-lab.md",
