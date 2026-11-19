@@ -135,9 +135,20 @@ void main() {
   test('nested schemaに合うSpan/Trace/Metricだけを受け入れる', () async {
     final transport = _FakeObservationTransport()
       ..response = {'status': 'accepted', 'body': _sampleBody()};
-    final body = await ObservationClient(transport).list();
+    final body = await ObservationClient(
+      transport,
+    ).list(traceId: 'observation-trace-1');
 
     expect(body['件数'], 1);
+  });
+
+  test('Trace指定に一致しない一覧は表示へ渡さない', () async {
+    final transport = _FakeObservationTransport()
+      ..response = {'status': 'accepted', 'body': _sampleBody()};
+    await expectLater(
+      ObservationClient(transport).list(traceId: 'observation-trace-2'),
+      throwsA(isA<BrokerClientException>()),
+    );
   });
 
   test('nested objectの余分な秘密fieldとSpan/Trace不整合を拒否する', () async {

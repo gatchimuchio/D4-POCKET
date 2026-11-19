@@ -167,6 +167,14 @@ class _TraceInspectorState extends State<TraceInspector> {
                     _selectedTraceId = value;
                     _refresh();
                   }),
+                )
+              else if (_selectedTraceId != null)
+                OutlinedButton(
+                  onPressed: () => setState(() {
+                    _selectedTraceId = null;
+                    _refresh();
+                  }),
+                  child: const Text('全Traceを表示'),
                 ),
               OutlinedButton(
                 onPressed: () => setState(_refresh),
@@ -176,11 +184,15 @@ class _TraceInspectorState extends State<TraceInspector> {
           ),
         ),
         if (spans.isEmpty)
-          const EmptyStatePanel(
+          EmptyStatePanel(
             title: 'Traceなし',
-            meaning: '現在のBroker内部観測に表示対象のTraceはありません。',
+            meaning: _selectedTraceId == null
+                ? '現在のBroker内部観測に表示対象のTraceはありません。'
+                : '選択したTraceは現在のBroker内部観測にありません。',
             phaseBBlocked: false,
-            nextAction: 'Broker操作後に更新してください。',
+            nextAction: _selectedTraceId == null
+                ? 'Broker操作後に更新してください。'
+                : '全Traceを表示して直近の観測を取得できます。',
           )
         else
           _waterfallPanel(

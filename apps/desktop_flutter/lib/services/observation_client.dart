@@ -98,11 +98,15 @@ class ObservationClient {
     final body = <String, Object?>{
       for (final entry in rawBody.entries) entry.key as String: entry.value,
     };
-    _validateBody(body, limit: limit);
+    _validateBody(body, limit: limit, traceId: traceId);
     return body;
   }
 
-  void _validateBody(Map<String, Object?> body, {required int limit}) {
+  void _validateBody(
+    Map<String, Object?> body, {
+    required int limit,
+    required String? traceId,
+  }) {
     if (body.keys.toSet().difference(_observationBodyKeys).isNotEmpty ||
         _observationBodyKeys.difference(body.keys.toSet()).isNotEmpty ||
         body['版'] != 1 ||
@@ -134,7 +138,9 @@ class ObservationClient {
     final spanMaps = <Map<String, Object?>>[];
     for (final item in spans) {
       final span = _stringMap(item);
-      if (span == null || !_validSpan(span)) {
+      if (span == null ||
+          !_validSpan(span) ||
+          (traceId != null && span['TraceID'] != traceId)) {
         throw const BrokerClientException('観測一覧応答が契約に適合しません');
       }
       spanMaps.add(span);

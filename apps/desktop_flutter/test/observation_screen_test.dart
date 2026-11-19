@@ -13,6 +13,7 @@ class _ObservationTransport implements BrokerTransport {
   final String label;
   final requests = <Map<String, Object?>>[];
   Completer<void>? nextObservationGate;
+  int traceSequence = 1;
 
   @override
   Future<Map<String, Object?>> request(
@@ -29,52 +30,58 @@ class _ObservationTransport implements BrokerTransport {
     final gate = nextObservationGate;
     nextObservationGate = null;
     if (gate != null) await gate.future;
+    final traceId = 'observation-trace-$traceSequence';
+    final includeTrace =
+        payload?['TraceID'] == null || payload?['TraceID'] == traceId;
     return {
       'status': 'accepted',
       'body': {
         '版': 1,
         'Span一覧': [
-          {
-            '版': 1,
-            'TraceID': 'observation-trace-1',
-            'SpanID': 'observation-span-1',
-            '親SpanID': null,
-            '対象': 'Broker',
-            '操作': 'fixture-observation-$label',
-            '状態': 'completed',
-            '所要Millis': 12,
-            'エラー分類': null,
-            '関連監査ID': 'audit-$label',
-            '証拠種別': 'INTERNAL_STATE',
-            '開始EpochMillis': 1700000000000,
-            '終了EpochMillis': 1700000000012,
-          },
+          if (includeTrace)
+            {
+              '版': 1,
+              'TraceID': traceId,
+              'SpanID': 'observation-span-1',
+              '親SpanID': null,
+              '対象': 'Broker',
+              '操作': 'fixture-observation-$label',
+              '状態': 'completed',
+              '所要Millis': 12,
+              'エラー分類': null,
+              '関連監査ID': 'audit-$label',
+              '証拠種別': 'INTERNAL_STATE',
+              '開始EpochMillis': 1700000000000,
+              '終了EpochMillis': 1700000000012,
+            },
         ],
         'Trace一覧': [
-          {
-            '版': 1,
-            'TraceID': 'observation-trace-1',
-            'SpanID一覧': ['observation-span-1'],
-            '件数': 1,
-            '証拠種別': 'INTERNAL_STATE',
-            '生成源': 'broker_audit_finalization',
-            '親TraceID': null,
-          },
+          if (includeTrace)
+            {
+              '版': 1,
+              'TraceID': traceId,
+              'SpanID一覧': ['observation-span-1'],
+              '件数': 1,
+              '証拠種別': 'INTERNAL_STATE',
+              '生成源': 'broker_audit_finalization',
+              '親TraceID': null,
+            },
         ],
         'Metric一覧': [
-          {
-            '版': 1,
-            'MetricID': 'broker.operation.count',
-            '名称': 'Fixture Metric $label',
-            '値': 3,
-            '単位': 'count',
-            '種別': 'counter',
-            '観測件数': 1,
-            '状態': 'observed',
-            '証拠種別': 'INTERNAL_STATE',
-          },
+          if (includeTrace)
+            {
+              '版': 1,
+              'MetricID': 'broker.operation.count',
+              '名称': 'Fixture Metric $label',
+              '値': 3,
+              '単位': 'count',
+              '種別': 'counter',
+              '観測件数': 1,
+              '状態': 'observed',
+              '証拠種別': 'INTERNAL_STATE',
+            },
         ],
-        '件数': 1,
+        '件数': includeTrace ? 1 : 0,
         '証拠種別': 'INTERNAL_STATE',
         '観測範囲': 'broker_audit_finalization',
         'Auditとの責任分離': 'Audit=責任・安全・証拠; Observation=性能・挙動・運用状態',
@@ -188,5 +195,44 @@ void main() {
         findsOneWidget);
     expect(
         find.text('Broker / fixture-observation-A / completed'), findsNothing);
+  });
+
+  testWidgets('保持上限で消えたTraceから全Traceの取得へ戻れる', (tester) async {
+    final transport = _ObservationTransport('A');
+    await tester.pumpWidget(_traceScreen(transport));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButton<String?>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('observation-trace-1').last);
+    await tester.pumpAndSettle();
+    expect(
+      transport.requests.last['payload'],
+      containsPair('TraceID', 'observation-trace-1'),
+    );
+
+    transport.traceSequence = 2;
+    await tester.tap(find.text('更新'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('選択したTraceは現在のBroker内部観測にありません。'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Broker / fixture-observation-A / completed'),
+      findsNothing,
+    );
+
+    await tester.tap(find.text('全Traceを表示'));
+    await tester.pumpAndSettle();
+    expect(transport.requests.last['payload'], {'版': 1, '上限': 256});
+    expect(
+      find.text('Broker / fixture-observation-A / completed'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Trace識別子: observation-trace-2'),
+      findsOneWidget,
+    );
   });
 }

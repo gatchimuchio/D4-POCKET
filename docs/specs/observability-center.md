@@ -24,6 +24,7 @@ Auditのreason、payload hash、metadata、credential、raw contentはSpan、Tra
 
 - Broker内のSpan保持は最大1024件。超過時は最古の観測を破棄する。
 - IPC返却は最大256Span、256Trace、16Metricとする。
+- `観測一覧` はTraceID指定を適用したうえで直近のSpanを上限まで選び、確定順で返す。TraceとMetricも同じSpan集合から生成する。選択したTraceが保持上限で消えた場合は、画面から全Traceを再取得できる。
 - Metric値が測定不能な場合は`unknown`とし、測定不能を0へ変換しない。
 - 観測一覧の監査は通常のBroker Auditへ記録するが、そのAuditのreasonは観測bodyへ戻さない。
 

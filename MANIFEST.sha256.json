@@ -337,7 +337,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trace_inspector.dart",
-      "sha256": "cee33e0027c4b5c24fb7c658212ccc813986fe08d66c49fceba0d127ffe1c81f"
+      "sha256": "0ecce27f339d9296500d15351d5aa594c10950761beea17b56ca7fdf86b0ebc8"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trust_center.dart",
@@ -421,7 +421,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/observation_client.dart",
-      "sha256": "d094896a6c749146124f6f6a46839160d3323086540156df955d0cde09a2e875"
+      "sha256": "cf49264025c0506b11af339871f1c80845f48bf729c773f5d93471e1f1a69768"
     },
     {
       "path": "apps/desktop_flutter/lib/services/profile_client.dart",
@@ -773,11 +773,11 @@
     },
     {
       "path": "apps/desktop_flutter/test/observation_client_test.dart",
-      "sha256": "d9157aeb9717e69ad29d212c918cc96c999c80a5e3ec6773f25ed9f30d1c50b3"
+      "sha256": "adaf5ac220e24eb5b0d7efa7792566f7ed2ea72d5da30af8654bff45aa7a2aeb"
     },
     {
       "path": "apps/desktop_flutter/test/observation_screen_test.dart",
-      "sha256": "d09d0c3db8137349eb76bf2ce320ee78cd3fcf2d0625d375c18010aa61df6f6d"
+      "sha256": "2ed03de5d81cd6dfbd5326881d85d07cee3b62faa355304b4b2ecaf76d395aca"
     },
     {
       "path": "apps/desktop_flutter/test/profile_client_test.dart",
@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "bfacf8d9978eee27d5dbb9a8e20d63a02dada41837686571fb4c36cdded1b4ea"
+      "sha256": "e812504d37bfa6bbd1ee2894012514939757fa9069fa7f46c31acb3b140d35f3"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1965,7 +1965,7 @@
     },
     {
       "path": "docs/specs/observability-center.md",
-      "sha256": "af96b80830acdee3549a121762f72af86b16d7c2172a3367ea2036074c7e3682"
+      "sha256": "6f5f28d9a0e8130db8ed70a439342f89c610c593d13479a4f8ba8864e0179b3d"
     },
     {
       "path": "docs/specs/operation-profile.md",
@@ -4209,7 +4209,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/observation_center.rs",
-      "sha256": "11db67a649e95a6b8eaee98179a9d4bed25512c99488503ee4fac938a163c826"
+      "sha256": "ee45c837bd024f0b7cc58fef5b9f6f0c13310ed5f77d01e9cdecdbc922fa6266"
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",

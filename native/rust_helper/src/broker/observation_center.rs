@@ -44,7 +44,7 @@ struct PendingFollowup {
     expires_at: Instant,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ObservationSpan {
     span_id: String,
     trace_id: String,
@@ -120,17 +120,19 @@ impl ObservationCenter {
 
     fn response_body(&self, request: &ListRequest) -> Value {
         let limit = request.limit.unwrap_or(MAX_RESPONSE_SPANS);
-        let mut spans: Vec<ObservationSpan> = self.spans.iter().cloned().collect();
+        let spans = self.spans.iter().rev();
         #[cfg(feature = "module_trace_inspector")]
-        spans.retain(|span| {
+        let spans = spans.filter(|span| {
             request
                 .trace_id
                 .as_deref()
                 .map(|trace_id| span.trace_id == trace_id)
                 .unwrap_or(true)
         });
-        spans.truncate(limit);
-        let span_values: Vec<Value> = spans.iter().map(ObservationSpan::to_value).collect();
+        let mut spans: Vec<&ObservationSpan> = spans.take(limit).collect();
+        // 直近を選び、応答内は従来どおり確定順に並べる。
+        spans.reverse();
+        let span_values: Vec<Value> = spans.iter().map(|span| span.to_value()).collect();
         let trace_values = traces_for(&spans, &self.trace_parent_ids);
         let metric_values = metrics_for(&spans);
         json!({
@@ -297,7 +299,10 @@ impl ObservationSpan {
     }
 }
 
-fn traces_for(spans: &[ObservationSpan], parent_trace_ids: &HashMap<String, String>) -> Vec<Value> {
+fn traces_for(
+    spans: &[&ObservationSpan],
+    parent_trace_ids: &HashMap<String, String>,
+) -> Vec<Value> {
     let mut indexes = HashMap::<String, usize>::new();
     let mut grouped = Vec::<(String, Vec<String>)>::new();
     for span in spans {
@@ -354,7 +359,7 @@ fn valid_result_id(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn metrics_for(spans: &[ObservationSpan]) -> Vec<Value> {
+fn metrics_for(spans: &[&ObservationSpan]) -> Vec<Value> {
     let count = spans.len() as u64;
     let error_count = spans
         .iter()
@@ -863,6 +868,14 @@ mod tests {
     #[test]
     fn 観測一覧は通常Broker経路から内部観測だけを返す() {
         let mut broker = Broker::new("observation-session");
+        for index in 1..=9 {
+            let decision = if index == 9 { "rejected" } else { "accepted" };
+            broker.observations.record_completed_span(
+                &event(decision, index),
+                index as i64,
+                index as u64,
+            );
+        }
         let issued_at = BrokerRequestEnvelope::current_issued_at();
         let mut request = BrokerRequestEnvelope::command_envelope(
             "observation-request",
@@ -880,5 +893,41 @@ mod tests {
         assert_eq!(body["証拠種別"], "INTERNAL_STATE");
         assert_eq!(body["権限生成"], "なし");
         assert_eq!(body["OpenTelemetry export"], "unsupported");
+        let spans = body["Span一覧"].as_array().unwrap();
+        assert_eq!(spans.len(), 8);
+        assert_eq!(spans[0]["関連監査ID"], "broker-audit-2");
+        assert_eq!(spans[7]["関連監査ID"], "broker-audit-9");
+        assert_eq!(body["Metric一覧"][1]["値"], 1);
+        assert_eq!(body["Metric一覧"][3]["値"], 9);
+    }
+
+    #[cfg(feature = "module_trace_inspector")]
+    #[test]
+    fn Trace指定は該当する直近Spanだけを確定順で返す() {
+        let mut center = ObservationCenter::default();
+        let instruction_hash = crate::audit_hash::sha256_tagged(b"task instruction");
+        for index in [1, 3, 5] {
+            let stage = if index == 1 { "start" } else { "terminal" };
+            center.record_completed_span(
+                &task_event("task-a", stage, &instruction_hash, index),
+                1_000,
+                3,
+            );
+            center.record_completed_span(&event("accepted", index + 1), 1_000, 1);
+        }
+        let trace_id = center.spans.front().unwrap().trace_id.clone();
+        let body = center.response_body(&ListRequest {
+            version: VERSION,
+            limit: Some(2),
+            trace_id: Some(trace_id.clone()),
+        });
+        assert_eq!(body["件数"], 2);
+        assert_eq!(body["Trace一覧"][0]["TraceID"], trace_id);
+        assert_eq!(
+            body["Trace一覧"][0]["SpanID一覧"],
+            json!(["observation-span-3", "observation-span-5"])
+        );
+        assert_eq!(body["Span一覧"][0]["関連監査ID"], "broker-audit-3");
+        assert_eq!(body["Span一覧"][1]["関連監査ID"], "broker-audit-5");
     }
 }
