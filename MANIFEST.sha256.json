@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "29f2cb7747c15d0a7eaba23d5f0d486834b9614952587699a516c02601867ae9"
+      "sha256": "bfacf8d9978eee27d5dbb9a8e20d63a02dada41837686571fb4c36cdded1b4ea"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1921,7 +1921,7 @@
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
-      "sha256": "5bd3ccfb07be2912c8c8cffe291a67864a2c67591abe2be88fa4fcafda4fa666"
+      "sha256": "451704206e6ea080d8a5caa1cbb2944d9d1297d1e41551f8d3aab2a3f492e8ad"
     },
     {
       "path": "docs/specs/macos-host-registration.md",
@@ -4329,7 +4329,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
-      "sha256": "2daeffc5b3d47bf58a7a427975dcd7db0f859604d086cc81e8e45c39444b8ab4"
+      "sha256": "58fb643b98e58fcdcaf35b850886331ec66a499488c14622c5aae96f1c071ac5"
     },
     {
       "path": "native/rust_helper/src/macos_workspace_selection.rs",

@@ -12,11 +12,13 @@ P13 A2A接続入口のCLOSED責任正本は`macos-a2a-center.md`。本追加Mess
 
 Flutter → 固定MethodChannel → native Runner → 起動時に作る匿名pipe → 同梱Rust helper → 既存認証loopback Broker → 既存handler。
 
-Runnerは固定bundle内のhelper一個を引数なしで起動し、要求JSONと応答JSONだけを運ぶ。資格、endpoint、Audit、Permission、Approvalを読み取らず決定しない。環境はOSが与えたsandbox HOMEと一時保存先だけ。Rustは固定HOME配下の専用0700保存先、create-only起動lock、normal資格を所有する。入力session_idは既存Windows中継と同じ拒否用fieldを付加し、既存Brokerのvalidation／replay／Auditへ通す。通常接続のCLOSED単位ではOwner資格とOwner操作receiverを作らなかった。現在の追加receiverは本書後段のOwner追加契約だけに限定し、Owner資格fileは引き続き作らない。通常要求の可否はBrokerが判定し、Runnerがread-only能力やAuthorityを自己生成しない。
+Runnerは固定bundle内のhelper一個を引数なしで起動し、要求JSONと応答JSONだけを運ぶ。資格、endpoint、Audit、Permission、Approvalを読み取らず決定しない。環境はOSが与えたsandbox HOMEと一時保存先だけ。Rustは固定HOME配下の専用0700保存先、起動用の排他ロック、normal資格を所有する。入力session_idは既存Windows中継と同じ拒否用fieldを付加し、既存Brokerのvalidation／replay／Auditへ通す。通常接続のCLOSED単位ではOwner資格とOwner操作receiverを作らなかった。現在の追加receiverは本書後段のOwner追加契約だけに限定し、Owner資格fileは引き続き作らない。通常要求の可否はBrokerが判定し、Runnerがread-only能力やAuthorityを自己生成しない。
 
 Rustは自身の実行pathから`.app/Contents/MacOS`、固定名app／helper、Info.plistの通常file・bundle内配置を確認してから、既存Brokerの初回UI設定初期化を有効にする。これは配置検査だけで、正式署名・install identity・Owner承認を証明しない。native試験の固定bootstrap操作観測はDebugだけへcompileし、要求本文・応答本文・秘密を記録しない。
 
-要求は64KiB、応答は4MiB、一行JSON、画面内待機は最大4件。native応答期限超過・不正frame・helper停止時は通信路を閉じ、未確定要求を自動再送しない。画面終了はpipe EOFでBrokerの既存停止・Audit確定を待つ。期限内に終了しなければhelperを停止し、正常終了とは報告しない。Audit storeは保持し、同じ生成内容のsession fileと自分の起動lockだけを回収する。異常終了後の残留lockの自動除去はしない（最終Recovery保証は別単位）。
+要求は64KiB、応答は4MiB、一行JSON、画面内待機は最大4件。native応答期限超過・不正frame・helper停止時は通信路を閉じ、未確定要求を自動再送しない。画面終了はpipe EOFでBrokerの既存停止・Audit確定を待つ。期限内に終了しなければhelperを停止し、正常終了とは報告しない。Audit storeは保持し、同じ生成内容のsession fileと自分の起動lockだけを回収する。
+
+起動時には `running.lock` を新規作成し、開始前に接続ファイルの不在を確認して形式を記録する。同形式の残留ロックでは、OSの排他ロックを取得し、ファイル実体が一致した場合だけ、固定名の `normal-session.json` と作成途中の `normal-session.json.tmp` を検査して片付ける。両方とも現在利用者所有の専用権限、単一リンク、4KiB以下の通常ファイルに限る。起動後は新しい接続資格を発行する。稼働中の排他ロック、旧形式や不明な起動ロック、出所が対応しない接続ファイルは保持して起動を拒否する。正常終了では接続ファイルと起動ロックを回収し、旧版の通常起動も可能にする。[Appleの排他ロックの仕様](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/flock.2.html)
 
 ## App Sandboxとbuild
 

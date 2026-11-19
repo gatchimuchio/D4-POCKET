@@ -4,6 +4,8 @@ use crate::broker::{BrokerCredentialRole, BrokerEndpoint, BrokerServerConfig};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
+#[cfg(unix)]
+use std::os::unix::fs::{FileExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -15,7 +17,10 @@ use zeroize::{Zeroize, Zeroizing};
 
 const REQUEST_LIMIT: usize = 64 * 1024;
 const RESPONSE_LIMIT: usize = 4 * 1024 * 1024;
+const SESSION_FILE_LIMIT: u64 = 4096;
 const PRODUCT_MANIFEST_LIMIT: u64 = 64 * 1024;
+#[cfg(unix)]
+const RUN_LOCK_FORMAT: &[u8] = b"D4 Pocket macOS Broker lock v2\n";
 const IO_TIMEOUT: Duration = Duration::from_secs(4);
 
 fn failure() -> io::Error {
@@ -227,8 +232,51 @@ fn private_directory(base: &Path, names: &[String]) -> io::Result<PathBuf> {
 struct RunLock {
     path: PathBuf,
     file: File,
+    #[cfg(unix)]
+    recovering: bool,
 }
 impl RunLock {
+    #[cfg(unix)]
+    fn acquire(root: &Path) -> io::Result<Self> {
+        use rustix::fs::{flock, FlockOperation};
+
+        let metadata = fs::symlink_metadata(root)?;
+        if !metadata.is_dir()
+            || metadata.uid() != rustix::process::geteuid().as_raw()
+            || metadata.mode() & 0o077 != 0
+        {
+            return Err(failure());
+        }
+        let path = root.join("running.lock");
+        let mut options = OpenOptions::new();
+        options
+            .read(true)
+            .write(true)
+            .mode(0o600)
+            .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
+        let (file, recovering) = match options.clone().create_new(true).open(&path) {
+            Ok(file) => (file, false),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+                let file = options.open(&path)?;
+                // 旧版の空fileや作成中のfileでは排他取得も回復も行わない。
+                verify_lock_format(&file)?;
+                (file, true)
+            }
+            Err(error) => return Err(error),
+        };
+        flock(&file, FlockOperation::NonBlockingLockExclusive).map_err(|_| failure())?;
+        verify_private_file_identity(&path, &file)?;
+        if recovering {
+            verify_lock_format(&file)?;
+        }
+        Ok(Self {
+            path,
+            file,
+            recovering,
+        })
+    }
+
+    #[cfg(not(unix))]
     fn acquire(root: &Path) -> io::Result<Self> {
         let path = root.join("running.lock");
         let file = OpenOptions::new()
@@ -237,11 +285,121 @@ impl RunLock {
             .open(&path)?;
         Ok(Self { path, file })
     }
+
+    fn prepare_session(&mut self, path: &Path) -> io::Result<()> {
+        let pending = path.with_extension("json.tmp");
+        #[cfg(unix)]
+        if self.recovering {
+            let endpoints = [path, pending.as_path()];
+            // 固定名を両方検査してから回収し、不正な場合は既存物を保持する。
+            let inspected = [
+                stale_endpoint_metadata(endpoints[0])?,
+                stale_endpoint_metadata(endpoints[1])?,
+            ];
+            for (endpoint, old) in endpoints.into_iter().zip(inspected) {
+                if let Some(old) = old {
+                    let current = stale_endpoint_metadata(endpoint)?.ok_or_else(failure)?;
+                    if !same_inode(&old, &current) {
+                        return Err(failure());
+                    }
+                    fs::remove_file(endpoint)?;
+                }
+            }
+            return Ok(());
+        }
+        let empty = [path, pending.as_path()]
+            .into_iter()
+            .try_for_each(|endpoint| match fs::symlink_metadata(endpoint) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+                Err(error) => Err(error),
+                Ok(_) => Err(failure()),
+            });
+        #[cfg(unix)]
+        {
+            // 元から存在した接続情報を自分の起動から残ったものとして扱わない。
+            let marked = empty.and_then(|_| {
+                self.file.write_all(RUN_LOCK_FORMAT)?;
+                self.file.sync_all()
+            });
+            if marked.is_err() {
+                self.remove_current_lock()?;
+            }
+            marked
+        }
+        #[cfg(not(unix))]
+        empty
+    }
+
+    #[cfg(unix)]
+    fn finish(self) -> io::Result<()> {
+        self.remove_current_lock()
+    }
+
+    #[cfg(unix)]
+    fn remove_current_lock(&self) -> io::Result<()> {
+        verify_private_file_identity(&self.path, &self.file)?;
+        fs::remove_file(&self.path)
+    }
+
+    #[cfg(not(unix))]
+    fn finish(self) -> io::Result<()> {
+        Ok(())
+    }
 }
+#[cfg(not(unix))]
 impl Drop for RunLock {
     fn drop(&mut self) {
         let _ = self.file.sync_all();
         let _ = fs::remove_file(&self.path);
+    }
+}
+
+#[cfg(unix)]
+fn private_file(metadata: &fs::Metadata) -> bool {
+    metadata.is_file()
+        && metadata.nlink() == 1
+        && metadata.uid() == rustix::process::geteuid().as_raw()
+        && metadata.mode() & 0o077 == 0
+}
+
+#[cfg(unix)]
+fn same_inode(first: &fs::Metadata, second: &fs::Metadata) -> bool {
+    first.ino() != 0 && first.ino() == second.ino() && first.dev() == second.dev()
+}
+
+#[cfg(unix)]
+fn verify_private_file_identity(path: &Path, file: &File) -> io::Result<()> {
+    let opened = file.metadata()?;
+    let observed = fs::symlink_metadata(path)?;
+    if !private_file(&opened) || !private_file(&observed) || !same_inode(&opened, &observed) {
+        return Err(failure());
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn verify_lock_format(file: &File) -> io::Result<()> {
+    let metadata = file.metadata()?;
+    if !private_file(&metadata) || metadata.len() != RUN_LOCK_FORMAT.len() as u64 {
+        return Err(failure());
+    }
+    let mut marker = [0; RUN_LOCK_FORMAT.len()];
+    file.read_exact_at(&mut marker, 0)?;
+    if marker.as_slice() != RUN_LOCK_FORMAT {
+        return Err(failure());
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn stale_endpoint_metadata(path: &Path) -> io::Result<Option<fs::Metadata>> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if private_file(&metadata) && metadata.len() <= SESSION_FILE_LIMIT => {
+            Ok(Some(metadata))
+        }
+        Ok(_) => Err(failure()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
     }
 }
 
@@ -259,11 +417,9 @@ fn serve(
     output: &mut impl Write,
     confirm: &mut impl FnMut(&str) -> bool,
 ) -> io::Result<()> {
-    let _lock = RunLock::acquire(root)?;
+    let mut lock = RunLock::acquire(root)?;
     let session = root.join("normal-session.json");
-    if session.try_exists()? || session.with_extension("json.tmp").try_exists()? {
-        return Err(failure());
-    }
+    lock.prepare_session(&session)?;
     // 保存先を検査できない場合、Brokerは書出しだけを拒否する。
     #[cfg(unix)]
     let export_root = crate::broker::export_center::open_private_export_directory(root).ok();
@@ -298,7 +454,10 @@ fn serve(
             .recv_timeout(Duration::from_secs(15))
             .map_err(|_| failure())?;
         let metadata = fs::symlink_metadata(&session)?;
-        if !metadata.is_file() || metadata.file_type().is_symlink() || metadata.len() > 4096 {
+        if !metadata.is_file()
+            || metadata.file_type().is_symlink()
+            || metadata.len() > SESSION_FILE_LIMIT
+        {
             return Err(failure());
         }
         *owned_session = fs::read(&session)?;
@@ -371,7 +530,8 @@ fn serve(
     } else {
         Ok(())
     };
-    result.and(stopped).and(cleanup)
+    result.and(stopped).and(cleanup)?;
+    lock.finish()
 }
 
 fn read_frame(input: &mut impl BufRead, limit: usize) -> io::Result<Option<Vec<u8>>> {
@@ -726,8 +886,127 @@ mod tests {
         fs::create_dir(&root).unwrap();
         let lock = RunLock::acquire(&root).unwrap();
         assert!(RunLock::acquire(&root).is_err());
-        drop(lock);
+        lock.finish().unwrap();
         fs::remove_dir(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    fn recovery_fixture() -> (registration_fixture::FixtureTempDirectory, PathBuf) {
+        use std::os::unix::fs::DirBuilderExt;
+
+        let temp = registration_fixture::FixtureTempDirectory::create();
+        let root = temp.path().canonicalize().unwrap().join("broker");
+        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        (temp, root)
+    }
+
+    #[cfg(unix)]
+    fn write_private_fixture(path: &Path, bytes: &[u8]) {
+        OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(path)
+            .unwrap()
+            .write_all(bytes)
+            .unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn restart_reclaims_only_released_run_and_preserves_broker_audit() {
+        let (_temp, root) = recovery_fixture();
+        let session = root.join("normal-session.json");
+        let pending = session.with_extension("json.tmp");
+        let audit = root.join("store/audit.jsonl");
+        let health = |id: &str| {
+            json!({
+                "request_id": id, "nonce": id, "operation": "health",
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "payload_hash": crate::broker::protocol::canonical_payload_hash(None),
+                "metadata": {"client": "desktop_flutter"}
+            })
+        };
+        let first = health("macos-before-restart");
+        serve(
+            &root,
+            &VerifiedBundle::default(),
+            &mut io::Cursor::new(format!("{first}\n")),
+            &mut Vec::new(),
+            &mut |_| false,
+        )
+        .unwrap();
+        let previous_audit = fs::read(&audit).unwrap();
+
+        let mut old_run = RunLock::acquire(&root).unwrap();
+        old_run.prepare_session(&session).unwrap();
+        write_private_fixture(&session, b"old synthetic endpoint");
+        write_private_fixture(&pending, b"interrupted synthetic endpoint");
+        assert!(RunLock::acquire(&root).is_err());
+        assert!(session.is_file() && pending.is_file());
+        drop(old_run);
+
+        let mut output = Vec::new();
+        let second = health("macos-after-restart");
+        serve(
+            &root,
+            &VerifiedBundle::default(),
+            &mut io::Cursor::new(format!("{second}\n")),
+            &mut output,
+            &mut |_| false,
+        )
+        .unwrap();
+        let reply: Value = serde_json::from_slice(&output).unwrap();
+        assert_eq!(reply["status"], "accepted");
+        assert!(fs::read(&audit).unwrap().starts_with(&previous_audit));
+        assert!(!session.exists());
+        assert!(!pending.exists());
+        assert!(!root.join("running.lock").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn restart_does_not_adopt_legacy_lock_or_unattributed_endpoint() {
+        let (_temp, root) = recovery_fixture();
+        let session = root.join("normal-session.json");
+        let legacy_lock = root.join("running.lock");
+        write_private_fixture(&legacy_lock, b"");
+        write_private_fixture(&session, b"unattributed endpoint");
+        assert!(RunLock::acquire(&root).is_err());
+        assert_eq!(fs::read(&legacy_lock).unwrap(), b"");
+        assert_eq!(fs::read(&session).unwrap(), b"unattributed endpoint");
+
+        fs::remove_file(&legacy_lock).unwrap();
+        for _ in 0..2 {
+            let mut fresh = RunLock::acquire(&root).unwrap();
+            assert!(fresh.prepare_session(&session).is_err());
+            assert!(!legacy_lock.exists());
+            assert_eq!(fs::read(&session).unwrap(), b"unattributed endpoint");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn restart_refuses_linked_pending_endpoint_before_removing_other_files() {
+        use std::os::unix::fs::symlink;
+
+        let (_temp, root) = recovery_fixture();
+        let session = root.join("normal-session.json");
+        let pending = session.with_extension("json.tmp");
+        let target = root.join("protected");
+        write_private_fixture(&target, b"protected data");
+        let mut old_run = RunLock::acquire(&root).unwrap();
+        old_run.prepare_session(&session).unwrap();
+        write_private_fixture(&session, b"stale endpoint");
+        symlink(&target, &pending).unwrap();
+        drop(old_run);
+
+        let mut recovered = RunLock::acquire(&root).unwrap();
+        assert!(recovered.prepare_session(&session).is_err());
+        assert_eq!(fs::read(&session).unwrap(), b"stale endpoint");
+        assert_eq!(fs::read(&target).unwrap(), b"protected data");
+        assert!(pending.is_symlink());
+        assert!(root.join("running.lock").is_file());
     }
 
     #[test]
