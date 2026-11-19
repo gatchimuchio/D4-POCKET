@@ -278,6 +278,78 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
 
+  for (final switchBroker in [true, false]) {
+    testWidgets(
+      switchBroker
+          ? 'Broker切替で確認中のCompose Tool Previewを閉じる'
+          : 'Settingsを離れると確認中のCompose Tool Previewを閉じる',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final oldTransport = _ComposeScreenTransport();
+        final currentTransport = _ComposeScreenTransport();
+        var unknownOutcomeCount = 0;
+
+        Widget settingsFor(BrokerTransport transport, {bool active = true}) =>
+            MaterialApp(
+              home: Scaffold(
+                body: SettingsScreen(
+                  client: ShellCoreClient.mock(transport: transport),
+                  active: active,
+                  onBrokerMutationOutcomeUnknown: () => unknownOutcomeCount++,
+                ),
+              ),
+            );
+
+        await tester.pumpWidget(settingsFor(oldTransport));
+        await tester.pumpAndSettle();
+        await _tap(tester, 'compose-runtime-agent-catalog-refresh');
+        await _tap(tester, 'compose-agent-agent.codex');
+        await _tap(tester, 'compose-mcp-catalog-refresh');
+        await _tap(tester, 'compose-mcp-server-mcp.local');
+        await _tap(tester, 'compose-mcp-tool-${oldTransport.composeToolId}');
+        await _tap(tester, 'compose-manifest-button');
+        await _tap(tester, 'compose-tool-run-${oldTransport.composeToolId}');
+        await _enter(
+          tester,
+          'compose-tool-action-arguments',
+          '{"query":"needle"}',
+        );
+        await _tap(tester, 'compose-tool-action-submit');
+
+        final confirmation = find.byKey(
+          const ValueKey('compose-tool-preview-owner-confirm'),
+        );
+        expect(confirmation, findsOneWidget);
+
+        await tester.pumpWidget(switchBroker
+            ? settingsFor(currentTransport)
+            : settingsFor(oldTransport, active: false));
+        await tester.pumpAndSettle();
+
+        expect(confirmation, findsNothing);
+        for (final transport in [oldTransport, currentTransport]) {
+          expect(
+            transport.requests.where(
+              (request) => request['operation'] == 'MCP Tool実行',
+            ),
+            isEmpty,
+          );
+        }
+        expect(unknownOutcomeCount, 0);
+        if (!switchBroker) {
+          await tester.pumpWidget(settingsFor(oldTransport));
+          await tester.pumpAndSettle();
+        }
+        await _tap(tester, 'compose-mcp-catalog-refresh');
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.windows),
+    );
+  }
+
   testWidgets('Broker切替中のAI Edit提案はunknownを通知し旧応答を投影・再送しない', (
     tester,
   ) async {

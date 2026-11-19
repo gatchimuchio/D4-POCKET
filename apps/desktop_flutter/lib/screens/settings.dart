@@ -184,6 +184,8 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
   bool _composeCatalogLoading = false;
   bool _composeToolCallInProgress = false;
   bool _composeToolPreviewInProgress = false;
+  int _composeToolInteractionGeneration = 0;
+  DialogRoute<Object?>? _composeToolDialog;
   List<String> _composeRuntimeIds = const [];
   List<ComposeAgentCatalogEntry> _composeAgentCatalog = const [];
   List<ComposeRuntimeCatalogEntry> _composeRuntimeCandidates = const [];
@@ -231,6 +233,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
 
   @override
   void dispose() {
+    _dismissComposeToolDialog();
     if (_updateMutationInProgress ||
         _composeToolCallInProgress ||
         _aiEditInProgress) {
@@ -253,6 +256,10 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
   @override
   void didUpdateWidget(covariant _SettingsScreenStateful oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.active && !widget.active) {
+      _composeToolInteractionGeneration++;
+      _dismissComposeToolDialog();
+    }
     if (!oldWidget.active && widget.active) {
       _updatesFuture = _updateClient?.list();
     }
@@ -1070,6 +1077,12 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     McpConnectionSummary connection,
     McpToolSummary tool,
   ) async {
+    if (!widget.active ||
+        _composeToolDialog != null ||
+        _composeToolPreviewInProgress ||
+        _composeToolCallInProgress) {
+      return;
+    }
     final client = _composeMcpCatalogClient;
     final manifest = _lastAcceptedComposeManifest;
     if (client == null ||
@@ -1081,15 +1094,22 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           '現在の選択と一致するCompose受理済みManifestがありません。先に構成Manifestを作り直してください。');
       return;
     }
+    final generation = _composeToolInteractionGeneration;
+    final catalogHash = _composeCatalogSnapshotHash;
+    bool canContinue() =>
+        mounted &&
+        widget.active &&
+        generation == _composeToolInteractionGeneration &&
+        catalogHash == _composeCatalogSnapshotHash &&
+        identical(manifest, _lastAcceptedComposeManifest) &&
+        _acceptedComposeMatchesDraft;
 
     final controller = TextEditingController(text: '{}');
     var previewRequested = false;
     var actionRequested = false;
     try {
-      final navigator = Navigator.of(context, rootNavigator: true);
-      final route = DialogRoute<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
+      final raw = await _showComposeToolDialog<String>(
+        (dialogContext) => AlertDialog(
           title: Text('Compose構成から${tool.name}を実行'),
           content: SizedBox(
             width: 560,
@@ -1130,9 +1150,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           ],
         ),
       );
-      final raw = await navigator.push(route);
-      await route.completed;
-      if (raw == null || !mounted) return;
+      if (raw == null || !canContinue()) return;
 
       final Object? decoded;
       try {
@@ -1161,11 +1179,15 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         arguments: arguments,
         composeManifest: manifest,
       );
-      if (!mounted) return;
+      if (!canContinue()) {
+        _setComposeMessage('Composeの構成または画面が変わりました。MCP Toolは送信していません。');
+        return;
+      }
       setState(() => _composeToolPreviewInProgress = false);
 
       final proceed = await _showComposedToolPreview(preview);
-      if (proceed != true || !mounted) {
+      if (!canContinue()) return;
+      if (proceed != true) {
         _setComposeMessage('Previewを確認しました。MCP Toolは実行していません。');
         return;
       }
@@ -1200,6 +1222,33 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     }
   }
 
+  Future<T?> _showComposeToolDialog<T>(WidgetBuilder builder) async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final route = DialogRoute<T>(
+      context: context,
+      builder: builder,
+      themes: InheritedTheme.capture(from: context, to: navigator.context),
+      barrierColor: Theme.of(context).dialogTheme.barrierColor ?? Colors.black54,
+    );
+    _composeToolDialog = route;
+    try {
+      final result = await navigator.push(route);
+      await route.completed;
+      return result;
+    } finally {
+      if (identical(_composeToolDialog, route)) _composeToolDialog = null;
+    }
+  }
+
+  void _dismissComposeToolDialog() {
+    final route = _composeToolDialog;
+    if (route == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = route.navigator;
+      if (route.isActive && navigator != null) navigator.removeRoute(route);
+    });
+  }
+
   Future<bool?> _showComposedToolPreview(McpToolActionPreview preview) {
     final nativeOwnerLabel = switch (defaultTargetPlatform) {
       TargetPlatform.macOS => 'Mac native Owner確認へ',
@@ -1207,10 +1256,8 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
       _ => 'Windows native Owner確認へ',
     };
     final visibleBindings = preview.dependencyBindings.take(12).toList();
-    return showDialog<bool>(
-      context: context,
-      useRootNavigator: true,
-      builder: (dialogContext) => AlertDialog(
+    return _showComposeToolDialog<bool>(
+      (dialogContext) => AlertDialog(
         title: const Text('現在状態に束縛したMCP Tool Preview'),
         content: SizedBox(
           width: 640,
