@@ -5898,6 +5898,13 @@ void main() {
       ]),
     );
     expect(find.textContaining(followupTaskId), findsWidgets);
+    expect(
+      find.text(
+        'MCP要求元Task: $sourceTaskId / $sourceResultHash / '
+        'Audit audit-$sourceTaskId-completed',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('AgentのMCP Tool提案をBroker照合・native承認'), findsNothing);
     expect(find.text('未信頼MCP結果を同じAgentの新Taskへ渡す'), findsNothing);
     expect(find.textContaining('AGENT_AUTO_MCP_SECRET'), findsNothing);

@@ -1994,6 +1994,10 @@ class _AgentCenterState extends State<_AgentCenterScreen>
         state.record = updatedTask;
         state.taskBindingRejected = false;
         state.refreshError = null;
+        if (updatedTask.status == 'completed' &&
+            state.mcpSourceTaskRecord?.taskId == updatedTask.taskId) {
+          state.mcpSourceTaskRecord = updatedTask;
+        }
         if (const {
           'completed',
           'failed',
