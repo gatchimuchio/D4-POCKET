@@ -38,6 +38,8 @@ Brokerが新たに登録する利用者別 `.desktop` は、`Exec` の引数の�
 
 Linuxの初回導入では、Brokerが検証した製品ManifestのApp IDとAudit Store IDを照合し、表示に適した `display_name` を有効版記録の `linux_desktop_name` に保存する。利用者別 `.desktop` の `Name` はこの記録から生成し、更新・ロールバック・起動項目の修復でも初回名を使う。旧記録と表示名を採用できないManifestは従来の `D4 Pocket` 表示を使う。アンインストールの照合は同じ製品とAudit Storeに束縛した名前から完全な起動項目を再生成する。
 
+新たに登録するLinuxの利用者別 `.desktop` は、ファイル名と `StartupWMClass` を検証済みApp IDから導出する。GTKの初期化後にX11のウィンドウクラスを `com.d4pocket.<app_id>` に設定し、起動項目と揃える。従来の固定クラスで生成済みの項目は、同じ製品名と起動対象を含む従来の二つの形式に完全一致する場合に再利用する。[GTKのウィンドウクラス](https://docs.gtk.org/gdk3/func.set_program_class.html) [Desktop Entryのキー](https://specifications.freedesktop.org/desktop-entry/latest/recognized-keys.html)
+
 ## 開発専用Windows bundle build
 
 `tooling/export_windows_product.py`はWindows専用の開発用build pathである。clean `main`を要求し、GitHub `origin/main`の読取専用照会で同一commitを確認してから、そのcommitを`git archive`でRepository／OneDrive外の短い一時pathへ展開する。展開器はroot外path、Windows上のcase衝突、file／directory衝突、symlink等を拒否する。Flutter／PubとCargoへ渡す環境変数はallowlist化し、Pub cache、Cargo home、Cargo targetを一時領域へ分離する。

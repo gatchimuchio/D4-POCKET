@@ -115,6 +115,7 @@ static void my_application_startup(GApplication* application) {
   // Perform any actions required at application startup.
 
   G_APPLICATION_CLASS(my_application_parent_class)->startup(application);
+  gdk_set_program_class(APPLICATION_ID);
 }
 
 // Implements GApplication::shutdown.

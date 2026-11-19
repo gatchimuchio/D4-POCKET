@@ -517,7 +517,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.cc",
-      "sha256": "2648ec2e635b06bd9f37aa313a340483778fee02ac7dac4ad6abfa88f1f71138"
+      "sha256": "298f94173350c0c253116df34ffba3294b1c7cd46d4b8f9297e013b71a038674"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.h",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "23ac798cad6570303dcee9e9f19a0c8097947f645974eb9e64a72bc4875707d1"
+      "sha256": "14731e661cd235ae8e607e3b8160a8c7fe6923898b526673b73507601e43ff32"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "e85db3da4ef1df06c35bf9725dcd0d592d3301e3d717673530d4602b42fb632a"
+      "sha256": "cc94311aaa54e8b328791fad8b6e88094961682766ddba19e61eb04e34690dec"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -4205,7 +4205,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "c19bc992f656c460f667d67854166d1d9066f83634efdd4615b9525ad5fc26d2"
+      "sha256": "bf16877d251890aecf640ac31ff713fd4d0b13010838bf5498f4833af205ede5"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
