@@ -12,6 +12,8 @@ const _instructionHash =
     'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const _mcpCapabilityHash =
     'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+const _mcpInstructionHash =
+    'sha256:dc77148bc86d4a4687444ee3ecd4c08eac725a3ff4f1743dbfeeab72cc1de9c2';
 
 Map<String, Object?> _response(
   String operation,
@@ -136,7 +138,7 @@ class _McpTaskPort extends _TaskSubmissionPort {
         '実行系ID': 'codex-runtime',
         '対話セッションID': _sessionId,
         '作業領域ID': 'workspace-a',
-        '指示hash': _instructionHash,
+        '指示hash': _mcpInstructionHash,
         '期限': now + 900,
       });
     }
@@ -340,6 +342,13 @@ void main() {
       _mcpCapabilityHash,
     );
     expect(find.textContaining('申請をBrokerへ送信しました'), findsOneWidget);
+    expect(tester.widget<TextField>(instruction).controller?.text, isEmpty);
+    final card = find.byKey(const ValueKey('mobile-agent-task-$_requestId'));
+    await tester.ensureVisible(card);
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+    expect(find.text('指示hash: $_mcpInstructionHash'), findsOneWidget);
+    expect(find.text('MCP能力を使って調査する'), findsNothing);
     controller.dispose();
   });
 
@@ -521,6 +530,83 @@ void main() {
       },
     );
   }
+
+  testWidgets('Taskの初回観測後にOwner確認待ちへ戻る応答を受理しない', (tester) async {
+    const taskId = 'cccccccccccccccccccccccccccccccc';
+    final firstStatus = Completer<Map<String, Object?>>();
+    final port = _LifecyclePort(
+      runtimeId: 'runtime-old',
+      workspaceId: 'workspace-old',
+      requests: [_ownRequestRow()],
+      statusResponse: firstStatus,
+    );
+    final controller = DeviceLinkController(nativePort: port)..ready = true;
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: MobileAgentTaskScreen(
+          controller: controller,
+          connected: true,
+          active: true,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final card = find.byKey(const ValueKey('mobile-agent-task-$_requestId'));
+    final refresh = find.text('Broker状態');
+    Future<void> openRequest() async {
+      if (refresh.evaluate().isNotEmpty) return;
+      await tester.ensureVisible(card);
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+    }
+
+    await openRequest();
+    await tester.ensureVisible(refresh);
+    await tester.tap(refresh);
+    await tester.pump();
+    expect(port.statusRequestCount, 1);
+    firstStatus.complete(
+      _response('AgentTask端末状態', 'accepted', {
+        '申請ID': _requestId,
+        '状態': 'Task状態',
+        'Task': {
+          'task_id': taskId,
+          '実行系ID': 'runtime-old',
+          '対話セッションID': _sessionId,
+          '作業領域ID': 'workspace-old',
+          '指示hash': _instructionHash,
+          '状態': 'running',
+          '結果hash': null,
+          '結果本文あり': false,
+        },
+      }),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('申請状態をBrokerで更新しました。'), findsOneWidget);
+    await openRequest();
+    expect(find.text('Task: running / $taskId'), findsOneWidget);
+
+    final reload = find.text('登録・申請を更新');
+    await tester.ensureVisible(reload);
+    await tester.tap(reload);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('端末Taskを取得できません'), findsOneWidget);
+    await openRequest();
+    expect(find.text('Task: running / $taskId'), findsOneWidget);
+
+    await tester.ensureVisible(refresh);
+    await tester.tap(refresh);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('操作結果を確認できません'), findsOneWidget);
+    expect(find.textContaining('開始済み'), findsOneWidget);
+    expect(find.textContaining('Owner確認待ち'), findsNothing);
+    expect(port.statusRequestCount, 2);
+    controller.dispose();
+  });
 
   testWidgets('別Controllerへ切り替えた後に旧Task状態を表示しない', (tester) async {
     final oldStatusResponse = Completer<Map<String, Object?>>();

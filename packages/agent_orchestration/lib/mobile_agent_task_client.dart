@@ -1,3 +1,4 @@
+import 'package:broker_contract/broker_request_envelope.dart' show brokerTextHash;
 import 'package:broker_contract/broker_transport.dart'
     show BrokerClientException;
 
@@ -39,6 +40,25 @@ class MobileAgentTaskDraft {
   final String? taskId;
 
   bool get linked => taskId != null;
+
+  MobileAgentTaskDraft withTaskId(String id) {
+    if (!RegExp(_requestIdPattern).hasMatch(id) ||
+        (taskId != null && taskId != id)) {
+      _invalid();
+    }
+    return MobileAgentTaskDraft(
+      requestId: requestId,
+      deviceId: deviceId,
+      runtimeId: runtimeId,
+      sessionId: sessionId,
+      workspaceId: workspaceId,
+      instruction: instruction,
+      instructionHash: instructionHash,
+      createdAt: createdAt,
+      expiresAt: expiresAt,
+      taskId: id,
+    );
+  }
 
   AgentTaskRequest toAgentTaskRequest() => AgentTaskRequest(
         runtimeId: runtimeId,
@@ -287,11 +307,10 @@ class MobileAgentTaskClient {
       _invalid();
     }
     final requestId = body['申請ID'];
-    final hash = body['指示hash'];
+    final hash = brokerTextHash(request.instruction);
     if (requestId is! String ||
         !RegExp(_requestIdPattern).hasMatch(requestId) ||
-        hash is! String ||
-        !RegExp(_hashPattern).hasMatch(hash) ||
+        body['指示hash'] != hash ||
         (body['期限'] as int) <= 900) {
       _invalid();
     }
@@ -300,7 +319,7 @@ class MobileAgentTaskClient {
       runtimeId: request.runtimeId,
       sessionId: request.sessionId,
       workspaceId: request.workspaceId,
-      instruction: request.instruction,
+      instruction: '',
       instructionHash: hash,
       createdAt: (body['期限']! as int) - 900,
       expiresAt: body['期限']! as int,
@@ -345,7 +364,7 @@ class MobileAgentTaskClient {
     if (body['状態'] == 'Task状態') {
       if (!_exactKeys(body, const {'申請ID', '状態', 'Task'})) _invalid();
       final taskBody = _stringMap(body['Task'], 'Agent Task状態');
-      final task = _parseTask(taskBody, expectedTaskId: null);
+      final task = _parseTask(taskBody);
       if (!_matchesDraft(task, draft)) {
         _invalid();
       }
@@ -355,7 +374,8 @@ class MobileAgentTaskClient {
         task: task,
       );
     }
-    if (body.length != 2 ||
+    if (draft.linked ||
+        body.length != 2 ||
         !_exactKeys(body, const {'申請ID', '状態'}) ||
         !const {'Owner確認待ち', '開始候補'}.contains(body['状態'])) {
       _invalid();
@@ -368,6 +388,7 @@ class MobileAgentTaskClient {
 
   Future<MobileAgentTaskRecord> start(MobileAgentTaskDraft draft) async {
     _validateRequestId(draft.requestId);
+    if (draft.linked) _invalid();
     final body = await _acceptedBody('AgentTask端末実行', {
       '申請ID': draft.requestId,
     });
@@ -425,10 +446,7 @@ class MobileAgentTaskClient {
     return _stringMap(response['body'], 'Broker応答');
   }
 
-  static MobileAgentTaskRecord _parseTask(
-    Map<String, Object?> body, {
-    String? expectedTaskId,
-  }) {
+  static MobileAgentTaskRecord _parseTask(Map<String, Object?> body) {
     const keys = {
       'task_id',
       '実行系ID',
@@ -452,7 +470,6 @@ class MobileAgentTaskClient {
     final contentAvailable = body['結果本文あり'];
     if (taskId is! String ||
         !RegExp(_requestIdPattern).hasMatch(taskId) ||
-        (expectedTaskId != null && taskId != expectedTaskId) ||
         runtime is! String ||
         !RegExp(_safeIdentifierPattern).hasMatch(runtime) ||
         session is! String ||
@@ -496,6 +513,7 @@ class MobileAgentTaskClient {
       task.runtimeId == draft.runtimeId &&
       task.sessionId == draft.sessionId &&
       task.workspaceId == draft.workspaceId &&
+      (draft.taskId == null || task.taskId == draft.taskId) &&
       (draft.instructionHash == null ||
           task.instructionHash == draft.instructionHash);
 

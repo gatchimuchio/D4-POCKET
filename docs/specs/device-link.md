@@ -60,6 +60,8 @@ MobileのAgent Task画面で使用者が明示選択した場合だけ、取得�
 
 MobileはTool接続・呼出しを行わず、能力一覧やTask結果本文も取得しない。Device Link共通応答envelopeの監査receiptは共通契約どおり受け取り、Clientが検証後に捨てる。Capability metadata、Agent request、UI選択はいずれもAuthorityではない。
 
+端末申請の受付は、Runtime・Session・Workspaceと、送信した指示のUTF-8 SHA-256を応答へ照合できた場合だけ端末に表示する。不一致の受付応答は結果不明として、Sessionを維持し、一覧を再確認する。成功後は端末の一覧に本文を残さず、申請ID、指示hash、状態を使う。同じ接続内で申請にTask IDが結び付いた後は、状態・取消応答の別Task IDや未開始への後退を拒否する。Desktopの本文確認とBrokerの開始認可は既存経路を使用する。
+
 ## Mobileの保管とlifecycle
 
 Mobileは端末ID、Hostの固定情報、結合ID、端末秘密、有効期限だけをAndroidの安全保管／iOS Keychainへ保存する。招待秘密は結合後に消去する。一般設定、標準preferences、log、clipboardへの自動書出し、バックアップからの自動復元へ秘密を置かない。保管失敗時に平文へfallbackしない。

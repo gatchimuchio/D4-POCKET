@@ -6,6 +6,10 @@ final _idB = List.filled(32, 'b').join();
 final _idC = List.filled(32, 'c').join();
 final _idD = List.filled(32, 'd').join();
 final _hashF = 'sha256:${List.filled(64, 'f').join()}';
+const _mcpInstructionHash =
+    'sha256:3c66dec8914b6e4b454d8a2dd8776acd00c7b491b78f74a19c960f7336556cc5';
+const _inspectionInstructionHash =
+    'sha256:3b7b7ed860ed9123984e0788d04a5285692a16d6c311376d64448f8bdcb40e92';
 
 Map<String, Object?> _accepted(String operation, Object body) => {
   'operation': operation,
@@ -91,7 +95,7 @@ void main() {
         '実行系ID': 'codex-runtime',
         '対話セッションID': _idA,
         '作業領域ID': 'workspace-a',
-        '指示hash': _hashF,
+        '指示hash': _mcpInstructionHash,
         '期限': now + 900,
       });
     });
@@ -112,7 +116,7 @@ void main() {
     expect(payloadSeen.keys, isNot(contains('mcp_result_id')));
   });
 
-  test('申請はAuthorityを含まず、Brokerのfalse保証を照合する', () async {
+  test('送った指示に一致する申請receiptから本文を除く', () async {
     String? operationSeen;
     Map<String, Object?>? payloadSeen;
     final client = MobileAgentTaskClient((operation, payload) async {
@@ -126,7 +130,7 @@ void main() {
         '実行系ID': 'codex-runtime',
         '対話セッションID': _idA,
         '作業領域ID': 'workspace-a',
-        '指示hash': _hashF,
+        '指示hash': _inspectionInstructionHash,
         '期限': now + 900,
       });
     });
@@ -147,12 +151,27 @@ void main() {
       'workspace_id': 'workspace-a',
       'instruction': 'inspect the selected files',
     });
-    expect(draft.instructionHash, _hashF);
+    expect(draft.instructionHash, _inspectionInstructionHash);
+    expect(draft.requestId, _idB);
+    expect(draft.instruction, isEmpty);
     expect(draft.linked, isFalse);
-    expect(draft.toAgentTaskRequest().mobileTaskRequestId, _idB);
-    expect(
-      draft.toAgentTaskRequest().toPayload()['mobile_task_request_id'],
-      _idB,
+
+    await expectLater(
+      client.submit(
+        AgentTaskRequest(
+          runtimeId: 'codex-runtime',
+          sessionId: _idA,
+          workspaceId: 'workspace-a',
+          instruction: 'inspect the selected files ',
+        ),
+      ),
+      throwsA(
+        isA<Exception>().having(
+          (error) => error is MobileAgentTaskSubmissionRejected,
+          '受理後の不一致は確定拒否として扱わない',
+          isFalse,
+        ),
+      ),
     );
   });
 
@@ -206,6 +225,49 @@ void main() {
     ready = false;
     final review = await client.status(draft);
     expect(review.canStart, isFalse);
+  });
+
+  test('既に結び付いた申請はTask ID違いと未開始状態を拒否する', () async {
+    late Map<String, Object?> statusBody;
+    final calls = <String>[];
+    final client = MobileAgentTaskClient((operation, payload) async {
+      calls.add(operation);
+      expect(payload, {'申請ID': _idB});
+      return _accepted(
+        operation,
+        operation == 'AgentTask端末状態'
+            ? statusBody
+            : {
+                '申請ID': _idB,
+                '状態': 'Task取消要求済み',
+                'Task': {..._taskRecord(status: 'cancelled'), 'task_id': _idC},
+              },
+      );
+    });
+    final draft = MobileAgentTaskDraft(
+      requestId: _idB,
+      runtimeId: 'codex-runtime',
+      sessionId: _idA,
+      workspaceId: 'workspace-a',
+      instruction: '',
+      instructionHash: _hashF,
+      createdAt: 100,
+      expiresAt: 1000,
+    ).withTaskId(_idD);
+    statusBody = {'申請ID': _idB, '状態': 'Task状態', 'Task': _taskRecord()};
+    expect((await client.status(draft)).task?.taskId, _idD);
+    statusBody = {...statusBody, 'Task': {..._taskRecord(), 'task_id': _idC}};
+    await expectLater(client.status(draft), throwsA(isA<Exception>()));
+    statusBody = {'申請ID': _idB, '状態': '開始候補'};
+    await expectLater(client.status(draft), throwsA(isA<Exception>()));
+    await expectLater(client.cancel(draft), throwsA(isA<Exception>()));
+    await expectLater(client.start(draft), throwsA(isA<Exception>()));
+    expect(calls, [
+      'AgentTask端末状態',
+      'AgentTask端末状態',
+      'AgentTask端末状態',
+      'AgentTask端末取消',
+    ]);
   });
 
   test('自端末一覧は本文を返さない指示hash付きprojectionを受理する', () async {

@@ -129,6 +129,19 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
       if (!_isCurrentConnection(generation, controller)) return;
       final requests = await _clientFor(controller).ownRequests();
       if (!_isCurrentConnection(generation, controller)) return;
+      final known = {for (final draft in _requests) draft.requestId: draft};
+      final received = {for (final draft in requests) draft.requestId: draft};
+      for (final draft in requests) {
+        final prior = known[draft.requestId];
+        if (prior != null &&
+            (draft.runtimeId != prior.runtimeId ||
+                draft.sessionId != prior.sessionId ||
+                draft.workspaceId != prior.workspaceId ||
+                draft.instructionHash != prior.instructionHash ||
+                (prior.linked && draft.taskId != prior.taskId))) {
+          throw StateError('端末申請の識別情報が一致しません');
+        }
+      }
       setState(() {
         _runtimes = runtimes;
         _workspaces = workspaces;
@@ -140,9 +153,11 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
             ? _workspace
             : (available.isEmpty ? null : available.first);
         _requests = requests;
-        _statuses.removeWhere(
-          (id, _) => !requests.any((request) => request.requestId == id),
-        );
+        _statuses.removeWhere((id, status) {
+          final draft = received[id];
+          return draft == null ||
+              (draft.linked && draft.taskId != status.task?.taskId);
+        });
       });
     } catch (_) {
       if (_isCurrentConnection(generation, controller))
@@ -163,6 +178,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
     final generation = _connectionGeneration;
     final controller = widget.controller;
     if (_busy ||
+        _loading ||
         !_isCurrentConnection(generation, controller) ||
         runtime == null ||
         workspace == null ||
@@ -299,7 +315,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
         return;
       }
       setState(() {
-        _statuses[draft.requestId] = status;
+        _rememberStatus(draft, status);
         _message = '申請状態をBrokerで更新しました。';
       });
     }, readOnly: true);
@@ -307,7 +323,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
 
   Future<void> _start(MobileAgentTaskDraft draft) async {
     final current = _statuses[draft.requestId];
-    if (current?.canStart != true) return;
+    if (draft.linked || current?.canStart != true) return;
     await _perform(draft, (controller, generation) async {
       final task = await _clientFor(controller).start(draft);
       if (!_isCurrentConnection(generation, controller) ||
@@ -315,14 +331,31 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
         return;
       }
       setState(() {
-        _statuses[draft.requestId] = MobileAgentTaskStatus(
-          requestId: draft.requestId,
-          state: 'Task状態',
-          task: task,
+        _rememberStatus(
+          draft,
+          MobileAgentTaskStatus(
+            requestId: draft.requestId,
+            state: 'Task状態',
+            task: task,
+          ),
         );
         _message = 'BrokerがTask開始を受け付けました。Task結果本文はMobileへ送信しません。';
       });
     });
+  }
+
+  void _rememberStatus(MobileAgentTaskDraft draft, MobileAgentTaskStatus status) {
+    final task = status.task;
+    if (!draft.linked && task != null) {
+      _requests = [
+        for (final item in _requests)
+          if (item.requestId == draft.requestId)
+            item.withTaskId(task.taskId)
+          else
+            item,
+      ];
+    }
+    _statuses[draft.requestId] = status;
   }
 
   Future<void> _cancel(MobileAgentTaskDraft draft) async {
@@ -355,7 +388,9 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
   }) async {
     final generation = _connectionGeneration;
     final controller = widget.controller;
-    if (_busy || !_isCurrentConnection(generation, controller)) return;
+    if (_busy || _loading || !_isCurrentConnection(generation, controller)) {
+      return;
+    }
     final operationId = ++_operationSequence;
     _activeOperation = operationId;
     _activeOperationReadOnly = readOnly;
@@ -463,6 +498,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
               key: const ValueKey('mobile-agent-task-submit'),
               onPressed:
                   _busy ||
+                      _loading ||
                       !widget.connected ||
                       !widget.active ||
                       _runtime == null ||
@@ -495,7 +531,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
           _MobileAgentTaskRequestCard(
             draft: draft,
             status: _statuses[draft.requestId],
-            busy: _busy || !widget.connected || !widget.active,
+            busy: _busy || _loading || !widget.connected || !widget.active,
             onRefresh: () => _refreshStatus(draft),
             onStart: () => _start(draft),
             onCancel: () => _cancel(draft),
@@ -533,12 +569,10 @@ class _MobileAgentTaskRequestCard extends StatelessWidget {
         subtitle: Text('$state ・ ${draft.runtimeId} / ${draft.workspaceId}'),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          Align(
+          const Align(
             alignment: Alignment.centerLeft,
             child: SelectableText(
-              draft.instruction.isEmpty
-                  ? '申請本文はDesktopのAgent Centerで確認してください。'
-                  : draft.instruction,
+              '申請本文はDesktopのAgent Centerで確認してください。',
             ),
           ),
           const SizedBox(height: 8),
@@ -567,7 +601,7 @@ class _MobileAgentTaskRequestCard extends StatelessWidget {
                 icon: const Icon(Icons.sync),
                 label: const Text('Broker状態'),
               ),
-              if (status?.canStart == true)
+              if (!draft.linked && status?.canStart == true)
                 FilledButton.icon(
                   onPressed: busy ? null : onStart,
                   icon: const Icon(Icons.play_arrow),
