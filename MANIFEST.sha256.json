@@ -996,6 +996,10 @@
       "sha256": "678647a824ef7ab16066708585790ab265135d32fdf84bcd918a4b050f8891b9"
     },
     {
+      "path": "apps/mobile_flutter/android/app/src/androidTest/kotlin/com/example/gui_shell_mobile/NativeDeviceLinkLifecycleTest.kt",
+      "sha256": "154e353da0643580b90ba0c2e14149d720209c641e7a86460da5aa19b52ee586"
+    },
+    {
       "path": "apps/mobile_flutter/android/app/src/androidTest/kotlin/com/example/gui_shell_mobile/NativeDeviceLinkProductFlowTest.kt",
       "sha256": "978b8f51031934cc9ad9e079e4c70215e7db7bf25ec6ecc0b2574edee4d5b943"
     },
@@ -1641,7 +1645,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "0e06bcb9a58e740c8833b2d2879c51e556302bde3a4f3657bff75c9008ba7574"
+      "sha256": "f88ad9dac0a4fbd608f73e90984927e376e551ecad6eb6be7d520797066177c8"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
