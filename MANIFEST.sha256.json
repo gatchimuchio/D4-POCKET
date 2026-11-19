@@ -1641,7 +1641,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "bef009b88c922e99691e8af07ad9b4472ef17cfc94f27d16bfa0d63ec58f0bf8"
+      "sha256": "4f8eb7734f8bcb1b87aa903d1b8b96abc4aec569bf9324cb1cc3e3bfd89bebac"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1885,7 +1885,7 @@
     },
     {
       "path": "docs/specs/linux-desktop-channel.md",
-      "sha256": "b3d2c3f72933fc3d29b931f16956bbbefe589dbc0966ba06cd0e1e0510c8e221"
+      "sha256": "ff72eedeb17042a9dea4deeb50359e182cc8157568e192a47115caeb8bfd0dec"
     },
     {
       "path": "docs/specs/linux-product-package.md",
@@ -4177,7 +4177,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "8316cf836069bfaa698a65fe4641fdee605ea122f25e353d8d76255711981eba"
+      "sha256": "d0a46212811b6d6940ebea9f1b50926fd5ed90538fc978e0737aec7d8d398281"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -4213,7 +4213,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "ce09d96e5d738bc399426b05df8e3559a3ec2ca99d84ec4064b0172471bda1d0"
+      "sha256": "686654cd0fcd687021917b6ee62d2011676a52debda5ec6d945eb287075eb75a"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -4241,7 +4241,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "14c9afd58052fd9c24257f7d20b1797f6d1c747d383bcf631a0611331b892d85"
+      "sha256": "901609887a292c3e23dcd3861ba9aa7b5f0ba9269c13e22c05884be3fbac76e3"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -4297,11 +4297,11 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_launcher.rs",
-      "sha256": "5d33adee381d991a8706249b572e527ea2031a52cc2e3cbfd587831a7c55fbc6"
+      "sha256": "44062b5b81fe835e519cd44ffa37de683a032b875cdb8997155d434ddaed3178"
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "ae4630112a67c63669adec8e938a55a6eefefe9e75ab10d6dc292476be1c3b82"
+      "sha256": "0dbbd5d87e3626d065e7218f03124684594de49bd54330eaf472c6abc92d9056"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",

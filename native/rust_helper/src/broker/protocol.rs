@@ -1164,6 +1164,9 @@ pub struct Broker {
     #[cfg(feature = "module_setup_doctor")]
     desktop_loopback_bind_verified: bool,
     pub(super) desktop_product_identity: Option<(String, String)>,
+    #[cfg(target_os = "linux")]
+    pub(super) linux_uninstall_handoff:
+        Option<crate::linux_desktop_launcher::ProductUninstallHandoff>,
     #[cfg(test)]
     pub(super) desktop_product_install_local_app_data: Option<PathBuf>,
     #[cfg(test)]
@@ -1217,6 +1220,8 @@ impl Broker {
             desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
             desktop_product_identity: None,
+            #[cfg(target_os = "linux")]
+            linux_uninstall_handoff: None,
             #[cfg(feature = "module_setup_doctor")]
             desktop_loopback_bind_verified: false,
             #[cfg(test)]
@@ -1308,6 +1313,8 @@ impl Broker {
             desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
             desktop_product_identity: None,
+            #[cfg(target_os = "linux")]
+            linux_uninstall_handoff: None,
             #[cfg(feature = "module_setup_doctor")]
             desktop_loopback_bind_verified: false,
             #[cfg(test)]

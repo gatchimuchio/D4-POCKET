@@ -809,6 +809,19 @@ struct ProductUninstallRequest {
     version: u64,
 }
 
+fn product_uninstall_available(broker: &Broker) -> bool {
+    if !broker.desktop_install_path_verified {
+        return false;
+    }
+    #[cfg(target_os = "linux")]
+    return broker
+        .linux_uninstall_handoff
+        .as_ref()
+        .is_some_and(|handoff| handoff.is_available());
+    #[cfg(not(target_os = "linux"))]
+    true
+}
+
 fn request_product_uninstall(
     broker: &mut Broker,
     payload: &Value,
@@ -841,6 +854,16 @@ fn request_product_uninstall(
             OP_UNINSTALL,
             "desktop_native_owner_confirmation_required",
             "導入済み製品の削除にはRust Desktop起動器のnative Owner確認が必要",
+            payload_hash,
+        );
+    }
+    if !product_uninstall_available(broker) {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL,
+            "product_uninstall_handoff_unavailable",
+            "現在の起動器に削除を引き継げないため、終了や削除を要求していません",
             payload_hash,
         );
     }
@@ -2230,7 +2253,7 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
             "適用実行": "suspended",
             "rollback実行": if rollback_available { "available" } else { "suspended" },
             "rollback状態": rollback,
-            "製品アンインストール操作": if broker.desktop_install_path_verified { "available" } else { "suspended" },
+            "製品アンインストール操作": if product_uninstall_available(broker) { "available" } else { "suspended" },
             "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
         }),
         hash,
@@ -6740,6 +6763,9 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn linux_product_uninstall_is_native_owner_bound_and_keeps_audit_outside_product_root() {
+        use crate::linux_desktop_launcher::{ProductLauncherLock, ProductUninstallHandoff};
+        use std::os::unix::fs::DirBuilderExt;
+
         let unique = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -6766,7 +6792,7 @@ mod tests {
         std::fs::create_dir_all(&store_root).unwrap();
         std::fs::write(&audit_marker, b"keep").unwrap();
 
-        let mut broker = Broker::new_persistent("linux-uninstall-test", &store_root).unwrap();
+        let mut broker = Broker::new_persistent("session-1", &store_root).unwrap();
         broker
             .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
             .unwrap();
@@ -6781,6 +6807,37 @@ mod tests {
             linux_desktop_entry_path: entry_path.clone(),
             payload_hash: payload_hash.clone(),
         };
+
+        let runtime = root.join("product-runtime");
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&runtime)
+            .unwrap();
+        let nonce = "a".repeat(32);
+        broker.linux_uninstall_handoff = ProductUninstallHandoff::new(&runtime, &nonce);
+        let not_ready = super::request_product_uninstall(
+            &mut broker,
+            &payload,
+            "linux-uninstall-no-launcher",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(not_ready.status, BrokerStatus::Rejected);
+        assert_eq!(
+            not_ready.error.unwrap().code,
+            "product_uninstall_handoff_unavailable"
+        );
+        assert!(not_ready.body.is_none());
+        assert!(product_root.is_dir());
+
+        let launcher = ProductLauncherLock::acquire(&runtime).unwrap();
+        launcher.bind(&nonce).unwrap();
+        let available = call(&mut broker, BrokerOperation::更新一覧, json!({"版": 1}));
+        assert_eq!(
+            available.body.unwrap()["製品アンインストール操作"],
+            "available"
+        );
 
         let denied = super::request_product_uninstall(
             &mut broker,
@@ -6906,6 +6963,12 @@ mod tests {
         assert_eq!(broker.audit_events().len(), audit_count);
         assert!(product_root.exists());
         assert_eq!(std::fs::read(&audit_marker).unwrap(), b"keep");
+        drop(launcher);
+        let unavailable = call(&mut broker, BrokerOperation::更新一覧, json!({"版": 1}));
+        assert_eq!(
+            unavailable.body.unwrap()["製品アンインストール操作"],
+            "suspended"
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -7326,7 +7389,7 @@ mod tests {
     }
 
     #[test]
-    fn update_list_exposes_uninstall_for_verified_installed_path_without_rollback_metadata() {
+    fn update_list_checks_uninstall_availability_independently_of_rollback_metadata() {
         let mut portable_broker = Broker::new("session-1");
         let portable_list = call(
             &mut portable_broker,
@@ -7348,7 +7411,12 @@ mod tests {
         );
         let body = installed_list.body.expect("更新一覧");
         assert_eq!(installed_list.status, BrokerStatus::Accepted);
-        assert_eq!(body["製品アンインストール操作"], "available");
+        let expected = if cfg!(target_os = "linux") {
+            "suspended"
+        } else {
+            "available"
+        };
+        assert_eq!(body["製品アンインストール操作"], expected);
         assert_eq!(body["rollback状態"]["状態"], "unknown");
         assert!(body["rollback状態"]["現在版"].is_null());
     }

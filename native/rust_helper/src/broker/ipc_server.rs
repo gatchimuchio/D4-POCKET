@@ -43,6 +43,9 @@ pub struct BrokerServerConfig {
     pub(crate) desktop_install_path_verified: bool,
     /// Product Build時に埋込み、要求payloadから受け取らないApp／Audit Store identity。
     pub(crate) desktop_product_identity: Option<(String, String)>,
+    #[cfg(target_os = "linux")]
+    pub(crate) linux_uninstall_handoff:
+        Option<crate::linux_desktop_launcher::ProductUninstallHandoff>,
     /// Desktop起動器だけが設定する、作業領域として登録できない製品保存先。
     pub(crate) desktop_workspace_protected_roots: Vec<PathBuf>,
 }
@@ -67,6 +70,8 @@ impl BrokerServerConfig {
             desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
             desktop_product_identity: None,
+            #[cfg(target_os = "linux")]
+            linux_uninstall_handoff: None,
             desktop_workspace_protected_roots: Vec::new(),
         }
     }
@@ -177,6 +182,10 @@ fn run_loopback_server_inner(
         broker
             .set_desktop_product_identity(app_id, audit_store_id)
             .map_err(BrokerServerError::new)?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        broker.linux_uninstall_handoff = config.linux_uninstall_handoff.clone();
     }
     let mut desktop_agent_workspace_protected_paths =
         vec![config.store_dir.clone(), config.session_file.clone()];

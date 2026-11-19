@@ -6,7 +6,7 @@ use rustix::process::{kill_process_group, test_kill_process_group, Pid, Signal};
 use sha2::{Digest, Sha256};
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
@@ -16,6 +16,7 @@ use zeroize::{Zeroize, Zeroizing};
 
 pub(crate) const LAUNCH_NONCE_ENV: &str = "D4P_LAUNCH_NONCE";
 const UNINSTALL_TICKET_PREFIX: &str = "product-uninstall-";
+const PRODUCT_LAUNCHER_LOCK: &str = "product-launcher.lock";
 const MAX_PRODUCT_MANIFEST_BYTES: u64 = 65_536;
 const EMBEDDED_PRODUCT_MANIFEST_SHA256: Option<&str> =
     option_env!("GUI_SHELL_PRODUCT_MANIFEST_SHA256");
@@ -95,7 +96,10 @@ pub(crate) fn capture_product_uninstall_ticket(
     }
     let result = (|| {
         let nonce = launch_nonce
-            .filter(|nonce| valid_hex(nonce, 32))
+            .filter(|nonce| {
+                ProductUninstallHandoff::new(runtime, nonce)
+                    .is_some_and(|handoff| handoff.is_available())
+            })
             .ok_or_else(|| std::io::Error::other("製品削除後処理のlaunch bindingがありません"))?;
         let path = uninstall_ticket_path(runtime, nonce)
             .ok_or_else(|| std::io::Error::other("製品削除後処理のlaunch bindingが不正です"))?;
@@ -253,13 +257,13 @@ pub(crate) fn cancel_product_uninstall_ticket_for_request(
     Ok(is_cancel)
 }
 
-struct ProductLauncherLock {
-    _file: File,
+pub(crate) struct ProductLauncherLock {
+    file: File,
 }
 
 impl ProductLauncherLock {
-    fn acquire(runtime: &Path) -> Result<Self, LinuxLaunchError> {
-        let path = runtime.join("product-launcher.lock");
+    pub(crate) fn acquire(runtime: &Path) -> Result<Self, LinuxLaunchError> {
+        let path = runtime.join(PRODUCT_LAUNCHER_LOCK);
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -272,16 +276,85 @@ impl ProductLauncherLock {
         let metadata = file
             .metadata()
             .map_err(|_| failure("D4 Pocketの起動状態を確認できません。"))?;
-        if !metadata.is_file()
-            || metadata.uid() != rustix::process::geteuid().as_raw()
-            || metadata.nlink() != 1
-            || metadata.permissions().mode() & 0o077 != 0
-        {
+        if !valid_launcher_lock(&metadata) {
             return Err(failure("D4 Pocketの起動lockが不正です。"));
         }
         flock(&file, FlockOperation::NonBlockingLockExclusive)
             .map_err(|_| failure("D4 Pocketはすでに実行中です。"))?;
-        Ok(Self { _file: file })
+        file.set_len(0)
+            .map_err(|_| failure("D4 Pocketの起動状態を初期化できません。"))?;
+        Ok(Self { file })
+    }
+
+    pub(crate) fn bind(&self, launch_nonce: &str) -> Result<(), LinuxLaunchError> {
+        if !valid_hex(launch_nonce, 32) {
+            return Err(failure("製品起動の相関値が不正です。"));
+        }
+        let mut file = &self.file;
+        file.seek(SeekFrom::Start(0))
+            .and_then(|_| file.write_all(launch_nonce.as_bytes()))
+            .and_then(|()| file.set_len(32))
+            .map_err(|_| failure("製品終了の引き継ぎを固定できません。"))
+    }
+}
+
+fn valid_launcher_lock(metadata: &fs::Metadata) -> bool {
+    metadata.is_file()
+        && metadata.uid() == rustix::process::geteuid().as_raw()
+        && metadata.nlink() == 1
+        && metadata.permissions().mode() & 0o077 == 0
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct ProductUninstallHandoff {
+    lock_path: PathBuf,
+    launch_nonce: String,
+}
+
+impl std::fmt::Debug for ProductUninstallHandoff {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ProductUninstallHandoff")
+            .finish_non_exhaustive()
+    }
+}
+
+impl ProductUninstallHandoff {
+    pub(crate) fn new(runtime: &Path, launch_nonce: &str) -> Option<Self> {
+        valid_hex(launch_nonce, 32).then(|| Self {
+            lock_path: runtime.join(PRODUCT_LAUNCHER_LOCK),
+            launch_nonce: launch_nonce.to_owned(),
+        })
+    }
+
+    pub(crate) fn is_available(&self) -> bool {
+        let checked = || -> std::io::Result<bool> {
+            let file = OpenOptions::new()
+                .read(true)
+                .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK)
+                .open(&self.lock_path)?;
+            let metadata = file.metadata()?;
+            if !valid_launcher_lock(&metadata) || metadata.len() != 32 {
+                return Ok(false);
+            }
+            let mut nonce = [0; 32];
+            (&file).read_exact(&mut nonce)?;
+            if nonce.as_slice() != self.launch_nonce.as_bytes() {
+                return Ok(false);
+            }
+            let current = fs::symlink_metadata(&self.lock_path)?;
+            if !valid_launcher_lock(&current)
+                || current.dev() != metadata.dev()
+                || current.ino() != metadata.ino()
+            {
+                return Ok(false);
+            }
+            Ok(matches!(
+                flock(&file, FlockOperation::NonBlockingLockShared),
+                Err(rustix::io::Errno::AGAIN)
+            ))
+        };
+        checked().unwrap_or(false)
     }
 }
 
@@ -793,8 +866,9 @@ pub fn run() -> Result<(), LinuxLaunchError> {
                 .ok_or_else(|| failure("製品identityを確認できません。"))?;
             let runtime = crate::linux_desktop_worker::prepare_runtime_directory(identity)
                 .map_err(|_| failure("製品runtime directoryを安全に準備できません。"))?;
-            let _launcher_lock = ProductLauncherLock::acquire(&runtime)?;
+            let launcher_lock = ProductLauncherLock::acquire(&runtime)?;
             let launch_nonce = new_launch_nonce()?;
+            launcher_lock.bind(&launch_nonce)?;
             let data_home = data_home
                 .as_deref()
                 .ok_or_else(|| failure("製品の利用者保存領域を確認できません。"))?;
@@ -816,7 +890,7 @@ pub fn run() -> Result<(), LinuxLaunchError> {
                 .ok_or_else(|| failure("製品identityを確認できません。"))?;
             let runtime = crate::linux_desktop_worker::prepare_runtime_directory(identity)
                 .map_err(|_| failure("製品runtime directoryを安全に準備できません。"))?;
-            let _launcher_lock = ProductLauncherLock::acquire(&runtime)?;
+            let launcher_lock = ProductLauncherLock::acquire(&runtime)?;
             run_frontend(&bundle, std::env::vars_os(), None)?;
 
             let data_home = data_home
@@ -835,6 +909,7 @@ pub fn run() -> Result<(), LinuxLaunchError> {
             let installed_bundle = linux_product_bundle::from_launcher(&active_launcher)
                 .map_err(|_| failure("導入後の有効版bundleが不正です。"))?;
             let launch_nonce = new_launch_nonce()?;
+            launcher_lock.bind(&launch_nonce)?;
             dispatch_active_version_and_finalize(
                 &installed_bundle,
                 data_home,
@@ -1340,6 +1415,8 @@ mod tests {
         fs::create_dir_all(&runtime).unwrap();
         fs::set_permissions(&runtime, fs::Permissions::from_mode(0o700)).unwrap();
         let nonce = "a".repeat(32);
+        let launcher = ProductLauncherLock::acquire(&runtime).unwrap();
+        launcher.bind(&nonce).unwrap();
         let ticket = "b".repeat(64);
         let mut response = serde_json::to_vec(&serde_json::json!({
             "request_id": "uninstall-request",
@@ -1374,15 +1451,40 @@ mod tests {
     fn uninstall_ticket_handoff_fails_closed_without_launch_binding() {
         let runtime = unique_root("uninstall-no-binding");
         fs::create_dir_all(&runtime).unwrap();
-        let ticket = "c".repeat(64);
-        let mut response = serde_json::to_vec(&serde_json::json!({
+        fs::set_permissions(&runtime, fs::Permissions::from_mode(0o700)).unwrap();
+        let nonce = "c".repeat(32);
+        let response = serde_json::to_vec(&serde_json::json!({
             "operation": "製品アンインストール要求",
             "status": "accepted",
-            "body": {"ticket": ticket}
+            "body": {"認可監査ID": "test-audit", "ticket": "d".repeat(64)}
         }))
         .unwrap();
-        assert!(capture_product_uninstall_ticket(&mut response, &runtime, None).is_err());
-        assert!(fs::read_dir(&runtime).unwrap().next().is_none());
+        for hint in [None, Some(nonce.as_str())] {
+            let mut unbound = response.clone();
+            assert!(capture_product_uninstall_ticket(&mut unbound, &runtime, hint).is_err());
+            assert!(unbound.iter().all(|byte| *byte == 0));
+        }
+        let launcher = ProductLauncherLock::acquire(&runtime).unwrap();
+        launcher.bind(&nonce).unwrap();
+        let unrelated_nonce = "f".repeat(32);
+        assert!(capture_product_uninstall_ticket(
+            &mut response.clone(),
+            &runtime,
+            Some(&unrelated_nonce)
+        )
+        .is_err());
+        drop(launcher);
+        let reader = File::open(runtime.join(PRODUCT_LAUNCHER_LOCK)).unwrap();
+        flock(&reader, FlockOperation::NonBlockingLockShared).unwrap();
+        assert!(
+            capture_product_uninstall_ticket(&mut response.clone(), &runtime, Some(&nonce))
+                .is_err()
+        );
+        drop(reader);
+        assert!(!uninstall_ticket_path(&runtime, &nonce).unwrap().exists());
+        assert!(!uninstall_ticket_path(&runtime, &unrelated_nonce)
+            .unwrap()
+            .exists());
         fs::remove_dir_all(runtime).unwrap();
     }
 
@@ -1394,6 +1496,8 @@ mod tests {
         fs::create_dir_all(&runtime).unwrap();
         fs::set_permissions(&runtime, fs::Permissions::from_mode(0o700)).unwrap();
         let nonce = "d".repeat(32);
+        let launcher = ProductLauncherLock::acquire(&runtime).unwrap();
+        launcher.bind(&nonce).unwrap();
         let ticket = "e".repeat(64);
         let mut response = serde_json::to_vec(&serde_json::json!({
             "operation": "製品アンインストール要求",

@@ -2,6 +2,7 @@
 use crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations;
 use crate::broker::{BrokerCredentialRole, BrokerEndpoint, BrokerServerConfig};
 use crate::linux_credential_input::LinuxCredentialUi;
+use crate::linux_desktop_launcher::ProductUninstallHandoff;
 use crate::linux_product_bundle::{self, VerifiedBundle};
 use cap_std::fs::Dir;
 use rustix::fs::{flock, FlockOperation};
@@ -356,6 +357,8 @@ fn serve(
         product_identity.is_some() && !desktop_install_path_verified;
     config.desktop_install_path_verified = desktop_install_path_verified;
     config.desktop_product_identity = product_identity;
+    config.linux_uninstall_handoff =
+        launch_nonce.and_then(|nonce| ProductUninstallHandoff::new(runtime, nonce));
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
     let (owner_tx, owner_rx) = mpsc::sync_channel(4);
     let server = thread::Builder::new()
