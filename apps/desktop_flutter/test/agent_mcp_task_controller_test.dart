@@ -905,6 +905,42 @@ void main() {
     );
   });
 
+  test('後続Task開始応答前のdisposeは旧Brokerへ取消を送らない', () async {
+    final result = await _runStaleFollowup(disposeWhileStarting: true);
+
+    expect(result.transport.operations.last, 'AgentTask実行');
+    expect(result.transport.operations, isNot(contains('AgentTask取消')));
+    expect(
+      result.updates.every((update) => update.sessionRecoveryNotice == null),
+      isTrue,
+    );
+  });
+
+  test('後続Taskの指示hashが異なる開始記録を取消に使わない', () async {
+    final result = await _runStaleFollowup(
+      startRecordOverrides: {'instruction_hash': _sourceResultHash},
+    );
+
+    expect(result.transport.operations.last, 'AgentTask実行');
+    expect(result.transport.operations, isNot(contains('AgentTask取消')));
+    expect(
+      result.updates
+          .singleWhere((update) => update.sessionRecoveryNotice != null)
+          .sessionRecoveryNotice,
+      contains('開始記録が事前検査と一致しません'),
+    );
+  });
+
+  test('後続Taskの開始応答が元Task IDを返した場合は取消にも監視にも使わない', () async {
+    final result = await _runStaleFollowup(
+      startRecordOverrides: {'task_id': _sourceTaskId},
+    );
+
+    expect(result.transport.operations.last, 'AgentTask実行');
+    expect(result.transport.operations, isNot(contains('AgentTask取消')));
+    expect(result.transport.operations, isNot(contains('AgentTask状態')));
+  });
+
   test('未完了のRecovery通知observerはBroker取消とTask監視完了を止めない', () async {
     final observerGate = Completer<void>();
     final noticeObserved = Completer<void>();
@@ -1485,25 +1521,28 @@ Future<
       _FakeBrokerTransport transport,
     })> _runStaleFollowup({
   bool cancelRequestFails = false,
+  bool disposeWhileStarting = false,
+  Map<String, Object?> startRecordOverrides = const {},
   AgentTaskExecutionUpdateHandler? onUpdate,
 }) async {
   final taskStartGate = Completer<void>();
   final taskStartRequested = Completer<void>();
-  final responses = _successfulResponses()
-    ..add(
-      _accepted('AgentTask取消', {
-        'task_id': _followupTaskId,
-        'record_version': 2,
-        'agent_runtime_id': 'codex-local',
-        'session_id': _session,
-        'workspace_id': 'workspace-local',
-        'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
-        'instruction_hash': _instructionHash,
-        'status': 'running',
-        'audit_event_id': 'audit-stale-followup-cancel',
-        'result_content_available': false,
-      }),
-    );
+  final responses = _successfulResponses();
+  (responses.last['body'] as Map<String, Object?>).addAll(startRecordOverrides);
+  responses.add(
+    _accepted('AgentTask取消', {
+      'task_id': _followupTaskId,
+      'record_version': 2,
+      'agent_runtime_id': 'codex-local',
+      'session_id': _session,
+      'workspace_id': 'workspace-local',
+      'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+      'instruction_hash': _instructionHash,
+      'status': 'running',
+      'audit_event_id': 'audit-stale-followup-cancel',
+      'result_content_available': false,
+    }),
+  );
   final transport = _FakeBrokerTransport(
     responses,
     blockedRequests: {'AgentTask実行': taskStartGate},
@@ -1520,21 +1559,25 @@ Future<
   );
 
   await taskStartRequested.future.timeout(const Duration(seconds: 1));
-  await coordinator.observeStartedTask(
-    request: _sourceRequest,
-    task: const AgentTaskRecord(
-      taskId: '99999999999999999999999999999999',
-      runtimeId: 'codex-local',
-      sessionId: _session,
-      workspaceId: 'workspace-local',
-      instructionHash: _instructionHash,
-      status: 'completed',
-      auditEventId: 'audit-replacement-task',
-    ),
-    expectedInstructionHash: _instructionHash,
-    allowMcpContinuation: false,
-    onUpdate: (_) {},
-  );
+  if (disposeWhileStarting) {
+    coordinator.dispose();
+  } else {
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: const AgentTaskRecord(
+        taskId: '99999999999999999999999999999999',
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'completed',
+        auditEventId: 'audit-replacement-task',
+      ),
+      expectedInstructionHash: _instructionHash,
+      allowMcpContinuation: false,
+      onUpdate: (_) {},
+    );
+  }
 
   taskStartGate.complete();
   await oldRun.timeout(const Duration(seconds: 1));

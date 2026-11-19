@@ -163,6 +163,7 @@ class AgentMcpTaskController {
     required AgentTaskRecord sourceTask,
     required bool Function() isCurrent,
     required FutureOr<void> Function(AgentMcpTaskUpdate update) onUpdate,
+    bool Function()? isSupersededInSession,
     FutureOr<void> Function(String message)? onSessionNotice,
   }) async {
     sourceRequest.validate();
@@ -377,8 +378,20 @@ class AgentMcpTaskController {
     );
     _requireCurrent(isCurrent);
     final followupTask = await _tasks.start(followupRequest);
+    if (followupTask.taskId == sourceTask.taskId ||
+        !followupTask.isBoundTo(
+          followupRequest,
+          expectedInstructionHash: preflight.instructionHash,
+        )) {
+      const message = '後続Taskの開始記録が事前検査と一致しません。BrokerでTask状態を再確認してください。';
+      if (isSupersededInSession?.call() == true) {
+        await onSessionNotice?.call(message);
+      }
+      throw const BrokerClientException(message);
+    }
     if (!isCurrent()) {
-      if (const {'pending', 'running'}.contains(followupTask.status)) {
+      if (isSupersededInSession?.call() == true &&
+          const {'pending', 'running'}.contains(followupTask.status)) {
         try {
           await _tasks.cancel(followupTask.taskId);
         } on Object {
@@ -392,7 +405,7 @@ class AgentMcpTaskController {
         );
       }
       throw const BrokerClientException(
-        '後続TaskのBroker受理後に元TaskまたはSessionが失効したため、Task取消要求を送信しました。停止完了はBroker状態の再確認が必要です',
+        '後続TaskのBroker受理後に元TaskまたはSessionが失効しました。BrokerでTask状態を再確認してください。',
       );
     }
     await emit(

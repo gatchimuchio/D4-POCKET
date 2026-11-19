@@ -292,6 +292,7 @@ class AgentTaskExecutionCoordinator {
             sourceRequest: run.request,
             sourceTask: sourceTask,
             isCurrent: () => _isCurrent(run),
+            isSupersededInSession: () => !_disposed && !run.active,
             onUpdate: (update) => _emit(run, mcpUpdate: update),
             onSessionNotice: (message) => _emitSessionNotice(run, message),
           );
