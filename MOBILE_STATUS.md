@@ -1,6 +1,12 @@
 # Mobile 状態
 
-## v5の現在の対象・受入状態（2026-11-14）
+## 現行の対象・証拠境界（2026-11-21 v9 NLC04）
+
+現行正本は[仕様 v9](docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl)・[工程 v9](docs/QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl)・[施工指示 v9](docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl)、採用の範囲は[v9採用記録](docs/QE_2026-11-21/採用記録.md)に従う。Android／iOSは必須対象で、Android Emulator／iOS Simulator上のinstalled製品QAと、正式identity・署名・配布の成立を分ける。iOS Simulator実行物とDevice配布物のSHA・ABI・署名も分離し、Simulatorを実Deviceの証拠にしない。非Windows物理端末の取得を施工・QAの必須条件にしない。
+
+[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)は旧対象・時点の履歴と未閉包を保持する。今回、v9候補のMobile製品状態・QAは再評価していない。以下の日時付き本文の「現行」「現在」も当時の意味に限り、過去のP13・build・端末証拠やFAILを現候補へ付け替えない。
+
+## v5の対象・受入状態（履歴、2026-11-14、非現行）
 
 Android／iOSは必須のMobile製品対象である。現行要求は[2026-11-14 v5採用記録](docs/QE_2026-11-14/採用記録.md)、現行状態は[v5進捗](docs/QE_2026-11-14/進捗.md)、v4時点のMobile受入移行は[旧差分台帳](docs/QE_2026-11-13/差分移行台帳.md)を参照する。v5の標準Android Emulator／iOS Simulatorへinstalled製品を導入するQAとSource/Artifact identityは未成立。非Windows物理端末の取得や試験は施工開始・製品QAの必須条件ではない。Simulator実行物と配布用Device Binary、正式identity／署名／配布は区別し、別のRelease Gateを維持する。過去のP13・端末状態は以下の履歴であり、v5候補の証拠ではない。
 

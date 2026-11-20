@@ -1,6 +1,12 @@
 # GUI Shell の主張境界
 
-## v5の現行主張・保証範囲（2026-11-14）
+## 現行の主張・保証範囲（2026-11-21 v9 NLC04）
+
+現行正本は[仕様 v9](docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl)・[工程 v9](docs/QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl)・[施工指示 v9](docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl)、採用の範囲は[v9採用記録](docs/QE_2026-11-21/採用記録.md)に固定する。Windows／macOS／Linux／Android／iOSはすべて必須対象である。文書採用は製品の実装完了・OS別QA・署名・配布・Owner GOの成立を意味しない。
+
+[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)は旧対象・時点の履歴と未閉包確認を保持し、v9候補の再評価は今回未実施とする。出荷関門は`release_blockers.registry.json`と同一候補の実証・本人の独立判断で保持する。以下の日時付き本文の「現行」「現在」は記録当時を指し、現在の適用文書や製品保証へ読み替えない。
+
+## v5の主張・保証範囲（履歴、2026-11-14、非現行）
 
 現行製品はD4 Pocketで、Windows／macOS／LinuxのDesktopとAndroid／iOSのMobileを必須対象とする。Windows-firstは優先順位であり、Linuxを開発用の補助対象へ限定しない。現行の製品要求・工程・状態は[v5採用記録](docs/QE_2026-11-14/採用記録.md)と[v5進捗](docs/QE_2026-11-14/進捗.md)、旧v4は[当時の履歴](docs/QE_2026-11-13/進捗.md)。rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、QE施工方法は[2026-10-22 QE正本](docs/QE_2026-10-22/採用記録.md)、出荷関門は`release_blockers.registry.json`を参照する。v5の標準OS installed製品QAは未成立であり、過去の局所実証をv5候補へ転記しない。各OSでInstaller/Packageを導入してサービス利用できる完成製品を目標とし、Windows所有PCの完成品最終確認以外のOS別物理端末試験を必須としない。非Windowsは宣言標準OSの合法な仮想/hosted/Emulator/Simulatorで検査し、未実証範囲の保証を主張しない。
 

@@ -1,6 +1,12 @@
 # GUI Shell ロードマップ
 
-## 現行統合製品工程（2026-11-16 v8）
+## 現行統合製品工程（2026-11-21 v9 NLC04）
+
+現行正本は[製品仕様書 v9](docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl)・[統合工程表 v9](docs/QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl)・[施工指示書 v9](docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl)とし、採用範囲・原文固定は[v9採用記録](docs/QE_2026-11-21/採用記録.md)に従う。製品進捗は[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)を対象・時点・未閉包ごとに保持する。今回の採用でv9候補の状態は再評価しておらず、旧E/W/N状態を自動転記しない。工程の開始・退出・独立線継続は現行工程表・施工指示書だけを適用し、旧台帳を番号順schedulerへ変換しない。
+
+### 履歴：2026-11-16 v8・2026-11-19 v8R2（非現行）
+
+次の段落の「現行」「現状」は当時を指す。状態・結果本文は変更せず、現在の適用先は上記v9三点とする。
 
 現行正本は[`docs/QE_2026-11-16/`](docs/QE_2026-11-16/)のv8製品仕様書・v8工程表と、2026-11-19のOwner指示で正式投入した[施工指示書 v8R2](docs/QE_2026-11-16/03_D4Pocket_CODEX_v8R2_LLM_JA.md)とする。採用の経緯は[採用記録](docs/QE_2026-11-16/採用記録.md)を参照する。現状はE0再同期済み、E1全Source初回施工中、E2/E3未完、E4/E5未実施、E6未開始。各工程の詳細な完了判定は現行三点を参照する。
 
@@ -12,9 +18,9 @@
 
 ### 履歴：2026-11-13 v4（非現行）
 
-当時ユーザー指示により採用したv4仕様・工程・Codex施工指示はdocs/QE_2026-11-13/に保存し、v4採用記録と当時の進捗を参照する。v4ではE0の全要求照合後、A〜Jを同じ全体BUILD期間へ投入し、E1全体BUILD→E2接続→E3 BUILD_COVERED→E4全体QC→E5標準OS QA→E6 Release Reviewへ進むと定義した。W00〜W08、P／B／Q等は要求・受入座標・履歴であり、番号順の施工待ちにしない。v4初期状態はW00=SCOPED_PASS、W01/G1=CLOSED（Windows normal Release／Codex CLI限定）、W02/G2=OPEN、B5=OPEN、B6未完了、正式Q0〜Q7=DEFERRED、Release Blockerは18件中16件unresolved／2件resolved、release_ready=false。v3以前の採用記録・進捗・失敗は履歴として保持し、v4当時の状態を上書きしない。非Windowsの物理端末を製品施工・QAの必須条件にせず、宣言対象OSのinstalled製品を標準VM/hosted/Emulator/Simulatorで検証するとした。**本項はv4履歴であり、現行施工に適用する順序・着工Gateは冒頭のv8を使用する。**
+当時ユーザー指示により採用したv4仕様・工程・Codex施工指示はdocs/QE_2026-11-13/に保存し、v4採用記録と当時の進捗を参照する。v4ではE0の全要求照合後、A〜Jを同じ全体BUILD期間へ投入し、E1全体BUILD→E2接続→E3 BUILD_COVERED→E4全体QC→E5標準OS QA→E6 Release Reviewへ進むと定義した。W00〜W08、P／B／Q等は要求・受入座標・履歴であり、番号順の施工待ちにしない。v4初期状態はW00=SCOPED_PASS、W01/G1=CLOSED（Windows normal Release／Codex CLI限定）、W02/G2=OPEN、B5=OPEN、B6未完了、正式Q0〜Q7=DEFERRED、Release Blockerは18件中16件unresolved／2件resolved、release_ready=false。v3以前の採用記録・進捗・失敗は履歴として保持し、v4当時の状態を上書きしない。非Windowsの物理端末を製品施工・QAの必須条件にせず、宣言対象OSのinstalled製品を標準VM/hosted/Emulator/Simulatorで検証するとした。**本項はv4履歴であり、現行施工に適用する順序・着工Gateは冒頭のv9を使用する。**
 
-QE段階・BUILD_BATCH・結合後QC／QAの共通方法論はOwner採用済みの[`docs/QE_2026-10-22/`](docs/QE_2026-10-22/)を保持する。製品要求・工程退出・施工順はv8三点セットを現行とする。以下のv3〜v5施工記録は履歴であり、冒頭v8現行工程の状態を上書きしない。
+QE段階・BUILD_BATCH・結合後QC／QAの共通方法論はOwner採用済みの[`docs/QE_2026-10-22/`](docs/QE_2026-10-22/)を保持する。製品要求・工程退出・施工順はv9三点セットを現行とする。以下の旧施工記録は履歴であり、現行工程の成立を証明せず、既存の未閉包・FAILも消去しない。
 
 ## 2026-11-09〜11-12 v3施工履歴（非現行）
 
@@ -100,7 +106,7 @@ QE段階・BUILD_BATCH・結合後QC／QAの共通方法論はOwner採用済み�
 
 是正追補（2026-10-22、`D4-AUD-F01`）: C32の参照path正規化とroot外拒否を修正し、有限是正を`VERIFIED`として閉鎖した。Windows／WSL Ubuntuで対象6試験が各PASSし、変更していないC32対応表のPOSIX偽不在256件は0件となった。[F01是正記録](docs/specs/final-development-audit.md)を参照。製品状態と既存Release Gateを保持し、次は`D4-AUD-F03`の実績文書同期へ進む。
 
-履歴注記（2026-10-22）：QE方法論・工程・BUILD_BATCHの運用および`D4-AUD-20261022`是正手順は、[採用記録付き2026-10-22 QE統合3点](docs/QE_2026-10-22/採用記録.md)に採用記録とともに保持し、共通QE方法論として適用する。本書は工程履歴・製品ロードマップを保持する。製品phase／Acceptance／証拠状態の現行正本は[`docs/QE_2026-11-16/`](docs/QE_2026-11-16/)のv8三点セット・進捗であり、[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)はrev5当時の機能受入れ・証拠履歴を保持する。2026-10-22当時に記録したCLOSED／FAIL、Linux native必須性、正式Q0〜Q7 `DEFERRED`、通常Release `task_execution=unsupported`／`release_ready=false`はその時点の状態として保持し、現在状態はv8正本とRelease Registryで判断する。以下の小単位ごとの運用記述に旧方式の残差がある場合、施工・検証・Git閉包の単位はv8工程表・施工指示書に従う。
+履歴注記（2026-10-22）：QE方法論・工程・BUILD_BATCHの運用および`D4-AUD-20261022`是正手順は、[採用記録付き2026-10-22 QE統合3点](docs/QE_2026-10-22/採用記録.md)に採用記録とともに保持し、共通QE方法論として適用する。本書は工程履歴・製品ロードマップを保持する。製品要求・工程・施工の現行正本は冒頭の[v9採用記録](docs/QE_2026-11-21/採用記録.md)に束縛した三点であり、証拠状態はv8継続施工証拠・v5継続N/W受入証拠と分離する。[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)はrev5当時の機能受入れ・証拠履歴を保持する。2026-10-22当時に記録したCLOSED／FAIL、Linux native必須性、正式Q0〜Q7 `DEFERRED`、通常Release `task_execution=unsupported`／`release_ready=false`はその時点の状態として保持し、v9候補への再評価を文書採用で代替しない。出荷判定にはRelease Registryと対象候補の実証が別途必要である。以下の小単位ごとの運用記述に旧方式の残差がある場合、施工・検証・Git閉包の単位はv9工程表・施工指示書と現行AGENTS.mdに従う。
 
 現行追補（2026-10-22、Linux導入済みMCP受入れ実行 #107）: 手動起動した`workflow_dispatch`の[実行 #107](https://github.com/gatchimuchio/D4-POCKET/actions/runs/39688466328)は検査対象のcommit `bf2a51ac955eb5b9d7b6ecccdf0a21ee0875b96c`で実行対象の処理段階がPASSした（ロールバック／書き出し／アンインストールと資格情報保管庫の受入れ段階は対象外SKIP）。導入済み製品バージョン `0.1.0`のパッケージのSHA-256は`8115cbd53177b1d507846ddb37d6e659b58b5d65d8deb0536fc63029bd14dec2`。Ubuntu 24.04 ホスト型Xvfb／X11の導入済みGTK製品から、新規要求に対するnative Owner確認の拒否ではstdio子プロセスが起動せず、別要求のOwner許可後に固定`/usr/bin/python3`の合成MCP子プロセスを起動し、`server/discover`／`tools/list`／一回だけのOwner承認付き`tools/call`を通過した。UIは`LIVE_RUNTIME`の結果ハッシュ／内容種別／監査受領票だけを表示し、結果本文はUI・Audit・ログ・受入れ記録に露出しなかった。切断拒否は子プロセス群を維持し、別のOwner許可でBroker接続を除去して所有プロセス群を停止した。導入済みアプリの通常終了、実行用ルート清掃、実行後に変更のない作業ツリー、45件を記録したファイル保存型監査連鎖／anchor HMAC検証もPASSした。成果物は生成されていない。対象はローカル合成サーバー、未署名の試験用識別情報、自動AT-SPI／キーボードによるX11受入れに限る。Wayland描画、外部Provider／資格情報注入、正式署名／配布、Linux製品全体の完成は示さない。このMCP導入済み利用経路は受入れ済みとして再試験せず、Linux必須対象の未成立の利用経路を現行進捗から続行する。`linux_native_product_support=unresolved`、通常リリース `task_execution=unsupported`、`release_ready=false`を維持する。
 
@@ -318,6 +324,8 @@ P13 iOS局所検証: 手動Actions実行 [#22](https://github.com/gatchimuchio/G
 
 2026-10-06 rev5 P11追補: 欠損した固定root Bootstrapper／固定Start Menu shortcutだけを復元する限定Repairに続き、有効版payload内の欠損fileを同一の現在trust済みpackageから補う限定Repairを既存Broker applyへ接続した。既存fileの内容不一致は拒否し、上書きしない。Cargo focused integration test 1件、Flutter対象test 13件、変更Dart解析、Windows Debug build PASS（MSB8029 Temp中間directory warning）。証拠はBroker／UI fixtureとcompileであり、全payload・破損active recordの復旧や導入済み製品の連続LIVE_RUNTIMEを示さない。完全Repair、Installer、installed end-to-end、crash／電源断Recoveryは未成立。P11はOPENを維持し、現行詳細は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
 
+履歴境界：次の2026-11-16状態は当時の本文を保持する。現在の適用文書は冒頭のv9三点・採用記録、旧状態は対象を固定した継続証拠であり、v9候補の再評価ではない。
+
 状態（2026-11-16 v8）：D4 Pocket / GUI-Shell統合v8工程で開発中。現行の工程・実装状況は`docs/QE_2026-11-16/進捗.md`、製品仕様・工程・施工順は同ディレクトリのv8三点セットを正本とする。v5のR2／P系列の受入れ記録は当時の履歴であり、v8工程状態へ読み替えない。Technical Completeおよび正式releaseは未成立。
 
 2026-10-06 rev5 P11追補: Windows Export Manifest fileの任意`update_trust`をRust Brokerのcompile-time公開trustへ結合し、製品Brokerが編集可能な永続trust fileを権限源にしない経路を追加。汎用Brokerの既存永続trustは維持し、製品trust未設定はfail-closed。Rust Update Center 25件、Schema 161／157／208、Conformance 236 checksがPASS。証拠はunit／fixture／contractに限り、configured-trust Windows product build、実配布元、installed updateを未証明。P11はOPEN。
@@ -330,7 +338,7 @@ P3 Agent引継ぎ（rev5実装指示書ではR4）も2026-10-05にProduct Build�
 
 P7ではA2A loopback、Host registry／表示面、local・remote／degraded区分、Adapter既存record操作、Manifest metadata導入／更新を接続し、rev5の「実接続または決定的fixtureで主要経路成立」を2026-10-05に満たしたためProduct Buildを閉鎖した。P8ではRuntime／Agent／Tool／MCP参照ID、UI構成設定、Module plan、Preview、proposal-only AI EditをDesktop設定面とBrokerへ接続し、一構成をManifestとして生成できるため同日に閉鎖した。P9ではManifest fixtureから実行可能Windows portable bundleを生成し、製品別IDのruntime rootへFlutter child／Rust起動器を起動した。P10では選択外画面の機能上の除外をWidget試験とWindows Export build設定で確認した。当時の次phaseはP11 Windows Productization。実Host間通信・remote capability、外部Adapter artifactのdownload／filesystem導入・削除・process管理、Windows installed／別user profile evidence、署名・Installer、実binary pruningは当時未成立のrelease blockerとして保持し、P7のC17〜C19やrelease全体を完成扱いしなかった。根拠は`docs/REV5_PRODUCT_PROGRESS.md`、`docs/specs/gui-shell-compose.md`、`docs/specs/host-operation-surface.md`、`docs/specs/adapter-management-surface.md`。
 
-本書の以下の過去日付付き記録は、記録当時の証拠・計画を保持する。v8の現在状態と作業順を判断するときは冒頭の現行正本を優先し、過去の「現行」表記を現在状態として再利用しない。
+本書の以下の過去日付付き記録は、記録当時の証拠・計画を保持する。現行の要求と作業順は冒頭のv9正本を適用し、状態は対象・時点を固定した証拠から別に判断する。過去の「現行」表記を現在状態として再利用しない。
 
 P11追補（2026-10-06）: 署名済みpackageの未起動version stagingを、Broker fixture上で既存stage再開まで接続した。再適用では既存fileが同一packageのbyte prefixと一致する部分だけ再利用し、完了後にfile／directory inventoryを全照合する。相違byte、package外entry、reparse pointは保持して拒否し、再試行ごとにnative Owner確認とdurable Auditを要求する。部分stage／完全stageのfixture試験はPASS。別のBroker fixtureでは1.1.0から記録済み1.0.0へのRollback、stale対象／通常IPC拒否、Audit、stage保持、Start Menu不変更を確認した。これらは実導入済み製品 process crash／電源断後のLIVE_RUNTIME Recoveryやinstalled Rollbackではない。Installer、Uninstaller、installed起動・切替・Rollback、installed path検証を含むP11はOPENのまま。
 

@@ -113,7 +113,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "218d1ebf24482e5276f756674cb5e2daef657884d5edeab74c1c4be11d041a85"
+      "sha256": "2dd4656b622987592cda06940ef8d69764fbdcc9ddcb50f30671aea20bf0b4b8"
     },
     {
       "path": "AUDIT.md",
@@ -129,11 +129,11 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "2c3b228fc145fc3bfc7610472915982768dcef2043888e6fa1414adf77cf831f"
+      "sha256": "2eed328443f0bc14358da580666370419767829de75b34f96c5cb061c31c0a8b"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
-      "sha256": "20d3d1d0d64e442f33e557d48ac83d0461608c3c756ecf3a96a7cd4d1aaab170"
+      "sha256": "975ff78313aeb585279963ae126188f6b9f1346ff4ea2b473e9c11531523922b"
     },
     {
       "path": "CONFIG.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "INSTALLER_STATUS.md",
-      "sha256": "5b4bbb5fc4b12043990106a83fe34217c7c26ccb847eb825545847643e0abf5a"
+      "sha256": "77784d18662caa1662b3ee462f36fd485f37b7af8c0029f0a2900eadc3920b07"
     },
     {
       "path": "LICENSE",
@@ -165,7 +165,7 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "99dae77d9e4c8f77008d7b0ec786b107650d2f020a9f2047a3fa1936b9be9bcf"
+      "sha256": "b30c764cc8b2e76908cabf01693ca35dad5eca6297c83ed54718365846cba947"
     },
     {
       "path": "NOTICE",
@@ -173,19 +173,19 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "faccad54a62eef0f711d1b1d29cd251acdb0b5d2acaf5b3d990a47ca701fb0b2"
+      "sha256": "67b2c3afea63242f4f96805e16751d5222d7cdf4bbd9b72e0ebe5dc5a906f6ff"
     },
     {
       "path": "README.md",
-      "sha256": "fed3566d8edb24de027952baf7bfd5b8cba0ae21bd4fd86f206abede43aed86f"
+      "sha256": "05371bc9294bfc34ef5b7fccd9cba468358afc6d227168505d2043828a5bcd6d"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "376ba18cf0b16dbaa2d4e4ea752334a50962c4c3b92462a9b90fb1e65a49ab8c"
+      "sha256": "008c7e0592bd39c57ba30555896b21760f52bf0aef079572f938d7924fb04b4b"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "7a0986fe73dacbaadea0c34350176ea06127d940d2a4eb2f3a463893460006a6"
+      "sha256": "12dc31c0141d7c589dfafceb7f0b328f026ddea47c18566b1b392c5b3a266c39"
     },
     {
       "path": "SECURITY.md",
@@ -1421,7 +1421,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "91f6a5be516a76a1c7d0925d096f38ca1c45b78d1ffd2fcf318fabe60172ad5d"
+      "sha256": "342d78f9e6d837344d088aca498a2f18c1662e3ef9fb438fe7d04a9d72d57331"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1437,7 +1437,7 @@
     },
     {
       "path": "docs/LANGUAGE_POLICY.md",
-      "sha256": "40321d7076ab0bc042d78fccdd20fbb25ebbef85cb677c6777cdec37923896a6"
+      "sha256": "ab654904fe4af1d88e4ed9cf66b49eae06cfcd410620e9a1622b60eab77524cc"
     },
     {
       "path": "docs/MUTATION_VERIFICATION.md",
@@ -1650,6 +1650,22 @@
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
       "sha256": "1152d139b1696fe01cc10139a566478809dcc2079e2a4ebd95b4333bef31b4d6"
+    },
+    {
+      "path": "docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl",
+      "sha256": "3bfaaf9383df384e6651fa7fec84b5e09d6d8c1275ae82ae9f63650ce4f5c50f"
+    },
+    {
+      "path": "docs/QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl",
+      "sha256": "47d75ea9691321737c771668c2cf77588acafd9f99a5e89671d34fde54a38c37"
+    },
+    {
+      "path": "docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl",
+      "sha256": "2df47c8523dfd3abd22d1a87bb12fdbf7408832369aabde0d01ed1390faa839e"
+    },
+    {
+      "path": "docs/QE_2026-11-21/\u63a1\u7528\u8a18\u9332.md",
+      "sha256": "ca07760f4141700892cb0129d7d12467e15731be1d6fd738fecd3b562a37799b"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4985,7 +5001,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "11a1f0854a54cdee44735e37eada75f3d3a21ac0fbd9d7e69c00301cf2025548"
+      "sha256": "9ce6006fecda5d425ad4e60195577d4135e58955884407d2c7c7f7d0e223cc42"
     },
     {
       "path": "requirements-dev.txt",
@@ -5801,7 +5817,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "18467fcc95df9c62600905e7872e3dae1c917bac6fbef8369fa4f09572b19be8"
+      "sha256": "ea66e92a3b9ced428abb536f361c830dd4dd9d4dd64c65abf7e071461f8b577d"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5826,6 +5842,10 @@
     {
       "path": "tooling/conformance_tests/windows_surface_geometry.ps1",
       "sha256": "181de4451db2c3689e125727691522aafe170490eafac25ef787b5610eb7096a"
+    },
+    {
+      "path": "tooling/current_governance_check.py",
+      "sha256": "bfdf5253bbd878790f653d1e4717cbedf76ec503b234a822c3b3093298194b92"
     },
     {
       "path": "tooling/device_link_live_check.py",
@@ -5957,7 +5977,7 @@
     },
     {
       "path": "tooling/release_gate_check.py",
-      "sha256": "5a7fa09365f30725400bee7cc5dda4bf1badd490f16e0bac20a68e3c9d4990d3"
+      "sha256": "783c68cba5420bf3c4a394e79e459065d99ebcca55e8fdffc087d83970285374"
     },
     {
       "path": "tooling/release_runtime_assertions.py",
@@ -6044,6 +6064,10 @@
       "sha256": "f6699282b9be85277bb74da37d6606dd11d500c78f2589d36ef77fa528082fa0"
     },
     {
+      "path": "tooling/tests/test_current_governance_check.py",
+      "sha256": "32cc40c4ec5d7654cb35e0503ea81310dc5f14ac157ee2ce1671055994d60190"
+    },
+    {
       "path": "tooling/tests/test_export_linux_product.py",
       "sha256": "1b514eedc13e043ad2c38fc15c20d7b14a00457d1b3e6e8317ba1cccfc8e7a49"
     },
@@ -6117,7 +6141,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "c39ea51ea48f7d64ed5743152a9c990759f9979f069abc65ef3f231b48ec1490"
+      "sha256": "853143e05d0434c3d11c773793a4be4521290468be4ed64104361abeb2fb335c"
     },
     {
       "path": "tooling/windows_dpapi_check.ps1",
@@ -6141,7 +6165,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "03a9836050f60a721f2b24593968fa7eef164b3a62080ea35ea17eb74125bd04"
+      "sha256": "ca8ca9f3213967960780326fcc532f23689aa514711350049148691d8cf89c7b"
     }
   ]
 }

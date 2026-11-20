@@ -116,6 +116,11 @@ def build_steps(
             python_step("tooling/日本語基底監査.py", "--strict"),
             ROOT,
         ),
+        ValidationStep(
+            "current_governance_check",
+            python_step("tooling/current_governance_check.py"),
+            ROOT,
+        ),
         ValidationStep("schema_check", python_step("tooling/schema_check/check_schemas.py"), ROOT),
         ValidationStep(
             "conformance_skeleton",

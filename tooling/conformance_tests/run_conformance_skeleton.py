@@ -61,6 +61,7 @@ from tooling.packaging_portability_check import (
 )
 from tooling.release_gate_check import (
     BLOCKER_CAUSE_CATEGORIES,
+    CONTINUING_ACCEPTANCE_PROGRESS,
     CURRENT_FACING_RELEASE_DOCS,
     RELEASE_TRACKS,
     SCAN_FILES,
@@ -3954,16 +3955,18 @@ def test_strict_release_requires_current_n_w_consumer_evidence() -> list[str]:
         no_evidence = complete_ledger.replace("[evidence](evidence.md)", "[evidence](missing.md)", 1)
         if not any("W00" in error and "evidence" in error for error in workplan_acceptance_errors(no_evidence, root, progress_directory)):
             errors.append("存在しないlocal evidenceをstrict releaseが受理した")
-    current_progress = ROOT / "docs" / "QE_2026-11-14" / "進捗.md"
-    if current_progress.is_file():
-        current_errors = workplan_acceptance_errors(current_progress.read_text(encoding="utf-8"), ROOT)
+    continuing_progress = CONTINUING_ACCEPTANCE_PROGRESS
+    if continuing_progress.is_file():
+        current_errors = workplan_acceptance_errors(continuing_progress.read_text(encoding="utf-8"), ROOT)
         if not any("W02" in error for error in current_errors):
-            errors.append("現行のW02 OPEN状態をrelease acceptanceが拒否しなかった")
+            errors.append("継続台帳のW02 OPEN状態をrelease acceptanceが拒否しなかった")
     else:
-        errors.append("現行N/W acceptance progressがなく、strict releaseの適用を確認できない")
+        errors.append("継続N/W受入証拠台帳がなく、strict releaseの適用を確認できない")
     gate_source = (ROOT / "tooling" / "release_gate_check.py").read_text(encoding="utf-8")
-    if "if args.strict_release:" not in gate_source or "workplan_acceptance_errors(current_progress, ROOT)" not in gate_source:
-        errors.append("strict release CLIが現行N/W consumer ledgerを実行しない")
+    if "if args.strict_release:" not in gate_source or "workplan_acceptance_errors(continuing_progress, ROOT)" not in gate_source:
+        errors.append("strict release CLIが継続N/W受入証拠台帳を検査しない")
+    if "errors.extend(governance_errors())" not in gate_source:
+        errors.append("release gate CLIが現行採用三点を検査しない")
     return errors
 
 

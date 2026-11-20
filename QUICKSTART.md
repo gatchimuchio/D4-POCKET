@@ -3,7 +3,8 @@
 D4 Pocketは開発中の汎用AI Runtime／Agent操作基盤です。以下は**ソースコードから実装・契約を検証するための手順**であり、正式出荷製品のインストール案内ではありません。
 
 - プロジェクト概要・技術的特徴：[README.md](README.md)
-- 現行工程・最新状態：[docs/QE_2026-11-14/進捗.md](docs/QE_2026-11-14/進捗.md)
+- 現行正本：[仕様 v9](docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl)・[工程 v9](docs/QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl)・[施工指示 v9](docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl)・[採用記録](docs/QE_2026-11-21/採用記録.md)
+- 継続証拠：[v8施工記録](docs/QE_2026-11-16/進捗.md)・[v5 N/W受入台帳](docs/QE_2026-11-14/進捗.md)（旧対象・時点の履歴と未閉包を保持。v9候補の再評価は未実施）
 - rev5の製品受入れ履歴：[docs/REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)
 - 安全・権限・Git運用：[AGENTS.md](AGENTS.md)
 - 出荷判断：[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)
@@ -40,9 +41,9 @@ python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_test --des
 
 対象限定実行はFlutter stepの結果を必須扱いし、未実行・失敗を成功へ変換しません。検査は`validate_all.py`が定義するanalyze／test／buildを一時snapshot上で実行します。Owner用launcherも隔離起動scriptを使いますが、任意に直接実行する`flutter run`は保護経路を通りません。Broker永続storeは既存開発データを維持するため従来locationに残り、短期session fileとbuild生成物はsnapshot内で回収します。
 
-2026年10月11日のB4-L2ではRust直列test 569 passed / 0 failed / 13 ignoredを記録。一方、Flutter analyzerは既存deprecated info 5件、`cargo fmt --check`は既存の形式差分により終了値1を記録しています。これらの履歴を無言でPASSへ変換しないでください。現在の個別事実と必要な検証対象は[進捗](docs/REV5_PRODUCT_PROGRESS.md)を確認してください。
+2026年10月11日のB4-L2ではRust直列test 569 passed / 0 failed / 13 ignoredを記録。一方、Flutter analyzerは既存deprecated info 5件、`cargo fmt --check`は既存の形式差分により終了値1を記録しています。これらの履歴を無言でPASSへ変換しないでください。当時の個別事実は[rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md)、現在の必要な検証対象は冒頭のv9三点を確認してください。
 
-Mobileはv5でAndroid Emulator／iOS Simulator等へinstalled製品を導入して検証します。過去のP13受入れは当時の範囲に属し、v5候補のQA・正式配布を成立させません。物理端末検証を非Windows施工の停止条件にしません。
+Mobileは現行v9の指定に従い、Android Emulator／iOS Simulatorへinstalled製品を導入して検証します。過去のP13受入れは当時の範囲に属し、現候補のQA・正式配布を成立させません。iOS Simulator実行物とDevice配布物のSHA・ABI・署名は分けて検証し、Simulatorを実Deviceの証拠へ昇格しません。物理端末検証を非Windows施工の停止条件にしません。
 
 ## 3. 開発時のOwner操作
 
@@ -60,10 +61,12 @@ powershell -NoProfile -File scripts\launch_owner_desktop.ps1
 
 ## 4. 判断を混同しない
 
+以下のB4・W01等の状態は、記録済みの限定証拠を保持したものです。「次工程」「他Runtime／OS」「未成立」も当時の対象・時点に限定し、現行schedulerやv9候補の再評価に置き換えません。現行の施工順・工程退出は冒頭のv9工程表・施工指示書に従います。
+
 - **Schema適合**と**実Runtime作用**と**製品の安全な使用**は別の成立条件です。
 - Windowsの<code>FEATURE COMPLETE</code>は正式Releaseではありません。
 - P13 Mobile／Non-Windowsの有限Product Build受入は、実端末・署名・配布保証ではありません。
 - B4の有限製品経路受入は2026-10-17にCLOSEDです。対象は`r2-e2e` staged buildとlocalhost合成APIによる一経路であり、通常Release・installed provenance・緩衝作用の独立照合を意味しません。次工程はB5自己適用QCです。
 - Windows normal Release／Codex CLIのW01/G1に限り<code>task_execution=supported</code>です。他Runtime／OSの能力とW02以降は未成立のままです。<code>release_ready=false</code>、16件のRelease Blocker、Ownerの独立GO未成立を維持します。
 
-製品主張の射程は[CLAIM.md](CLAIM.md)、現行工程は[v5進捗](docs/QE_2026-11-14/進捗.md)、v4/v3の採用時状態は[旧v4進捗](docs/QE_2026-11-13/進捗.md)・[旧v3進捗](docs/QE_2026-11-09/進捗.md)、rev5の受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、歴史的な試験結果は[VALIDATION.txt](VALIDATION.txt)で確認します。
+製品主張の射程は[CLAIM.md](CLAIM.md)、現行工程は[v9工程表](docs/QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl)、適用と証拠の責任分離は[v9採用記録](docs/QE_2026-11-21/採用記録.md)で確認します。継続証拠は[v8施工記録](docs/QE_2026-11-16/進捗.md)・[v5 N/W受入台帳](docs/QE_2026-11-14/進捗.md)、v4/v3の採用時状態は[旧v4進捗](docs/QE_2026-11-13/進捗.md)・[旧v3進捗](docs/QE_2026-11-09/進捗.md)、rev5の受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、歴史的な試験結果は[VALIDATION.txt](VALIDATION.txt)で保持します。

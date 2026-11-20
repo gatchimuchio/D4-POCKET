@@ -1,6 +1,12 @@
 # リリースチェックリスト
 
-## v5の現行対象と関門（2026-11-14）
+## 現行の対象と関門（2026-11-21 v9 NLC04）
+
+現行正本は[仕様 v9](docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl)・[工程 v9](docs/QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl)・[施工指示 v9](docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl)、採用範囲は[v9採用記録](docs/QE_2026-11-21/採用記録.md)に従う。Windows／macOS／Linux／Android／iOSの必須範囲、署名・Publisher identity・配布資格・Owner GOと`release_blockers.registry.json`の関門を保持する。
+
+[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)は旧対象・時点の履歴と未閉包確認に継続使用する。v5のN/W検査は既存の必要条件の保持であり、v9候補の工程達成・五OS QA・出荷許可を代替しない。v9候補の再評価は今回未実施であり、文書採用だけでN/W、18 Blocker、品質状態、署名、Owner GO、`release_ready`を変更しない。以下の日時付き本文の「現行」「現在」は当時を指し、旧証拠を新候補へ自動転記しない。
+
+## v5の対象と関門（履歴、2026-11-14、非現行）
 
 製品対象はWindows／macOS／LinuxのDesktopとAndroid／iOSのMobile。現行工程・状態は[v5進捗](docs/QE_2026-11-14/進捗.md)、rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、出荷関門は`release_blockers.registry.json`を参照する。採用前観測で18項目中16項目がunresolvedである。v5では非Windows物理端末を必須条件にせず、宣言した標準OSのinstalled製品を合法なVM/hosted/Emulator/Simulatorで検証する。Windows所有実機での完成品最終確認は記録する。署名・Publisher identity・配布資格・Owner GOは独立関門のまま維持する。以下の旧欄は測定時点の状態・結果を保持し、v5候補の実証へ転記しない。
 

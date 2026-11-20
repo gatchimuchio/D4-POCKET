@@ -7,9 +7,9 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 名前のとおり目指すのは、異なる能力やRuntimeを必要に応じて取り出し、安全に組み合わせられる**エージェントのための四次元ポケット**。特定のLLMやBLUE-TANUKI専用のフロントエンドではありません。
 
-[現行仕様 v8](docs/QE_2026-11-16/01_D4Pocket_SPEC_v8_LLM_JA.md) · [現行工程 v8](docs/QE_2026-11-16/02_D4Pocket_PLAN_v8_LLM_JA.md) · [現行施工指示 v8R2](docs/QE_2026-11-16/03_D4Pocket_CODEX_v8R2_LLM_JA.md) · [現行進捗 v8](docs/QE_2026-11-16/進捗.md) · [v8採用記録](docs/QE_2026-11-16/採用記録.md) · [v5工程履歴](docs/QE_2026-11-14/進捗.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
+[現行仕様 v9](docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl) · [現行工程 v9](docs/QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl) · [現行施工指示 v9](docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl) · [v9採用記録](docs/QE_2026-11-21/採用記録.md) · [v8継続施工証拠](docs/QE_2026-11-16/進捗.md) · [v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
 
-> **開発中 — 製品リリース未宣言。** 現行正本は[2026-11-16採用のv8三点セット](docs/QE_2026-11-16/採用記録.md)です。現在の工程はE0=`CLOSED`、E1=`IN_PROGRESS`、E2/E3=`OPEN`、E4/E5=`NOT_RUN`、E6=`NOT_STARTED`。E1のA〜J本番Source初回一巡と五OSのinstalled製品QAは未完です。Windows、macOS、Linux、Android、iOSはすべて必須対象で、Linux nativeも未受入れ範囲が残っています。Release Registryは18件中16件が未解決で、`release_ready=false`です。以下の2026-11-10時点の表は限定証拠の履歴であり、v8の現行状態を置き換えません。
+> **開発中 — 製品リリース未宣言。** 現行正本は[2026-11-21採用のv9 NLC04三点セット](docs/QE_2026-11-21/採用記録.md)です。文書採用は製品進捗の再判定ではなく、v9候補の実装・QA・出荷状態は今回再評価していません。v8継続施工証拠に記録されたE0=`CLOSED`、E1=`IN_PROGRESS`、E2/E3=`OPEN`、E4/E5=`NOT_RUN`、E6=`NOT_STARTED`と、E1のA〜J本番Source初回一巡・五OSのinstalled製品QA未完を、その対象・時点のまま保持します。v5のN/W受入証拠も未閉包確認に継続使用し、v9候補の実証へ自動転記しません。Windows、macOS、Linux、Android、iOSはすべて必須対象です。採用前のRelease Registry記録は18件中16件未解決、`release_ready=false`であり、文書採用だけで変更しません。以下の2026-11-10時点の表も限定証拠の履歴です。
 
 ## D4 Pocketが変えようとしていること
 
@@ -90,7 +90,7 @@ python tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-
 
 `--flutter-step`は指定したFlutter analyze／test／buildだけをOneDrive外の一時source snapshotで実行します。Owner用起動scriptも`tooling/launch_owner_desktop_isolated.py`を介し、Rust helper build、Flutter run、一時session fileを隔離snapshot内で扱います。snapshot内のCargoには同じ最終成果物・中間生成物の配置規則を適用します。任意に直接実行する`flutter run`等はこの隔離経路を通りません。snapshotは生成物を隔離する開発用機構で、Rust BrokerのAuthorityを代替しません。Broker永続storeは既存の開発データ互換性のため従来locationを維持します。
 
-環境差と既知の未解決検査は[現行進捗](docs/QE_2026-11-16/進捗.md)を参照してください。ソースからの開発・検証を始める手順は[開発クイックスタート](QUICKSTART.md)にあります。
+現行の適用文書と証拠の責任分離は[v9採用記録](docs/QE_2026-11-21/採用記録.md)、既記録の環境差と未解決検査は[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)・[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)を参照してください。旧証拠の対象・時点を保持し、候補再評価を代替しません。ソースからの開発・検証を始める手順は[開発クイックスタート](QUICKSTART.md)にあります。
 
 ## リポジトリを読む
 

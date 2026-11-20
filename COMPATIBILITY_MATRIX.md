@@ -1,6 +1,12 @@
 # 互換性対応表
 
-## v5の現行対象・保証境界（2026-11-14）
+## 現行の対象・保証境界（2026-11-21 v9 NLC04）
+
+現行正本は[仕様 v9](docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl)・[工程 v9](docs/QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl)・[施工指示 v9](docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl)、採用範囲は[v9採用記録](docs/QE_2026-11-21/採用記録.md)に従う。Windows／macOS／Linux／Android／iOSは必須対象のまま、各OSの標準環境・正規Installer/Package・版/Arch/ABI・署名・配布資格を区別する。詳細な検査条件は現行三点の指定を適用し、過去の一OS・一run・fixtureの成功で他の対象を充足しない。
+
+[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)を旧対象・時点に結合した履歴・未閉包として保持する。v9候補の互換性・OS別QAは今回再評価していない。以下の日時付き本文の「現行」「現在」は当時を指し、旧証拠や文書採用を新候補の合格根拠にしない。
+
+## v5の対象・保証境界（履歴、2026-11-14、非現行）
 
 現行製品正本は[2026-11-14 v5](docs/QE_2026-11-14/採用記録.md)、現行状態は[v5進捗](docs/QE_2026-11-14/進捗.md)。Windows／macOS／Linux／Android／iOSを必須対象とする。採用時点でv5候補のOS別installed QAは未成立であり、以下の過去のscope限定証拠をv5候補へ転記しない。Windowsは所有実機で完成品最終確認を記録し、非Windowsは宣言した標準OS環境の合法なVM/hosted/Emulator/Simulatorへ実製品を導入して確認する。物理Mac/Android/iPhoneを要求しない。各OSの正規Installer/Package、版/Arch/ABIの宣言と署名・配布資格は別の成立条件である。
 

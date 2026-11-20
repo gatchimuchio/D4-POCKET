@@ -274,7 +274,18 @@ FFI直結は便利だが、信頼境界用途では弱い。
 
 ## 7. Local Validation / Release Gate 方針
 
-GitHub Actions / CI workflow は GUI-Shell の品質判定経路ではない。`.github/workflows` 配下に YAML workflow を置かず、品質判定は owner / Codex が明示実行する local validation、smoke、release verification、Windows 実機 evidence を正とする。
+品質の成立条件・工程退出は、[現行v9採用記録](QE_2026-11-21/採用記録.md)が指定する仕様書・工程表・施工指示書に従う。owner / Codex が許可範囲内で明示実行するlocal validation・smoke・release verificationと、対象候補に結合したOS別製品証拠を分けて保持する。GitHub Actionsの成功だけで製品完成・五OS QA・出荷許可を判定しない。
+
+`.github/workflows`には、既存のOwner許可による手動`workflow_dispatch`専用の次の8 workflowを保持する。必要な検証範囲・対象commitを固定して使用し、`push`／`pull_request`／`merge_group`の自動実行を導入しない。ファイルの存在は新たな実行許可を与えない。
+
+- `windows-manual-rust-validation.yml`
+- `windows-manual-desktop-flutter-validation.yml`
+- `windows-manual-export-build.yml`
+- `linux-manual-rust-validation.yml`
+- `linux-manual-export-build.yml`
+- `android-manual-product-candidate.yml`
+- `android-manual-emulator.yml`
+- `apple-manual-build.yml`
 
 ケビン指摘を踏まえ、local validation / release gate は以下の責任分離を行う。
 
@@ -304,12 +315,19 @@ GitHub Actions / CI workflow は GUI-Shell の品質判定経路ではない。`
    - audit replay tests
 
 5. OS-specific release evidence
-   - Windows / macOS / Linux に分離
-   - WSLg前提を品質判定基準面へ漏らさない
-   - Flutter SDK不在で全体release gateが死なないよう分離
+   - Windows / macOS / Linux / Android / iOS の五OSを分離
+   - 同一SourceSHAからのOS別ArtifactSHA、OS版・arch・ABI・GUI・署名関係を記録
+   - Windows: 合法なVMで検証し、完成候補を本人所有PCで最終確認
+   - macOS: 合法なVM / Hosted GUIへ通常製品を導入
+   - Linux: 宣言distro・arch・X11 / Waylandのnative Desktop VM / Hostedへ通常導入
+   - Android: 標準Emulator上のinstalled製品を対象範囲内で確認
+   - iOS: Simulator上のinstalled製品とdevice IPAのArtifactSHA・ABI・署名を別に監査
+   - WSL / WSLg / Xvfb / headlessのみでLinux通常Desktop全体のQAを代替しない
+   - Simulatorを物理iPhone・Store配布の証拠へ昇格しない
+   - 非Windows物理端末の不在だけで独立施工を停止しない
 ```
 
-重要なのは、全 validation を一枚岩にしないこと。Flutter SDKやGUI smokeの失敗が、contract/security validation の結果を無効化しない構成にする。
+各検査の対象・結果・責任を分離する。Flutter SDK不在やGUI smokeの失敗は独立したcontract/security検査の実測結果を無効化しない一方、未実施・失敗した製品検査をPASSへ変更しない。未観測OSは`QA_NOT_ESTABLISHED`として保持し、他OS・別run・fixtureの成功で代替しない。署名・Publisher・Store・独立Audit・Owner GOと既存Release Gateは別の成立条件として維持する。
 
 ## 8. 最終採用方針
 

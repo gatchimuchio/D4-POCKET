@@ -11,8 +11,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from tooling.current_governance_check import CONTINUING_ACCEPTANCE_LEDGER, governance_errors
+
 RELEASE_BLOCKERS_REGISTRY = ROOT / "release_blockers.registry.json"
-CURRENT_ACCEPTANCE_PROGRESS = ROOT / "docs" / "QE_2026-11-14" / "進捗.md"
+CONTINUING_ACCEPTANCE_PROGRESS = ROOT / CONTINUING_ACCEPTANCE_LEDGER
 REQUIRED_WORK_PHASES = tuple(f"W{index:02d}" for index in range(9))
 REQUIRED_PRODUCT_REQUIREMENTS = tuple(f"N{index:02d}" for index in range(1, 12))
 WINDOWS_EVIDENCE_STATUS_SOURCE = "windows_release_evidence"
@@ -419,12 +421,12 @@ def workplan_acceptance_errors(
     repository_root: Path = ROOT,
     progress_directory: Path | None = None,
 ) -> list[str]:
-    """Global strict release requires every current N/W consumer to be closed with local evidence."""
+    """継続するN/W残件を検査する必要条件。現行三点全数・同候補QAの十分条件ではない。"""
     phases: dict[str, tuple[str, str]] = {}
     requirements: dict[str, tuple[str, tuple[str, ...], str]] = {}
     status_pattern = re.compile(r"\b(SCOPED_PASS|CLOSED|IN_PROGRESS|PLANNED|OPEN|BLOCKED|FAILED|FAIL)\b")
     errors: list[str] = []
-    evidence_base = progress_directory or CURRENT_ACCEPTANCE_PROGRESS.parent
+    evidence_base = progress_directory or CONTINUING_ACCEPTANCE_PROGRESS.parent
 
     for line in markdown.splitlines():
         if not line.lstrip().startswith("|"):
@@ -622,16 +624,17 @@ def main() -> int:
             combined += "\n" + path.read_text(encoding="utf-8")
         errors.extend(scan_file(path))
 
+    errors.extend(governance_errors())
     errors.extend(release_runtime_assertion_errors())
     registry_validation_errors = registry_errors()
     errors.extend(registry_validation_errors)
     if args.strict_release:
         try:
-            current_progress = CURRENT_ACCEPTANCE_PROGRESS.read_text(encoding="utf-8")
+            continuing_progress = CONTINUING_ACCEPTANCE_PROGRESS.read_text(encoding="utf-8")
         except OSError as exc:
-            errors.append(f"current N/W acceptance progressを読めない: {exc}")
+            errors.append(f"継続N/W受入証拠台帳を読めない: {exc}")
         else:
-            errors.extend(workplan_acceptance_errors(current_progress, ROOT))
+            errors.extend(workplan_acceptance_errors(continuing_progress, ROOT))
     if not registry_validation_errors:
         errors.extend(release_blocker_doc_sync_errors())
     if args.technical_complete and not registry_validation_errors:
