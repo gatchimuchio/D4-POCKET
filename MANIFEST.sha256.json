@@ -1693,7 +1693,7 @@
     },
     {
       "path": "docs/QE_2026-11-21/\u9032\u6357.md",
-      "sha256": "f365741e470a8e79cff2e16dd0379e6ee3af451d2f222253e3c41ce42c836ca0"
+      "sha256": "fe5fe19feee01bb504ac20dd2645e0853aaef532a30d392949c832001a0100bb"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1917,7 +1917,7 @@
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
-      "sha256": "2b41df99aa7971f5a1af95b071f180df955674746e37c8ccb662aca0ac69af3c"
+      "sha256": "3a3076389e9de728c2d097ef3f8bf46e63f94cf165ce76a744f268fe8c7a07a5"
     },
     {
       "path": "docs/specs/gui-shell-preview.md",
@@ -2525,7 +2525,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_module_comparison_evidence.valid.json",
-      "sha256": "63f1eee5be79bb0a4d9695ba1ca0aac0f593f556dd37ce66f9baf4bd6c039ee9"
+      "sha256": "9830431ee2c7b97b52a960301ec3926e79a571e65e2cb3b1a3cfc388d49ab5c3"
     },
     {
       "path": "examples/contracts/gui_shell_preview.valid.json",
@@ -5401,7 +5401,7 @@
     },
     {
       "path": "specs/gui_shell_module_comparison_evidence.schema.json",
-      "sha256": "5fb8fbd5e033c2a7cf832829328f5c534401c37f4da09faaba4167c5c4859b72"
+      "sha256": "eec48c276b93d94f23375d65115425e9b0e3d486089d9963463961db3e410fdd"
     },
     {
       "path": "specs/gui_shell_preview.schema.json",
@@ -5841,7 +5841,7 @@
     },
     {
       "path": "tooling/compare_module_builds_windows.py",
-      "sha256": "c1e2fb14fa2902660ebe91b05c8bd2aff54f2e25f88a52109a7c5e51a7e3f273"
+      "sha256": "eae0ec4681c08a8cc6282139f435e8a0eca9f1fa2dbd644536674139d9036ea1"
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
@@ -6089,7 +6089,7 @@
     },
     {
       "path": "tooling/tests/test_compare_module_builds_windows.py",
-      "sha256": "80bfdbb31d4f311b15a287f4e6505c25a65d4ce33899309593d986894cc9b4ed"
+      "sha256": "b560743d1a62170802ff3e99789679d5ce15af9159648177df74ed84e901b601"
     },
     {
       "path": "tooling/tests/test_current_governance_check.py",

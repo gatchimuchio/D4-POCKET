@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
@@ -37,13 +38,14 @@ from tooling.build_module_pruned_windows import (
     dart_defines,
     resolve_module_plan_for_optional_ids,
     resolve_module_plan,
+    resolve_module_plan_from_export_manifest,
 )
 from tooling.build_environment import build_child_environment
 from tooling.flutter_workspace import safe_flutter_temp_parent
 
 
 COMPARISON_SCHEMA = ROOT / "specs" / "gui_shell_module_comparison_evidence.schema.json"
-COMPARISON_EVIDENCE_VERSION = 5
+COMPARISON_EVIDENCE_VERSION = 6
 ANALYSIS_SENTINEL = "A summary of your Windows bundle analysis can be found at:"
 MAX_RECEIPT_BYTES = 1_000_000
 MAX_ANALYSIS_BYTES = 50_000_000
@@ -58,6 +60,16 @@ MAX_NATIVE_BINARY_BYTES = 512_000_000
 MAP_SYMBOL_LINE = re.compile(
     r"^\s*[0-9a-fA-F]+:[0-9a-fA-F]+\s+(\S+)\s+[0-9a-fA-F]+(?:\s|$)"
 )
+
+
+@dataclass(frozen=True)
+class _SelectionInput:
+    plan: ResolvedModulePlan
+    selection_input_trust: str
+    source_receipt_sha256: str | None
+    source_manifest_sha256: str
+    receipt: dict[str, Any] | None
+    manifest_file: dict[str, Any] | None
 
 
 def _safe_console_text(value: str, encoding: str | None = None) -> str:
@@ -376,7 +388,7 @@ def validate_comparison_evidence(
     evidence: dict[str, Any],
     schema: dict[str, Any],
     *,
-    receipt: dict[str, Any] | None = None,
+    selection_input: _SelectionInput | None = None,
     catalog: dict[str, Any] | None = None,
 ) -> list[str]:
     """Schemaと全構成の選択・file記録・比較値の相互整合を検査する。"""
@@ -624,23 +636,53 @@ def validate_comparison_evidence(
         errors.append(f"resource／dependency比較を再計算できない: {exc}")
 
     native_plan: ResolvedModulePlan | None = None
-    if receipt is not None:
+    if selection_input is not None:
         try:
-            plan = resolve_module_plan(receipt, active_catalog)
+            if evidence["selection_input_trust"] != selection_input.selection_input_trust:
+                errors.append("証拠の選択入力trustが実際の入力種別と一致しない")
+            if evidence["source_receipt_sha256"] != selection_input.source_receipt_sha256:
+                errors.append("証拠のReceipt SHA-256が実際の入力と一致しない")
+            if evidence["source_manifest_sha256"] != selection_input.source_manifest_sha256:
+                errors.append("証拠のManifest SHA-256が実際の入力と一致しない")
+
+            if selection_input.receipt is not None and selection_input.manifest_file is None:
+                plan = resolve_module_plan(
+                    selection_input.receipt, active_catalog, target_platform="windows"
+                )
+            elif selection_input.manifest_file is not None and selection_input.receipt is None:
+                from tooling.export_windows_product import MANIFEST_SCHEMA
+
+                manifest_schema = json.loads(
+                    MANIFEST_SCHEMA.read_text(encoding="utf-8")
+                )
+                manifest_errors = validate_instance(
+                    selection_input.manifest_file, manifest_schema
+                )
+                if manifest_errors:
+                    raise ValueError("Manifest fileが現行Schemaに適合しない")
+                plan = resolve_module_plan_from_export_manifest(
+                    selection_input.manifest_file["manifest"],
+                    active_catalog,
+                    target_platform="windows",
+                )
+            else:
+                raise ValueError("ReceiptとManifestの入力種別が一意でない")
+            if plan != selection_input.plan:
+                raise ValueError("読み込んだModulePlanが現在入力から再解決した値と異なる")
             native_plan = plan
             expected_selected_defines = dart_defines(plan, active_catalog)
             if evidence["selected"]["effective_dart_defines"] != expected_selected_defines:
-                errors.append("選択buildがReceiptのModulePlan・依存閉包と一致しない")
+                errors.append("選択buildが入力ModulePlan・依存閉包と一致しない")
             if evidence["requested_optional_module_ids"] != list(plan.requested_optional_ids):
-                errors.append("証拠の要求Module一覧がReceiptと一致しない")
+                errors.append("証拠の要求Module一覧が入力と一致しない")
             if evidence["included_module_ids"] != list(plan.included_module_ids):
-                errors.append("証拠の包含Module一覧がReceiptと一致しない")
+                errors.append("証拠の包含Module一覧が入力と一致しない")
             if evidence["excluded_optional_module_ids"] != list(plan.excluded_optional_ids):
-                errors.append("証拠の除外Module一覧がReceiptと一致しない")
+                errors.append("証拠の除外Module一覧が入力と一致しない")
             if evidence["selection_mode"] != plan.selection_mode:
-                errors.append("証拠の選択modeがReceiptと一致しない")
+                errors.append("証拠の選択modeが入力と一致しない")
         except (OSError, ValueError, KeyError, TypeError) as exc:
-            errors.append(f"Receiptとbuild証拠の対応検査に失敗した: {exc}")
+            errors.append(f"選択入力とbuild証拠の対応検査に失敗した: {exc}")
     errors.extend(
         validate_rust_binary_comparison(
             evidence["rust_binary_comparison"],
@@ -829,6 +871,58 @@ def _read_receipt(receipt_path: Path) -> tuple[bytes, dict[str, Any]]:
     if not isinstance(value, dict):
         raise ValueError("Receipt入力はJSON objectでなければならない")
     return raw, value
+
+
+def _load_selection_input(
+    *,
+    receipt_path: Path | None = None,
+    manifest_path: Path | None = None,
+    catalog: dict[str, Any] | None = None,
+) -> _SelectionInput:
+    """Resolve an untrusted GUI selection from exactly one persisted input."""
+    if (receipt_path is None) == (manifest_path is None):
+        raise ValueError("ReceiptまたはManifest fileのどちらか一方だけが必要である")
+
+    active_catalog = catalog if catalog is not None else _load_catalog()
+    if receipt_path is not None:
+        receipt_raw, receipt = _read_receipt(receipt_path)
+        plan = resolve_module_plan(receipt, active_catalog, target_platform="windows")
+        declared_manifest_hash = receipt.get("manifest_file", {}).get("sha256")
+        match = re.fullmatch(r"sha256:([0-9a-f]{64})", declared_manifest_hash or "")
+        if match is None:
+            raise ValueError("Receipt内のManifest SHA-256が不正である")
+        return _SelectionInput(
+            plan=plan,
+            selection_input_trust="unverified_receipt_json_selection_only",
+            source_receipt_sha256=hashlib.sha256(receipt_raw).hexdigest(),
+            source_manifest_sha256=match.group(1),
+            receipt=receipt,
+            manifest_file=None,
+        )
+
+    assert manifest_path is not None
+    from tooling.export_windows_product import (
+        MAX_MANIFEST_BYTES,
+        _read_regular_file,
+        validate_export_manifest_only_input,
+    )
+
+    manifest_raw = _read_regular_file(
+        manifest_path, MAX_MANIFEST_BYTES, "Export Manifest file"
+    )
+    manifest_file, plan, manifest_sha256 = validate_export_manifest_only_input(
+        manifest_raw,
+        manifest_path.name,
+        target_platform="windows",
+    )
+    return _SelectionInput(
+        plan=plan,
+        selection_input_trust="unverified_manifest_json_selection_only",
+        source_receipt_sha256=None,
+        source_manifest_sha256=manifest_sha256,
+        receipt=None,
+        manifest_file=manifest_file,
+    )
 
 
 def _destination_path(path: Path) -> Path:
@@ -1645,15 +1739,16 @@ def _capture_run(
     }
 
 
-def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]:
+def _comparison_evidence(
+    selection_input: _SelectionInput, output_dir: Path
+) -> dict[str, Any]:
     if sys.platform != "win32":
         raise ValueError("Windows comparison buildはWindows専用である")
     source_commit = _clean_source_commit()
     output_dir = _destination_path(output_dir)
 
-    receipt_bytes, receipt = _read_receipt(receipt_path)
     catalog = _load_catalog()
-    plan = resolve_module_plan(receipt, catalog)
+    plan = selection_input.plan
     selected_defines = dart_defines(plan, catalog)
     if not plan.excluded_optional_ids:
         raise ValueError("比較buildでは1つ以上の任意Moduleを除外するReceiptが必要である")
@@ -1740,10 +1835,11 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         "evidence_source": "INTERNAL_STATE",
         "product_artifact_claimed": False,
         "standalone_app_claimed": False,
-        "selection_input_trust": "unverified_receipt_json_selection_only",
+        "selection_input_trust": selection_input.selection_input_trust,
         "authority_verified": False,
         "source_commit": source_commit,
-        "source_receipt_sha256": hashlib.sha256(receipt_bytes).hexdigest(),
+        "source_receipt_sha256": selection_input.source_receipt_sha256,
+        "source_manifest_sha256": selection_input.source_manifest_sha256,
         "worktree_clean": True,
         "target_platform": "windows",
         "build_mode": "release",
@@ -1775,7 +1871,9 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         "signed": False,
     }
     schema = json.loads(COMPARISON_SCHEMA.read_text(encoding="utf-8"))
-    errors = validate_comparison_evidence(evidence, schema, receipt=receipt, catalog=catalog)
+    errors = validate_comparison_evidence(
+        evidence, schema, selection_input=selection_input, catalog=catalog
+    )
     if errors:
         raise ValueError("比較証拠がContractに適合しない: " + "; ".join(errors))
     (output_dir / "comparison_evidence.json").write_text(
@@ -1786,15 +1884,33 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="同一commitの全Optional、Receipt選択、個別除外、OptionalなしをWindows Releaseで測定するDeveloper専用tool。"
+        description="同一commitの全Optional、Export選択、個別除外、OptionalなしをWindows Releaseで測定するDeveloper専用tool。"
     )
-    parser.add_argument("--receipt", type=Path, required=True, help="画面選択としてのみ使う未信頼Export Receipt JSON")
+    selection_group = parser.add_mutually_exclusive_group(required=True)
+    selection_group.add_argument(
+        "--receipt",
+        type=Path,
+        help="画面選択としてのみ使う未信頼Export Receipt JSON",
+    )
+    selection_group.add_argument(
+        "--manifest-file",
+        type=Path,
+        help="Brokerが永続化した未信頼Export Manifest file。権限検証には使わない",
+    )
     parser.add_argument("--artifact-dir", type=Path, required=True, help="まだ存在しないRepository外の出力directory")
     args = parser.parse_args()
-    receipt_path = args.receipt if args.receipt.is_absolute() else ROOT / args.receipt
+    selection_path = args.receipt if args.receipt is not None else args.manifest_file
+    assert selection_path is not None
+    selection_path = (
+        selection_path if selection_path.is_absolute() else ROOT / selection_path
+    )
     output_dir = args.artifact_dir if args.artifact_dir.is_absolute() else ROOT / args.artifact_dir
     try:
-        evidence = _comparison_evidence(receipt_path, output_dir)
+        selection_input = _load_selection_input(
+            receipt_path=selection_path if args.receipt is not None else None,
+            manifest_path=selection_path if args.manifest_file is not None else None,
+        )
+        evidence = _comparison_evidence(selection_input, output_dir)
     except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError) as exc:
         message = f"Module比較buildを停止した: {exc}\n"
         encoding = getattr(sys.stderr, "encoding", None) or "utf-8"

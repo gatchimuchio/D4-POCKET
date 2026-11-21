@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -14,6 +16,7 @@ from tooling.build_module_pruned_windows import (
 )
 from tooling.compare_module_builds_windows import (
     COMPARISON_EVIDENCE_VERSION,
+    _load_selection_input,
     _aot_package_libraries,
     _parse_linker_map_symbols,
     _pruning_variant_plans,
@@ -422,6 +425,109 @@ Static symbols
         ].append("shell.setup_doctor")
         errors = validate_comparison_evidence(mismatched_native, schema)
         self.assertTrue(any("Rust no_optional_modules" in error for error in errors))
+
+    def test_manifest_file_is_a_supported_untrusted_comparison_selection(self) -> None:
+        manifest_path = ROOT / "examples/contracts/gui_shell_export_manifest.valid.json"
+        manifest_raw = manifest_path.read_bytes()
+        manifest = json.loads(manifest_raw.decode("utf-8"))
+        file_name = manifest["manifest"]["app_identity"]["app_id"] + ".json"
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / file_name
+            path.write_bytes(manifest_raw)
+            selection_input = _load_selection_input(manifest_path=path)
+
+        self.assertEqual(
+            selection_input.selection_input_trust,
+            "unverified_manifest_json_selection_only",
+        )
+        self.assertIsNone(selection_input.source_receipt_sha256)
+        self.assertEqual(
+            selection_input.source_manifest_sha256,
+            hashlib.sha256(manifest_raw).hexdigest(),
+        )
+        self.assertIsNone(selection_input.receipt)
+        self.assertEqual(selection_input.manifest_file["export_id"], manifest["export_id"])
+
+        evidence = json.loads(
+            (ROOT / "examples/contracts/gui_shell_module_comparison_evidence.valid.json")
+            .read_text(encoding="utf-8")
+        )
+        evidence["selection_input_trust"] = selection_input.selection_input_trust
+        evidence["source_receipt_sha256"] = None
+        evidence["source_manifest_sha256"] = selection_input.source_manifest_sha256
+        schema = json.loads(
+            (ROOT / "specs/gui_shell_module_comparison_evidence.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            validate_comparison_evidence(
+                evidence, schema, selection_input=selection_input
+            ),
+            [],
+        )
+        evidence["authority_verified"] = True
+        self.assertTrue(
+            validate_comparison_evidence(
+                evidence, schema, selection_input=selection_input
+            )
+        )
+
+    def test_receipt_selection_remains_supported_and_binds_manifest_hash(self) -> None:
+        receipt_path = ROOT / "examples/contracts/gui_shell_export_receipt.valid.json"
+        selection_input = _load_selection_input(receipt_path=receipt_path)
+        evidence = json.loads(
+            (ROOT / "examples/contracts/gui_shell_module_comparison_evidence.valid.json")
+            .read_text(encoding="utf-8")
+        )
+        evidence["source_receipt_sha256"] = selection_input.source_receipt_sha256
+        evidence["source_manifest_sha256"] = selection_input.source_manifest_sha256
+        schema = json.loads(
+            (ROOT / "specs/gui_shell_module_comparison_evidence.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            validate_comparison_evidence(
+                evidence, schema, selection_input=selection_input
+            ),
+            [],
+        )
+        evidence["source_manifest_sha256"] = "f" * 64
+        self.assertTrue(
+            validate_comparison_evidence(
+                evidence, schema, selection_input=selection_input
+            )
+        )
+
+    def test_manifest_selection_rejects_bad_name_and_inconsistent_module_plan(self) -> None:
+        manifest_raw = (
+            ROOT / "examples/contracts/gui_shell_export_manifest.valid.json"
+        ).read_bytes()
+        manifest = json.loads(manifest_raw.decode("utf-8"))
+        expected_name = manifest["manifest"]["app_identity"]["app_id"] + ".json"
+        with tempfile.TemporaryDirectory() as temporary:
+            wrong_name = Path(temporary) / "other.json"
+            wrong_name.write_bytes(manifest_raw)
+            with self.assertRaisesRegex(ValueError, "file名がApp IDと一致"):
+                _load_selection_input(manifest_path=wrong_name)
+
+            changed = copy.deepcopy(manifest)
+            changed["manifest"]["module_plan"]["included_module_ids"].remove(
+                "shell.observability"
+            )
+            inconsistent = Path(temporary) / expected_name
+            inconsistent.write_text(
+                json.dumps(changed, ensure_ascii=False), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ValueError, "必須Moduleと依存閉包に一致しない"):
+                _load_selection_input(manifest_path=inconsistent)
+
+    def test_selection_input_requires_exactly_one_source(self) -> None:
+        with self.assertRaisesRegex(ValueError, "どちらか一方"):
+            _load_selection_input()
+        with self.assertRaisesRegex(ValueError, "どちらか一方"):
+            _load_selection_input(
+                receipt_path=Path("receipt.json"), manifest_path=Path("manifest.json")
+            )
 
 
 if __name__ == "__main__":

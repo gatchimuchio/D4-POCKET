@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/gui_shell_module_comparison_evidence.schema.json",
-  "title": "開発用GUI Shell画面Module比較build証拠 v5",
+  "title": "開発用GUI Shell画面Module比較build証拠 v6",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,6 +14,7 @@
     "authority_verified",
     "source_commit",
     "source_receipt_sha256",
+    "source_manifest_sha256",
     "worktree_clean",
     "target_platform",
     "build_mode",
@@ -41,15 +42,24 @@
     "signed"
   ],
   "properties": {
-    "version": { "const": 5 },
+    "version": { "const": 6 },
     "evidence_type": { "const": "development_module_build_comparison" },
     "evidence_source": { "const": "INTERNAL_STATE" },
     "product_artifact_claimed": { "const": false },
     "standalone_app_claimed": { "const": false },
-    "selection_input_trust": { "const": "unverified_receipt_json_selection_only" },
+    "selection_input_trust": {
+      "enum": [
+        "unverified_receipt_json_selection_only",
+        "unverified_manifest_json_selection_only"
+      ]
+    },
     "authority_verified": { "const": false },
     "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "source_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_receipt_sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "worktree_clean": { "const": true },
     "target_platform": { "const": "windows" },
     "build_mode": { "const": "release" },
@@ -217,6 +227,28 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "selection_input_trust": {
+            "const": "unverified_receipt_json_selection_only"
+          }
+        },
+        "required": ["selection_input_trust"]
+      },
+      "then": {
+        "properties": {
+          "source_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      },
+      "else": {
+        "properties": {
+          "source_receipt_sha256": { "type": "null" }
+        }
+      }
+    }
+  ],
   "$defs": {
     "rust_symbol_file": {
       "type": "object",

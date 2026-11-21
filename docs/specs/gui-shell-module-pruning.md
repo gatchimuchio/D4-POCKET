@@ -45,17 +45,19 @@ Receiptの出所とOwner操作は認証しない。Windows Export buildでは、
 `tooling/compare_module_builds_windows.py`は、cleanなcommit済みWindows worktreeで、次の二つのDesktop Flutter Release UI buildを順に実行する。
 
 1. baseline: 任意画面defineを一切渡さず、Flutter側の既定値により全任意画面を有効にする。
-2. 選択build: Receiptから解決したModulePlanの任意画面defineを全件渡し、選択外を無効にする。
+2. 選択build: Export Manifestまたは従来Receiptから未信頼のModulePlanを解決し、任意画面defineを全件渡して選択外を無効にする。
 
 両buildは同じsource commit、Flutter executable、Flutter／Dart版、Windows Release、`--no-pub`、`--analyze-size`の共通条件で実行する。各buildのcode-size入力directoryを分離し、artifact全fileのSHA-256・size・tree hashに加え、Flutter size-analysis report、snapshot、precompiler traceを採取する。証拠生成前後でworktreeとHEADを確認し、toolchain versionの変化も拒否する。実行例:
 
 ```powershell
 python tooling/compare_module_builds_windows.py `
-  --receipt examples/contracts/gui_shell_export_receipt.valid.json `
+  --manifest-file "C:\path\returned-by-export\<app-id>.json" `
   --artifact-dir C:\Users\<user>\AppData\Local\GUI-Shell\developer-module-builds\comparison-<commit>
 ```
 
-出力先はRepository外の未作成directoryに限る。`specs/gui_shell_module_comparison_evidence.schema.json`が比較条件と非権限・非製品の主張境界を固定し、ConformanceがReceiptとのModulePlan一致、baselineの全有効、define command、共通build条件、artifact size/hash差分の内部整合を検査する。各Flutter size-analysis reportからCatalogに列挙されたDart library nodeを抽出し、baselineには全surface、選択buildには選択Moduleのsurfaceだけが現れることを要求する。AOT treeまたはCatalog対象nodeを一意に特定できない場合は比較証拠を作らない。
+Manifestの実際の保存先はExport画面が返すpathを使う。旧入力が必要な場合は`--manifest-file`の代わりに`--receipt examples/contracts/gui_shell_export_receipt.valid.json`を指定できる。両入力は排他的で、Manifestは通常file・上限size・現行Schema・App IDとfile名・現行Module Catalogへの選択Planを検証する。いずれの入力もUI選択を与えるだけで、Owner操作の真正性、Authority、Permission、Approvalを検証・付与しない。Manifest入力の証拠ではReceipt hashを`null`とし、入力ManifestのSHA-256を記録する。Receipt入力ではReceipt hashとReceiptが申告したManifest hashを記録し、どちらも未信頼入力のhashとして扱う。
+
+出力先はRepository外の未作成directoryに限る。`specs/gui_shell_module_comparison_evidence.schema.json` v6が入力種別、hash、比較条件と非権限・非製品の主張境界を固定し、Conformanceが選択入力とのModulePlan一致、baselineの全有効、define command、共通build条件、artifact size/hash差分の内部整合を検査する。各Flutter size-analysis reportからCatalogに列挙されたDart library nodeを抽出し、baselineには全surface、選択buildには選択Moduleのsurfaceだけが現れることを要求する。AOT treeまたはCatalog対象nodeを一意に特定できない場合は比較証拠を作らない。
 
 この比較は`INTERNAL_STATE`の開発証拠である。AOT report上でCatalog対象library nodeが選択と一致することは、そのFlutter compiler reportにおける当該library nodeの有無を示す。画面意味全体の不存在、共有symbolの不存在、別artifact・別toolchainへの一般化、起動時挙動、Rust／third-party Module除去、安全Coreの最終製品内保持、独立製品成立までは証明しない。したがって`binary_pruning_verified=false`を維持し、`semantic_pruning_status`も`flutter_aot_report_surface_libraries_match_selection; runtime_unverified`と範囲限定する。Cold startupと実行時resourceは測らない。build所要時間を製品startup性能へ読み替えない。
 
