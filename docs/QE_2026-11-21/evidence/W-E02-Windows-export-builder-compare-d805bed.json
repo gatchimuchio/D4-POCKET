@@ -1,0 +1,2140 @@
+{
+  "evidence_type": "d4_pocket_windows_export_builder_full_vs_pruned",
+  "evidence_source": "INTERNAL_STATE",
+  "recorded_at_utc": "2026-11-21T08:39:13.755516+00:00",
+  "source_candidate": {
+    "commit": "d805bed99cc80897bac35df97541b9516f23da72",
+    "archive_sha256": "4883f83a8f8bdc6d5b336d990c8d7494a133d925858ae60beeea8ffd4f81e7cc",
+    "same_for_full_and_pruned": true
+  },
+  "environment": {
+    "os": "Windows-11-10.0.26300-SP0",
+    "python": "3.12.10",
+    "target": "x86_64-pc-windows-msvc",
+    "flutter": "3.44.0",
+    "dart": "3.12.0",
+    "flutter_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+  },
+  "builder": {
+    "script": "tooling/export_windows_product.py",
+    "build_mode": "release",
+    "reproducibility": "same source archive and commit; separate full/pruned manifests; Cargo locked; Flutter enforce-lockfile; isolated build outputs"
+  },
+  "authority_boundary": {
+    "source_authority_verified": false,
+    "owner_authorization_verified": false,
+    "authority_strip": true,
+    "credential_values_explicitly_supplied": false,
+    "credential_artifact_scan_status": "passed_known_patterns",
+    "credential_inherited": false,
+    "permission_inherited": false,
+    "approval_inherited": false,
+    "audit_chain_inherited": false
+  },
+  "input_manifests": {
+    "full": {
+      "relative_path": "inputs/full/d4-pocket-app-11111111111111111111111111111111.json",
+      "sha256": "593986d408b3dc722c77df9b37dcfe559e24233e8d8ff5326ec613c1d5ea4806",
+      "bytes": 3275,
+      "byte_identical_to_output_manifest": true
+    },
+    "pruned": {
+      "relative_path": "inputs/pruned/d4-pocket-app-11111111111111111111111111111111.json",
+      "sha256": "da73ce1f732b8db598518078729240c91f14ef9e95fd0a89e4ae9a451203e74e",
+      "bytes": 3063,
+      "byte_identical_to_output_manifest": true
+    }
+  },
+  "product_manifests": {
+    "full": {
+      "sha256": "593986d408b3dc722c77df9b37dcfe559e24233e8d8ff5326ec613c1d5ea4806",
+      "bytes": 3275,
+      "document": {
+        "version": 1,
+        "product": "D4 Pocket",
+        "export_id": "export-d4-pocket",
+        "manifest": {
+          "app_identity": {
+            "app_id": "d4-pocket-app-11111111111111111111111111111111",
+            "display_name": "D4 Pocket ローカル構成",
+            "target_platform": "windows"
+          },
+          "audit_store": {
+            "store_id": "audit-store-22222222222222222222222222222222",
+            "chain_status": "new",
+            "inherited": false
+          },
+          "settings": {
+            "locale": "ja-JP",
+            "density": "comfortable",
+            "content_visibility": "summary"
+          },
+          "runtime_manifest": {
+            "runtime_ids": [
+              "gui_shell_rust_broker"
+            ]
+          },
+          "adapter_configuration": {
+            "agent_ids": [
+              "codex"
+            ],
+            "tool_ids": [],
+            "mcp_connection_ids": []
+          },
+          "capability_requirements": [
+            "agent.metadata",
+            "runtime.read"
+          ],
+          "distribution_metadata": {
+            "target_platform": "windows",
+            "artifact_status": "not_built",
+            "installer_status": "not_started",
+            "signed": false,
+            "channel": "local"
+          },
+          "inheritance_policy": {
+            "authority": "none",
+            "permission": "none",
+            "approval": "none",
+            "credential": "none",
+            "audit_chain": "none"
+          },
+          "module_plan": {
+            "catalog_version": 1,
+            "selection_mode": "all_optional",
+            "requested_optional_module_ids": [
+              "shell.setup_doctor",
+              "shell.history",
+              "shell.evaluation_lab",
+              "shell.host_capabilities",
+              "shell.notifications",
+              "shell.observability",
+              "shell.trace_inspector",
+              "shell.host_operations"
+            ],
+            "unprunable_core_ids": [
+              "core.security_broker",
+              "core.cryptography",
+              "core.audit_finality",
+              "core.credentials",
+              "core.os_controls",
+              "core.permission_enforcement",
+              "core.approval_enforcement",
+              "core.content_exposure"
+            ],
+            "mandatory_module_ids": [
+              "shell.dashboard",
+              "shell.runtime_operation",
+              "shell.agent_operation",
+              "shell.authority",
+              "shell.approval",
+              "shell.audit",
+              "shell.recovery",
+              "shell.problems",
+              "shell.evidence",
+              "shell.settings"
+            ],
+            "included_module_ids": [
+              "core.security_broker",
+              "core.cryptography",
+              "core.audit_finality",
+              "core.credentials",
+              "core.os_controls",
+              "core.permission_enforcement",
+              "core.approval_enforcement",
+              "core.content_exposure",
+              "shell.dashboard",
+              "shell.runtime_operation",
+              "shell.agent_operation",
+              "shell.authority",
+              "shell.approval",
+              "shell.audit",
+              "shell.recovery",
+              "shell.problems",
+              "shell.evidence",
+              "shell.settings",
+              "shell.setup_doctor",
+              "shell.history",
+              "shell.evaluation_lab",
+              "shell.host_capabilities",
+              "shell.notifications",
+              "shell.observability",
+              "shell.trace_inspector",
+              "shell.host_operations"
+            ],
+            "excluded_optional_module_ids": [],
+            "binary_pruning_status": "not_applied"
+          }
+        }
+      }
+    },
+    "pruned": {
+      "sha256": "da73ce1f732b8db598518078729240c91f14ef9e95fd0a89e4ae9a451203e74e",
+      "bytes": 3063,
+      "document": {
+        "version": 1,
+        "product": "D4 Pocket",
+        "export_id": "export-d4-pocket",
+        "manifest": {
+          "app_identity": {
+            "app_id": "d4-pocket-app-11111111111111111111111111111111",
+            "display_name": "D4 Pocket ローカル構成",
+            "target_platform": "windows"
+          },
+          "audit_store": {
+            "store_id": "audit-store-22222222222222222222222222222222",
+            "chain_status": "new",
+            "inherited": false
+          },
+          "settings": {
+            "locale": "ja-JP",
+            "density": "comfortable",
+            "content_visibility": "summary"
+          },
+          "runtime_manifest": {
+            "runtime_ids": [
+              "gui_shell_rust_broker"
+            ]
+          },
+          "adapter_configuration": {
+            "agent_ids": [
+              "codex"
+            ],
+            "tool_ids": [],
+            "mcp_connection_ids": []
+          },
+          "capability_requirements": [
+            "agent.metadata",
+            "runtime.read"
+          ],
+          "distribution_metadata": {
+            "target_platform": "windows",
+            "artifact_status": "not_built",
+            "installer_status": "not_started",
+            "signed": false,
+            "channel": "local"
+          },
+          "inheritance_policy": {
+            "authority": "none",
+            "permission": "none",
+            "approval": "none",
+            "credential": "none",
+            "audit_chain": "none"
+          },
+          "module_plan": {
+            "catalog_version": 1,
+            "selection_mode": "explicit_optional",
+            "requested_optional_module_ids": [
+              "shell.trace_inspector"
+            ],
+            "unprunable_core_ids": [
+              "core.security_broker",
+              "core.cryptography",
+              "core.audit_finality",
+              "core.credentials",
+              "core.os_controls",
+              "core.permission_enforcement",
+              "core.approval_enforcement",
+              "core.content_exposure"
+            ],
+            "mandatory_module_ids": [
+              "shell.dashboard",
+              "shell.runtime_operation",
+              "shell.agent_operation",
+              "shell.authority",
+              "shell.approval",
+              "shell.audit",
+              "shell.recovery",
+              "shell.problems",
+              "shell.evidence",
+              "shell.settings"
+            ],
+            "included_module_ids": [
+              "core.security_broker",
+              "core.cryptography",
+              "core.audit_finality",
+              "core.credentials",
+              "core.os_controls",
+              "core.permission_enforcement",
+              "core.approval_enforcement",
+              "core.content_exposure",
+              "shell.dashboard",
+              "shell.runtime_operation",
+              "shell.agent_operation",
+              "shell.authority",
+              "shell.approval",
+              "shell.audit",
+              "shell.recovery",
+              "shell.problems",
+              "shell.evidence",
+              "shell.settings",
+              "shell.observability",
+              "shell.trace_inspector"
+            ],
+            "excluded_optional_module_ids": [
+              "shell.setup_doctor",
+              "shell.history",
+              "shell.evaluation_lab",
+              "shell.host_capabilities",
+              "shell.notifications",
+              "shell.host_operations"
+            ],
+            "binary_pruning_status": "not_applied"
+          }
+        }
+      }
+    }
+  },
+  "build_receipts": {
+    "full": {
+      "version": 2,
+      "evidence_type": "d4_pocket_windows_export_build",
+      "evidence_source": "INTERNAL_STATE",
+      "product": "D4 Pocket",
+      "target_platform": "windows",
+      "build_mode": "release",
+      "source_commit": "d805bed99cc80897bac35df97541b9516f23da72",
+      "source_archive_sha256": "4883f83a8f8bdc6d5b336d990c8d7494a133d925858ae60beeea8ffd4f81e7cc",
+      "source_receipt_sha256": null,
+      "source_manifest_sha256": "593986d408b3dc722c77df9b37dcfe559e24233e8d8ff5326ec613c1d5ea4806",
+      "selection_input_source": "manifest_file_untrusted",
+      "export_id": "export-d4-pocket",
+      "app_id": "d4-pocket-app-11111111111111111111111111111111",
+      "audit_store_id": "audit-store-22222222222222222222222222222222",
+      "authority_boundary": {
+        "source_authority_verified": false,
+        "owner_authorization_verified": false,
+        "authority_strip": true,
+        "credential_values_explicitly_supplied": false,
+        "credential_artifact_scan_status": "passed_known_patterns",
+        "credential_inherited": false,
+        "permission_inherited": false,
+        "approval_inherited": false,
+        "audit_chain_inherited": false
+      },
+      "module_plan": {
+        "catalog_version": 1,
+        "selection_mode": "all_optional",
+        "requested_optional_module_ids": [
+          "shell.setup_doctor",
+          "shell.history",
+          "shell.evaluation_lab",
+          "shell.host_capabilities",
+          "shell.notifications",
+          "shell.observability",
+          "shell.trace_inspector",
+          "shell.host_operations"
+        ],
+        "unprunable_core_ids": [
+          "core.security_broker",
+          "core.cryptography",
+          "core.audit_finality",
+          "core.credentials",
+          "core.os_controls",
+          "core.permission_enforcement",
+          "core.approval_enforcement",
+          "core.content_exposure"
+        ],
+        "included_module_ids": [
+          "core.security_broker",
+          "core.cryptography",
+          "core.audit_finality",
+          "core.credentials",
+          "core.os_controls",
+          "core.permission_enforcement",
+          "core.approval_enforcement",
+          "core.content_exposure",
+          "shell.dashboard",
+          "shell.runtime_operation",
+          "shell.agent_operation",
+          "shell.authority",
+          "shell.approval",
+          "shell.audit",
+          "shell.recovery",
+          "shell.problems",
+          "shell.evidence",
+          "shell.settings",
+          "shell.setup_doctor",
+          "shell.history",
+          "shell.evaluation_lab",
+          "shell.host_capabilities",
+          "shell.notifications",
+          "shell.observability",
+          "shell.trace_inspector",
+          "shell.host_operations"
+        ],
+        "excluded_optional_module_ids": []
+      },
+      "aot_surface_analysis": {
+        "scope": "flutter_windows_x64_release_aot_catalog_surfaces",
+        "report_size_bytes": 10275105,
+        "report_sha256": "7c1b78f6de8a87805836cb15c32dc0b4db75027c8dc568eff78c2b70026641a2",
+        "aot_surface_libraries": [
+          "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
+          "apps/desktop_flutter/lib/screens/history_screen.dart",
+          "apps/desktop_flutter/lib/screens/host_capability_center.dart",
+          "apps/desktop_flutter/lib/screens/host_operation_center.dart",
+          "apps/desktop_flutter/lib/screens/notifications.dart",
+          "apps/desktop_flutter/lib/screens/observability_center.dart",
+          "apps/desktop_flutter/lib/screens/setup_doctor.dart",
+          "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+        ],
+        "included_source_surfaces": [
+          "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
+          "apps/desktop_flutter/lib/screens/history_screen.dart",
+          "apps/desktop_flutter/lib/screens/host_capability_center.dart",
+          "apps/desktop_flutter/lib/screens/host_operation_center.dart",
+          "apps/desktop_flutter/lib/screens/notifications.dart",
+          "apps/desktop_flutter/lib/screens/observability_center.dart",
+          "apps/desktop_flutter/lib/screens/setup_doctor.dart",
+          "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+        ],
+        "excluded_source_surfaces": [],
+        "profiled_aot_image_size_bytes": 8569744,
+        "exported_aot_image_size_bytes": 8569744,
+        "profiled_aot_image_sha256": "917df482223d9a42498e061560e324a78ecdd28e07ecb04bbda530db2f2f03db",
+        "exported_aot_image_sha256": "917df482223d9a42498e061560e324a78ecdd28e07ecb04bbda530db2f2f03db",
+        "image_matches_export": true
+      },
+      "toolchain": {
+        "flutter": "3.44.0",
+        "dart": "3.12.0",
+        "framework_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+      },
+      "pub_get_arguments": [
+        "--suppress-analytics",
+        "pub",
+        "get",
+        "--enforce-lockfile"
+      ],
+      "flutter_build_arguments": [
+        "--suppress-analytics",
+        "build",
+        "windows",
+        "--release",
+        "--no-pub",
+        "--analyze-size",
+        "--dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=true",
+        "--dart-define=GUI_SHELL_MODULE_HISTORY=true",
+        "--dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=true",
+        "--dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=true",
+        "--dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=true",
+        "--dart-define=GUI_SHELL_MODULE_OBSERVABILITY=true",
+        "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true",
+        "--dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=true",
+        "--dart-define=GUI_SHELL_PRODUCT_VERSION=0.1.0"
+      ],
+      "rust_build_arguments": [
+        "build",
+        "--release",
+        "--locked",
+        "--no-default-features",
+        "--features",
+        "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations",
+        "--target-dir",
+        "<isolated-target-dir>",
+        "--manifest-path",
+        "native/rust_helper/Cargo.toml",
+        "--bin",
+        "gui_shell_rust_helper",
+        "--bin",
+        "gui_shell_desktop_launcher"
+      ],
+      "rust_compile_time_identity": {
+        "source": "schema_validated_manifest",
+        "app_id": "d4-pocket-app-11111111111111111111111111111111",
+        "audit_store_id": "audit-store-22222222222222222222222222222222",
+        "manifest_sha256": "593986d408b3dc722c77df9b37dcfe559e24233e8d8ff5326ec613c1d5ea4806"
+      },
+      "rust_compile_time_update_trust": {
+        "source": "not_configured",
+        "configured": false,
+        "public_key_fingerprint": null,
+        "package_source_count": 0
+      },
+      "build_duration_ms": 803444,
+      "runtime_storage_root_template": "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>",
+      "portable_bundle_assembled": true,
+      "manifest_copied_byte_for_byte": true,
+      "build_receipt_excluded_from_artifact_inventory": true,
+      "standalone_app_verified": false,
+      "runtime_manifest_consumed": false,
+      "binary_pruning_verified": false,
+      "formal_distribution_claimed": false,
+      "signed": false,
+      "installer_status": "not_started",
+      "launch_status": "not_verified",
+      "artifact_root": ".",
+      "artifact_files": [
+        {
+          "path": "app/data/app.so",
+          "size_bytes": 8569744,
+          "sha256": "917df482223d9a42498e061560e324a78ecdd28e07ecb04bbda530db2f2f03db"
+        },
+        {
+          "path": "app/data/flutter_assets/AssetManifest.bin",
+          "size_bytes": 2,
+          "sha256": "f566cc6fccc657365c0197accf3a7d6f80f85209ff666ff774f4dcbc524aa842"
+        },
+        {
+          "path": "app/data/flutter_assets/FontManifest.json",
+          "size_bytes": 82,
+          "sha256": "28b1eb2b3d2e1ad60b8c8b0f9100b1ccbf492f7fa97f5bebb51ea97e73926e7d"
+        },
+        {
+          "path": "app/data/flutter_assets/fonts/MaterialIcons-Regular.otf",
+          "size_bytes": 1645184,
+          "sha256": "d9865b671a09d683d13a863089d8825e0f61a37696ce5d7d448bc8023aa62453"
+        },
+        {
+          "path": "app/data/flutter_assets/NativeAssetsManifest.json",
+          "size_bytes": 45,
+          "sha256": "9548a31e4a048135c1d94f919328bfb62ae2c7bb3cab96557c7941daa97776cb"
+        },
+        {
+          "path": "app/data/flutter_assets/NOTICES.Z",
+          "size_bytes": 103576,
+          "sha256": "fcddabb0ecf2215d5d82cb7dd7e26fbf2fc530879edc1666270849b4c9f6b6a8"
+        },
+        {
+          "path": "app/data/flutter_assets/shaders/ink_sparkle.frag",
+          "size_bytes": 21856,
+          "sha256": "1fe8436a743884cb65078fe8c7b38e18f5365f2a2961270916f426fd13c604af"
+        },
+        {
+          "path": "app/data/flutter_assets/shaders/stretch_effect.frag",
+          "size_bytes": 17624,
+          "sha256": "62a899ff4e168ac6ca888ce7c2f40e5d3fbf8ca20a1c3ded781a116a6d7907e2"
+        },
+        {
+          "path": "app/data/icudtl.dat",
+          "size_bytes": 862304,
+          "sha256": "998367809a821d595928089c197b3f7959f0420f81f79d4d0daee53378492ed5"
+        },
+        {
+          "path": "app/flutter_windows.dll",
+          "size_bytes": 21284352,
+          "sha256": "3168c546aeb0b0e6a77abc97e0de95b45d13ada150faaad6de75e79acaf3b050"
+        },
+        {
+          "path": "app/gui_shell_desktop.exe",
+          "size_bytes": 163840,
+          "sha256": "deadc092568c767624285aebc60ea0a42ce39acc43d916e6c69fab66de4d6b12"
+        },
+        {
+          "path": "broker/gui_shell_rust_helper.exe",
+          "size_bytes": 17484288,
+          "sha256": "5722ea37a07eff0332fbdf3b80ef4ce5d6beb8f734bee0d9e7b737de657e7afa"
+        },
+        {
+          "path": "gui_shell_desktop_launcher.exe",
+          "size_bytes": 17796608,
+          "sha256": "8bf8ab0f9e88762104ea2db4906231446db55a2d27419661e98fbe739c11cb9c"
+        },
+        {
+          "path": "product_manifest.json",
+          "size_bytes": 3275,
+          "sha256": "593986d408b3dc722c77df9b37dcfe559e24233e8d8ff5326ec613c1d5ea4806"
+        }
+      ],
+      "artifact_total_bytes": 67952780,
+      "artifact_tree_sha256": "a0f40c0f44d48a07d93e025a331b33125b8397264459134e9878c262c934c188",
+      "credential_artifact_scan": {
+        "version": 1,
+        "status": "passed_known_patterns",
+        "scope": "runtime_artifact_files",
+        "coverage": "known_patterns_only",
+        "files_scanned": 14,
+        "bytes_scanned": 67952780,
+        "findings": 0,
+        "artifact_tree_sha256": "a0f40c0f44d48a07d93e025a331b33125b8397264459134e9878c262c934c188"
+      }
+    },
+    "pruned": {
+      "version": 2,
+      "evidence_type": "d4_pocket_windows_export_build",
+      "evidence_source": "INTERNAL_STATE",
+      "product": "D4 Pocket",
+      "target_platform": "windows",
+      "build_mode": "release",
+      "source_commit": "d805bed99cc80897bac35df97541b9516f23da72",
+      "source_archive_sha256": "4883f83a8f8bdc6d5b336d990c8d7494a133d925858ae60beeea8ffd4f81e7cc",
+      "source_receipt_sha256": null,
+      "source_manifest_sha256": "da73ce1f732b8db598518078729240c91f14ef9e95fd0a89e4ae9a451203e74e",
+      "selection_input_source": "manifest_file_untrusted",
+      "export_id": "export-d4-pocket",
+      "app_id": "d4-pocket-app-11111111111111111111111111111111",
+      "audit_store_id": "audit-store-22222222222222222222222222222222",
+      "authority_boundary": {
+        "source_authority_verified": false,
+        "owner_authorization_verified": false,
+        "authority_strip": true,
+        "credential_values_explicitly_supplied": false,
+        "credential_artifact_scan_status": "passed_known_patterns",
+        "credential_inherited": false,
+        "permission_inherited": false,
+        "approval_inherited": false,
+        "audit_chain_inherited": false
+      },
+      "module_plan": {
+        "catalog_version": 1,
+        "selection_mode": "explicit_optional",
+        "requested_optional_module_ids": [
+          "shell.trace_inspector"
+        ],
+        "unprunable_core_ids": [
+          "core.security_broker",
+          "core.cryptography",
+          "core.audit_finality",
+          "core.credentials",
+          "core.os_controls",
+          "core.permission_enforcement",
+          "core.approval_enforcement",
+          "core.content_exposure"
+        ],
+        "included_module_ids": [
+          "core.security_broker",
+          "core.cryptography",
+          "core.audit_finality",
+          "core.credentials",
+          "core.os_controls",
+          "core.permission_enforcement",
+          "core.approval_enforcement",
+          "core.content_exposure",
+          "shell.dashboard",
+          "shell.runtime_operation",
+          "shell.agent_operation",
+          "shell.authority",
+          "shell.approval",
+          "shell.audit",
+          "shell.recovery",
+          "shell.problems",
+          "shell.evidence",
+          "shell.settings",
+          "shell.observability",
+          "shell.trace_inspector"
+        ],
+        "excluded_optional_module_ids": [
+          "shell.setup_doctor",
+          "shell.history",
+          "shell.evaluation_lab",
+          "shell.host_capabilities",
+          "shell.notifications",
+          "shell.host_operations"
+        ]
+      },
+      "aot_surface_analysis": {
+        "scope": "flutter_windows_x64_release_aot_catalog_surfaces",
+        "report_size_bytes": 9934422,
+        "report_sha256": "bade9dedc316f5394a26856c5d62d6992230a8d055d82cbd2b0b6ecd6485f989",
+        "aot_surface_libraries": [
+          "apps/desktop_flutter/lib/screens/observability_center.dart",
+          "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+        ],
+        "included_source_surfaces": [
+          "apps/desktop_flutter/lib/screens/observability_center.dart",
+          "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+        ],
+        "excluded_source_surfaces": [
+          "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
+          "apps/desktop_flutter/lib/screens/history_screen.dart",
+          "apps/desktop_flutter/lib/screens/host_capability_center.dart",
+          "apps/desktop_flutter/lib/screens/host_operation_center.dart",
+          "apps/desktop_flutter/lib/screens/notifications.dart",
+          "apps/desktop_flutter/lib/screens/setup_doctor.dart"
+        ],
+        "profiled_aot_image_size_bytes": 8160144,
+        "exported_aot_image_size_bytes": 8160144,
+        "profiled_aot_image_sha256": "a6735f30c774bf2599fa8c3065311367cb1ca5c1ce3322003eea9ee6966e9e02",
+        "exported_aot_image_sha256": "a6735f30c774bf2599fa8c3065311367cb1ca5c1ce3322003eea9ee6966e9e02",
+        "image_matches_export": true
+      },
+      "toolchain": {
+        "flutter": "3.44.0",
+        "dart": "3.12.0",
+        "framework_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+      },
+      "pub_get_arguments": [
+        "--suppress-analytics",
+        "pub",
+        "get",
+        "--enforce-lockfile"
+      ],
+      "flutter_build_arguments": [
+        "--suppress-analytics",
+        "build",
+        "windows",
+        "--release",
+        "--no-pub",
+        "--analyze-size",
+        "--dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=false",
+        "--dart-define=GUI_SHELL_MODULE_HISTORY=false",
+        "--dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=false",
+        "--dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=false",
+        "--dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=false",
+        "--dart-define=GUI_SHELL_MODULE_OBSERVABILITY=true",
+        "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true",
+        "--dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=false",
+        "--dart-define=GUI_SHELL_PRODUCT_VERSION=0.1.0"
+      ],
+      "rust_build_arguments": [
+        "build",
+        "--release",
+        "--locked",
+        "--no-default-features",
+        "--features",
+        "module_observability,module_trace_inspector",
+        "--target-dir",
+        "<isolated-target-dir>",
+        "--manifest-path",
+        "native/rust_helper/Cargo.toml",
+        "--bin",
+        "gui_shell_rust_helper",
+        "--bin",
+        "gui_shell_desktop_launcher"
+      ],
+      "rust_compile_time_identity": {
+        "source": "schema_validated_manifest",
+        "app_id": "d4-pocket-app-11111111111111111111111111111111",
+        "audit_store_id": "audit-store-22222222222222222222222222222222",
+        "manifest_sha256": "da73ce1f732b8db598518078729240c91f14ef9e95fd0a89e4ae9a451203e74e"
+      },
+      "rust_compile_time_update_trust": {
+        "source": "not_configured",
+        "configured": false,
+        "public_key_fingerprint": null,
+        "package_source_count": 0
+      },
+      "build_duration_ms": 740286,
+      "runtime_storage_root_template": "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>",
+      "portable_bundle_assembled": true,
+      "manifest_copied_byte_for_byte": true,
+      "build_receipt_excluded_from_artifact_inventory": true,
+      "standalone_app_verified": false,
+      "runtime_manifest_consumed": false,
+      "binary_pruning_verified": false,
+      "formal_distribution_claimed": false,
+      "signed": false,
+      "installer_status": "not_started",
+      "launch_status": "not_verified",
+      "artifact_root": ".",
+      "artifact_files": [
+        {
+          "path": "app/data/app.so",
+          "size_bytes": 8160144,
+          "sha256": "a6735f30c774bf2599fa8c3065311367cb1ca5c1ce3322003eea9ee6966e9e02"
+        },
+        {
+          "path": "app/data/flutter_assets/AssetManifest.bin",
+          "size_bytes": 2,
+          "sha256": "f566cc6fccc657365c0197accf3a7d6f80f85209ff666ff774f4dcbc524aa842"
+        },
+        {
+          "path": "app/data/flutter_assets/FontManifest.json",
+          "size_bytes": 82,
+          "sha256": "28b1eb2b3d2e1ad60b8c8b0f9100b1ccbf492f7fa97f5bebb51ea97e73926e7d"
+        },
+        {
+          "path": "app/data/flutter_assets/fonts/MaterialIcons-Regular.otf",
+          "size_bytes": 1645184,
+          "sha256": "d9865b671a09d683d13a863089d8825e0f61a37696ce5d7d448bc8023aa62453"
+        },
+        {
+          "path": "app/data/flutter_assets/NativeAssetsManifest.json",
+          "size_bytes": 45,
+          "sha256": "9548a31e4a048135c1d94f919328bfb62ae2c7bb3cab96557c7941daa97776cb"
+        },
+        {
+          "path": "app/data/flutter_assets/NOTICES.Z",
+          "size_bytes": 103576,
+          "sha256": "fcddabb0ecf2215d5d82cb7dd7e26fbf2fc530879edc1666270849b4c9f6b6a8"
+        },
+        {
+          "path": "app/data/flutter_assets/shaders/ink_sparkle.frag",
+          "size_bytes": 21856,
+          "sha256": "1fe8436a743884cb65078fe8c7b38e18f5365f2a2961270916f426fd13c604af"
+        },
+        {
+          "path": "app/data/flutter_assets/shaders/stretch_effect.frag",
+          "size_bytes": 17624,
+          "sha256": "62a899ff4e168ac6ca888ce7c2f40e5d3fbf8ca20a1c3ded781a116a6d7907e2"
+        },
+        {
+          "path": "app/data/icudtl.dat",
+          "size_bytes": 862304,
+          "sha256": "998367809a821d595928089c197b3f7959f0420f81f79d4d0daee53378492ed5"
+        },
+        {
+          "path": "app/flutter_windows.dll",
+          "size_bytes": 21284352,
+          "sha256": "3168c546aeb0b0e6a77abc97e0de95b45d13ada150faaad6de75e79acaf3b050"
+        },
+        {
+          "path": "app/gui_shell_desktop.exe",
+          "size_bytes": 163840,
+          "sha256": "d3f84ed5e0d97a9f1bbe3068e4cdf5fadbc8291a3277c31e2b9689da06ea3d57"
+        },
+        {
+          "path": "broker/gui_shell_rust_helper.exe",
+          "size_bytes": 16404480,
+          "sha256": "64c5534a0b0bf9a40afde76f23986b05b045acbd2f2d636a15ed608f5b986bc6"
+        },
+        {
+          "path": "gui_shell_desktop_launcher.exe",
+          "size_bytes": 16720384,
+          "sha256": "f47af92436783a3ff0b3c594e3954e2a992001087a2ed7b0ee925f6729089535"
+        },
+        {
+          "path": "product_manifest.json",
+          "size_bytes": 3063,
+          "sha256": "da73ce1f732b8db598518078729240c91f14ef9e95fd0a89e4ae9a451203e74e"
+        }
+      ],
+      "artifact_total_bytes": 65386936,
+      "artifact_tree_sha256": "be527f3fccddb3727e7ffb9352f610d68c13b9193f4c2a9fb35bab22817ddb81",
+      "credential_artifact_scan": {
+        "version": 1,
+        "status": "passed_known_patterns",
+        "scope": "runtime_artifact_files",
+        "coverage": "known_patterns_only",
+        "files_scanned": 14,
+        "bytes_scanned": 65386936,
+        "findings": 0,
+        "artifact_tree_sha256": "be527f3fccddb3727e7ffb9352f610d68c13b9193f4c2a9fb35bab22817ddb81"
+      }
+    }
+  },
+  "receipt_hashes": {
+    "full": "eec75a8dfd694978730e55b9e58964854eaf7e9a04449e9b4911b6ad63561619",
+    "pruned": "e6640710968f813005e561abd647b88a62cc8429a05d0b76e79b59e794c1475e"
+  },
+  "build_logs_metadata_only": {
+    "full": {
+      "bytes": 24507,
+      "sha256": "77c2172852decd4f4f1ef4e340ed6078e567359ad572cf2092c3edb97fcbe5f6"
+    },
+    "pruned": {
+      "bytes": 23334,
+      "sha256": "9d5110e2ab53461034eac7174252e64838603016a824f7182d8403217a142796"
+    }
+  },
+  "flutter_size_reports": {
+    "full": {
+      "path": "C:\\Users\\ohira\\.flutter-devtools\\windows-code-size-analysis_18.json",
+      "bytes": 10275105,
+      "sha256": "7c1b78f6de8a87805836cb15c32dc0b4db75027c8dc568eff78c2b70026641a2",
+      "matches_receipt": true
+    },
+    "pruned": {
+      "path": "C:\\Users\\ohira\\.flutter-devtools\\windows-code-size-analysis_19.json",
+      "bytes": 9934422,
+      "sha256": "bade9dedc316f5394a26856c5d62d6992230a8d055d82cbd2b0b6ecd6485f989",
+      "matches_receipt": true
+    }
+  },
+  "independent_artifact_verification": {
+    "full": {
+      "file_count": 14,
+      "total_bytes": 67952780,
+      "tree_sha256_recomputed": "a0f40c0f44d48a07d93e025a331b33125b8397264459134e9878c262c934c188",
+      "matches_builder_receipt": true,
+      "files": [
+        {
+          "path": "app/data/app.so",
+          "size_bytes": 8569744,
+          "sha256": "917df482223d9a42498e061560e324a78ecdd28e07ecb04bbda530db2f2f03db"
+        },
+        {
+          "path": "app/data/flutter_assets/AssetManifest.bin",
+          "size_bytes": 2,
+          "sha256": "f566cc6fccc657365c0197accf3a7d6f80f85209ff666ff774f4dcbc524aa842"
+        },
+        {
+          "path": "app/data/flutter_assets/FontManifest.json",
+          "size_bytes": 82,
+          "sha256": "28b1eb2b3d2e1ad60b8c8b0f9100b1ccbf492f7fa97f5bebb51ea97e73926e7d"
+        },
+        {
+          "path": "app/data/flutter_assets/fonts/MaterialIcons-Regular.otf",
+          "size_bytes": 1645184,
+          "sha256": "d9865b671a09d683d13a863089d8825e0f61a37696ce5d7d448bc8023aa62453"
+        },
+        {
+          "path": "app/data/flutter_assets/NativeAssetsManifest.json",
+          "size_bytes": 45,
+          "sha256": "9548a31e4a048135c1d94f919328bfb62ae2c7bb3cab96557c7941daa97776cb"
+        },
+        {
+          "path": "app/data/flutter_assets/NOTICES.Z",
+          "size_bytes": 103576,
+          "sha256": "fcddabb0ecf2215d5d82cb7dd7e26fbf2fc530879edc1666270849b4c9f6b6a8"
+        },
+        {
+          "path": "app/data/flutter_assets/shaders/ink_sparkle.frag",
+          "size_bytes": 21856,
+          "sha256": "1fe8436a743884cb65078fe8c7b38e18f5365f2a2961270916f426fd13c604af"
+        },
+        {
+          "path": "app/data/flutter_assets/shaders/stretch_effect.frag",
+          "size_bytes": 17624,
+          "sha256": "62a899ff4e168ac6ca888ce7c2f40e5d3fbf8ca20a1c3ded781a116a6d7907e2"
+        },
+        {
+          "path": "app/data/icudtl.dat",
+          "size_bytes": 862304,
+          "sha256": "998367809a821d595928089c197b3f7959f0420f81f79d4d0daee53378492ed5"
+        },
+        {
+          "path": "app/flutter_windows.dll",
+          "size_bytes": 21284352,
+          "sha256": "3168c546aeb0b0e6a77abc97e0de95b45d13ada150faaad6de75e79acaf3b050"
+        },
+        {
+          "path": "app/gui_shell_desktop.exe",
+          "size_bytes": 163840,
+          "sha256": "deadc092568c767624285aebc60ea0a42ce39acc43d916e6c69fab66de4d6b12"
+        },
+        {
+          "path": "broker/gui_shell_rust_helper.exe",
+          "size_bytes": 17484288,
+          "sha256": "5722ea37a07eff0332fbdf3b80ef4ce5d6beb8f734bee0d9e7b737de657e7afa"
+        },
+        {
+          "path": "gui_shell_desktop_launcher.exe",
+          "size_bytes": 17796608,
+          "sha256": "8bf8ab0f9e88762104ea2db4906231446db55a2d27419661e98fbe739c11cb9c"
+        },
+        {
+          "path": "product_manifest.json",
+          "size_bytes": 3275,
+          "sha256": "593986d408b3dc722c77df9b37dcfe559e24233e8d8ff5326ec613c1d5ea4806"
+        }
+      ]
+    },
+    "pruned": {
+      "file_count": 14,
+      "total_bytes": 65386936,
+      "tree_sha256_recomputed": "be527f3fccddb3727e7ffb9352f610d68c13b9193f4c2a9fb35bab22817ddb81",
+      "matches_builder_receipt": true,
+      "files": [
+        {
+          "path": "app/data/app.so",
+          "size_bytes": 8160144,
+          "sha256": "a6735f30c774bf2599fa8c3065311367cb1ca5c1ce3322003eea9ee6966e9e02"
+        },
+        {
+          "path": "app/data/flutter_assets/AssetManifest.bin",
+          "size_bytes": 2,
+          "sha256": "f566cc6fccc657365c0197accf3a7d6f80f85209ff666ff774f4dcbc524aa842"
+        },
+        {
+          "path": "app/data/flutter_assets/FontManifest.json",
+          "size_bytes": 82,
+          "sha256": "28b1eb2b3d2e1ad60b8c8b0f9100b1ccbf492f7fa97f5bebb51ea97e73926e7d"
+        },
+        {
+          "path": "app/data/flutter_assets/fonts/MaterialIcons-Regular.otf",
+          "size_bytes": 1645184,
+          "sha256": "d9865b671a09d683d13a863089d8825e0f61a37696ce5d7d448bc8023aa62453"
+        },
+        {
+          "path": "app/data/flutter_assets/NativeAssetsManifest.json",
+          "size_bytes": 45,
+          "sha256": "9548a31e4a048135c1d94f919328bfb62ae2c7bb3cab96557c7941daa97776cb"
+        },
+        {
+          "path": "app/data/flutter_assets/NOTICES.Z",
+          "size_bytes": 103576,
+          "sha256": "fcddabb0ecf2215d5d82cb7dd7e26fbf2fc530879edc1666270849b4c9f6b6a8"
+        },
+        {
+          "path": "app/data/flutter_assets/shaders/ink_sparkle.frag",
+          "size_bytes": 21856,
+          "sha256": "1fe8436a743884cb65078fe8c7b38e18f5365f2a2961270916f426fd13c604af"
+        },
+        {
+          "path": "app/data/flutter_assets/shaders/stretch_effect.frag",
+          "size_bytes": 17624,
+          "sha256": "62a899ff4e168ac6ca888ce7c2f40e5d3fbf8ca20a1c3ded781a116a6d7907e2"
+        },
+        {
+          "path": "app/data/icudtl.dat",
+          "size_bytes": 862304,
+          "sha256": "998367809a821d595928089c197b3f7959f0420f81f79d4d0daee53378492ed5"
+        },
+        {
+          "path": "app/flutter_windows.dll",
+          "size_bytes": 21284352,
+          "sha256": "3168c546aeb0b0e6a77abc97e0de95b45d13ada150faaad6de75e79acaf3b050"
+        },
+        {
+          "path": "app/gui_shell_desktop.exe",
+          "size_bytes": 163840,
+          "sha256": "d3f84ed5e0d97a9f1bbe3068e4cdf5fadbc8291a3277c31e2b9689da06ea3d57"
+        },
+        {
+          "path": "broker/gui_shell_rust_helper.exe",
+          "size_bytes": 16404480,
+          "sha256": "64c5534a0b0bf9a40afde76f23986b05b045acbd2f2d636a15ed608f5b986bc6"
+        },
+        {
+          "path": "gui_shell_desktop_launcher.exe",
+          "size_bytes": 16720384,
+          "sha256": "f47af92436783a3ff0b3c594e3954e2a992001087a2ed7b0ee925f6729089535"
+        },
+        {
+          "path": "product_manifest.json",
+          "size_bytes": 3063,
+          "sha256": "da73ce1f732b8db598518078729240c91f14ef9e95fd0a89e4ae9a451203e74e"
+        }
+      ]
+    }
+  },
+  "artifact_comparison": {
+    "same_path_set": true,
+    "full_path_count": 14,
+    "pruned_path_count": 14,
+    "added_in_pruned": [],
+    "removed_in_pruned": [],
+    "changed": [
+      "app/data/app.so",
+      "app/gui_shell_desktop.exe",
+      "broker/gui_shell_rust_helper.exe",
+      "gui_shell_desktop_launcher.exe",
+      "product_manifest.json"
+    ],
+    "unchanged": [
+      "app/data/flutter_assets/AssetManifest.bin",
+      "app/data/flutter_assets/FontManifest.json",
+      "app/data/flutter_assets/NOTICES.Z",
+      "app/data/flutter_assets/NativeAssetsManifest.json",
+      "app/data/flutter_assets/fonts/MaterialIcons-Regular.otf",
+      "app/data/flutter_assets/shaders/ink_sparkle.frag",
+      "app/data/flutter_assets/shaders/stretch_effect.frag",
+      "app/data/icudtl.dat",
+      "app/flutter_windows.dll"
+    ],
+    "size_delta_pruned_minus_full_bytes": -2565844,
+    "per_path": [
+      {
+        "path": "app/data/app.so",
+        "full_bytes": 8569744,
+        "pruned_bytes": 8160144,
+        "full_sha256": "917df482223d9a42498e061560e324a78ecdd28e07ecb04bbda530db2f2f03db",
+        "pruned_sha256": "a6735f30c774bf2599fa8c3065311367cb1ca5c1ce3322003eea9ee6966e9e02"
+      },
+      {
+        "path": "app/data/flutter_assets/AssetManifest.bin",
+        "full_bytes": 2,
+        "pruned_bytes": 2,
+        "full_sha256": "f566cc6fccc657365c0197accf3a7d6f80f85209ff666ff774f4dcbc524aa842",
+        "pruned_sha256": "f566cc6fccc657365c0197accf3a7d6f80f85209ff666ff774f4dcbc524aa842"
+      },
+      {
+        "path": "app/data/flutter_assets/FontManifest.json",
+        "full_bytes": 82,
+        "pruned_bytes": 82,
+        "full_sha256": "28b1eb2b3d2e1ad60b8c8b0f9100b1ccbf492f7fa97f5bebb51ea97e73926e7d",
+        "pruned_sha256": "28b1eb2b3d2e1ad60b8c8b0f9100b1ccbf492f7fa97f5bebb51ea97e73926e7d"
+      },
+      {
+        "path": "app/data/flutter_assets/NOTICES.Z",
+        "full_bytes": 103576,
+        "pruned_bytes": 103576,
+        "full_sha256": "fcddabb0ecf2215d5d82cb7dd7e26fbf2fc530879edc1666270849b4c9f6b6a8",
+        "pruned_sha256": "fcddabb0ecf2215d5d82cb7dd7e26fbf2fc530879edc1666270849b4c9f6b6a8"
+      },
+      {
+        "path": "app/data/flutter_assets/NativeAssetsManifest.json",
+        "full_bytes": 45,
+        "pruned_bytes": 45,
+        "full_sha256": "9548a31e4a048135c1d94f919328bfb62ae2c7bb3cab96557c7941daa97776cb",
+        "pruned_sha256": "9548a31e4a048135c1d94f919328bfb62ae2c7bb3cab96557c7941daa97776cb"
+      },
+      {
+        "path": "app/data/flutter_assets/fonts/MaterialIcons-Regular.otf",
+        "full_bytes": 1645184,
+        "pruned_bytes": 1645184,
+        "full_sha256": "d9865b671a09d683d13a863089d8825e0f61a37696ce5d7d448bc8023aa62453",
+        "pruned_sha256": "d9865b671a09d683d13a863089d8825e0f61a37696ce5d7d448bc8023aa62453"
+      },
+      {
+        "path": "app/data/flutter_assets/shaders/ink_sparkle.frag",
+        "full_bytes": 21856,
+        "pruned_bytes": 21856,
+        "full_sha256": "1fe8436a743884cb65078fe8c7b38e18f5365f2a2961270916f426fd13c604af",
+        "pruned_sha256": "1fe8436a743884cb65078fe8c7b38e18f5365f2a2961270916f426fd13c604af"
+      },
+      {
+        "path": "app/data/flutter_assets/shaders/stretch_effect.frag",
+        "full_bytes": 17624,
+        "pruned_bytes": 17624,
+        "full_sha256": "62a899ff4e168ac6ca888ce7c2f40e5d3fbf8ca20a1c3ded781a116a6d7907e2",
+        "pruned_sha256": "62a899ff4e168ac6ca888ce7c2f40e5d3fbf8ca20a1c3ded781a116a6d7907e2"
+      },
+      {
+        "path": "app/data/icudtl.dat",
+        "full_bytes": 862304,
+        "pruned_bytes": 862304,
+        "full_sha256": "998367809a821d595928089c197b3f7959f0420f81f79d4d0daee53378492ed5",
+        "pruned_sha256": "998367809a821d595928089c197b3f7959f0420f81f79d4d0daee53378492ed5"
+      },
+      {
+        "path": "app/flutter_windows.dll",
+        "full_bytes": 21284352,
+        "pruned_bytes": 21284352,
+        "full_sha256": "3168c546aeb0b0e6a77abc97e0de95b45d13ada150faaad6de75e79acaf3b050",
+        "pruned_sha256": "3168c546aeb0b0e6a77abc97e0de95b45d13ada150faaad6de75e79acaf3b050"
+      },
+      {
+        "path": "app/gui_shell_desktop.exe",
+        "full_bytes": 163840,
+        "pruned_bytes": 163840,
+        "full_sha256": "deadc092568c767624285aebc60ea0a42ce39acc43d916e6c69fab66de4d6b12",
+        "pruned_sha256": "d3f84ed5e0d97a9f1bbe3068e4cdf5fadbc8291a3277c31e2b9689da06ea3d57"
+      },
+      {
+        "path": "broker/gui_shell_rust_helper.exe",
+        "full_bytes": 17484288,
+        "pruned_bytes": 16404480,
+        "full_sha256": "5722ea37a07eff0332fbdf3b80ef4ce5d6beb8f734bee0d9e7b737de657e7afa",
+        "pruned_sha256": "64c5534a0b0bf9a40afde76f23986b05b045acbd2f2d636a15ed608f5b986bc6"
+      },
+      {
+        "path": "gui_shell_desktop_launcher.exe",
+        "full_bytes": 17796608,
+        "pruned_bytes": 16720384,
+        "full_sha256": "8bf8ab0f9e88762104ea2db4906231446db55a2d27419661e98fbe739c11cb9c",
+        "pruned_sha256": "f47af92436783a3ff0b3c594e3954e2a992001087a2ed7b0ee925f6729089535"
+      },
+      {
+        "path": "product_manifest.json",
+        "full_bytes": 3275,
+        "pruned_bytes": 3063,
+        "full_sha256": "593986d408b3dc722c77df9b37dcfe559e24233e8d8ff5326ec613c1d5ea4806",
+        "pruned_sha256": "da73ce1f732b8db598518078729240c91f14ef9e95fd0a89e4ae9a451203e74e"
+      }
+    ]
+  },
+  "resource_comparison": {
+    "scope": "app/data/flutter_assets/**",
+    "full_file_count": 7,
+    "pruned_file_count": 7,
+    "identical_inventory_and_hashes": true,
+    "removed_paths": [],
+    "added_paths": [],
+    "files": [
+      {
+        "path": "app/data/flutter_assets/AssetManifest.bin",
+        "size_bytes": 2,
+        "sha256": "f566cc6fccc657365c0197accf3a7d6f80f85209ff666ff774f4dcbc524aa842"
+      },
+      {
+        "path": "app/data/flutter_assets/FontManifest.json",
+        "size_bytes": 82,
+        "sha256": "28b1eb2b3d2e1ad60b8c8b0f9100b1ccbf492f7fa97f5bebb51ea97e73926e7d"
+      },
+      {
+        "path": "app/data/flutter_assets/fonts/MaterialIcons-Regular.otf",
+        "size_bytes": 1645184,
+        "sha256": "d9865b671a09d683d13a863089d8825e0f61a37696ce5d7d448bc8023aa62453"
+      },
+      {
+        "path": "app/data/flutter_assets/NativeAssetsManifest.json",
+        "size_bytes": 45,
+        "sha256": "9548a31e4a048135c1d94f919328bfb62ae2c7bb3cab96557c7941daa97776cb"
+      },
+      {
+        "path": "app/data/flutter_assets/NOTICES.Z",
+        "size_bytes": 103576,
+        "sha256": "fcddabb0ecf2215d5d82cb7dd7e26fbf2fc530879edc1666270849b4c9f6b6a8"
+      },
+      {
+        "path": "app/data/flutter_assets/shaders/ink_sparkle.frag",
+        "size_bytes": 21856,
+        "sha256": "1fe8436a743884cb65078fe8c7b38e18f5365f2a2961270916f426fd13c604af"
+      },
+      {
+        "path": "app/data/flutter_assets/shaders/stretch_effect.frag",
+        "size_bytes": 17624,
+        "sha256": "62a899ff4e168ac6ca888ce7c2f40e5d3fbf8ca20a1c3ded781a116a6d7907e2"
+      }
+    ]
+  },
+  "dependency_comparison": {
+    "scope": "Windows x64 normal Cargo dependency tree (build/dev edges excluded)",
+    "same_normal_dependency_tree": true,
+    "full": {
+      "command": [
+        "cargo",
+        "tree",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "native/rust_helper/Cargo.toml",
+        "--target",
+        "x86_64-pc-windows-msvc",
+        "--no-default-features",
+        "--features",
+        "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations",
+        "--edges",
+        "normal",
+        "--prefix",
+        "none",
+        "--format",
+        "{p}"
+      ],
+      "exit_code": 0,
+      "line_count": 383,
+      "lines_sha256": "6712a69129c432011f0e895a232bc803876162f48e7cbf74e64adfb6e6b69c3e",
+      "packages": [
+        "ahash v0.8.12",
+        "ahash v0.8.12 (*)",
+        "ahash v0.8.12 (*)",
+        "aho-corasick v1.1.5",
+        "aho-corasick v1.1.5 (*)",
+        "allocator-api2 v0.2.21",
+        "ambient-authority v0.0.2",
+        "atomic-waker v1.1.2",
+        "base64 v0.23.1",
+        "base64 v0.23.1",
+        "base64 v0.23.1",
+        "bit-set v0.8.0",
+        "bit-vec v0.8.0",
+        "bitflags v2.13.2",
+        "bitflags v2.13.2",
+        "block-buffer v0.10.4",
+        "borrow-or-share v0.2.4",
+        "bytecount v0.6.9",
+        "bytecount v0.6.9",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "cap-fs-ext v4.0.3",
+        "cap-fs-ext v4.0.3 (*)",
+        "cap-primitives v4.0.3",
+        "cap-primitives v4.0.3 (*)",
+        "cap-std v4.0.3",
+        "cap-std v4.0.3 (*)",
+        "cap-std v4.0.3 (*)",
+        "cfg-if v1.0.4",
+        "cfg-if v1.0.4",
+        "cfg-if v1.0.4",
+        "cfg-if v1.0.4",
+        "cfg-if v1.0.4",
+        "cfg-if v1.0.4",
+        "cpufeatures v0.2.17",
+        "crypto-common v0.1.7",
+        "data-encoding v2.11.1",
+        "deranged v0.5.8",
+        "digest v0.10.7",
+        "displaydoc v0.2.7 (proc-macro)",
+        "displaydoc v0.2.7 (proc-macro) (*)",
+        "displaydoc v0.2.7 (proc-macro) (*)",
+        "displaydoc v0.2.7 (proc-macro) (*)",
+        "displaydoc v0.2.7 (proc-macro) (*)",
+        "displaydoc v0.2.7 (proc-macro) (*)",
+        "email_address v0.2.9",
+        "equivalent v1.0.2",
+        "fancy-regex v0.19.2",
+        "fluent-uri v0.4.1",
+        "foldhash v0.2.0",
+        "form_urlencoded v1.2.2",
+        "fraction v0.17.0",
+        "fraction v0.17.0 (*)",
+        "fs-set-times v0.20.3",
+        "futures-channel v0.3.34",
+        "futures-channel v0.3.34 (*)",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-sink v0.3.34",
+        "futures-task v0.3.34",
+        "futures-util v0.3.34",
+        "futures-util v0.3.34 (*)",
+        "futures-util v0.3.34 (*)",
+        "futures-util v0.3.34 (*)",
+        "generic-array v0.14.7",
+        "generic-array v0.14.7 (*)",
+        "getrandom v0.2.17",
+        "getrandom v0.2.17 (*)",
+        "getrandom v0.3.4",
+        "gui_shell_process_supervision v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\process_supervision)",
+        "gui_shell_rust_helper v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\rust_helper)",
+        "gui_shell_windows_broker_channel v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\windows_broker_channel)",
+        "gui_shell_windows_dns v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\windows_dns)",
+        "gui_shell_windows_protection v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\windows_protection)",
+        "gui_shell_windows_runtime_observation v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\windows_runtime_observation)",
+        "hashbrown v0.17.1",
+        "heck v0.5.0",
+        "hex v0.4.3",
+        "http v1.5.0",
+        "http v1.5.0 (*)",
+        "http v1.5.0 (*)",
+        "http v1.5.0 (*)",
+        "http v1.5.0 (*)",
+        "http v1.5.0 (*)",
+        "http v1.5.0 (*)",
+        "http-body v1.1.0",
+        "http-body v1.1.0 (*)",
+        "http-body v1.1.0 (*)",
+        "http-body v1.1.0 (*)",
+        "http-body v1.1.0 (*)",
+        "http-body-util v0.1.5",
+        "httparse v1.10.1",
+        "httparse v1.10.1",
+        "hyper v1.11.1",
+        "hyper v1.11.1 (*)",
+        "hyper v1.11.1 (*)",
+        "hyper-rustls v0.27.10",
+        "hyper-util v0.1.21",
+        "hyper-util v0.1.21 (*)",
+        "icu_collections v2.3.0",
+        "icu_collections v2.3.0 (*)",
+        "icu_locale_core v2.3.0",
+        "icu_locale_core v2.3.0 (*)",
+        "icu_normalizer v2.3.0",
+        "icu_normalizer_data v2.3.0",
+        "icu_properties v2.3.0",
+        "icu_properties_data v2.3.0",
+        "icu_provider v2.3.1",
+        "icu_provider v2.3.1 (*)",
+        "idna v1.1.0",
+        "idna_adapter v1.2.2",
+        "io-extras v0.19.0",
+        "io-extras v0.19.0 (*)",
+        "io-lifetimes v2.0.4",
+        "io-lifetimes v3.0.1",
+        "io-lifetimes v3.0.1",
+        "io-lifetimes v3.0.1",
+        "io-lifetimes v3.0.1",
+        "ipnet v2.12.2",
+        "ipnet v2.12.2",
+        "itoa v1.0.18",
+        "itoa v1.0.18",
+        "itoa v1.0.18",
+        "itoa v1.0.18",
+        "itoa v1.0.18",
+        "jsonschema v0.58.1",
+        "jsonschema-regex v0.58.1",
+        "jsonschema-value v0.58.1",
+        "libc v0.2.186",
+        "litemap v0.8.3",
+        "lock_api v0.4.14",
+        "log v0.4.34",
+        "log v0.4.34",
+        "maybe-owned v0.3.4",
+        "memchr v2.8.1",
+        "memchr v2.8.1",
+        "memchr v2.8.1",
+        "memchr v2.8.1",
+        "micromap v0.3.0",
+        "mio v1.2.3",
+        "num v0.4.3",
+        "num-bigint v0.4.8",
+        "num-bigint v0.4.8 (*)",
+        "num-bigint v0.4.8 (*)",
+        "num-cmp v0.1.0",
+        "num-cmp v0.1.0",
+        "num-complex v0.4.6",
+        "num-conv v0.2.2",
+        "num-integer v0.1.47",
+        "num-integer v0.1.47 (*)",
+        "num-integer v0.1.47 (*)",
+        "num-integer v0.1.47 (*)",
+        "num-iter v0.1.46",
+        "num-rational v0.4.2",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "once_cell v1.21.4",
+        "once_cell v1.21.4",
+        "once_cell v1.21.4",
+        "outref v0.5.2",
+        "parking_lot v0.12.5",
+        "parking_lot_core v0.9.12",
+        "pem v4.0.0",
+        "percent-encoding v2.3.2",
+        "percent-encoding v2.3.2",
+        "percent-encoding v2.3.2",
+        "percent-encoding v2.3.2",
+        "percent-encoding v2.3.2",
+        "percent-encoding v2.3.2",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "potential_utf v0.1.6",
+        "powerfmt v0.2.0",
+        "proc-macro2 v1.0.106",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "quote v1.0.45",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "rcgen v0.14.10",
+        "ref-cast v1.0.27",
+        "ref-cast-impl v1.0.27 (proc-macro)",
+        "referencing v0.58.1",
+        "regex v1.13.1",
+        "regex v1.13.1 (*)",
+        "regex-automata v0.4.18",
+        "regex-automata v0.4.18 (*)",
+        "regex-syntax v0.8.11",
+        "regex-syntax v0.8.11",
+        "regex-syntax v0.8.11",
+        "regex-syntax v0.8.11",
+        "reqwest v0.13.5",
+        "ring v0.17.14",
+        "ring v0.17.14 (*)",
+        "ring v0.17.14 (*)",
+        "ring v0.17.14 (*)",
+        "rustls v0.23.44",
+        "rustls v0.23.44 (*)",
+        "rustls v0.23.44 (*)",
+        "rustls v0.23.44 (*)",
+        "rustls v0.23.44 (*)",
+        "rustls-pki-types v1.15.1",
+        "rustls-pki-types v1.15.1 (*)",
+        "rustls-pki-types v1.15.1 (*)",
+        "rustls-pki-types v1.15.1 (*)",
+        "rustls-platform-verifier v0.7.1",
+        "rustls-webpki v0.103.15",
+        "scopeguard v1.2.0",
+        "serde v1.0.228",
+        "serde v1.0.228 (*)",
+        "serde v1.0.228 (*)",
+        "serde v1.0.228 (*)",
+        "serde v1.0.228 (*)",
+        "serde_core v1.0.228",
+        "serde_core v1.0.228",
+        "serde_derive v1.0.228 (proc-macro)",
+        "serde_json v1.0.150",
+        "serde_json v1.0.150 (*)",
+        "serde_json v1.0.150 (*)",
+        "serde_json v1.0.150 (*)",
+        "sha2 v0.10.9",
+        "slab v0.4.12",
+        "smallvec v1.16.2",
+        "smallvec v1.16.2",
+        "smallvec v1.16.2",
+        "smallvec v1.16.2",
+        "socket2 v0.6.5",
+        "socket2 v0.6.5 (*)",
+        "stable_deref_trait v1.2.1",
+        "strum v0.28.0",
+        "strum_macros v0.28.0 (proc-macro)",
+        "subtle v2.6.1",
+        "subtle v2.6.1",
+        "syn v2.0.117",
+        "syn v2.0.117 (*)",
+        "syn v3.0.5",
+        "syn v3.0.5 (*)",
+        "syn v3.0.5 (*)",
+        "syn v3.0.5 (*)",
+        "syn v3.0.5 (*)",
+        "syn v3.0.5 (*)",
+        "sync_wrapper v1.0.2",
+        "sync_wrapper v1.0.2 (*)",
+        "synstructure v0.14.0",
+        "synstructure v0.14.0 (*)",
+        "time v0.3.55",
+        "time v0.3.55 (*)",
+        "time-core v0.1.9",
+        "tinystr v0.8.4",
+        "tinyvec v1.11.0",
+        "tinyvec_macros v0.1.1",
+        "tokio v1.53.1",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio-rustls v0.26.6",
+        "tokio-rustls v0.26.6 (*)",
+        "tokio-util v0.7.19",
+        "tower v0.5.3",
+        "tower v0.5.3 (*)",
+        "tower-http v0.6.11",
+        "tower-layer v0.3.3",
+        "tower-layer v0.3.3",
+        "tower-service v0.3.3",
+        "tower-service v0.3.3",
+        "tower-service v0.3.3",
+        "tower-service v0.3.3",
+        "tower-service v0.3.3",
+        "tracing v0.1.44",
+        "tracing-core v0.1.36",
+        "try-lock v0.2.5",
+        "typenum v1.20.0",
+        "typenum v1.20.0",
+        "unicode-general-category v1.1.0",
+        "unicode-ident v1.0.24",
+        "unicode-ident v1.0.24",
+        "unicode-ident v1.0.24",
+        "unicode-normalization v0.1.25",
+        "untrusted v0.9.0",
+        "untrusted v0.9.0",
+        "url v2.5.8",
+        "url v2.5.8 (*)",
+        "utf8_iter v1.0.4",
+        "utf8_iter v1.0.4",
+        "uuid-simd v0.8.0",
+        "vsimd v0.8.0",
+        "want v0.3.1",
+        "windows-link v0.2.1",
+        "windows-link v0.2.1",
+        "windows-sys v0.52.0",
+        "windows-sys v0.52.0 (*)",
+        "windows-sys v0.52.0 (*)",
+        "windows-sys v0.52.0 (*)",
+        "windows-sys v0.61.2",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-targets v0.52.6",
+        "windows_x86_64_msvc v0.52.6",
+        "winsafe v0.0.29",
+        "winx v0.36.4",
+        "writeable v0.6.4",
+        "writeable v0.6.4",
+        "yasna v0.6.0",
+        "yoke v0.8.3",
+        "yoke v0.8.3 (*)",
+        "yoke v0.8.3 (*)",
+        "yoke v0.8.3 (*)",
+        "yoke-derive v0.8.3 (proc-macro)",
+        "zerocopy v0.8.59",
+        "zerofrom v0.1.8",
+        "zerofrom v0.1.8 (*)",
+        "zerofrom v0.1.8 (*)",
+        "zerofrom v0.1.8 (*)",
+        "zerofrom v0.1.8 (*)",
+        "zerofrom-derive v0.1.8 (proc-macro)",
+        "zeroize v1.9.0",
+        "zeroize v1.9.0",
+        "zeroize v1.9.0",
+        "zerotrie v0.2.5",
+        "zerotrie v0.2.5 (*)",
+        "zerovec v0.11.8",
+        "zerovec v0.11.8 (*)",
+        "zerovec v0.11.8 (*)",
+        "zerovec v0.11.8 (*)",
+        "zerovec v0.11.8 (*)",
+        "zerovec v0.11.8 (*)",
+        "zerovec v0.11.8 (*)",
+        "zerovec-derive v0.11.6 (proc-macro)",
+        "zmij v1.0.23",
+        "zmij v1.0.23"
+      ]
+    },
+    "pruned": {
+      "command": [
+        "cargo",
+        "tree",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "native/rust_helper/Cargo.toml",
+        "--target",
+        "x86_64-pc-windows-msvc",
+        "--no-default-features",
+        "--features",
+        "module_observability,module_trace_inspector",
+        "--edges",
+        "normal",
+        "--prefix",
+        "none",
+        "--format",
+        "{p}"
+      ],
+      "exit_code": 0,
+      "line_count": 383,
+      "lines_sha256": "6712a69129c432011f0e895a232bc803876162f48e7cbf74e64adfb6e6b69c3e",
+      "packages": [
+        "ahash v0.8.12",
+        "ahash v0.8.12 (*)",
+        "ahash v0.8.12 (*)",
+        "aho-corasick v1.1.5",
+        "aho-corasick v1.1.5 (*)",
+        "allocator-api2 v0.2.21",
+        "ambient-authority v0.0.2",
+        "atomic-waker v1.1.2",
+        "base64 v0.23.1",
+        "base64 v0.23.1",
+        "base64 v0.23.1",
+        "bit-set v0.8.0",
+        "bit-vec v0.8.0",
+        "bitflags v2.13.2",
+        "bitflags v2.13.2",
+        "block-buffer v0.10.4",
+        "borrow-or-share v0.2.4",
+        "bytecount v0.6.9",
+        "bytecount v0.6.9",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "bytes v1.12.1",
+        "cap-fs-ext v4.0.3",
+        "cap-fs-ext v4.0.3 (*)",
+        "cap-primitives v4.0.3",
+        "cap-primitives v4.0.3 (*)",
+        "cap-std v4.0.3",
+        "cap-std v4.0.3 (*)",
+        "cap-std v4.0.3 (*)",
+        "cfg-if v1.0.4",
+        "cfg-if v1.0.4",
+        "cfg-if v1.0.4",
+        "cfg-if v1.0.4",
+        "cfg-if v1.0.4",
+        "cfg-if v1.0.4",
+        "cpufeatures v0.2.17",
+        "crypto-common v0.1.7",
+        "data-encoding v2.11.1",
+        "deranged v0.5.8",
+        "digest v0.10.7",
+        "displaydoc v0.2.7 (proc-macro)",
+        "displaydoc v0.2.7 (proc-macro) (*)",
+        "displaydoc v0.2.7 (proc-macro) (*)",
+        "displaydoc v0.2.7 (proc-macro) (*)",
+        "displaydoc v0.2.7 (proc-macro) (*)",
+        "displaydoc v0.2.7 (proc-macro) (*)",
+        "email_address v0.2.9",
+        "equivalent v1.0.2",
+        "fancy-regex v0.19.2",
+        "fluent-uri v0.4.1",
+        "foldhash v0.2.0",
+        "form_urlencoded v1.2.2",
+        "fraction v0.17.0",
+        "fraction v0.17.0 (*)",
+        "fs-set-times v0.20.3",
+        "futures-channel v0.3.34",
+        "futures-channel v0.3.34 (*)",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-core v0.3.34",
+        "futures-sink v0.3.34",
+        "futures-task v0.3.34",
+        "futures-util v0.3.34",
+        "futures-util v0.3.34 (*)",
+        "futures-util v0.3.34 (*)",
+        "futures-util v0.3.34 (*)",
+        "generic-array v0.14.7",
+        "generic-array v0.14.7 (*)",
+        "getrandom v0.2.17",
+        "getrandom v0.2.17 (*)",
+        "getrandom v0.3.4",
+        "gui_shell_process_supervision v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\process_supervision)",
+        "gui_shell_rust_helper v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\rust_helper)",
+        "gui_shell_windows_broker_channel v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\windows_broker_channel)",
+        "gui_shell_windows_dns v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\windows_dns)",
+        "gui_shell_windows_protection v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\windows_protection)",
+        "gui_shell_windows_runtime_observation v0.1.0 (C:\\Users\\ohira\\.codex\\worktrees\\ai-edit-workspace-inspector\\D4ポケット\\native\\windows_runtime_observation)",
+        "hashbrown v0.17.1",
+        "heck v0.5.0",
+        "hex v0.4.3",
+        "http v1.5.0",
+        "http v1.5.0 (*)",
+        "http v1.5.0 (*)",
+        "http v1.5.0 (*)",
+        "http v1.5.0 (*)",
+        "http v1.5.0 (*)",
+        "http v1.5.0 (*)",
+        "http-body v1.1.0",
+        "http-body v1.1.0 (*)",
+        "http-body v1.1.0 (*)",
+        "http-body v1.1.0 (*)",
+        "http-body v1.1.0 (*)",
+        "http-body-util v0.1.5",
+        "httparse v1.10.1",
+        "httparse v1.10.1",
+        "hyper v1.11.1",
+        "hyper v1.11.1 (*)",
+        "hyper v1.11.1 (*)",
+        "hyper-rustls v0.27.10",
+        "hyper-util v0.1.21",
+        "hyper-util v0.1.21 (*)",
+        "icu_collections v2.3.0",
+        "icu_collections v2.3.0 (*)",
+        "icu_locale_core v2.3.0",
+        "icu_locale_core v2.3.0 (*)",
+        "icu_normalizer v2.3.0",
+        "icu_normalizer_data v2.3.0",
+        "icu_properties v2.3.0",
+        "icu_properties_data v2.3.0",
+        "icu_provider v2.3.1",
+        "icu_provider v2.3.1 (*)",
+        "idna v1.1.0",
+        "idna_adapter v1.2.2",
+        "io-extras v0.19.0",
+        "io-extras v0.19.0 (*)",
+        "io-lifetimes v2.0.4",
+        "io-lifetimes v3.0.1",
+        "io-lifetimes v3.0.1",
+        "io-lifetimes v3.0.1",
+        "io-lifetimes v3.0.1",
+        "ipnet v2.12.2",
+        "ipnet v2.12.2",
+        "itoa v1.0.18",
+        "itoa v1.0.18",
+        "itoa v1.0.18",
+        "itoa v1.0.18",
+        "itoa v1.0.18",
+        "jsonschema v0.58.1",
+        "jsonschema-regex v0.58.1",
+        "jsonschema-value v0.58.1",
+        "libc v0.2.186",
+        "litemap v0.8.3",
+        "lock_api v0.4.14",
+        "log v0.4.34",
+        "log v0.4.34",
+        "maybe-owned v0.3.4",
+        "memchr v2.8.1",
+        "memchr v2.8.1",
+        "memchr v2.8.1",
+        "memchr v2.8.1",
+        "micromap v0.3.0",
+        "mio v1.2.3",
+        "num v0.4.3",
+        "num-bigint v0.4.8",
+        "num-bigint v0.4.8 (*)",
+        "num-bigint v0.4.8 (*)",
+        "num-cmp v0.1.0",
+        "num-cmp v0.1.0",
+        "num-complex v0.4.6",
+        "num-conv v0.2.2",
+        "num-integer v0.1.47",
+        "num-integer v0.1.47 (*)",
+        "num-integer v0.1.47 (*)",
+        "num-integer v0.1.47 (*)",
+        "num-iter v0.1.46",
+        "num-rational v0.4.2",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "num-traits v0.2.19",
+        "once_cell v1.21.4",
+        "once_cell v1.21.4",
+        "once_cell v1.21.4",
+        "outref v0.5.2",
+        "parking_lot v0.12.5",
+        "parking_lot_core v0.9.12",
+        "pem v4.0.0",
+        "percent-encoding v2.3.2",
+        "percent-encoding v2.3.2",
+        "percent-encoding v2.3.2",
+        "percent-encoding v2.3.2",
+        "percent-encoding v2.3.2",
+        "percent-encoding v2.3.2",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "pin-project-lite v0.2.17",
+        "potential_utf v0.1.6",
+        "powerfmt v0.2.0",
+        "proc-macro2 v1.0.106",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "proc-macro2 v1.0.106 (*)",
+        "quote v1.0.45",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "quote v1.0.45 (*)",
+        "rcgen v0.14.10",
+        "ref-cast v1.0.27",
+        "ref-cast-impl v1.0.27 (proc-macro)",
+        "referencing v0.58.1",
+        "regex v1.13.1",
+        "regex v1.13.1 (*)",
+        "regex-automata v0.4.18",
+        "regex-automata v0.4.18 (*)",
+        "regex-syntax v0.8.11",
+        "regex-syntax v0.8.11",
+        "regex-syntax v0.8.11",
+        "regex-syntax v0.8.11",
+        "reqwest v0.13.5",
+        "ring v0.17.14",
+        "ring v0.17.14 (*)",
+        "ring v0.17.14 (*)",
+        "ring v0.17.14 (*)",
+        "rustls v0.23.44",
+        "rustls v0.23.44 (*)",
+        "rustls v0.23.44 (*)",
+        "rustls v0.23.44 (*)",
+        "rustls v0.23.44 (*)",
+        "rustls-pki-types v1.15.1",
+        "rustls-pki-types v1.15.1 (*)",
+        "rustls-pki-types v1.15.1 (*)",
+        "rustls-pki-types v1.15.1 (*)",
+        "rustls-platform-verifier v0.7.1",
+        "rustls-webpki v0.103.15",
+        "scopeguard v1.2.0",
+        "serde v1.0.228",
+        "serde v1.0.228 (*)",
+        "serde v1.0.228 (*)",
+        "serde v1.0.228 (*)",
+        "serde v1.0.228 (*)",
+        "serde_core v1.0.228",
+        "serde_core v1.0.228",
+        "serde_derive v1.0.228 (proc-macro)",
+        "serde_json v1.0.150",
+        "serde_json v1.0.150 (*)",
+        "serde_json v1.0.150 (*)",
+        "serde_json v1.0.150 (*)",
+        "sha2 v0.10.9",
+        "slab v0.4.12",
+        "smallvec v1.16.2",
+        "smallvec v1.16.2",
+        "smallvec v1.16.2",
+        "smallvec v1.16.2",
+        "socket2 v0.6.5",
+        "socket2 v0.6.5 (*)",
+        "stable_deref_trait v1.2.1",
+        "strum v0.28.0",
+        "strum_macros v0.28.0 (proc-macro)",
+        "subtle v2.6.1",
+        "subtle v2.6.1",
+        "syn v2.0.117",
+        "syn v2.0.117 (*)",
+        "syn v3.0.5",
+        "syn v3.0.5 (*)",
+        "syn v3.0.5 (*)",
+        "syn v3.0.5 (*)",
+        "syn v3.0.5 (*)",
+        "syn v3.0.5 (*)",
+        "sync_wrapper v1.0.2",
+        "sync_wrapper v1.0.2 (*)",
+        "synstructure v0.14.0",
+        "synstructure v0.14.0 (*)",
+        "time v0.3.55",
+        "time v0.3.55 (*)",
+        "time-core v0.1.9",
+        "tinystr v0.8.4",
+        "tinyvec v1.11.0",
+        "tinyvec_macros v0.1.1",
+        "tokio v1.53.1",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio v1.53.1 (*)",
+        "tokio-rustls v0.26.6",
+        "tokio-rustls v0.26.6 (*)",
+        "tokio-util v0.7.19",
+        "tower v0.5.3",
+        "tower v0.5.3 (*)",
+        "tower-http v0.6.11",
+        "tower-layer v0.3.3",
+        "tower-layer v0.3.3",
+        "tower-service v0.3.3",
+        "tower-service v0.3.3",
+        "tower-service v0.3.3",
+        "tower-service v0.3.3",
+        "tower-service v0.3.3",
+        "tracing v0.1.44",
+        "tracing-core v0.1.36",
+        "try-lock v0.2.5",
+        "typenum v1.20.0",
+        "typenum v1.20.0",
+        "unicode-general-category v1.1.0",
+        "unicode-ident v1.0.24",
+        "unicode-ident v1.0.24",
+        "unicode-ident v1.0.24",
+        "unicode-normalization v0.1.25",
+        "untrusted v0.9.0",
+        "untrusted v0.9.0",
+        "url v2.5.8",
+        "url v2.5.8 (*)",
+        "utf8_iter v1.0.4",
+        "utf8_iter v1.0.4",
+        "uuid-simd v0.8.0",
+        "vsimd v0.8.0",
+        "want v0.3.1",
+        "windows-link v0.2.1",
+        "windows-link v0.2.1",
+        "windows-sys v0.52.0",
+        "windows-sys v0.52.0 (*)",
+        "windows-sys v0.52.0 (*)",
+        "windows-sys v0.52.0 (*)",
+        "windows-sys v0.61.2",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-sys v0.61.2 (*)",
+        "windows-targets v0.52.6",
+        "windows_x86_64_msvc v0.52.6",
+        "winsafe v0.0.29",
+        "winx v0.36.4",
+        "writeable v0.6.4",
+        "writeable v0.6.4",
+        "yasna v0.6.0",
+        "yoke v0.8.3",
+        "yoke v0.8.3 (*)",
+        "yoke v0.8.3 (*)",
+        "yoke v0.8.3 (*)",
+        "yoke-derive v0.8.3 (proc-macro)",
+        "zerocopy v0.8.59",
+        "zerofrom v0.1.8",
+        "zerofrom v0.1.8 (*)",
+        "zerofrom v0.1.8 (*)",
+        "zerofrom v0.1.8 (*)",
+        "zerofrom v0.1.8 (*)",
+        "zerofrom-derive v0.1.8 (proc-macro)",
+        "zeroize v1.9.0",
+        "zeroize v1.9.0",
+        "zeroize v1.9.0",
+        "zerotrie v0.2.5",
+        "zerotrie v0.2.5 (*)",
+        "zerovec v0.11.8",
+        "zerovec v0.11.8 (*)",
+        "zerovec v0.11.8 (*)",
+        "zerovec v0.11.8 (*)",
+        "zerovec v0.11.8 (*)",
+        "zerovec v0.11.8 (*)",
+        "zerovec v0.11.8 (*)",
+        "zerovec-derive v0.11.6 (proc-macro)",
+        "zmij v1.0.23",
+        "zmij v1.0.23"
+      ]
+    },
+    "runtime_bundle_dependency_artifacts_identical": [
+      "app/flutter_windows.dll",
+      "app/data/icudtl.dat"
+    ]
+  },
+  "result": {
+    "binary_code_pruning_observed": true,
+    "resource_pruning_observed": false,
+    "normal_third_party_dependency_pruning_observed": false,
+    "optional_aot_surfaces_in_full": [
+      "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
+      "apps/desktop_flutter/lib/screens/history_screen.dart",
+      "apps/desktop_flutter/lib/screens/host_capability_center.dart",
+      "apps/desktop_flutter/lib/screens/host_operation_center.dart",
+      "apps/desktop_flutter/lib/screens/notifications.dart",
+      "apps/desktop_flutter/lib/screens/observability_center.dart",
+      "apps/desktop_flutter/lib/screens/setup_doctor.dart",
+      "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+    ],
+    "optional_aot_surfaces_in_pruned": [
+      "apps/desktop_flutter/lib/screens/observability_center.dart",
+      "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+    ],
+    "excluded_optional_source_surfaces": [
+      "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
+      "apps/desktop_flutter/lib/screens/history_screen.dart",
+      "apps/desktop_flutter/lib/screens/host_capability_center.dart",
+      "apps/desktop_flutter/lib/screens/host_operation_center.dart",
+      "apps/desktop_flutter/lib/screens/notifications.dart",
+      "apps/desktop_flutter/lib/screens/setup_doctor.dart"
+    ],
+    "security_core_and_mandatory_modules_preserved": true,
+    "known_pattern_credential_scan_findings_full": 0,
+    "known_pattern_credential_scan_findings_pruned": 0,
+    "credential_scan_coverage": "known patterns only; not proof of general secret absence"
+  },
+  "acceptance": {
+    "W-E02": "OPEN",
+    "overall_disposition": "INCOMPLETE",
+    "reason": "The Builder and actual artifact inventory are compared. Current module catalog maps optional screens and inter-module dependencies only; Flutter resource inventory and Windows normal third-party dependency graph are identical across this selected candidate, with no module-owned resource or optional Cargo package dependency identified. Product launch and runtime behavior (excluded-route denial, retained Task/Tool/Stop/Recovery, Broker Authority/Effect/Audit) remain unverified by this INTERNAL_STATE comparison.",
+    "portable_runtime_smoke": "NOT_RUN",
+    "standalone_app_verified": false,
+    "runtime_manifest_consumed": false,
+    "binary_pruning_verified_by_builder": false,
+    "source_authority_verified": false,
+    "owner_authorization_verified": false
+  },
+  "source_contracts": {
+    "module_catalog": {
+      "path": "specs/gui_shell_module_catalog.json",
+      "sha256": "a533db586ff3a085c2f527931a1c680b40343fbc004e0a96f90985430341bceb",
+      "version": 1,
+      "optional_modules": [
+        {
+          "module_id": "shell.setup_doctor",
+          "depends_on": [],
+          "source_surfaces": [
+            "apps/desktop_flutter/lib/screens/setup_doctor.dart"
+          ]
+        },
+        {
+          "module_id": "shell.history",
+          "depends_on": [],
+          "source_surfaces": [
+            "apps/desktop_flutter/lib/screens/history_screen.dart"
+          ]
+        },
+        {
+          "module_id": "shell.evaluation_lab",
+          "depends_on": [],
+          "source_surfaces": [
+            "apps/desktop_flutter/lib/screens/evaluation_lab.dart"
+          ]
+        },
+        {
+          "module_id": "shell.host_capabilities",
+          "depends_on": [],
+          "source_surfaces": [
+            "apps/desktop_flutter/lib/screens/host_capability_center.dart"
+          ]
+        },
+        {
+          "module_id": "shell.notifications",
+          "depends_on": [],
+          "source_surfaces": [
+            "apps/desktop_flutter/lib/screens/notifications.dart"
+          ]
+        },
+        {
+          "module_id": "shell.observability",
+          "depends_on": [],
+          "source_surfaces": [
+            "apps/desktop_flutter/lib/screens/observability_center.dart"
+          ]
+        },
+        {
+          "module_id": "shell.trace_inspector",
+          "depends_on": [
+            "shell.observability"
+          ],
+          "source_surfaces": [
+            "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+          ]
+        },
+        {
+          "module_id": "shell.host_operations",
+          "depends_on": [],
+          "source_surfaces": [
+            "apps/desktop_flutter/lib/screens/host_operation_center.dart"
+          ]
+        }
+      ],
+      "optional_module_fields": [
+        "depends_on",
+        "module_id",
+        "source_surfaces"
+      ],
+      "module_owned_resource_or_package_dependency_fields_present": false
+    },
+    "rust_features": {
+      "path": "native/rust_helper/Cargo.toml",
+      "sha256": "3b87a678fd3736762d33e2bce1b63080a44b28fb84b055b3b60f82841596ecd0",
+      "module_features": {
+        "module_setup_doctor": [],
+        "module_history": [],
+        "module_evaluation_lab": [],
+        "module_host_capabilities": [],
+        "module_notifications": [],
+        "module_observability": [],
+        "module_trace_inspector": [
+          "module_observability"
+        ],
+        "module_host_operations": []
+      },
+      "optional_third_party_dependencies": []
+    },
+    "flutter_dependencies": {
+      "path": "apps/desktop_flutter/pubspec.yaml",
+      "sha256": "aff3f4b649ed785d06be63ada98f73033101e2c60f8848ffb38c175a2267ca82",
+      "runtime_dependency_names": [
+        "agent_orchestration",
+        "broker_contract",
+        "gui_shell_ui",
+        "flutter",
+        "flutter_localizations"
+      ],
+      "module_specific_dependency_mapping_present": false
+    }
+  }
+}
