@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 case "${D4P_ACCEPTANCE_SCOPE:-}" in
-  product_build|update_lifecycle|credential_vault|mcp_tool_execution|mcp_credential_binding|a2a_metadata|host_registration|workspace_selection|agent_task_supervision|agent_mcp_followup|agent_task_normal_release|agent_task_crash_recovery|provider_credential_binding|runtime_provenance|wayland_rendering|wayland_workspace_selection|portable_archive|debian_setup_package|debian_setup_first_install|debian_setup_lifecycle) ;;
+  product_build|update_lifecycle|credential_vault|mcp_tool_execution|mcp_credential_binding|a2a_metadata|host_registration|workspace_selection|agent_task_supervision|agent_mcp_followup|agent_task_normal_release|agent_task_crash_recovery|agent_task_supervision_crash_same_package|provider_credential_binding|runtime_provenance|wayland_rendering|wayland_workspace_selection|portable_archive|debian_setup_package|debian_setup_first_install|debian_setup_lifecycle) ;;
   *) printf '%s\n' 'unsupported Linux acceptance scope' >&2; exit 2 ;;
 esac
 set -euo pipefail
@@ -37,7 +37,7 @@ export_arguments=(
   --output-dir "$output_root"
   --allow-verification-branch
 )
-if [ "$D4P_ACCEPTANCE_SCOPE" = 'agent_task_supervision' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'agent_mcp_followup' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'agent_task_crash_recovery' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'provider_credential_binding' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_lifecycle' ]; then
+if [ "$D4P_ACCEPTANCE_SCOPE" = 'agent_task_supervision' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'agent_mcp_followup' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'agent_task_crash_recovery' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'agent_task_supervision_crash_same_package' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'provider_credential_binding' ] || [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_lifecycle' ]; then
   export_arguments+=(--r2-e2e-test-build)
 fi
 if [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_package' ]; then

@@ -89,7 +89,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "f9bcac03be13fb7f8b4fa2f3bdca191bb9062c8698ac9b65faf6aa44534f2bdd"
+      "sha256": "ac0c559704bc3f7280a082a9b948fbeaae9f96513efe30b39e5697b80df352e0"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -1664,6 +1664,10 @@
       "sha256": "2df47c8523dfd3abd22d1a87bb12fdbf7408832369aabde0d01ed1390faa839e"
     },
     {
+      "path": "docs/QE_2026-11-21/evidence/W-E02-Windows-compare-manifest-fixture-060ebfa.json",
+      "sha256": "5f18312f9d75710568313945cf8938c2ddc13d1bafa225abb71cded9f918d693"
+    },
+    {
       "path": "docs/QE_2026-11-21/evidence/W-E02-Windows-export-builder-compare-d805bed.json",
       "sha256": "e46daab5ac6337c8941b3ec3dd4331b9dadef160d0a27326ee498b7478e994b8"
     },
@@ -1693,7 +1697,7 @@
     },
     {
       "path": "docs/QE_2026-11-21/\u9032\u6357.md",
-      "sha256": "fe5fe19feee01bb504ac20dd2645e0853aaef532a30d392949c832001a0100bb"
+      "sha256": "e17fa9989f3042c179c5995737f86cf9863afa252df383be2df3847b4c43fb98"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5933,15 +5937,15 @@
     },
     {
       "path": "tooling/linux_export_workflow.py",
-      "sha256": "b975470759d629959b6db3f364f778d0c4aa9fdf933d5d4b530f66baee8f7402"
+      "sha256": "edf13d5f30c94c4a6181a5523e7efbab4f852406e3beac6f52b3e597aca1a374"
     },
     {
       "path": "tooling/linux_installed_acceptance_summary.py",
-      "sha256": "98ddde1ee4307c26bd16bc04dc36c6454f72d111ce03b902d74cfc28aa548349"
+      "sha256": "76f873a96bf803c6e490f667107445822b8319349b0ae20e8c2379606e4c6256"
     },
     {
       "path": "tooling/linux_manual_export_build.sh",
-      "sha256": "1b5fe89c31f843b18cd80e593e5fdbd2f4464255251bb33e714870ad4343a523"
+      "sha256": "d5eb389dcf4ad0ff6d1afd62019769fffd7564b436f86b3ac5a0e36f6840bd0a"
     },
     {
       "path": "tooling/long_run_validation.py",
@@ -6137,7 +6141,7 @@
     },
     {
       "path": "tooling/tests/test_linux_workflow_helpers.py",
-      "sha256": "0569578e9a96ecded4ac9eee27cc07d6241569233264e356cbf976ef25d8bb59"
+      "sha256": "fbde8d897a70caef68c965e6524f4754a59bde8c3f62f820095bd24894e8f709"
     },
     {
       "path": "tooling/tests/test_mobile_product_candidate_metadata.py",

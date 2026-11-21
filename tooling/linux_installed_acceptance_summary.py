@@ -84,10 +84,128 @@ def summarize_wayland_workspace_selection() -> None:
     print(f"- 管理対象processのcleanup: `{result['owned_process_cleanup']}`")
     print("- 証拠範囲: X11 DISPLAYを未設定にしたheadless Weston／Pixman Wayland session。実desktop session、compositor間の差、署名／正式配布、Linux全体のrelease readinessは示さない。")
 
+def verify_agent_task_supervision_crash_same_package() -> None:
+    import json
+    import re
+
+    if len(sys.argv) != 3:
+        raise SystemExit("使い方: verify-agent-task-supervision-crash-same-package <supervision.jsonl> <crash.jsonl>")
+
+    def read_one(path: Path, expected_scope: str) -> dict[str, object]:
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeError) as error:
+            raise SystemExit("Agent Task Acceptance結果を読めません") from error
+        matches = []
+        for line in lines:
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict) and value.get("acceptance_scope") == expected_scope:
+                matches.append(value)
+        if len(matches) != 1:
+            raise SystemExit("Agent Task Acceptance結果はscopeごとに一件必要です")
+        return matches[0]
+
+    supervision_result = read_one(Path(sys.argv[1]), "agent_task_supervision")
+    crash_result = read_one(Path(sys.argv[2]), "agent_task_crash_recovery")
+    package_hash = supervision_result.get("package_sha256")
+    product_version = supervision_result.get("product_version")
+    if (
+        not isinstance(package_hash, str)
+        or re.fullmatch(r"[a-f0-9]{64}", package_hash) is None
+        or crash_result.get("package_sha256") != package_hash
+        or not isinstance(product_version, str)
+        or crash_result.get("product_version") != product_version
+    ):
+        raise SystemExit("Agent Task Acceptanceの導入package同一性が一致しません")
+
+    supervision = supervision_result.get("agent_task_supervision")
+    if not isinstance(supervision, dict):
+        raise SystemExit("Task supervision結果がありません")
+    if (
+        supervision.get("task_scenarios") != ["complete", "cancel", "deadline"]
+        or supervision.get("normal_release_task") is not False
+        or supervision.get("workspace_write") is not True
+        or supervision.get("secret_and_outside_reads_denied") is not True
+        or supervision.get("descendant_groups_stopped") is not True
+        or supervision.get("workspace_task_scratch_removed") is not True
+    ):
+        raise SystemExit("complete／cancel／deadline supervisionの受入条件が不足しています")
+    scratch_journal = supervision.get("scratch_recovery_journal")
+    if (
+        not isinstance(scratch_journal, dict)
+        or scratch_journal.get("entries") != 0
+        or scratch_journal.get("hmac_present") is not True
+    ):
+        raise SystemExit("supervision後の認証済みscratch回復journalが不成立です")
+    live_audit = supervision_result.get("live_audit")
+    if not isinstance(live_audit, dict) or any(
+        live_audit.get(key) != expected
+        for key, expected in {
+            "agent_task_started": 3,
+            "agent_task_completed": 1,
+            "agent_task_cancelled": 1,
+            "agent_task_deadline_failed": 1,
+            "agent_task_permission_grants": 3,
+            "agent_task_owner_approvals": 3,
+            "agent_task_scratch_cleanup_confirmed": 1,
+        }.items()
+    ):
+        raise SystemExit("Task supervisionのAudit回数がAcceptance結果と一致しません")
+
+    crash = crash_result.get("agent_task_crash_recovery")
+    if not isinstance(crash, dict):
+        raise SystemExit("Broker crash recovery結果がありません")
+    if (
+        crash.get("task_descendant_group_stopped") is not True
+        or crash.get("scratch_retained_until_recovery") is not True
+        or crash.get("scratch_removed_after_restart_and_workspace_registration") is not True
+        or crash.get("task_recovery_status") != "suspended"
+        or crash.get("old_approval_reused") is not False
+        or crash.get("positive_result_after_crash") is not False
+        or crash.get("workspace_registration_after_restart") is not True
+    ):
+        raise SystemExit("Broker crash後の停止／回復／Authority条件が不足しています")
+    loopback = crash.get("loopback")
+    scenarios = loopback.get("scenarios") if isinstance(loopback, dict) else None
+    if (
+        not isinstance(scenarios, list)
+        or len(scenarios) != 1
+        or not isinstance(scenarios[0], dict)
+        or scenarios[0].get("name") != "crash"
+        or scenarios[0].get("posts") != 1
+        or scenarios[0].get("tool_calls") != 1
+        or scenarios[0].get("tool_outputs") != 0
+    ):
+        raise SystemExit("Crash後にTool結果を再送しない条件が不足しています")
+    before_restart = crash.get("audit_chain")
+    after_restart = crash_result.get("durable_audit_after_broker_restart")
+    if (
+        not isinstance(before_restart, dict)
+        or not isinstance(after_restart, dict)
+        or not isinstance(before_restart.get("events"), int)
+        or not isinstance(after_restart.get("events"), int)
+        or after_restart["events"] <= before_restart["events"]
+    ):
+        raise SystemExit("Broker restart後のdurable Audit増分がありません")
+
+    print(json.dumps({
+        "acceptance_scope": "agent_task_supervision_crash_same_package",
+        "same_package": True,
+        "package_sha256": package_hash,
+        "product_version": product_version,
+        "task_scenarios": supervision["task_scenarios"],
+        "crash_recovery_status": crash["task_recovery_status"],
+        "audit_events_after_crash_restart": after_restart["events"],
+    }, separators=(",", ":")))
+
 OPERATIONS = {
     'summarize-runtime-provenance': summarize_runtime_provenance,
     'summarize-wayland-rendering': summarize_wayland_rendering,
     'summarize-wayland-workspace-selection': summarize_wayland_workspace_selection,
+    'verify-agent-task-supervision-crash-same-package': verify_agent_task_supervision_crash_same_package,
 }
 
 

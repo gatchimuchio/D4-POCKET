@@ -105,10 +105,19 @@ class LinuxWorkflowHelperTests(unittest.TestCase):
                 "package": {"installed_product_verified": False, "sha256": digest(package)},
                 "cmake_configure_arguments": ["-DD4_LINUX_R2_E2E_TEST_BUILD=ON"],
             })
-            valid = run_helper(EXPORT_HELPER, "verify-build-result", str(root), "source-1", "agent_task_supervision")
-            self.assertEqual(valid.returncode, 0, valid.stderr)
-            self.assertIn('"r2_e2e_test_build":true', valid.stdout)
-            invalid = run_helper(EXPORT_HELPER, "verify-build-result", str(root), "source-2", "agent_task_supervision")
+            for scope in (
+                "agent_task_supervision",
+                "agent_task_supervision_crash_same_package",
+            ):
+                with self.subTest(scope=scope):
+                    valid = run_helper(
+                        EXPORT_HELPER, "verify-build-result", str(root), "source-1", scope
+                    )
+                    self.assertEqual(valid.returncode, 0, valid.stderr)
+                    self.assertIn('"r2_e2e_test_build":true', valid.stdout)
+            invalid = run_helper(
+                EXPORT_HELPER, "verify-build-result", str(root), "source-2", "agent_task_supervision"
+            )
             self.assertNotEqual(invalid.returncode, 0)
 
     def test_debian_lifecycle_is_a_verification_build_only_for_that_scope(self) -> None:
@@ -264,6 +273,95 @@ class LinuxWorkflowHelperTests(unittest.TestCase):
                     self.assertEqual(valid.returncode, 0, valid.stderr)
                     log.write_text(json.dumps({"acceptance_scope": "other", **fields}) + "\n", encoding="utf-8")
                     invalid = run_helper(SUMMARY_HELPER, operation, str(log))
+                    self.assertNotEqual(invalid.returncode, 0)
+
+    def test_agent_task_supervision_and_crash_must_share_one_package(self) -> None:
+        operation = "verify-agent-task-supervision-crash-same-package"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            supervision_path = root / "supervision.jsonl"
+            crash_path = root / "crash.jsonl"
+            supervision = {
+                "acceptance_scope": "agent_task_supervision",
+                "product_version": "0.1.0",
+                "package_sha256": "a" * 64,
+                "agent_task_supervision": {
+                    "task_scenarios": ["complete", "cancel", "deadline"],
+                    "normal_release_task": False,
+                    "workspace_write": True,
+                    "secret_and_outside_reads_denied": True,
+                    "descendant_groups_stopped": True,
+                    "workspace_task_scratch_removed": True,
+                    "scratch_recovery_journal": {"entries": 0, "hmac_present": True},
+                },
+                "live_audit": {
+                    "agent_task_started": 3,
+                    "agent_task_completed": 1,
+                    "agent_task_cancelled": 1,
+                    "agent_task_deadline_failed": 1,
+                    "agent_task_permission_grants": 3,
+                    "agent_task_owner_approvals": 3,
+                    "agent_task_scratch_cleanup_confirmed": 1,
+                },
+            }
+            crash = {
+                "acceptance_scope": "agent_task_crash_recovery",
+                "product_version": "0.1.0",
+                "package_sha256": "a" * 64,
+                "agent_task_crash_recovery": {
+                    "task_descendant_group_stopped": True,
+                    "scratch_retained_until_recovery": True,
+                    "scratch_removed_after_restart_and_workspace_registration": True,
+                    "task_recovery_status": "suspended",
+                    "old_approval_reused": False,
+                    "positive_result_after_crash": False,
+                    "workspace_registration_after_restart": True,
+                    "loopback": {"scenarios": [{
+                        "name": "crash", "posts": 1, "tool_calls": 1, "tool_outputs": 0,
+                    }]},
+                    "audit_chain": {"events": 11},
+                },
+                "durable_audit_after_broker_restart": {"events": 12},
+            }
+
+            write_json(supervision_path, supervision)
+            write_json(crash_path, crash)
+            valid = run_helper(SUMMARY_HELPER, operation, str(supervision_path), str(crash_path))
+            self.assertEqual(valid.returncode, 0, valid.stderr)
+            self.assertIn('"same_package":true', valid.stdout)
+            self.assertIn('"package_sha256":"' + "a" * 64 + '"', valid.stdout)
+
+            invalid_cases = (
+                ("different package", {**crash, "package_sha256": "b" * 64}),
+                (
+                    "old approval reuse",
+                    {
+                        **crash,
+                        "agent_task_crash_recovery": {
+                            **crash["agent_task_crash_recovery"],
+                            "old_approval_reused": True,
+                        },
+                    },
+                ),
+                (
+                    "tool result replay",
+                    {
+                        **crash,
+                        "agent_task_crash_recovery": {
+                            **crash["agent_task_crash_recovery"],
+                            "loopback": {"scenarios": [{
+                                "name": "crash", "posts": 1, "tool_calls": 1, "tool_outputs": 1,
+                            }]},
+                        },
+                    },
+                ),
+            )
+            for label, invalid_crash in invalid_cases:
+                with self.subTest(label=label):
+                    write_json(crash_path, invalid_crash)
+                    invalid = run_helper(
+                        SUMMARY_HELPER, operation, str(supervision_path), str(crash_path)
+                    )
                     self.assertNotEqual(invalid.returncode, 0)
 
     def test_unknown_operation_fails_closed(self) -> None:
