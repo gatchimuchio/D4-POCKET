@@ -3,9 +3,11 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tooling.build_environment import build_child_environment
 from tooling.build_module_pruned_windows import (
@@ -21,6 +23,7 @@ from tooling.compare_module_builds_windows import (
     _parse_linker_map_symbols,
     _pruning_variant_plans,
     _runtime_dependency_tree_from_json,
+    _run_build,
     package_dependency_comparison,
     resource_inventory_comparison,
     _symbol_inventory_record,
@@ -33,6 +36,33 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ModuleComparisonMeasurementTests(unittest.TestCase):
+    def test_failed_flutter_build_uses_verbose_command_and_keeps_diagnostics(self) -> None:
+        diagnostic = "Dart compiler diagnostic\n"
+        completed = subprocess.CompletedProcess(
+            args=["flutter.bat"], returncode=1, stdout=diagnostic
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            with (
+                patch(
+                    "tooling.compare_module_builds_windows.subprocess.run",
+                    return_value=completed,
+                ) as run,
+                patch("tooling.compare_module_builds_windows._console_write") as write,
+            ):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    _run_build(
+                        executable="flutter.bat",
+                        defines={},
+                        profile_input_dir=root / "baseline" / "size-analysis-inputs",
+                        cwd=root,
+                    )
+
+        command = run.call_args.args[0]
+        self.assertEqual(command[:3], ["flutter.bat", "--verbose", "--suppress-analytics"])
+        self.assertIn("--analyze-size", command)
+        write.assert_called_once_with(diagnostic)
+
     def test_evidence_producer_version_matches_schema(self) -> None:
         schema = json.loads(
             (ROOT / "specs/gui_shell_module_comparison_evidence.schema.json")

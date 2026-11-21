@@ -1611,6 +1611,7 @@ def _run_build(
     profile_input_dir.mkdir(parents=True, exist_ok=False)
     command = [
         executable,
+        "--verbose",
         "--suppress-analytics",
         "build",
         "windows",
@@ -1635,10 +1636,11 @@ def _run_build(
         errors="replace",
     )
     elapsed_ms = round((time.perf_counter() - started) * 1000)
-    if completed.stdout:
-        _console_write(completed.stdout)
     if completed.returncode != 0:
+        if completed.stdout:
+            _console_write(completed.stdout)
         raise subprocess.CalledProcessError(completed.returncode, command)
+    _console_write(f"Flutter Windows Release build passed ({elapsed_ms} ms).\n")
 
     report_path = _analysis_report_path(completed.stdout)
     report_bytes = report_path.read_bytes()

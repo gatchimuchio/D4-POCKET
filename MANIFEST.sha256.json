@@ -5853,7 +5853,7 @@
     },
     {
       "path": "tooling/compare_module_builds_windows.py",
-      "sha256": "eae0ec4681c08a8cc6282139f435e8a0eca9f1fa2dbd644536674139d9036ea1"
+      "sha256": "526bbe2513183bf905070e33296bfd1d52bc75a77bdfda913b7bf1c7021b5b4a"
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
@@ -6101,7 +6101,7 @@
     },
     {
       "path": "tooling/tests/test_compare_module_builds_windows.py",
-      "sha256": "b560743d1a62170802ff3e99789679d5ce15af9159648177df74ed84e901b601"
+      "sha256": "32a00d35204d35d1a47fc76d95103255bf48f505c5b0603bca484a5085ebabf1"
     },
     {
       "path": "tooling/tests/test_current_governance_check.py",
