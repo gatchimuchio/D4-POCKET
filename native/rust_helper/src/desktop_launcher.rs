@@ -5417,7 +5417,17 @@ mod tests {
                 Some((server_export_dir, server_export_root)),
             )
         });
-        ready_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        match ready_rx.recv_timeout(Duration::from_secs(5)) {
+            Ok(()) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                let broker_result = server.join();
+                panic!("Broker起動準備前にthreadが終了: {broker_result:?}");
+            }
+            Err(error) => {
+                shutdown.store(true, Ordering::Release);
+                panic!("Broker起動準備通知が5秒以内に届かない: {error:?}");
+            }
+        }
         let (mut session_bytes, mut broker_endpoint) = read_endpoint(&session_file).unwrap();
 
         let mut rejected_request = desktop_export_request(
