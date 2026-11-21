@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "9acc023291c5472d84d040fe2c4ff8bf3c1b0fa882e1836b01b7b1df86ddf8e3"
+      "sha256": "36f57ccd21991417467e7b869194865692f01c3299ef48c0faa74c657fa71b2a"
     },
     {
       "path": "docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl",
@@ -1666,6 +1666,10 @@
     {
       "path": "docs/QE_2026-11-21/evidence/W-E02-Windows-module-comparison-36bfe603.json",
       "sha256": "0a935a48602b7dfa1e7b554f341e654232dc8d19fb036ff035c56cfc416e72a5"
+    },
+    {
+      "path": "docs/QE_2026-11-21/evidence/W-E02-Windows-module-comparison-b83c2236.json",
+      "sha256": "b895b091d6f2c363b0a1e568ebba22c604b151c98a50528ed74d10db04d57e7c"
     },
     {
       "path": "docs/QE_2026-11-21/\u63a1\u7528\u8a18\u9332.md",
