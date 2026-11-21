@@ -4964,31 +4964,21 @@ mod tests {
             displayed_text, expected_text,
             "実表示がproduction確認文と異なる"
         );
+        // MessageBox標準のcaptionはWindows表示言語に依存するため、固定文字列では判定しない。
+        // MB_YESNOのcontrol IDと実際のButton controlを使って選択先を識別する。
         let yes_button = dialog
             .GetDlgItem(IDYES)
-            .and_then(|button| button.GetWindowText())
             .expect("Owner確認dialogのYes button");
-        let no_button = dialog
-            .GetDlgItem(IDNO)
-            .and_then(|button| button.GetWindowText())
-            .expect("Owner確認dialogのNo button");
-        let yes_label = yes_button
-            .split(['(', '（'])
-            .next()
-            .unwrap_or_default()
-            .trim();
-        let no_label = no_button
-            .split(['(', '（'])
-            .next()
-            .unwrap_or_default()
-            .trim();
+        let no_button = dialog.GetDlgItem(IDNO).expect("Owner確認dialogのNo button");
         assert!(
-            yes_label.eq_ignore_ascii_case("Yes") || yes_label == "はい",
-            "Win32 MessageBoxのYes button labelが想定外"
+            yes_button.IsWindowVisible()
+                && yes_button.GetClassName().is_ok_and(|name| name == "Button"),
+            "Win32 MessageBoxのIDYES controlが可視Buttonではない"
         );
         assert!(
-            no_label.eq_ignore_ascii_case("No") || no_label == "いいえ",
-            "Win32 MessageBoxのNo button labelが想定外"
+            no_button.IsWindowVisible()
+                && no_button.GetClassName().is_ok_and(|name| name == "Button"),
+            "Win32 MessageBoxのIDNO controlが可視Buttonではない"
         );
 
         assert!(
