@@ -1,0 +1,71 @@
+{
+  "evidence_id": "W-A07-linux-hosted-same-package-44933825811",
+  "recorded_date": "2026-11-22",
+  "requirement": "結線/W-A07",
+  "result_scope": "Linux hosted installed-product path",
+  "result": "PASS",
+  "evidence_class": "HOSTED_OS_PRODUCT",
+  "source_commit": "c2e43dc8d8174860a4a19e667073a17d37ce78bf",
+  "workflow": {
+    "url": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/44933825811",
+    "run_id": 44933825811,
+    "run_number": 338,
+    "event": "workflow_dispatch",
+    "conclusion": "success",
+    "runner": "ubuntu-22.04",
+    "display": "Xvfb/X11",
+    "acceptance_scope": "agent_task_supervision_crash_same_package"
+  },
+  "candidate": {
+    "product_version": "0.1.0",
+    "package_sha256": "778eb42303379c530c39a779da2455efaad3ffdca951128421501077716b6578",
+    "r2_e2e_test_build": true,
+    "signed": false,
+    "normal_release_task": false
+  },
+  "supervision": {
+    "task_scenarios": ["complete", "cancel", "deadline"],
+    "workspace_write": true,
+    "secret_and_outside_reads_denied": true,
+    "descendant_groups_stopped": true,
+    "workspace_task_scratch_removed": true,
+    "scratch_recovery_journal": {
+      "entries_after_cleanup": 0,
+      "hmac_present": true
+    },
+    "permission_grants": 3,
+    "owner_approvals": 3,
+    "task_started": 3,
+    "task_completed": 1,
+    "task_cancelled": 1,
+    "task_deadline_failed": 1,
+    "live_audit_events": 111,
+    "durable_audit_events_after_normal_exit": 112,
+    "installed_app_exit": "normal_window_close_and_owned_process_cleanup"
+  },
+  "crash_recovery": {
+    "task_descendant_group_stopped": true,
+    "scratch_retained_until_recovery": true,
+    "scratch_removed_after_restart_and_workspace_registration": true,
+    "task_recovery_status": "suspended",
+    "old_approval_reused": false,
+    "positive_result_after_crash": false,
+    "crash_fixture_posts": 1,
+    "crash_fixture_tool_calls": 1,
+    "crash_fixture_tool_outputs": 0,
+    "audit_events_before_restart": 71,
+    "durable_audit_events_after_restart": 72,
+    "installed_app_exit": "normal_window_close_and_owned_process_cleanup"
+  },
+  "same_candidate_pair": {
+    "supervision_package_sha256": "778eb42303379c530c39a779da2455efaad3ffdca951128421501077716b6578",
+    "crash_recovery_package_sha256": "778eb42303379c530c39a779da2455efaad3ffdca951128421501077716b6578",
+    "verified": true
+  },
+  "run_owned_temp_root_cleanup": true,
+  "overall_e2_status": "OPEN",
+  "limitations": [
+    "Unsigned r2-e2e verification package and synthetic identity; normal Release task capability was not enabled.",
+    "Ubuntu 22.04 hosted Xvfb/X11 only; this evidence does not establish other operating systems, Wayland, formal signing, distribution, or full E2 completion."
+  ]
+}
