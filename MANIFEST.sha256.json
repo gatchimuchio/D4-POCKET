@@ -221,7 +221,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "909661fb1e6c9f12ffce13f4427f70c9958ec036926aec2aa79dd858b9d0828a"
+      "sha256": "be5e8f9d609e1060db48ef0bccdb75f294b6e7e6a4bdaf26bdccfa35c1f65890"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -1693,7 +1693,7 @@
     },
     {
       "path": "docs/QE_2026-11-21/\u9032\u6357.md",
-      "sha256": "7a0ded525ecb01bac21bbe4f0517c3de346c4310a7ab3adec732e3e7bd9c6095"
+      "sha256": "f7d2b045b8c9726bfc50d54a14679222626594f01d704df6f37bc7d1bdffdd49"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
