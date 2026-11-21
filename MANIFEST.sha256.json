@@ -4337,7 +4337,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "04cd8f3f97e024fd96f5b7a825e1ba21008462ce519f5480fccbd2b3fca55471"
+      "sha256": "794121fabba9147885b30aa6ee868cd59b8bdc98322d369877c19d79dacdabe4"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",

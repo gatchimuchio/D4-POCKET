@@ -5081,6 +5081,22 @@ mod tests {
         path
     }
 
+    // Windows runnerのsystem temp rootはroot境界検査に拒否されたため、fixtureをCargo targetへ隔離する。
+    fn test_root_under_cargo_target(label: &str) -> PathBuf {
+        let mut random = [0u8; 16];
+        getrandom::getrandom(&mut random).expect("乱数識別子");
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("w-e02-test-roots");
+        fs::create_dir_all(&base).expect("Cargo test隔離領域");
+        let path = base.join(format!(
+            "gui-shell-launcher-{label}-{}",
+            hex::encode(random)
+        ));
+        fs::create_dir(&path).expect("隔離作業ディレクトリ");
+        path
+    }
+
     fn product_manifest_fixture(identity: &ProductRuntimeIdentity) -> Vec<u8> {
         serde_json::to_vec(&json!({
             "version": 1,
@@ -5387,7 +5403,7 @@ mod tests {
     fn nativeOwner確認dialogのExportNoYesをBrokerReceiptManifestまで接続する() {
         const PRIVATE_COMPOSE_ID_MARKER: &str = "ui-private-compose-marker";
 
-        let root = test_root("desktop-export-owner-dialog");
+        let root = test_root_under_cargo_target("desktop-export-owner-dialog");
         let session_file = root.join(SESSION_FILE);
         let store_dir = root.join("store");
         let protected_store_dir = root.join("protected");
