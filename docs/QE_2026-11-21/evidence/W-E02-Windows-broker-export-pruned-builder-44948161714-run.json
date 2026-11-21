@@ -1,0 +1,139 @@
+{
+  "evidence_type": "w_e02_windows_broker_export_manifest_to_compare_builder",
+  "result": "passed",
+  "evidence_source": "INTERNAL_STATE",
+  "source_commit": "3d09e706612d07182138270605e100aa24961347",
+  "runner": {
+    "os": "Windows-2025Server-10.0.26100-SP0",
+    "image": "win25-vs2026/20261116.315.1",
+    "python": "3.12.10"
+  },
+  "producer": {
+    "command": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --ignored --exact <Export Owner dialog test> --test-threads=1",
+    "test_filter": "desktop_launcher::tests::nativeOwner確認dialogのExportNoYesをBrokerReceiptManifestまで接続する",
+    "result": "passed",
+    "passed_test_count": 1,
+    "real_owner_authority": false,
+    "confirmation_actor": "isolated test harness controlling the native Win32 No/Yes dialog",
+    "assertions_executed_by_test": [
+      "No拒否時owner_requiredとなりManifestを作らない",
+      "Yes選択時にproduction BrokerがManifestを生成する",
+      "Receiptと生成ManifestのApp ID／Audit store ID／Manifest SHAを照合する",
+      "Broker Audit fileに拒否／受理要求を確認し、private marker不在を確認する",
+      "Authority／Permission／Approval／Credential／Audit chainを継承しない"
+    ]
+  },
+  "export": {
+    "export_id": "export-desktop-test",
+    "app_id": "d4-pocket-app-6c78feb33d4607e36b5588d426b4ff7a",
+    "audit_store_id": "audit-store-3d701ea1d7b9a778234e139954ecf0c1",
+    "manifest_file_name": "d4-pocket-app-6c78feb33d4607e36b5588d426b4ff7a.json",
+    "manifest_byte_length": 2828,
+    "manifest_sha256": "eb50d26adddb86ce8aabbcd62648d536f4d046c8e5d0ee296818c0c4240b00a5",
+    "audit_event_id": "broker-audit-6",
+    "builder_manifest_sha256": "eb50d26adddb86ce8aabbcd62648d536f4d046c8e5d0ee296818c0c4240b00a5"
+  },
+  "builder": {
+    "tool": "tooling/compare_module_builds_windows.py",
+    "evidence_type": "development_module_build_comparison",
+    "evidence_source": "INTERNAL_STATE",
+    "selection_input_trust": "unverified_manifest_json_selection_only",
+    "authority_verified": false,
+    "same_source_commit": true,
+    "same_toolchain": true,
+    "worktree_clean": true,
+    "requested_optional_module_ids": [
+      "shell.history"
+    ],
+    "included_module_ids": [
+      "core.security_broker",
+      "core.cryptography",
+      "core.audit_finality",
+      "core.credentials",
+      "core.os_controls",
+      "core.permission_enforcement",
+      "core.approval_enforcement",
+      "core.content_exposure",
+      "shell.dashboard",
+      "shell.runtime_operation",
+      "shell.agent_operation",
+      "shell.authority",
+      "shell.approval",
+      "shell.audit",
+      "shell.recovery",
+      "shell.problems",
+      "shell.evidence",
+      "shell.settings",
+      "shell.history"
+    ],
+    "excluded_optional_module_ids": [
+      "shell.setup_doctor",
+      "shell.evaluation_lab",
+      "shell.host_capabilities",
+      "shell.notifications",
+      "shell.observability",
+      "shell.trace_inspector",
+      "shell.host_operations"
+    ],
+    "comparison": {
+      "baseline_total_bytes": 32667073,
+      "selected_total_bytes": 32339393,
+      "total_bytes_reduced": 327680,
+      "baseline_app_code_bytes": 8569744,
+      "selected_app_code_bytes": 8242064,
+      "app_code_bytes_reduced": 327680,
+      "baseline_app_code_sha256": "b2a1e80929c75b77a2fb860852ba871efae7043288b2ce6b5e194e1e3bfd525c",
+      "selected_app_code_sha256": "07918505abacc4cf38f8700f82b2d37d3d7995552cac999bf2b8706b8e31cef3",
+      "changed_artifact_paths": [
+        "data/app.so"
+      ],
+      "non_aot_changed_artifact_paths": [],
+      "non_aot_artifacts_identical": true
+    },
+    "resource_inventory_comparison": {
+      "baseline_resource_bytes": 1788369,
+      "selected_resource_bytes": 1788369,
+      "changed_resource_paths": [],
+      "resource_inventory_identical": true
+    },
+    "package_dependency_comparison": {
+      "baseline_runtime_tree_sha256": "9092e2662e2ca777dcbe7531c0a2f3d32a3cfebf947c7448dceb87774da94241",
+      "selected_runtime_tree_sha256": "9092e2662e2ca777dcbe7531c0a2f3d32a3cfebf947c7448dceb87774da94241",
+      "runtime_package_tree_identical": true,
+      "removed_aot_package_libraries": [
+        "package:flutter/src/spacer.dart",
+        "package:gui_shell_desktop/evaluation_lab.dart",
+        "package:gui_shell_desktop/host_capability_center.dart",
+        "package:gui_shell_desktop/host_operation_center.dart",
+        "package:gui_shell_desktop/notification_client.dart",
+        "package:gui_shell_desktop/notifications.dart",
+        "package:gui_shell_desktop/observability_center.dart",
+        "package:gui_shell_desktop/observation_client.dart",
+        "package:gui_shell_desktop/regression_case_client.dart",
+        "package:gui_shell_desktop/setup_doctor.dart",
+        "package:gui_shell_desktop/trace_inspector.dart",
+        "package:gui_shell_ui/src/evaluation_client.dart",
+        "package:gui_shell_ui/src/regression_case_client.dart",
+        "package:gui_shell_ui/src/regression_case_owner_client.dart"
+      ],
+      "added_aot_package_libraries": []
+    },
+    "binary_pruning_verified": false,
+    "comparison_evidence_sha256": "1473a0555d924da37cee0fbce6347c85907fee333a248df0a0bfb1fb8ae3e9a3",
+    "symbol_evidence_file_count": 16
+  },
+  "scope": {
+    "same_run_broker_manifest_to_windows_builder": true,
+    "real_installed_product": false,
+    "real_flutter_settings_ui": false,
+    "real_owner_authority": false,
+    "normal_release_capability": false,
+    "binary_pruning_verified": false
+  },
+  "cleanup": {
+    "broker_test_capture_removed": true,
+    "manifest_staging_removed": true,
+    "comparison_build_outputs_removed": true,
+    "durable_evidence_contains_build_binaries": false
+  }
+}
