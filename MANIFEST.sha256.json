@@ -5941,7 +5941,7 @@
     },
     {
       "path": "tooling/linux_installed_acceptance_summary.py",
-      "sha256": "76f873a96bf803c6e490f667107445822b8319349b0ae20e8c2379606e4c6256"
+      "sha256": "bbf094ab5c1354cf63cab875b77748bf54336ba1857c22ba0864f736ad5f2a47"
     },
     {
       "path": "tooling/linux_manual_export_build.sh",
@@ -6141,7 +6141,7 @@
     },
     {
       "path": "tooling/tests/test_linux_workflow_helpers.py",
-      "sha256": "fbde8d897a70caef68c965e6524f4754a59bde8c3f62f820095bd24894e8f709"
+      "sha256": "d53997eb81eda05bfd10fdae75ccd08520dc944a8bc0b67d458adfdb8796f1af"
     },
     {
       "path": "tooling/tests/test_mobile_product_candidate_metadata.py",
