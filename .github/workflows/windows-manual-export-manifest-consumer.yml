@@ -67,11 +67,28 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $flutterCommit -ne '559ffa3f75e7402d65a8def9c28389a9b2e6fe42') {
             throw "Flutter checkout mismatch: $flutterCommit"
           }
+          $flutterExecutable = Join-Path $flutterRoot 'bin\flutter.bat'
+          & $flutterExecutable --version
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Flutter first-run initialization failed' }
+          $flutterMachineLines = & $flutterExecutable --version --machine
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Flutter machine-version query failed' }
+          $flutterMachineJson = ($flutterMachineLines -join "`n").Trim()
+          if ([string]::IsNullOrWhiteSpace($flutterMachineJson)) {
+            throw 'Pinned Flutter --version --machine returned empty stdout'
+          }
+          $flutterVersion = ConvertFrom-Json -InputObject $flutterMachineJson -ErrorAction Stop
+          if ($flutterVersion.frameworkVersion -ne '3.44.0' -or
+              $flutterVersion.frameworkRevision -ne '559ffa3f75e7402d65a8def9c28389a9b2e6fe42' -or
+              [string]::IsNullOrWhiteSpace($flutterVersion.dartSdkVersion)) {
+            throw 'Pinned Flutter machine-version identity mismatch'
+          }
           "$flutterRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           @(
             "rustc=$rustcVersion"
             "cargo=$cargoVersion"
             "flutter_commit=$flutterCommit"
+            "flutter_version=$($flutterVersion.frameworkVersion)"
+            "flutter_dart_version=$($flutterVersion.dartSdkVersion)"
             "python=$((python --version 2>&1).Trim())"
           ) | Tee-Object -FilePath "$env:RUNNER_TEMP\w-e02-toolchain.txt" -Append
 

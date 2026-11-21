@@ -105,7 +105,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-export-manifest-consumer.yml",
-      "sha256": "9b044b81e0c0302a2d6533924818fe2da3f5b48811387d1e6ffc49a9d2249c36"
+      "sha256": "08fbdd67ebdb22af7e1a6c6b26ed73311658d77e54a36c2ad9cdd19e9a03e298"
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
