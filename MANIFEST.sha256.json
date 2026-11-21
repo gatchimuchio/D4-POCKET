@@ -1672,6 +1672,10 @@
       "sha256": "0a935a48602b7dfa1e7b554f341e654232dc8d19fb036ff035c56cfc416e72a5"
     },
     {
+      "path": "docs/QE_2026-11-21/evidence/W-E02-Windows-module-comparison-641ab90.json",
+      "sha256": "b91096155717808936e1f6437d2da89651dc06c272bb2fbff5c5e4b1e16faf22"
+    },
+    {
       "path": "docs/QE_2026-11-21/evidence/W-E02-Windows-module-comparison-b83c2236.json",
       "sha256": "b895b091d6f2c363b0a1e568ebba22c604b151c98a50528ed74d10db04d57e7c"
     },
@@ -1682,6 +1686,10 @@
     {
       "path": "docs/QE_2026-11-21/\u63a1\u7528\u8a18\u9332.md",
       "sha256": "ca07760f4141700892cb0129d7d12467e15731be1d6fd738fecd3b562a37799b"
+    },
+    {
+      "path": "docs/QE_2026-11-21/\u9032\u6357.md",
+      "sha256": "cbfe69371f59cd9443e5e20a5004b594ec78021ae2a4132bdf1645f0b392ac5d"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
