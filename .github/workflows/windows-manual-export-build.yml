@@ -172,6 +172,13 @@ jobs:
               $launchEvidence.evidence_class -ne 'LIVE_RUNTIME' -or
               $launchEvidence.frontend.ui_observation_status -ne 'passed' -or
               $launchEvidence.source_commit -ne $env:GITHUB_SHA -or
+              $launchEvidence.broker.selected_trace_operation_status -ne 'accepted' -or
+              [string]::IsNullOrWhiteSpace([string]$launchEvidence.broker.selected_trace_operation_audit_id) -or
+              $launchEvidence.broker.selected_trace_operation_authority_absent -ne $true -or
+              $launchEvidence.frontend.trace_inspector_ui_status -ne 'passed' -or
+              [int]$launchEvidence.frontend.trace_inspector_span_count -lt 1 -or
+              $launchEvidence.frontend.trace_inspector_selected_operation_visible -ne $true -or
+              $launchEvidence.broker.audit_validation.selected_trace_event_id_bound -ne $true -or
               $launchEvidence.broker.excluded_operation_status -ne 'rejected' -or
               $launchEvidence.broker.excluded_operation_code -ne 'optional_module_not_included' -or
               $launchEvidence.broker.generic_command_status -ne 'suspended' -or
@@ -212,10 +219,12 @@ jobs:
             "- Export build: ``passed``; evidence source: ``INTERNAL_STATE``; fixture input only."
             "- Artifact inventory: ``$($evidence.artifact_files.Count)`` files, ``$($evidence.artifact_total_bytes)`` bytes, tree SHA-256 ``$($evidence.artifact_tree_sha256)``."
             "- Separate launch smoke: ``$($launchEvidence.result)`` / ``$($launchEvidence.evidence_class)`` on ``$($launchEvidence.runner_image)``; launcher PID ``$($launchEvidence.frontend.launcher_pid)``, Flutter child PID ``$($launchEvidence.frontend.process_id)``; selected UI labels ``$($launchEvidence.frontend.included_surfaces -join ', ')``; excluded UI labels absent: ``$($launchEvidence.frontend.excluded_surfaces_absent)``."
+            "- Selected Trace Inspector Broker call: ``$($launchEvidence.broker.selected_trace_operation_status)``; Audit ID ``$($launchEvidence.broker.selected_trace_operation_audit_id)``; authority absent ``$($launchEvidence.broker.selected_trace_operation_authority_absent)``; Audit event bound ``$($launchEvidence.broker.audit_validation.selected_trace_event_id_bound)``."
+            "- Flutter Trace Inspector consumer: ``$($launchEvidence.frontend.trace_inspector_ui_status)``; rendered spans ``$($launchEvidence.frontend.trace_inspector_span_count)``; selected positive operation visible ``$($launchEvidence.frontend.trace_inspector_selected_operation_visible)``."
             "- Launcher argument refusal: ``$($launchEvidence.frontend.launcher_argument_rejected)`` / ``$($launchEvidence.frontend.launcher_argument_error_code)``; unexpected Flutter child: ``$($launchEvidence.frontend.unexpected_frontend_spawned)``."
             "- Authenticated Broker: excluded Setup Doctor request ``$($launchEvidence.broker.excluded_operation_status)`` / ``$($launchEvidence.broker.excluded_operation_code)``; generic command ``$($launchEvidence.broker.generic_command_status)`` / ``$($launchEvidence.broker.generic_command_code)``; both have Audit IDs and no private marker or session secret exposure."
             "- Native tray exit and runtime fixture cleanup: attempted ``$($launchEvidence.frontend.graceful_exit_attempted)``; graceful ``$($launchEvidence.frontend.graceful_exit)``; endpoint removed ``$($launchEvidence.cleanup.endpoint_removed)``; isolated runtime store removed ``$($launchEvidence.cleanup.runtime_fixture_removed)``; Audit SHA-256 ``$($launchEvidence.broker.audit_sha256)`` (``$($launchEvidence.broker.audit_bytes)`` bytes)."
-            "- Audit validation: excluded event ID ``$($launchEvidence.broker.audit_validation.excluded_event_id_bound)``; exclusion code ``$($launchEvidence.broker.audit_validation.excluded_operation_code_bound)``; command event ID ``$($launchEvidence.broker.audit_validation.command_event_id_bound)``; private marker absent ``$($launchEvidence.broker.audit_validation.private_marker_absent)``; command marker absent ``$($launchEvidence.broker.audit_validation.command_marker_absent)``; session secret absent ``$($launchEvidence.broker.audit_validation.session_secret_absent)``."
+            "- Audit validation: selected event ID ``$($launchEvidence.broker.audit_validation.selected_trace_event_id_bound)``; excluded event ID ``$($launchEvidence.broker.audit_validation.excluded_event_id_bound)``; exclusion code ``$($launchEvidence.broker.audit_validation.excluded_operation_code_bound)``; command event ID ``$($launchEvidence.broker.audit_validation.command_event_id_bound)``; private marker absent ``$($launchEvidence.broker.audit_validation.private_marker_absent)``; command marker absent ``$($launchEvidence.broker.audit_validation.command_marker_absent)``; session secret absent ``$($launchEvidence.broker.audit_validation.session_secret_absent)``."
             "- Portable ZIP: ``passed``; entries: ``$($zipSummary.file_count)``; compressed bytes: ``$($zipSummary.archive_bytes)``; SHA-256: ``$zipHash``."
             '- Credential scan: zero findings for the implemented known-pattern set only; not proof of general credential absence.'
             '- Build receipt remains ``standalone_app_verified=false``, ``launch_status=not_verified``, ``binary_pruning_verified=false``; the separate smoke is not an installed-product, full pruning, Owner-authorization, signing, or distribution claim.'

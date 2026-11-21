@@ -312,6 +312,9 @@ $evidence = [ordered]@{
     ui_observation_failure_stage = $null
     ui_observation_raw_node_count = 0
     ui_observation_known_labels = @()
+    trace_inspector_ui_status = 'not_run'
+    trace_inspector_span_count = 0
+    trace_inspector_selected_operation_visible = $false
     included_surfaces = @()
     excluded_surfaces_absent = $false
     tray_exit_callback_posted = $false
@@ -326,6 +329,9 @@ $evidence = [ordered]@{
   }
   broker = [ordered]@{
     normal_endpoint_observed = $false
+    selected_trace_operation_status = $null
+    selected_trace_operation_audit_id = $null
+    selected_trace_operation_authority_absent = $false
     excluded_operation_status = $null
     excluded_operation_code = $null
     excluded_operation_audit_id = $null
@@ -338,6 +344,7 @@ $evidence = [ordered]@{
     audit_bytes = 0
     audit_validation = [ordered]@{
       file_observed = $false
+      selected_trace_event_id_bound = $false
       excluded_event_id_bound = $false
       excluded_operation_code_bound = $false
       command_event_id_bound = $false
@@ -759,6 +766,40 @@ public static class GuiShellExportSmokeWin32 {
   $sessionSecret = [string]$endpoint.session_secret
   $evidence.broker.normal_endpoint_observed = $true
 
+  $stage = 'exercise selected Trace Inspector operation over authenticated loopback IPC'
+  $selectedPayload = [ordered]@{ '上限' = 32; '版' = 1 }
+  $selectedPayloadJson = ConvertTo-Json -InputObject $selectedPayload -Compress -Depth 8
+  $selectedPayloadHash = 'sha256:' + (Get-Sha256Hex -Bytes ([Text.UTF8Encoding]::new($false).GetBytes($selectedPayloadJson)))
+  $selectedRequest = [ordered]@{
+    request_id = 'export-selected-' + [guid]::NewGuid().ToString('N')
+    session_id = [string]$endpoint.session_id
+    operation = '観測一覧'
+    payload_hash = $selectedPayloadHash
+    nonce = 'export-selected-' + [guid]::NewGuid().ToString('N')
+    issued_at = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+    metadata = [ordered]@{}
+    payload = $selectedPayload
+  }
+  $selectedJson = ConvertTo-Json -InputObject $selectedRequest -Compress -Depth 8
+  $selectedResult = Invoke-AuthenticatedRequest -Endpoint $endpoint -SessionSecret $sessionSecret -RequestJson $selectedJson
+  $selectedBody = $selectedResult.Response.body
+  if ($selectedResult.Json.Contains($sessionSecret) -or
+      $selectedResult.Response.status -cne 'accepted' -or
+      $selectedResult.Response.operation -cne '観測一覧' -or
+      $null -ne $selectedResult.Response.error -or
+      [string]::IsNullOrWhiteSpace([string]$selectedResult.Response.audit_event_id) -or
+      $selectedBody.'権限生成' -cne 'なし' -or
+      $selectedBody.'証拠種別' -cne 'INTERNAL_STATE' -or
+      $selectedBody.'Span一覧' -isnot [System.Array] -or
+      $selectedBody.'Trace一覧' -isnot [System.Array] -or
+      $selectedBody.'Span一覧'.Count -lt 1 -or
+      $selectedBody.'Trace一覧'.Count -lt 1) {
+    throw 'selected Trace Inspector Broker operation was not accepted with bounded non-authoritative output'
+  }
+  $evidence.broker.selected_trace_operation_status = [string]$selectedResult.Response.status
+  $evidence.broker.selected_trace_operation_audit_id = [string]$selectedResult.Response.audit_event_id
+  $evidence.broker.selected_trace_operation_authority_absent = $selectedBody.'権限生成' -ceq 'なし'
+
   $stage = 'exercise excluded Broker operation over authenticated loopback IPC'
   $privateMarker = 'windows-export-private-marker-' + [guid]::NewGuid().ToString('N')
   $payload = [ordered]@{ privateMarker = $privateMarker }
@@ -815,6 +856,56 @@ public static class GuiShellExportSmokeWin32 {
   $evidence.broker.generic_command_code = [string]$commandResult.Response.error.code
   $evidence.broker.generic_command_audit_id = [string]$commandResult.Response.audit_event_id
 
+  $stage = 'render selected Trace Inspector Broker data through the live Flutter consumer'
+  $traceNavItem = $null
+  $traceNavDeadline = (Get-Date).AddSeconds(15)
+  while ((Get-Date) -lt $traceNavDeadline -and $null -eq $traceNavItem) {
+    $navigationElements = @(Get-RawViewDescendants -RootElement $window)
+    foreach ($item in $navigationElements) {
+      try {
+        if ($item.Current.Name -ceq '追跡' -and $item.Current.IsEnabled) {
+          $null = $item.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+          $traceNavItem = $item
+          break
+        }
+      } catch {
+        # Continue until an enabled, invokable selected-module destination is observed.
+      }
+    }
+    if ($null -eq $traceNavItem) { Start-Sleep -Milliseconds 200 }
+  }
+  if ($null -eq $traceNavItem) {
+    throw 'selected Trace Inspector navigation destination was not invokable in the live product UI'
+  }
+  $pattern = $traceNavItem.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+  $pattern.Invoke()
+
+  $traceUiDeadline = (Get-Date).AddSeconds(30)
+  $traceUiNames = @()
+  $traceUiText = ''
+  $traceSpanCount = 0
+  $traceSelectedOperationVisible = $false
+  while ((Get-Date) -lt $traceUiDeadline) {
+    $traceUiElements = @(Get-RawViewDescendants -RootElement $window)
+    $traceUiNames = @($traceUiElements | ForEach-Object {
+      try { [string]$_.Current.Name } catch { '' }
+    } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $traceUiText = $traceUiNames -join "`n"
+    $spanMatch = [regex]::Match($traceUiText, 'Span:\s*([0-9]+)')
+    if ($spanMatch.Success) { $traceSpanCount = [int]$spanMatch.Groups[1].Value }
+    $traceSelectedOperationVisible = $traceUiText.Contains('Broker / 観測一覧 / accepted')
+    if ($traceUiText.Contains('追跡情報') -and $traceSpanCount -gt 0 -and $traceSelectedOperationVisible) {
+      break
+    }
+    Start-Sleep -Milliseconds 250
+  }
+  if (-not $traceUiText.Contains('追跡情報') -or $traceSpanCount -lt 1 -or -not $traceSelectedOperationVisible) {
+    throw 'selected Trace Inspector did not render the positive Broker observation through Flutter'
+  }
+  $evidence.frontend.trace_inspector_ui_status = 'passed'
+  $evidence.frontend.trace_inspector_span_count = $traceSpanCount
+  $evidence.frontend.trace_inspector_selected_operation_visible = $traceSelectedOperationVisible
+
   $stage = 'verify bounded Audit non-exposure and retain only safe evidence fields'
   if (-not (Test-Path -LiteralPath $auditPath -PathType Leaf)) { throw 'Broker Audit file was not created' }
   $evidence.broker.audit_validation.file_observed = $true
@@ -823,13 +914,15 @@ public static class GuiShellExportSmokeWin32 {
   $evidence.broker.audit_bytes = $auditBytes.Length
   [Array]::Clear($auditBytes, 0, $auditBytes.Length)
   $auditText = Get-Content -LiteralPath $auditPath -Raw -Encoding utf8
+  $evidence.broker.audit_validation.selected_trace_event_id_bound = $auditText.Contains([string]$selectedResult.Response.audit_event_id)
   $evidence.broker.audit_validation.excluded_event_id_bound = $auditText.Contains([string]$excludedResult.Response.audit_event_id)
   $evidence.broker.audit_validation.excluded_operation_code_bound = $auditText.Contains('optional_module_not_included')
   $evidence.broker.audit_validation.command_event_id_bound = $auditText.Contains([string]$commandResult.Response.audit_event_id)
   $evidence.broker.audit_validation.private_marker_absent = -not $auditText.Contains($privateMarker)
   $evidence.broker.audit_validation.command_marker_absent = -not $auditText.Contains($commandMarker)
   $evidence.broker.audit_validation.session_secret_absent = -not $auditText.Contains($sessionSecret)
-  if (-not $evidence.broker.audit_validation.excluded_event_id_bound -or
+  if (-not $evidence.broker.audit_validation.selected_trace_event_id_bound -or
+      -not $evidence.broker.audit_validation.excluded_event_id_bound -or
       -not $evidence.broker.audit_validation.excluded_operation_code_bound -or
       -not $evidence.broker.audit_validation.command_event_id_bound -or
       -not $evidence.broker.audit_validation.private_marker_absent -or
