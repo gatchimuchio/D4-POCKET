@@ -331,6 +331,8 @@ $evidence = [ordered]@{
     launcher_started = $false
     direct_child_verified = $false
     main_window_observed = $false
+    ui_observation_activation_attempted = $false
+    ui_observation_window_activated = $false
     flutter_runner_uia_framework_id = $null
     flutter_runner_uia_control_type = $null
     flutter_runner_control_node_count = 0
@@ -847,6 +849,7 @@ public static class GuiShellExportSmokeWin32 {
   $stage = 'observe Flutter top-level window through UI Automation'
   $elements = @()
   $observedKnownNavigationLabels = @()
+  $maximumObservedNodeCount = 0
   try {
     $window = $null
     $uiDeadline = (Get-Date).AddSeconds(90)
@@ -876,6 +879,14 @@ public static class GuiShellExportSmokeWin32 {
     if ($mainWindowHandle -eq [IntPtr]::Zero -or $observedWindowHandle -ne $mainWindowHandle) {
       throw 'UI Automation process window does not match the verified Flutter main-window handle'
     }
+    $stage = 'activate the verified Flutter test window before UI Automation tree materialization'
+    $evidence.frontend.ui_observation_activation_attempted = $true
+    $evidence.frontend.ui_observation_window_activated = [GuiShellExportSmokeWin32]::ActivateWindowForProcess(
+      $mainWindowHandle, [uint32]$frontendProcess.Id
+    )
+    Start-Sleep -Milliseconds 500
+    $frontendProcess.Refresh()
+    if ($frontendProcess.HasExited) { throw 'Flutter child exited during the bounded UI Automation activation attempt' }
     $stage = 'materialize Flutter runner UI Automation root before its semantics child'
     $flutterRunnerElement = [System.Windows.Automation.AutomationElement]::FromHandle($mainWindowHandle)
     if ($flutterRunnerElement.Current.ProcessId -ne $frontendProcess.Id) {
@@ -997,7 +1008,7 @@ public static class GuiShellExportSmokeWin32 {
   } catch {
     $evidence.frontend.ui_observation_status = 'not_established'
     $evidence.frontend.ui_observation_failure_stage = $stage
-    $evidence.frontend.ui_observation_control_node_count = $elements.Count
+    $evidence.frontend.ui_observation_control_node_count = $maximumObservedNodeCount
     if ($observedKnownNavigationLabels.Count -gt 0) {
       $evidence.frontend.ui_observation_known_labels = $observedKnownNavigationLabels
     }
