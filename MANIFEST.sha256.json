@@ -101,7 +101,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-export-build.yml",
-      "sha256": "82a9f70328864dbc37b857c88304b914ca318ef893b08ecb95a53f8b891f96d0"
+      "sha256": "0cc448c5dbd3f1a56ed1adff40a7e1c1dd726d7e4ff86dc7e7641f40874eef54"
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
@@ -1693,7 +1693,7 @@
     },
     {
       "path": "docs/QE_2026-11-21/\u9032\u6357.md",
-      "sha256": "5fb5a25fbe4ef56fd946e8d38f00a02fda39b47574d53635ef9a412ec8005885"
+      "sha256": "183c84b820639726ae76e730f7576687c202f94edd777a318610c5014ddf0200"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -6165,7 +6165,7 @@
     },
     {
       "path": "tooling/tests/windows_export_portable_launch_smoke.ps1",
-      "sha256": "70630efe0ddb68c50f0d24c779fe8d69caa55e8c050c2938cecd2cda4bf2caa5"
+      "sha256": "2a03c29b9b24ec75044a0b58fb4d3e341c6e14464e64773791eb5e139345cae7"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",

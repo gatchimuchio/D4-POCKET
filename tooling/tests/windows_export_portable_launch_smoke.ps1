@@ -59,12 +59,12 @@ function Assert-ArtifactHash {
   return $actual
 }
 
-function Get-RawViewDescendants {
+function Get-ControlViewDescendants {
   param(
     [Parameter(Mandatory = $true)]$RootElement,
     [int]$MaximumElements = 8192
   )
-  $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+  $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
   $pending = New-Object 'System.Collections.Generic.Stack[object]'
   $elements = New-Object 'System.Collections.Generic.List[object]'
   $child = $walker.GetFirstChild($RootElement)
@@ -310,7 +310,7 @@ $evidence = [ordered]@{
     main_window_observed = $false
     ui_observation_status = 'not_run'
     ui_observation_failure_stage = $null
-    ui_observation_raw_node_count = 0
+    ui_observation_control_node_count = 0
     ui_observation_known_labels = @()
     trace_inspector_ui_status = 'not_run'
     trace_inspector_span_count = 0
@@ -489,7 +489,6 @@ public static class GuiShellExportSmokeWin32 {
   private const uint kKeyUp = 2;
 
   private delegate bool EnumThreadWindowsCallback(IntPtr window, IntPtr parameter);
-  private delegate bool EnumChildWindowsCallback(IntPtr window, IntPtr parameter);
 
   [StructLayout(LayoutKind.Sequential)]
   private struct KeyboardInput {
@@ -517,9 +516,6 @@ public static class GuiShellExportSmokeWin32 {
   [DllImport("user32.dll", SetLastError = true)]
   private static extern bool EnumThreadWindows(uint threadId, EnumThreadWindowsCallback callback, IntPtr parameter);
 
-  [DllImport("user32.dll", SetLastError = true)]
-  private static extern bool EnumChildWindows(IntPtr parent, EnumChildWindowsCallback callback, IntPtr parameter);
-
   [DllImport("user32.dll")]
   private static extern IntPtr GetWindow(IntPtr window, uint command);
 
@@ -539,22 +535,6 @@ public static class GuiShellExportSmokeWin32 {
     var className = new StringBuilder(256);
     int length = GetClassNameW(window, className, className.Capacity);
     return length > 0 ? className.ToString() : String.Empty;
-  }
-
-  public static uint GetWindowProcessId(IntPtr window) {
-    uint processId;
-    GetWindowThreadProcessId(window, out processId);
-    return processId;
-  }
-
-  public static IntPtr[] GetChildWindows(IntPtr parent, int maximumCount) {
-    var windows = new List<IntPtr>();
-    if (parent == IntPtr.Zero || maximumCount < 1 || maximumCount > 256) return windows.ToArray();
-    EnumChildWindows(parent, (candidate, parameter) => {
-      windows.Add(candidate);
-      return windows.Count < maximumCount;
-    }, IntPtr.Zero);
-    return windows.ToArray();
   }
 
   [DllImport("user32.dll", SetLastError = true)]
@@ -704,14 +684,11 @@ public static class GuiShellExportSmokeWin32 {
     while ((Get-Date) -lt $uiDeadline -and $null -eq $window) {
       $frontendProcess.Refresh()
       if ($frontendProcess.HasExited) { throw 'Flutter child exited before UI observation' }
-      $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+      $window = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
         [System.Windows.Automation.TreeScope]::Children, $condition
       )
-      if ($windows.Count -gt 0 -and $frontendProcess.MainWindowHandle -ne [IntPtr]::Zero) {
-        $window = [System.Windows.Automation.AutomationElement]::FromHandle(
-          $frontendProcess.MainWindowHandle
-        )
-      } else {
+      if ($null -eq $window -or $frontendProcess.MainWindowHandle -eq [IntPtr]::Zero) {
+        $window = $null
         Start-Sleep -Milliseconds 250
       }
     }
@@ -723,71 +700,45 @@ public static class GuiShellExportSmokeWin32 {
     if ($frontendProcess.MainWindowHandle -eq [IntPtr]::Zero) {
       throw 'Flutter process has no native main-window handle'
     }
-    $stage = 'enumerate Flutter host and child HWND accessibility fragments'
-    $candidateHandles = New-Object 'System.Collections.Generic.List[System.IntPtr]'
-    $candidateHandles.Add([IntPtr]$frontendProcess.MainWindowHandle)
-    $childHandles = [GuiShellExportSmokeWin32]::GetChildWindows(
-      $frontendProcess.MainWindowHandle, 64
-    )
-    foreach ($childHandle in $childHandles) {
-      if ([GuiShellExportSmokeWin32]::GetWindowProcessId($childHandle) -eq [uint32]$frontendProcess.Id) {
-        $candidateHandles.Add([IntPtr]$childHandle)
-      }
-    }
     $knownNavigationLabels = @('観測', '追跡', '診断', '履歴', '評価ラボ', 'ホスト能力', '通知', 'Host操作')
-    $candidateSummary = New-Object 'System.Collections.Generic.List[string]'
     $observedLabels = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     $maximumObservedNodeCount = 0
     $navRoot = @()
-    for ($probe = 0; $probe -lt 3 -and $navRoot.Count -eq 0; $probe++) {
-      $candidateSummary.Clear()
-      foreach ($nativeHandle in $candidateHandles) {
-        $candidateClass = [GuiShellExportSmokeWin32]::GetWindowClassName($nativeHandle)
+    $uiDeadline = (Get-Date).AddSeconds(60)
+    while ((Get-Date) -lt $uiDeadline -and $navRoot.Count -eq 0) {
+      try {
+        $elements = @(Get-ControlViewDescendants -RootElement $window)
+      } catch {
+        $elements = @()
+      }
+      if ($elements.Count -gt $maximumObservedNodeCount) {
+        $maximumObservedNodeCount = $elements.Count
+      }
+      $candidateNodes = @($window) + $elements
+      foreach ($node in $candidateNodes) {
         try {
-          $candidateRoot = [System.Windows.Automation.AutomationElement]::FromHandle($nativeHandle)
-          $candidateElements = @(Get-RawViewDescendants -RootElement $candidateRoot)
+          $name = [string]$node.Current.Name
+          if ($knownNavigationLabels -ccontains $name) { $null = $observedLabels.Add($name) }
         } catch {
-          if ($candidateSummary.Count -lt 64) { $candidateSummary.Add("$candidateClass=unavailable") }
-          continue
-        }
-        if ($candidateElements.Count -gt $maximumObservedNodeCount) {
-          $maximumObservedNodeCount = $candidateElements.Count
-        }
-        if ($candidateSummary.Count -lt 64) {
-          $candidateSummary.Add("$candidateClass=$($candidateElements.Count)")
-        }
-        $candidateNodes = @($candidateRoot) + $candidateElements
-        foreach ($node in $candidateNodes) {
-          try {
-            $name = [string]$node.Current.Name
-            if ($knownNavigationLabels -ccontains $name) { $null = $observedLabels.Add($name) }
-          } catch {
-            # Continue across nodes that disappear during UIA materialization.
-          }
-        }
-        $candidateRail = @($candidateNodes | Where-Object {
-          try {
-            $_.Current.Name -eq 'ナビゲーション' -or $_.Current.AutomationId -eq 'gui_shell.surface.navigation_rail'
-          } catch { $false }
-        } | Select-Object -First 1)
-        if ($candidateRail.Count -eq 1) {
-          $window = $candidateRoot
-          $elements = $candidateElements
-          $navRoot = $candidateRail
-          break
+          # Continue across nodes that disappear during UIA materialization.
         }
       }
-      if ($navRoot.Count -eq 0) { Start-Sleep -Milliseconds 300 }
+      $navRoot = @($candidateNodes | Where-Object {
+        try {
+          $_.Current.Name -eq 'ナビゲーション' -or $_.Current.AutomationId -eq 'gui_shell.surface.navigation_rail'
+        } catch { $false }
+      } | Select-Object -First 1)
+      if ($navRoot.Count -eq 0) { Start-Sleep -Milliseconds 250 }
     }
-    $evidence.frontend.ui_observation_raw_node_count = $maximumObservedNodeCount
+    $evidence.frontend.ui_observation_control_node_count = $maximumObservedNodeCount
     $observedKnownNavigationLabels = @($observedLabels | Sort-Object)
     if ($navRoot.Count -ne 1) {
       $evidence.frontend.ui_observation_known_labels = $observedKnownNavigationLabels
-      $stage = "locate live NavigationRail semantic root (candidate_hwnds=$($candidateHandles.Count); max_raw_nodes=$maximumObservedNodeCount; candidates=$($candidateSummary -join ','); known_labels=$($observedKnownNavigationLabels -join ','))"
+      $stage = "locate live NavigationRail Control View semantic root (max_control_nodes=$maximumObservedNodeCount; known_labels=$($observedKnownNavigationLabels -join ','))"
       throw 'NavigationRail semantic root was not observed through its native UIA fragment'
     }
     $stage = 'enumerate live NavigationRail semantic children'
-    $navigationElements = @(Get-RawViewDescendants -RootElement $navRoot[0])
+    $navigationElements = @(Get-ControlViewDescendants -RootElement $navRoot[0])
     $navigationNames = @($navigationElements | ForEach-Object {
       try { [string]$_.Current.Name } catch { '' }
     } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
@@ -810,7 +761,7 @@ public static class GuiShellExportSmokeWin32 {
   } catch {
     $evidence.frontend.ui_observation_status = 'not_established'
     $evidence.frontend.ui_observation_failure_stage = $stage
-    $evidence.frontend.ui_observation_raw_node_count = $elements.Count
+    $evidence.frontend.ui_observation_control_node_count = $elements.Count
     if ($observedKnownNavigationLabels.Count -gt 0) {
       $evidence.frontend.ui_observation_known_labels = $observedKnownNavigationLabels
     }
@@ -929,7 +880,7 @@ public static class GuiShellExportSmokeWin32 {
   $traceNavItem = $null
   $traceNavDeadline = (Get-Date).AddSeconds(15)
   while ((Get-Date) -lt $traceNavDeadline -and $null -eq $traceNavItem) {
-    $navigationElements = @(Get-RawViewDescendants -RootElement $window)
+    $navigationElements = @(Get-ControlViewDescendants -RootElement $window)
     foreach ($item in $navigationElements) {
       try {
         if ($item.Current.Name -ceq '追跡' -and $item.Current.IsEnabled) {
@@ -955,7 +906,7 @@ public static class GuiShellExportSmokeWin32 {
   $traceSpanCount = 0
   $traceSelectedOperationVisible = $false
   while ((Get-Date) -lt $traceUiDeadline) {
-    $traceUiElements = @(Get-RawViewDescendants -RootElement $window)
+    $traceUiElements = @(Get-ControlViewDescendants -RootElement $window)
     $traceUiNames = @($traceUiElements | ForEach-Object {
       try { [string]$_.Current.Name } catch { '' }
     } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
