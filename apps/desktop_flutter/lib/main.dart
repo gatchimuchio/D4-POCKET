@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/semantics.dart' show SemanticsBinding, SemanticsHandle;
 import 'package:gui_shell_ui/gui_shell_ui.dart' show HistoryClient;
 
 import 'screens/approval_center.dart';
@@ -47,16 +45,11 @@ export 'module_features.dart';
 const String kD4PocketProductTitle = 'D4 Pocket';
 const String kGuiShellProductTitle = 'D4 Pocket powered by GUI Shell';
 const double _navigationRailMinScrollableExtent = 960;
-SemanticsHandle? _windowsAccessibilitySemanticsHandle;
 
 Future<void> main() async {
   await runZonedGuarded<Future<void>>(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
-      if (defaultTargetPlatform == TargetPlatform.windows) {
-        _windowsAccessibilitySemanticsHandle ??=
-            SemanticsBinding.instance.ensureSemantics();
-      }
       _installFatalErrorHandlers();
       final client = await ShellCoreClient.product();
       runApp(GuiShellDesktopApp(client: client));
