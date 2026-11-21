@@ -1,0 +1,255 @@
+{
+  "version": 2,
+  "evidence_type": "d4_pocket_windows_export_build",
+  "evidence_source": "INTERNAL_STATE",
+  "product": "D4 Pocket",
+  "target_platform": "windows",
+  "build_mode": "release",
+  "source_commit": "74e16561e0faedf97a3fcb52d7a5c715f6e6f235",
+  "source_archive_sha256": "bbcab48460986a3f6b22d709a4319707c90048a2edf50edf765c592fc25243aa",
+  "source_receipt_sha256": null,
+  "source_manifest_sha256": "4ab0bd23b31a2d75a38f5de0b3076082b744cc0ee81d6319fa466b3626696a31",
+  "selection_input_source": "manifest_file_untrusted",
+  "export_id": "export-d4-pocket",
+  "app_id": "d4-pocket-app-11111111111111111111111111111111",
+  "audit_store_id": "audit-store-22222222222222222222222222222222",
+  "authority_boundary": {
+    "source_authority_verified": false,
+    "owner_authorization_verified": false,
+    "authority_strip": true,
+    "credential_values_explicitly_supplied": false,
+    "credential_artifact_scan_status": "passed_known_patterns",
+    "credential_inherited": false,
+    "permission_inherited": false,
+    "approval_inherited": false,
+    "audit_chain_inherited": false
+  },
+  "module_plan": {
+    "catalog_version": 1,
+    "selection_mode": "explicit_optional",
+    "requested_optional_module_ids": [
+      "shell.trace_inspector"
+    ],
+    "unprunable_core_ids": [
+      "core.security_broker",
+      "core.cryptography",
+      "core.audit_finality",
+      "core.credentials",
+      "core.os_controls",
+      "core.permission_enforcement",
+      "core.approval_enforcement",
+      "core.content_exposure"
+    ],
+    "included_module_ids": [
+      "core.security_broker",
+      "core.cryptography",
+      "core.audit_finality",
+      "core.credentials",
+      "core.os_controls",
+      "core.permission_enforcement",
+      "core.approval_enforcement",
+      "core.content_exposure",
+      "shell.dashboard",
+      "shell.runtime_operation",
+      "shell.agent_operation",
+      "shell.authority",
+      "shell.approval",
+      "shell.audit",
+      "shell.recovery",
+      "shell.problems",
+      "shell.evidence",
+      "shell.settings",
+      "shell.observability",
+      "shell.trace_inspector"
+    ],
+    "excluded_optional_module_ids": [
+      "shell.setup_doctor",
+      "shell.history",
+      "shell.evaluation_lab",
+      "shell.host_capabilities",
+      "shell.notifications",
+      "shell.host_operations"
+    ]
+  },
+  "aot_surface_analysis": {
+    "scope": "flutter_windows_x64_release_aot_catalog_surfaces",
+    "report_size_bytes": 9934422,
+    "report_sha256": "bade9dedc316f5394a26856c5d62d6992230a8d055d82cbd2b0b6ecd6485f989",
+    "aot_surface_libraries": [
+      "apps/desktop_flutter/lib/screens/observability_center.dart",
+      "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+    ],
+    "included_source_surfaces": [
+      "apps/desktop_flutter/lib/screens/observability_center.dart",
+      "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+    ],
+    "excluded_source_surfaces": [
+      "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
+      "apps/desktop_flutter/lib/screens/history_screen.dart",
+      "apps/desktop_flutter/lib/screens/host_capability_center.dart",
+      "apps/desktop_flutter/lib/screens/host_operation_center.dart",
+      "apps/desktop_flutter/lib/screens/notifications.dart",
+      "apps/desktop_flutter/lib/screens/setup_doctor.dart"
+    ],
+    "profiled_aot_image_size_bytes": 8160144,
+    "exported_aot_image_size_bytes": 8160144,
+    "profiled_aot_image_sha256": "a6735f30c774bf2599fa8c3065311367cb1ca5c1ce3322003eea9ee6966e9e02",
+    "exported_aot_image_sha256": "a6735f30c774bf2599fa8c3065311367cb1ca5c1ce3322003eea9ee6966e9e02",
+    "image_matches_export": true
+  },
+  "toolchain": {
+    "flutter": "3.44.0",
+    "dart": "3.12.0",
+    "framework_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+  },
+  "pub_get_arguments": [
+    "--suppress-analytics",
+    "pub",
+    "get",
+    "--enforce-lockfile"
+  ],
+  "flutter_build_arguments": [
+    "--suppress-analytics",
+    "build",
+    "windows",
+    "--release",
+    "--no-pub",
+    "--analyze-size",
+    "--dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=false",
+    "--dart-define=GUI_SHELL_MODULE_HISTORY=false",
+    "--dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=false",
+    "--dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=false",
+    "--dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=false",
+    "--dart-define=GUI_SHELL_MODULE_OBSERVABILITY=true",
+    "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true",
+    "--dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=false",
+    "--dart-define=GUI_SHELL_PRODUCT_VERSION=0.1.0"
+  ],
+  "rust_build_arguments": [
+    "build",
+    "--release",
+    "--locked",
+    "--no-default-features",
+    "--features",
+    "module_observability,module_trace_inspector",
+    "--target-dir",
+    "<isolated-target-dir>",
+    "--manifest-path",
+    "native/rust_helper/Cargo.toml",
+    "--bin",
+    "gui_shell_rust_helper",
+    "--bin",
+    "gui_shell_desktop_launcher"
+  ],
+  "rust_compile_time_identity": {
+    "source": "schema_validated_manifest",
+    "app_id": "d4-pocket-app-11111111111111111111111111111111",
+    "audit_store_id": "audit-store-22222222222222222222222222222222",
+    "manifest_sha256": "4ab0bd23b31a2d75a38f5de0b3076082b744cc0ee81d6319fa466b3626696a31"
+  },
+  "rust_compile_time_update_trust": {
+    "source": "not_configured",
+    "configured": false,
+    "public_key_fingerprint": null,
+    "package_source_count": 0
+  },
+  "build_duration_ms": 795404,
+  "runtime_storage_root_template": "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>",
+  "portable_bundle_assembled": true,
+  "manifest_copied_byte_for_byte": true,
+  "build_receipt_excluded_from_artifact_inventory": true,
+  "standalone_app_verified": false,
+  "runtime_manifest_consumed": false,
+  "binary_pruning_verified": false,
+  "formal_distribution_claimed": false,
+  "signed": false,
+  "installer_status": "not_started",
+  "launch_status": "not_verified",
+  "artifact_root": ".",
+  "artifact_files": [
+    {
+      "path": "app/data/app.so",
+      "size_bytes": 8160144,
+      "sha256": "a6735f30c774bf2599fa8c3065311367cb1ca5c1ce3322003eea9ee6966e9e02"
+    },
+    {
+      "path": "app/data/flutter_assets/AssetManifest.bin",
+      "size_bytes": 2,
+      "sha256": "f566cc6fccc657365c0197accf3a7d6f80f85209ff666ff774f4dcbc524aa842"
+    },
+    {
+      "path": "app/data/flutter_assets/FontManifest.json",
+      "size_bytes": 82,
+      "sha256": "28b1eb2b3d2e1ad60b8c8b0f9100b1ccbf492f7fa97f5bebb51ea97e73926e7d"
+    },
+    {
+      "path": "app/data/flutter_assets/fonts/MaterialIcons-Regular.otf",
+      "size_bytes": 1645184,
+      "sha256": "d9865b671a09d683d13a863089d8825e0f61a37696ce5d7d448bc8023aa62453"
+    },
+    {
+      "path": "app/data/flutter_assets/NativeAssetsManifest.json",
+      "size_bytes": 45,
+      "sha256": "9548a31e4a048135c1d94f919328bfb62ae2c7bb3cab96557c7941daa97776cb"
+    },
+    {
+      "path": "app/data/flutter_assets/NOTICES.Z",
+      "size_bytes": 103576,
+      "sha256": "fcddabb0ecf2215d5d82cb7dd7e26fbf2fc530879edc1666270849b4c9f6b6a8"
+    },
+    {
+      "path": "app/data/flutter_assets/shaders/ink_sparkle.frag",
+      "size_bytes": 21856,
+      "sha256": "1fe8436a743884cb65078fe8c7b38e18f5365f2a2961270916f426fd13c604af"
+    },
+    {
+      "path": "app/data/flutter_assets/shaders/stretch_effect.frag",
+      "size_bytes": 17624,
+      "sha256": "62a899ff4e168ac6ca888ce7c2f40e5d3fbf8ca20a1c3ded781a116a6d7907e2"
+    },
+    {
+      "path": "app/data/icudtl.dat",
+      "size_bytes": 862304,
+      "sha256": "998367809a821d595928089c197b3f7959f0420f81f79d4d0daee53378492ed5"
+    },
+    {
+      "path": "app/flutter_windows.dll",
+      "size_bytes": 21284352,
+      "sha256": "3168c546aeb0b0e6a77abc97e0de95b45d13ada150faaad6de75e79acaf3b050"
+    },
+    {
+      "path": "app/gui_shell_desktop.exe",
+      "size_bytes": 163840,
+      "sha256": "1232b74fd8b6b76f0e2ebdb412bf0f0f798f65fe60bd2c006a673cc116b2cb79"
+    },
+    {
+      "path": "broker/gui_shell_rust_helper.exe",
+      "size_bytes": 16404992,
+      "sha256": "ce2ba6cf2eedda574da1ffae7766c23635201a2b282bf82a77e561d34df3b4be"
+    },
+    {
+      "path": "gui_shell_desktop_launcher.exe",
+      "size_bytes": 16720384,
+      "sha256": "bf0eeaf919fcef00731977e281dacdfd76aec698510b6e1b3d41669cfc66361f"
+    },
+    {
+      "path": "product_manifest.json",
+      "size_bytes": 2321,
+      "sha256": "4ab0bd23b31a2d75a38f5de0b3076082b744cc0ee81d6319fa466b3626696a31"
+    }
+  ],
+  "artifact_total_bytes": 65386706,
+  "artifact_tree_sha256": "7f0a1822ecc7674bb0322bbf2dd1edcaf48716c02c7b1c359a1f23f3c3d16ae2",
+  "credential_artifact_scan": {
+    "version": 1,
+    "status": "passed_known_patterns",
+    "scope": "runtime_artifact_files",
+    "coverage": "known_patterns_only",
+    "files_scanned": 14,
+    "bytes_scanned": 65386706,
+    "findings": 0,
+    "artifact_tree_sha256": "7f0a1822ecc7674bb0322bbf2dd1edcaf48716c02c7b1c359a1f23f3c3d16ae2"
+  }
+}

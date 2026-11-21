@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "b4fbb0ef3a850ec30ec2479d1d6a0662e15ac25ea28640f63c78af75eb5f1b03"
+      "sha256": "49bbe4acdf1800ae55412f7160279aef7c637b3528d0b6a9078d6c589a02c46a"
     },
     {
       "path": "docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl",
@@ -1662,6 +1662,10 @@
     {
       "path": "docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl",
       "sha256": "2df47c8523dfd3abd22d1a87bb12fdbf7408832369aabde0d01ed1390faa839e"
+    },
+    {
+      "path": "docs/QE_2026-11-21/evidence/W-E02-Windows-manifest-only-bundle-74e16561.json",
+      "sha256": "cf3d24ef862ece537792f2b5e445b6f4dd7f97bc2c74970c0b6bce5312d50846"
     },
     {
       "path": "docs/QE_2026-11-21/evidence/W-E02-Windows-module-comparison-36bfe603.json",
