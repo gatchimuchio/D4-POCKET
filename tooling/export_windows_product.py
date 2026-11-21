@@ -29,6 +29,7 @@ from tooling.build_module_pruned_windows import (
     cargo_feature_arguments,
     dart_defines,
     resolve_module_plan,
+    resolve_module_plan_from_export_manifest,
 )
 from tooling.build_environment import build_child_environment as _build_child_environment
 from tooling.compare_module_builds_windows import (
@@ -258,6 +259,34 @@ def validate_export_inputs(
     catalog = _validate_catalog(_parse_json_bytes(catalog_raw))
     plan = resolve_module_plan(receipt, catalog, target_platform=target_platform)
     return receipt, manifest_file, plan, _sha256(receipt_raw), _sha256(manifest_raw)
+
+
+def validate_export_manifest_only_input(
+    manifest_raw: bytes,
+    manifest_file_name: str,
+    *,
+    target_platform: str = "windows",
+) -> tuple[dict[str, Any], Any, str]:
+    """Validate a Manifest file as an untrusted developer build input."""
+    if len(manifest_raw) > MAX_MANIFEST_BYTES:
+        raise ValueError("Export Manifest fileがsize上限を超えている")
+    manifest_file = _parse_json_bytes(manifest_raw)
+    if not isinstance(manifest_file, dict):
+        raise ValueError("Export Manifest fileはJSON objectでなければならない")
+    manifest_errors = validate_instance(manifest_file, _schema(MANIFEST_SCHEMA.name))
+    if manifest_errors:
+        raise ValueError("Export Manifest fileがSchemaに適合しない")
+    _update_trust_summary(manifest_file)
+    app_id = manifest_file["manifest"]["app_identity"]["app_id"]
+    if manifest_file_name != f"{app_id}.json":
+        raise ValueError("入力Manifest file名がApp IDと一致しない")
+
+    catalog_raw = _read_regular_file(CATALOG_PATH, MAX_INPUT_BYTES, "Module一覧")
+    catalog = _validate_catalog(_parse_json_bytes(catalog_raw))
+    plan = resolve_module_plan_from_export_manifest(
+        manifest_file["manifest"], catalog, target_platform=target_platform
+    )
+    return manifest_file, plan, _sha256(manifest_raw)
 
 
 def _git_value(*arguments: str) -> str:
@@ -647,6 +676,14 @@ def validate_build_evidence(evidence: dict[str, Any], artifact_root: Path) -> No
     errors = validate_instance(evidence, _schema(BUILD_SCHEMA.name))
     if errors:
         raise ValueError("Export build evidenceがSchemaに適合しない: " + "; ".join(errors))
+    input_source = evidence.get("selection_input_source")
+    if input_source == "manifest_file_untrusted":
+        if evidence["source_receipt_sha256"] is not None or evidence[
+            "authority_boundary"
+        ]["source_authority_verified"] is not False:
+            raise ValueError("Manifest単体buildがReceipt hashまたはAuthorityを主張している")
+    elif input_source not in {None, "receipt_and_manifest"}:
+        raise ValueError("Export build input sourceが未対応である")
     if evidence["rust_compile_time_identity"] != {
         "source": "schema_validated_manifest",
         "app_id": evidence["app_id"],
@@ -758,20 +795,30 @@ def _copy_bundle(
 
 
 def build_portable_bundle(
-    receipt_path: Path, manifest_path: Path, output_dir: Path
+    receipt_path: Path | None, manifest_path: Path, output_dir: Path
 ) -> dict[str, Any]:
     if sys.platform != "win32":
         raise ValueError("このExport buildはWindows host専用である")
     commit = _require_clean_source()
     output = _resolve_output_directory(output_dir)
-    receipt_raw = _read_regular_file(receipt_path, MAX_INPUT_BYTES, "Export Receipt")
     manifest_raw = _read_regular_file(manifest_path, MAX_MANIFEST_BYTES, "Export Manifest file")
-    receipt, manifest_file, plan, receipt_hash, manifest_hash = validate_export_inputs(
-        receipt_raw, manifest_raw
-    )
-    manifest_info = receipt["manifest_file"]
-    if manifest_path.name != manifest_info["file_name"]:
-        raise ValueError("入力Manifest file名がBroker Receiptと一致しない")
+    if receipt_path is None:
+        manifest_file, plan, manifest_hash = validate_export_manifest_only_input(
+            manifest_raw, manifest_path.name, target_platform="windows"
+        )
+        receipt_hash = None
+        export_id = manifest_file["export_id"]
+        selection_input_source = "manifest_file_untrusted"
+    else:
+        receipt_raw = _read_regular_file(receipt_path, MAX_INPUT_BYTES, "Export Receipt")
+        receipt, manifest_file, plan, receipt_hash, manifest_hash = validate_export_inputs(
+            receipt_raw, manifest_raw
+        )
+        manifest_info = receipt["manifest_file"]
+        if manifest_path.name != manifest_info["file_name"]:
+            raise ValueError("入力Manifest file名がBroker Receiptと一致しない")
+        export_id = receipt["export_id"]
+        selection_input_source = "receipt_and_manifest"
 
     app_id = manifest_file["manifest"]["app_identity"]["app_id"]
     audit_store_id = manifest_file["manifest"]["audit_store"]["store_id"]
@@ -932,7 +979,8 @@ def build_portable_bundle(
             "source_archive_sha256": archive_hash,
             "source_receipt_sha256": receipt_hash,
             "source_manifest_sha256": manifest_hash,
-            "export_id": receipt["export_id"],
+            "selection_input_source": selection_input_source,
+            "export_id": export_id,
             "app_id": app_id,
             "audit_store_id": audit_store_id,
             "authority_boundary": {
@@ -1013,10 +1061,19 @@ def build_portable_bundle(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Broker Export Receipt／Manifestから、Windows用未署名portable bundleを作る開発専用tool。"
+        description="Broker Manifest（任意でReceipt照合）からWindows用未署名portable bundleを作る開発専用tool。"
     )
-    parser.add_argument("--receipt", type=Path, required=True, help="Brokerが返したExport Receipt JSON")
-    parser.add_argument("--manifest-file", type=Path, required=True, help="Receiptが指すManifest file")
+    parser.add_argument(
+        "--receipt",
+        type=Path,
+        help="任意のBroker Export Receipt JSON。指定時はManifestとの内容／hashを照合する",
+    )
+    parser.add_argument(
+        "--manifest-file",
+        type=Path,
+        required=True,
+        help="Manifest JSON file。Receiptなしでは非信頼入力として検証する",
+    )
     parser.add_argument(
         "--output-dir",
         type=Path,

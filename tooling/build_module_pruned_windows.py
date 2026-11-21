@@ -223,8 +223,23 @@ def resolve_module_plan(
             raise ValueError(f"Export Receiptの非継承条件が不正である: {field}")
 
     export_manifest = receipt.get("export_manifest")
+    return resolve_module_plan_from_export_manifest(
+        export_manifest, catalog, target_platform=target_platform
+    )
+
+
+def resolve_module_plan_from_export_manifest(
+    export_manifest: dict[str, Any],
+    catalog: dict[str, Any] | None = None,
+    *,
+    target_platform: str = "windows",
+) -> ResolvedModulePlan:
+    """Manifest単体から選択Planを検証する。Authority／Receiptを推定しない。"""
+    if target_platform not in {"windows", "linux", "macos"}:
+        raise ValueError("Desktop Export targetが未対応である")
+    catalog = _validate_catalog(catalog) if catalog is not None else _load_catalog()
     if not isinstance(export_manifest, dict):
-        raise ValueError("Export ReceiptにManifestがない")
+        raise ValueError("Export Manifest fileにManifestがない")
     identity = export_manifest.get("app_identity")
     distribution = export_manifest.get("distribution_metadata")
     if (
@@ -235,13 +250,13 @@ def resolve_module_plan(
         or distribution.get("artifact_status") != "not_built"
         or distribution.get("signed") is not False
     ):
-        raise ValueError("Export Receiptが指定Desktop platformのmanifest-only build入力ではない")
+        raise ValueError("Export入力が指定Desktop platformのmanifest-only build条件に適合しない")
 
     plan = export_manifest.get("module_plan")
     if not isinstance(plan, dict) or plan.get("catalog_version") != catalog["version"]:
-        raise ValueError("Export ReceiptのModulePlanがないかModule一覧の版が未知である")
+        raise ValueError("Export ManifestのModulePlanがないかModule一覧の版が未知である")
     if plan.get("binary_pruning_status") != "not_applied":
-        raise ValueError("Manifest-only Export Receiptがbinary除去済みを主張している")
+        raise ValueError("Export Manifestがbinary除去済みを主張している")
     if plan.get("unprunable_core_ids") != catalog["unprunable_core_ids"]:
         raise ValueError("ModulePlanが固定安全Coreを欠落または変更している")
     if plan.get("mandatory_module_ids") != catalog["required_module_ids"]:

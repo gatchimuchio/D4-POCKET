@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "665ca2a6b68a70b8fb441def2c53f84fe5f309f8c32970bd9442df19bfb7fcf2"
+      "sha256": "b4fbb0ef3a850ec30ec2479d1d6a0662e15ac25ea28640f63c78af75eb5f1b03"
     },
     {
       "path": "docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl",
@@ -1670,6 +1670,10 @@
     {
       "path": "docs/QE_2026-11-21/evidence/W-E02-Windows-module-comparison-b83c2236.json",
       "sha256": "b895b091d6f2c363b0a1e568ebba22c604b151c98a50528ed74d10db04d57e7c"
+    },
+    {
+      "path": "docs/QE_2026-11-21/evidence/W-E02-Windows-portable-bundle-b737fe3.json",
+      "sha256": "ec91048e623e3bdd40e0206e2620576613a5bcd58263071445cc21c8bdec442e"
     },
     {
       "path": "docs/QE_2026-11-21/\u63a1\u7528\u8a18\u9332.md",
@@ -5393,7 +5397,7 @@
     },
     {
       "path": "specs/gui_shell_windows_export_build.schema.json",
-      "sha256": "d1f10c697cb1e26cfe4c28ece051fa44b16f9e7a604e940a6b61b620821fef70"
+      "sha256": "4b6b6149aa964112ef2bfe2d77a12399d122957e43f076c12d5727f1deda36df"
     },
     {
       "path": "specs/gui_shell_windows_setup_export.schema.json",
@@ -5793,7 +5797,7 @@
     },
     {
       "path": "tooling/build_module_pruned_windows.py",
-      "sha256": "d170fc4b76b123f8fba9cd04cc9f5fa9f8d0b73879319add60b9c902d2be2968"
+      "sha256": "d5c54da601f6521fa5d10812f5d052c72d7d1d8503f8617693e193bc11189437"
     },
     {
       "path": "tooling/build_windows_installer.py",
@@ -5881,7 +5885,7 @@
     },
     {
       "path": "tooling/export_windows_product.py",
-      "sha256": "fede64dffcaceaec39ce629c830f754c51d90590663f5c27e747335191e9a84d"
+      "sha256": "9d7f0fa84d2e74686f9cc04a40be7a52ef30b73f6418c35f3a4f945e96b8bf5f"
     },
     {
       "path": "tooling/failure_injection_validation.py",
@@ -6082,6 +6086,10 @@
     {
       "path": "tooling/tests/test_export_macos_product.py",
       "sha256": "cd95ce1a618c3e487856c37425f1e80c240ac2901855df295a816a5fafa0c19a"
+    },
+    {
+      "path": "tooling/tests/test_export_manifest_only_input.py",
+      "sha256": "214eaa9108746e327a94f9ac3708fee0386811278f8139838b17bc66e2f9bdd4"
     },
     {
       "path": "tooling/tests/test_ios_product_candidate.py",
