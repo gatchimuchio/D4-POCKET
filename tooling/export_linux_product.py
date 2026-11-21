@@ -43,6 +43,7 @@ from tooling.export_windows_product import (
     _schema,
     _update_trust_summary,
     product_version_from_source,
+    validate_export_manifest_only_input,
     validate_export_inputs,
 )
 from tooling.package_linux_product import EXECUTABLE_PATHS, write_product_package
@@ -773,6 +774,19 @@ def validate_build_evidence(
     errors = validate_instance(evidence, schema)
     if errors:
         raise ValueError("Linux Export build evidenceがSchemaに適合しない")
+    input_source = evidence.get("selection_input_source")
+    receipt_hash = evidence["source_receipt_sha256"]
+    if input_source == "manifest_file_untrusted":
+        if (
+            receipt_hash is not None
+            or evidence["authority_boundary"]["source_authority_verified"] is not False
+        ):
+            raise ValueError("Manifest単体buildがReceipt hashまたはAuthorityを主張している")
+    elif input_source in {None, "receipt_and_manifest"}:
+        if not isinstance(receipt_hash, str):
+            raise ValueError("Receipt付きbuildのReceipt hashが不足している")
+    else:
+        raise ValueError("Linux Export build input sourceが未対応である")
     app_id = evidence["app_id"]
     audit_store_id = evidence["audit_store_id"]
     expected_manifest_hash = hashlib.sha256(manifest_raw).hexdigest()
@@ -802,8 +816,9 @@ def validate_build_evidence(
         parsed_manifest["manifest"]["app_identity"]["app_id"] != app_id
         or parsed_manifest["manifest"]["audit_store"]["store_id"] != audit_store_id
         or parsed_manifest["manifest"]["app_identity"]["target_platform"] != "linux"
+        or parsed_manifest["export_id"] != evidence["export_id"]
     ):
-        raise ValueError("bundle Manifest identity／targetがbuild evidenceと一致しない")
+        raise ValueError("bundle Manifest identity／target／Export IDがbuild evidenceと一致しない")
     manifest_module_plan = parsed_manifest["manifest"]["module_plan"]
     for evidence_key, manifest_key in (
         ("selection_mode", "selection_mode"),
@@ -882,7 +897,7 @@ def _validate_debian_setup(evidence: dict[str, Any], output_root: Path) -> None:
 
 
 def build_linux_product(
-    receipt_path: Path,
+    receipt_path: Path | None,
     manifest_path: Path,
     output_dir: Path,
     *,
@@ -905,13 +920,24 @@ def build_linux_product(
         allow_verification_branch=allow_verification_branch
     )
     output = _resolve_output_directory(output_dir)
-    receipt_raw = _read_regular_file(receipt_path, MAX_INPUT_BYTES, "Export Receipt")
     manifest_raw = _read_regular_file(manifest_path, MAX_MANIFEST_BYTES, "Export Manifest file")
-    receipt, manifest_file, plan, receipt_hash, manifest_hash = validate_export_inputs(
-        receipt_raw, manifest_raw, target_platform="linux"
-    )
-    if manifest_path.name != receipt["manifest_file"]["file_name"]:
-        raise ValueError("入力Manifest file名がBroker Receiptと一致しない")
+    if receipt_path is None:
+        manifest_file, plan, manifest_hash = validate_export_manifest_only_input(
+            manifest_raw, manifest_path.name, target_platform="linux"
+        )
+        receipt = None
+        receipt_hash = None
+        export_id = manifest_file["export_id"]
+        selection_input_source = "manifest_file_untrusted"
+    else:
+        receipt_raw = _read_regular_file(receipt_path, MAX_INPUT_BYTES, "Export Receipt")
+        receipt, manifest_file, plan, receipt_hash, manifest_hash = validate_export_inputs(
+            receipt_raw, manifest_raw, target_platform="linux"
+        )
+        if manifest_path.name != receipt["manifest_file"]["file_name"]:
+            raise ValueError("入力Manifest file名がBroker Receiptと一致しない")
+        export_id = receipt["export_id"]
+        selection_input_source = "receipt_and_manifest"
     app_id = manifest_file["manifest"]["app_identity"]["app_id"]
     audit_store_id = manifest_file["manifest"]["audit_store"]["store_id"]
     if r2_e2e_test_build:
@@ -1154,7 +1180,8 @@ def build_linux_product(
                 "source_archive_sha256": archive_hash,
                 "source_receipt_sha256": receipt_hash,
                 "source_manifest_sha256": manifest_hash,
-                "export_id": receipt["export_id"],
+                "selection_input_source": selection_input_source,
+                "export_id": export_id,
                 "app_id": app_id,
                 "audit_store_id": audit_store_id,
                 "authority_boundary": {
@@ -1172,7 +1199,7 @@ def build_linux_product(
                     "catalog_version": 1,
                     "selection_mode": plan.selection_mode,
                     "requested_optional_module_ids": list(plan.requested_optional_ids),
-                    "unprunable_core_ids": receipt["export_manifest"]["module_plan"]["unprunable_core_ids"],
+                    "unprunable_core_ids": manifest_file["manifest"]["module_plan"]["unprunable_core_ids"],
                     "included_module_ids": list(plan.included_module_ids),
                     "excluded_optional_module_ids": list(plan.excluded_optional_ids),
                 },
@@ -1276,10 +1303,18 @@ def build_linux_product(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Broker Receipt／ManifestからLinux Release bundle、D4PKG01、build provenanceを作る"
+        description=(
+            "Broker Receipt／Manifestまたは非信頼Manifest fileからLinux Release bundle、"
+            "D4PKG01、build provenanceを作る"
+        )
     )
-    parser.add_argument("--receipt", type=Path, required=True, help="Brokerが返したExport Receipt")
-    parser.add_argument("--manifest-file", type=Path, required=True, help="Receiptが束縛するManifest file")
+    parser.add_argument("--receipt", type=Path, help="任意。Brokerが返したExport Receipt")
+    parser.add_argument(
+        "--manifest-file",
+        type=Path,
+        required=True,
+        help="Receipt付き時はReceiptが束縛するManifest file。単独指定時は非信頼入力",
+    )
     parser.add_argument("--output-dir", type=Path, required=True, help="Repository／OneDrive外の新規出力root")
     parser.add_argument(
         "--allow-verification-branch",

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import tempfile
 import hashlib
+import io
 import json
 import plistlib
 import shutil
 import subprocess
+import sys
 import unittest
 from pathlib import Path, PurePosixPath
 from unittest.mock import patch
@@ -48,10 +50,14 @@ from tooling.export_macos_product import (
     _validate_build_evidence,
     build_macos_product,
     bundle_identifier_for_app,
+    main as macos_export_main,
     render_macos_uninstaller_postinstall,
     uninstaller_package_identifier_for_app,
 )
-from tooling.export_windows_product import validate_export_inputs
+from tooling.export_windows_product import (
+    validate_export_inputs,
+    validate_export_manifest_only_input,
+)
 from tooling.build_module_pruned_windows import dart_defines
 from tooling.schema_check.check_schemas import validate_instance
 from tooling.tests.create_macos_export_fixture import (
@@ -1345,6 +1351,16 @@ class MacOSProductExportTests(unittest.TestCase):
             evidence["macos_binary_architecture_scan"]["status"], "passed_host_architecture"
         )
         self.assertEqual(validate_instance(evidence, schema), [])
+        manifest_only = json.loads(json.dumps(evidence))
+        manifest_only["selection_input_source"] = "manifest_file_untrusted"
+        manifest_only["source_receipt_sha256"] = None
+        self.assertEqual(validate_instance(manifest_only, schema), [])
+        manifest_only["source_receipt_sha256"] = "c" * 64
+        self.assertTrue(validate_instance(manifest_only, schema))
+        receipt_required = json.loads(json.dumps(evidence))
+        receipt_required["selection_input_source"] = "receipt_and_manifest"
+        receipt_required["source_receipt_sha256"] = None
+        self.assertTrue(validate_instance(receipt_required, schema))
         invalid_framework_path = (
             Path(__file__).resolve().parents[2]
             / "examples/contracts/invalid/gui_shell_macos_export_build_framework_mismatch.invalid.json"
@@ -1452,6 +1468,7 @@ class MacOSProductExportTests(unittest.TestCase):
                 {
                     "app_id": APP_ID,
                     "audit_store_id": AUDIT_STORE_ID,
+                    "export_id": _manifest["export_id"],
                     "bundle_identifier": bundle_identifier_for_app(APP_ID),
                     "installer_identifier": bundle_identifier_for_app(APP_ID) + ".installer",
                     "bundle_name": app.name,
@@ -1676,6 +1693,64 @@ class MacOSProductExportTests(unittest.TestCase):
         with patch("tooling.export_macos_product.sys.platform", "win32"):
             with self.assertRaisesRegex(ValueError, "macOS native host"):
                 build_macos_product(Path("receipt"), Path("manifest"), Path("output"))
+
+    def test_untrusted_manifest_only_input_is_validated_for_macos(self) -> None:
+        _receipt_raw, manifest_raw = macos_export_pair()
+        manifest = json.loads(manifest_raw.decode("utf-8"))
+        validated, plan, manifest_hash = validate_export_manifest_only_input(
+            manifest_raw, f"{APP_ID}.json", target_platform="macos"
+        )
+
+        self.assertEqual(validated["export_id"], manifest["export_id"])
+        self.assertEqual(validated["manifest"]["app_identity"]["target_platform"], "macos")
+        self.assertEqual(manifest_hash, hashlib.sha256(manifest_raw).hexdigest())
+        self.assertIn("core.security_broker", plan.included_module_ids)
+
+    def test_macos_builder_accepts_manifest_only_without_receipt_read(self) -> None:
+        class ReachedToolchain(Exception):
+            pass
+
+        _receipt_raw, manifest_raw = macos_export_pair()
+        with tempfile.TemporaryDirectory(prefix="d4p-macos-manifest-only-") as temporary:
+            root = Path(temporary)
+            manifest_path = root / f"{APP_ID}.json"
+            manifest_path.write_bytes(manifest_raw)
+            with (
+                patch("tooling.export_macos_product.sys.platform", "darwin"),
+                patch(
+                    "tooling.export_macos_product._require_clean_source",
+                    return_value=("main", "refs/heads/main", "a" * 40),
+                ),
+                patch(
+                    "tooling.export_macos_product._resolve_output_directory",
+                    return_value=root / "output",
+                ),
+                patch(
+                    "tooling.export_macos_product._tool_paths",
+                    side_effect=ReachedToolchain,
+                ),
+            ):
+                with self.assertRaises(ReachedToolchain):
+                    build_macos_product(None, manifest_path, root / "output")
+
+    def test_macos_cli_forwards_missing_receipt_as_untrusted_manifest_input(self) -> None:
+        stderr = io.StringIO()
+        arguments = [
+            "export_macos_product.py",
+            "--manifest-file", "manifest.json",
+            "--output-dir", "output",
+        ]
+        with (
+            patch.object(sys, "argv", arguments),
+            patch(
+                "tooling.export_macos_product.build_macos_product",
+                side_effect=ValueError("stop after argument routing"),
+            ) as build,
+            patch("sys.stderr", stderr),
+        ):
+            self.assertEqual(macos_export_main(), 1)
+        self.assertIsNone(build.call_args.args[0])
+        self.assertEqual(build.call_args.args[1], Path("manifest.json"))
 
 
 if __name__ == "__main__":

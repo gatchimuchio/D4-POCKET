@@ -48,6 +48,7 @@ from tooling.export_windows_product import (
     _update_trust_summary,
     _write_source_archive,
     product_version_from_source,
+    validate_export_manifest_only_input,
     validate_export_inputs,
 )
 from tooling.schema_check.check_schemas import validate_instance
@@ -1939,7 +1940,7 @@ def _validate_macos_aot_surface_evidence(
 
 
 def build_macos_product(
-    receipt_path: Path,
+    receipt_path: Path | None,
     manifest_path: Path,
     output_dir: Path,
     *,
@@ -1951,13 +1952,24 @@ def build_macos_product(
         allow_verification_branch=allow_verification_branch
     )
     output = _resolve_output_directory(output_dir)
-    receipt_raw = _read_regular_file(receipt_path, MAX_INPUT_BYTES, "Export Receipt")
     manifest_raw = _read_regular_file(manifest_path, MAX_MANIFEST_BYTES, "Export Manifest file")
-    receipt, manifest_file, plan, receipt_hash, manifest_hash = validate_export_inputs(
-        receipt_raw, manifest_raw, target_platform="macos"
-    )
-    if manifest_path.name != receipt["manifest_file"]["file_name"]:
-        raise ValueError("入力Manifest file名がBroker Receiptと一致しない")
+    if receipt_path is None:
+        manifest_file, plan, manifest_hash = validate_export_manifest_only_input(
+            manifest_raw, manifest_path.name, target_platform="macos"
+        )
+        receipt = None
+        receipt_hash = None
+        export_id = manifest_file["export_id"]
+        selection_input_source = "manifest_file_untrusted"
+    else:
+        receipt_raw = _read_regular_file(receipt_path, MAX_INPUT_BYTES, "Export Receipt")
+        receipt, manifest_file, plan, receipt_hash, manifest_hash = validate_export_inputs(
+            receipt_raw, manifest_raw, target_platform="macos"
+        )
+        if manifest_path.name != receipt["manifest_file"]["file_name"]:
+            raise ValueError("入力Manifest file名がBroker Receiptと一致しない")
+        export_id = receipt["export_id"]
+        selection_input_source = "receipt_and_manifest"
     app_id = manifest_file["manifest"]["app_identity"]["app_id"]
     audit_store_id = manifest_file["manifest"]["audit_store"]["store_id"]
     suffix = app_id.removeprefix("d4-pocket-app-")
@@ -2224,7 +2236,8 @@ def build_macos_product(
             "source_archive_sha256": archive_hash,
             "source_receipt_sha256": receipt_hash,
             "source_manifest_sha256": manifest_hash,
-            "export_id": receipt["export_id"],
+            "selection_input_source": selection_input_source,
+            "export_id": export_id,
             "app_id": app_id,
             "audit_store_id": audit_store_id,
             "bundle_identifier": bundle_id,
@@ -2357,6 +2370,19 @@ def _validate_build_evidence(
     )
     if validate_instance(evidence, schema):
         raise ValueError("macOS Export build evidenceが専用Schemaに適合しない")
+    input_source = evidence.get("selection_input_source")
+    receipt_hash = evidence["source_receipt_sha256"]
+    if input_source == "manifest_file_untrusted":
+        if (
+            receipt_hash is not None
+            or evidence["authority_boundary"]["source_authority_verified"] is not False
+        ):
+            raise ValueError("Manifest単体buildがReceipt hashまたはAuthorityを主張している")
+    elif input_source in {None, "receipt_and_manifest"}:
+        if not isinstance(receipt_hash, str):
+            raise ValueError("Receipt付きbuildのReceipt hashが不足している")
+    else:
+        raise ValueError("macOS Export build input sourceが未対応である")
     _validate_macos_aot_surface_evidence(
         evidence,
         root,
@@ -2426,6 +2452,7 @@ def _validate_build_evidence(
         or evidence.get("target_platform") != "macos"
         or evidence.get("app_id") != expected_app_id
         or evidence.get("audit_store_id") != expected_audit_id
+        or evidence.get("export_id") != manifest["export_id"]
         or evidence.get("bundle_identifier") != expected_bundle_id
         or evidence.get("installer_identifier") != f"{expected_bundle_id}.installer"
         or evidence.get("bundle_name") != expected_bundle_name
@@ -2539,10 +2566,18 @@ def _validate_build_evidence(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Broker Receipt／ManifestからPublisher identityなしのmacOS .app／.pkg候補を構築する"
+        description=(
+            "Broker Receipt／Manifestまたは非信頼Manifest fileからPublisher identityなしの"
+            "macOS .app／.pkg候補を構築する"
+        )
     )
-    parser.add_argument("--receipt", type=Path, required=True)
-    parser.add_argument("--manifest-file", type=Path, required=True)
+    parser.add_argument("--receipt", type=Path, help="任意。Brokerが返したExport Receipt")
+    parser.add_argument(
+        "--manifest-file",
+        type=Path,
+        required=True,
+        help="Receipt付き時はReceiptが束縛するManifest file。単独指定時は非信頼入力",
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument(
         "--allow-verification-branch",

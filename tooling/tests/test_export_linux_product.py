@@ -29,7 +29,10 @@ from tooling.export_linux_product import (
     validate_build_evidence,
     main as linux_export_main,
 )
-from tooling.export_windows_product import validate_export_inputs
+from tooling.export_windows_product import (
+    validate_export_inputs,
+    validate_export_manifest_only_input,
+)
 from tooling.package_linux_product import EXECUTABLE_PATHS
 from tooling.schema_check.check_schemas import validate_instance
 from tooling.tests.create_linux_export_fixture import linux_export_pair
@@ -180,6 +183,25 @@ class LinuxExportInputTests(unittest.TestCase):
             "ValueError: portable archiveの検証条件に不一致", stderr.getvalue()
         )
 
+    def test_main_forwards_missing_receipt_as_untrusted_manifest_input(self) -> None:
+        stderr = io.StringIO()
+        arguments = [
+            "export_linux_product.py",
+            "--manifest-file", "manifest.json",
+            "--output-dir", "output",
+        ]
+        with (
+            patch.object(sys, "argv", arguments),
+            patch(
+                "tooling.export_linux_product.build_linux_product",
+                side_effect=ValueError("stop after argument routing"),
+            ) as build,
+            patch("sys.stderr", stderr),
+        ):
+            self.assertEqual(linux_export_main(), 1)
+        self.assertIsNone(build.call_args.args[0])
+        self.assertEqual(build.call_args.args[1], Path("manifest.json"))
+
     def test_broker_shaped_receipt_and_manifest_are_hash_bound_for_linux(self) -> None:
         receipt_raw, manifest_raw = linux_export_pair()
         receipt, manifest, plan, receipt_hash, manifest_hash = validate_export_inputs(
@@ -194,6 +216,19 @@ class LinuxExportInputTests(unittest.TestCase):
         self.assertFalse(receipt["permission_inherited"])
         self.assertFalse(receipt["approval_inherited"])
         self.assertFalse(receipt["audit_chain_inherited"])
+
+    def test_untrusted_manifest_only_input_is_validated_for_linux(self) -> None:
+        _receipt_raw, manifest_raw = linux_export_pair()
+        manifest = json.loads(manifest_raw.decode("utf-8"))
+        app_id = manifest["manifest"]["app_identity"]["app_id"]
+        validated, plan, manifest_hash = validate_export_manifest_only_input(
+            manifest_raw, f"{app_id}.json", target_platform="linux"
+        )
+
+        self.assertEqual(validated["export_id"], manifest["export_id"])
+        self.assertEqual(validated["manifest"]["app_identity"]["target_platform"], "linux")
+        self.assertEqual(manifest_hash, hashlib.sha256(manifest_raw).hexdigest())
+        self.assertIn("core.security_broker", plan.included_module_ids)
 
     def test_linux_fixture_can_embed_bounded_ephemeral_update_trust(self) -> None:
         public_der = bytes.fromhex("302a300506032b6570032100") + bytes(range(32))
@@ -430,6 +465,9 @@ class LinuxExportBuildTests(unittest.TestCase):
     def test_release_bundle_package_and_provenance_are_published_together(self) -> None:
         self._check_release_export()
 
+    def test_manifest_only_release_bundle_is_published_as_untrusted_input(self) -> None:
+        self._check_release_export(manifest_only=True)
+
     @unittest.skipUnless(shutil.which("dpkg-deb"), "dpkg-deb is required for Debian packaging")
     def test_release_export_publishes_debian_setup_with_the_same_provenance(self) -> None:
         self._check_release_export(debian_package_revision=2)
@@ -447,10 +485,13 @@ class LinuxExportBuildTests(unittest.TestCase):
 
     def _check_release_export(
         self, *, debian_package_revision: int | None = None, fail_debian_packaging: bool = False,
+        manifest_only: bool = False,
     ) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-linux-export-test-") as temporary:
             root = Path(temporary)
             receipt, manifest = self._input_files(root)
+            if manifest_only:
+                receipt.unlink()
             output = root / "result"
             source_commit = "a" * 40
             tool_paths = {
@@ -615,7 +656,30 @@ class LinuxExportBuildTests(unittest.TestCase):
                     self.assertFalse(output.exists())
                     self.assertEqual(set(root.iterdir()), {receipt, manifest})
                     return
-                evidence = build_linux_product(receipt, manifest, output, debian_package_revision=debian_package_revision)
+                evidence = build_linux_product(
+                    None if manifest_only else receipt,
+                    manifest,
+                    output,
+                    debian_package_revision=debian_package_revision,
+                )
+
+            self.assertEqual(
+                evidence["selection_input_source"],
+                "manifest_file_untrusted" if manifest_only else "receipt_and_manifest",
+            )
+            if manifest_only:
+                self.assertIsNone(evidence["source_receipt_sha256"])
+                invalid_receipt_claim = json.loads(json.dumps(evidence))
+                invalid_receipt_claim["source_receipt_sha256"] = "a" * 64
+                with self.assertRaisesRegex(ValueError, "Schema"):
+                    validate_build_evidence(
+                        invalid_receipt_claim,
+                        output / "bundle",
+                        output / "D4Pocket-linux.d4pkg",
+                        manifest.read_bytes(),
+                    )
+            else:
+                self.assertRegex(evidence["source_receipt_sha256"], r"^[0-9a-f]{64}$")
 
             self.assertTrue((output / "bundle" / "gui_shell_desktop").is_file())
             self.assertTrue((output / "D4Pocket-linux.d4pkg").is_file())
