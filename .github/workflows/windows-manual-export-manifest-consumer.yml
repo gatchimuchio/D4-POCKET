@@ -92,6 +92,22 @@ jobs:
             "python=$((python --version 2>&1).Trim())"
           ) | Tee-Object -FilePath "$env:RUNNER_TEMP\w-e02-toolchain.txt" -Append
 
+      - name: Flutter依存をlockfileから復元
+        shell: pwsh
+        working-directory: apps/desktop_flutter
+        run: |
+          $ErrorActionPreference = 'Stop'
+          flutter pub get --enforce-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $packageConfig = '.dart_tool/package_config.json'
+          if (-not (Test-Path -LiteralPath $packageConfig -PathType Leaf)) {
+            throw 'Flutter dependency restore did not create .dart_tool/package_config.json'
+          }
+          $lockHash = (Get-FileHash -LiteralPath 'pubspec.lock' -Algorithm SHA256).Hash.ToLowerInvariant()
+          $configHash = (Get-FileHash -LiteralPath $packageConfig -Algorithm SHA256).Hash.ToLowerInvariant()
+          "pubspec_lock_sha256=$lockHash" | Tee-Object -FilePath "$env:RUNNER_TEMP\w-e02-toolchain.txt" -Append
+          "package_config_sha256=$configHash" | Tee-Object -FilePath "$env:RUNNER_TEMP\w-e02-toolchain.txt" -Append
+
       - name: Broker生成Manifestを同一Windows Builderへ渡す
         shell: pwsh
         run: |
