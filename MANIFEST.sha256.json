@@ -6165,7 +6165,7 @@
     },
     {
       "path": "tooling/tests/windows_export_portable_launch_smoke.ps1",
-      "sha256": "403a8c109fbd008776ad489af1a247c9f27cc8de0888a7957af0dc59b5d38719"
+      "sha256": "70630efe0ddb68c50f0d24c779fe8d69caa55e8c050c2938cecd2cda4bf2caa5"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
