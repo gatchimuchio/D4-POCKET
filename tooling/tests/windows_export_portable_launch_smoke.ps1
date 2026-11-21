@@ -333,6 +333,7 @@ $evidence = [ordered]@{
     main_window_observed = $false
     ui_observation_activation_attempted = $false
     ui_observation_window_activated = $false
+    flutter_runner_root_source = $null
     flutter_runner_uia_framework_id = $null
     flutter_runner_uia_control_type = $null
     flutter_runner_control_node_count = 0
@@ -340,6 +341,8 @@ $evidence = [ordered]@{
     flutter_view_window_class = $null
     flutter_view_child_window_count = 0
     flutter_view_native_handle = $null
+    flutter_view_uia_root_source = $null
+    flutter_view_uia_runner_tree_match_count = 0
     flutter_view_uia_framework_id = $null
     flutter_view_uia_control_type = $null
     flutter_view_uia_offscreen = $null
@@ -888,7 +891,8 @@ public static class GuiShellExportSmokeWin32 {
     $frontendProcess.Refresh()
     if ($frontendProcess.HasExited) { throw 'Flutter child exited during the bounded UI Automation activation attempt' }
     $stage = 'materialize Flutter runner UI Automation root before its semantics child'
-    $flutterRunnerElement = [System.Windows.Automation.AutomationElement]::FromHandle($mainWindowHandle)
+    $flutterRunnerElement = $window
+    $evidence.frontend.flutter_runner_root_source = 'process_window_find_first'
     if ($flutterRunnerElement.Current.ProcessId -ne $frontendProcess.Id) {
       throw 'Flutter runner UI Automation root belongs to another process'
     }
@@ -920,7 +924,23 @@ public static class GuiShellExportSmokeWin32 {
           throw 'FLUTTERVIEW child window process identity changed during observation'
         }
         try {
-          $candidateElement = [System.Windows.Automation.AutomationElement]::FromHandle($candidateHandle)
+          $runnerTreeMatches = @($runnerControlElements | Where-Object {
+            try {
+              [int]$_.Current.ProcessId -eq [int]$frontendProcess.Id -and
+                [long]$_.Current.NativeWindowHandle -eq $candidateHandle.ToInt64()
+            } catch { $false }
+          })
+          $evidence.frontend.flutter_view_uia_runner_tree_match_count = $runnerTreeMatches.Count
+          if ($runnerTreeMatches.Count -gt 1) {
+            throw 'multiple runner Control View elements match the verified FLUTTERVIEW child window'
+          }
+          if ($runnerTreeMatches.Count -eq 1) {
+            $candidateElement = $runnerTreeMatches[0]
+            $candidateRootSource = 'runner_control_view_child'
+          } else {
+            $candidateElement = [System.Windows.Automation.AutomationElement]::FromHandle($candidateHandle)
+            $candidateRootSource = 'from_handle_fallback'
+          }
           $candidateFrameworkId = [string]$candidateElement.Current.FrameworkId
           $candidateControlType = [string]$candidateElement.Current.ControlType.ProgrammaticName
           $candidateOffscreen = [bool]$candidateElement.Current.IsOffscreen
@@ -932,6 +952,7 @@ public static class GuiShellExportSmokeWin32 {
           $evidence.frontend.flutter_view_uia_framework_id = $candidateFrameworkId
           $evidence.frontend.flutter_view_uia_control_type = $candidateControlType
           $evidence.frontend.flutter_view_uia_offscreen = $candidateOffscreen
+          $evidence.frontend.flutter_view_uia_root_source = $candidateRootSource
         } catch {
           $lastFlutterViewUiaError = $_.Exception.GetType().Name
           $flutterViewElement = $null
@@ -1139,7 +1160,12 @@ public static class GuiShellExportSmokeWin32 {
   $traceNavScrollLimit = 8
   $traceNavDeadline = (Get-Date).AddSeconds(15)
   while ((Get-Date) -lt $traceNavDeadline -and -not $traceNavigationClicked) {
-    $flutterViewElement = [System.Windows.Automation.AutomationElement]::FromHandle($flutterViewHandle)
+    if (
+      [int]$flutterViewElement.Current.ProcessId -ne [int]$frontendProcess.Id -or
+      [long]$flutterViewElement.Current.NativeWindowHandle -ne $flutterViewHandle.ToInt64()
+    ) {
+      throw 'retained FLUTTERVIEW UI Automation element no longer matches the verified process window'
+    }
     $currentViewElements = @(Get-ControlViewDescendants -RootElement $flutterViewElement)
     $currentViewNodes = @($flutterViewElement) + $currentViewElements
     $currentNavRoots = @($currentViewNodes | Where-Object {
