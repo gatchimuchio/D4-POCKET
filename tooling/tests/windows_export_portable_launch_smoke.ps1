@@ -89,6 +89,29 @@ function Get-ControlViewDescendants {
   return @($elements.ToArray())
 }
 
+function Get-NormalizedFlutterSemanticsName {
+  param([AllowNull()][string]$Name)
+  if ($null -eq $Name) { return '' }
+  return [regex]::Replace($Name, '\r?\nタブ:\s*\d+/\d+$', '')
+}
+
+function Test-UiRectangleWithin {
+  param(
+    [Parameter(Mandatory = $true)]$OuterRectangle,
+    [Parameter(Mandatory = $true)]$InnerRectangle
+  )
+  if ($OuterRectangle.Width -le 0 -or $OuterRectangle.Height -le 0 -or
+      $InnerRectangle.Width -le 0 -or $InnerRectangle.Height -le 0) {
+    return $false
+  }
+  return (
+    $InnerRectangle.X -ge $OuterRectangle.X -and
+    $InnerRectangle.Y -ge $OuterRectangle.Y -and
+    ($InnerRectangle.X + $InnerRectangle.Width) -le ($OuterRectangle.X + $OuterRectangle.Width) + 1 -and
+    ($InnerRectangle.Y + $InnerRectangle.Height) -le ($OuterRectangle.Y + $OuterRectangle.Height) + 1
+  )
+}
+
 function Find-VerifiedFrontend {
   param(
     [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Launcher,
@@ -308,6 +331,16 @@ $evidence = [ordered]@{
     launcher_started = $false
     direct_child_verified = $false
     main_window_observed = $false
+    flutter_runner_uia_framework_id = $null
+    flutter_runner_uia_control_type = $null
+    flutter_runner_control_node_count = 0
+    flutter_view_window_observed = $false
+    flutter_view_window_class = $null
+    flutter_view_child_window_count = 0
+    flutter_view_native_handle = $null
+    flutter_view_uia_framework_id = $null
+    flutter_view_uia_control_type = $null
+    flutter_view_uia_offscreen = $null
     ui_observation_status = 'not_run'
     ui_observation_failure_stage = $null
     ui_observation_control_node_count = 0
@@ -315,6 +348,12 @@ $evidence = [ordered]@{
     trace_inspector_ui_status = 'not_run'
     trace_inspector_span_count = 0
     trace_inspector_selected_operation_visible = $false
+    trace_navigation_pointer_scroll_events = 0
+    trace_navigation_target_in_view = $false
+    trace_navigation_pointer_click_sent = $false
+    trace_navigation_window_activated = $false
+    trace_navigation_target_rect = $null
+    trace_navigation_last_target_rect = $null
     included_surfaces = @()
     excluded_surfaces_absent = $false
     tray_exit_callback_posted = $false
@@ -486,9 +525,14 @@ using System.Text;
 public static class GuiShellExportSmokeWin32 {
   private const uint kWindowOwner = 4;
   private const uint kKeyboardInput = 1;
+  private const uint kMouseInput = 0;
   private const uint kKeyUp = 2;
+  private const uint kMouseLeftDown = 0x0002;
+  private const uint kMouseLeftUp = 0x0004;
+  private const uint kMouseWheel = 0x0800;
 
-  private delegate bool EnumThreadWindowsCallback(IntPtr window, IntPtr parameter);
+   private delegate bool EnumThreadWindowsCallback(IntPtr window, IntPtr parameter);
+   private delegate bool EnumChildWindowsCallback(IntPtr window, IntPtr parameter);
 
   [StructLayout(LayoutKind.Sequential)]
   private struct KeyboardInput {
@@ -499,9 +543,20 @@ public static class GuiShellExportSmokeWin32 {
     public IntPtr extraInfo;
   }
 
+  [StructLayout(LayoutKind.Sequential)]
+  private struct MouseInput {
+    public int dx;
+    public int dy;
+    public uint mouseData;
+    public uint flags;
+    public uint time;
+    public IntPtr extraInfo;
+  }
+
   [StructLayout(LayoutKind.Explicit, Size = 32)]
   private struct InputUnion {
     [FieldOffset(0)] public KeyboardInput keyboard;
+    [FieldOffset(0)] public MouseInput mouse;
   }
 
   [StructLayout(LayoutKind.Sequential)]
@@ -510,8 +565,29 @@ public static class GuiShellExportSmokeWin32 {
     public InputUnion data;
   }
 
+  [StructLayout(LayoutKind.Sequential)]
+  private struct Point {
+    public int x;
+    public int y;
+  }
+
+  [DllImport("user32.dll", SetLastError = true)]
+  private static extern bool SetCursorPos(int x, int y);
+
+  [DllImport("user32.dll", SetLastError = true)]
+  private static extern bool SetForegroundWindow(IntPtr window);
+
+  [DllImport("user32.dll", SetLastError = true)]
+  private static extern bool ShowWindow(IntPtr window, int command);
+
+  [DllImport("user32.dll")]
+  private static extern IntPtr WindowFromPoint(Point point);
+
   [DllImport("user32.dll", SetLastError = true)]
   private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+   [DllImport("user32.dll", SetLastError = true)]
+   private static extern bool EnumChildWindows(IntPtr parent, EnumChildWindowsCallback callback, IntPtr parameter);
 
   [DllImport("user32.dll", SetLastError = true)]
   private static extern bool EnumThreadWindows(uint threadId, EnumThreadWindowsCallback callback, IntPtr parameter);
@@ -528,6 +604,9 @@ public static class GuiShellExportSmokeWin32 {
   [DllImport("user32.dll", SetLastError = true)]
   private static extern uint SendInput(uint inputCount, Input[] inputs, int inputSize);
 
+  [DllImport("user32.dll", SetLastError = true)]
+  private static extern bool ScreenToClient(IntPtr window, ref Point point);
+
   [DllImport("user32.dll", EntryPoint = "GetClassNameW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
   private static extern int GetClassNameW(IntPtr window, StringBuilder className, int maximumCount);
 
@@ -536,6 +615,100 @@ public static class GuiShellExportSmokeWin32 {
     int length = GetClassNameW(window, className, className.Capacity);
     return length > 0 ? className.ToString() : String.Empty;
   }
+
+   public static uint GetWindowProcessId(IntPtr window) {
+     uint processId;
+     GetWindowThreadProcessId(window, out processId);
+     return processId;
+   }
+
+   private static bool IsForegroundProcess(uint expectedProcessId) {
+     IntPtr foreground = GetForegroundWindow();
+     return foreground != IntPtr.Zero && GetWindowProcessId(foreground) == expectedProcessId;
+   }
+
+   private static bool PositionPointerForProcess(uint expectedProcessId, int x, int y) {
+     if (!SetCursorPos(x, y) || !IsForegroundProcess(expectedProcessId)) return false;
+     IntPtr underPointer = WindowFromPoint(new Point { x = x, y = y });
+     return underPointer != IntPtr.Zero && GetWindowProcessId(underPointer) == expectedProcessId;
+   }
+
+   public static bool ActivateWindowForProcess(IntPtr window, uint expectedProcessId) {
+     if (window == IntPtr.Zero || expectedProcessId == 0 ||
+         GetWindowProcessId(window) != expectedProcessId ||
+         GetWindowClassName(window) != "FLUTTER_RUNNER_WIN32_WINDOW") return false;
+     ShowWindow(window, 9);
+     SetForegroundWindow(window);
+     return IsForegroundProcess(expectedProcessId);
+   }
+
+   public static bool SendMouseWheelToForegroundProcess(uint expectedProcessId, int x, int y, int delta) {
+     if (expectedProcessId == 0 || delta == 0 ||
+         !PositionPointerForProcess(expectedProcessId, x, y)) return false;
+     Input input = new Input {
+       type = kMouseInput,
+       data = new InputUnion {
+         mouse = new MouseInput {
+           dx = 0,
+           dy = 0,
+           mouseData = unchecked((uint)delta),
+           flags = kMouseWheel,
+           time = 0,
+           extraInfo = IntPtr.Zero
+         }
+       }
+     };
+     return SendInput(1, new Input[] { input }, Marshal.SizeOf(typeof(Input))) == 1;
+   }
+
+   public static bool ClickScreenPointInForegroundProcess(uint expectedProcessId, int x, int y) {
+     if (expectedProcessId == 0 || !PositionPointerForProcess(expectedProcessId, x, y)) return false;
+     Input[] inputs = new Input[] {
+       MouseButtonInput(kMouseLeftDown),
+       MouseButtonInput(kMouseLeftUp)
+     };
+     return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(Input))) == (uint)inputs.Length;
+   }
+
+   private static Input MouseButtonInput(uint flags) {
+     return new Input {
+       type = kMouseInput,
+       data = new InputUnion {
+         mouse = new MouseInput {
+           dx = 0,
+           dy = 0,
+           mouseData = 0,
+           flags = flags,
+           time = 0,
+           extraInfo = IntPtr.Zero
+         }
+       }
+     };
+   }
+
+   public static IntPtr[] GetDescendantWindowsForProcess(IntPtr parent, uint expectedProcessId, int maximumCount) {
+     if (parent == IntPtr.Zero) throw new ArgumentException("parent window handle is zero", "parent");
+     if (expectedProcessId == 0) throw new ArgumentOutOfRangeException("expectedProcessId");
+     if (maximumCount < 1) throw new ArgumentOutOfRangeException("maximumCount");
+     var windows = new List<IntPtr>();
+     bool exceeded = false;
+     EnumChildWindowsCallback callback = (candidate, parameter) => {
+       uint candidateProcessId;
+       GetWindowThreadProcessId(candidate, out candidateProcessId);
+       if (candidateProcessId == expectedProcessId) {
+         if (windows.Count == maximumCount) {
+           exceeded = true;
+           return false;
+         }
+         windows.Add(candidate);
+       }
+       return true;
+     };
+     bool completed = EnumChildWindows(parent, callback, IntPtr.Zero);
+     if (exceeded) throw new InvalidOperationException("descendant window inspection exceeded its bounded limit");
+     if (!completed) throw new InvalidOperationException("descendant window inspection failed");
+     return windows.ToArray();
+   }
 
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
@@ -697,9 +870,71 @@ public static class GuiShellExportSmokeWin32 {
     }
     $evidence.frontend.main_window_observed = $true
     $stage = 'verify Flutter native main-window handle'
-    if ($frontendProcess.MainWindowHandle -eq [IntPtr]::Zero) {
-      throw 'Flutter process has no native main-window handle'
+    $frontendProcess.Refresh()
+    $mainWindowHandle = [IntPtr]$frontendProcess.MainWindowHandle
+    $observedWindowHandle = [IntPtr]$window.Current.NativeWindowHandle
+    if ($mainWindowHandle -eq [IntPtr]::Zero -or $observedWindowHandle -ne $mainWindowHandle) {
+      throw 'UI Automation process window does not match the verified Flutter main-window handle'
     }
+    $stage = 'materialize Flutter runner UI Automation root before its semantics child'
+    $flutterRunnerElement = [System.Windows.Automation.AutomationElement]::FromHandle($mainWindowHandle)
+    if ($flutterRunnerElement.Current.ProcessId -ne $frontendProcess.Id) {
+      throw 'Flutter runner UI Automation root belongs to another process'
+    }
+    $evidence.frontend.flutter_runner_uia_framework_id = [string]$flutterRunnerElement.Current.FrameworkId
+    $evidence.frontend.flutter_runner_uia_control_type = [string]$flutterRunnerElement.Current.ControlType.ProgrammaticName
+    $runnerControlElements = @(Get-ControlViewDescendants -RootElement $flutterRunnerElement)
+    $evidence.frontend.flutter_runner_control_node_count = $runnerControlElements.Count
+    $stage = 'materialize Flutter semantics from the same-process FLUTTERVIEW child window'
+    $flutterViewElement = $null
+    $flutterViewHandle = [IntPtr]::Zero
+    $lastFlutterViewUiaError = $null
+    $childWindowDeadline = (Get-Date).AddSeconds(60)
+    while ((Get-Date) -lt $childWindowDeadline -and $null -eq $flutterViewElement) {
+      $frontendProcess.Refresh()
+      if ($frontendProcess.HasExited) { throw 'Flutter child exited before its FLUTTERVIEW semantics became available' }
+      $childHandles = [GuiShellExportSmokeWin32]::GetDescendantWindowsForProcess(
+        $mainWindowHandle, [uint32]$frontendProcess.Id, 256
+      )
+      $flutterViewHandles = @($childHandles | Where-Object {
+        [GuiShellExportSmokeWin32]::GetWindowClassName($_) -ceq 'FLUTTERVIEW'
+      })
+      $evidence.frontend.flutter_view_child_window_count = $flutterViewHandles.Count
+      if ($flutterViewHandles.Count -gt 1) {
+        throw 'multiple same-process FLUTTERVIEW child windows were observed'
+      }
+      if ($flutterViewHandles.Count -eq 1) {
+        $candidateHandle = [IntPtr]$flutterViewHandles[0]
+        if ([GuiShellExportSmokeWin32]::GetWindowProcessId($candidateHandle) -ne [uint32]$frontendProcess.Id) {
+          throw 'FLUTTERVIEW child window process identity changed during observation'
+        }
+        try {
+          $candidateElement = [System.Windows.Automation.AutomationElement]::FromHandle($candidateHandle)
+          $candidateFrameworkId = [string]$candidateElement.Current.FrameworkId
+          $candidateControlType = [string]$candidateElement.Current.ControlType.ProgrammaticName
+          $candidateOffscreen = [bool]$candidateElement.Current.IsOffscreen
+          if ($candidateElement.Current.ProcessId -ne $frontendProcess.Id) {
+            throw 'FLUTTERVIEW UI Automation root belongs to another process'
+          }
+          $flutterViewHandle = $candidateHandle
+          $flutterViewElement = $candidateElement
+          $evidence.frontend.flutter_view_uia_framework_id = $candidateFrameworkId
+          $evidence.frontend.flutter_view_uia_control_type = $candidateControlType
+          $evidence.frontend.flutter_view_uia_offscreen = $candidateOffscreen
+        } catch {
+          $lastFlutterViewUiaError = $_.Exception.GetType().Name
+          $flutterViewElement = $null
+        }
+      }
+      if ($null -eq $flutterViewElement) { Start-Sleep -Milliseconds 250 }
+    }
+    if ($null -eq $flutterViewElement) {
+      $failureSuffix = if ($null -eq $lastFlutterViewUiaError) { '' } else { "; last_uia_error=$lastFlutterViewUiaError" }
+      throw "same-process FLUTTERVIEW UI Automation root was not materialized before deadline$failureSuffix"
+    }
+    $evidence.frontend.flutter_view_window_observed = $true
+    $evidence.frontend.flutter_view_window_class = [GuiShellExportSmokeWin32]::GetWindowClassName($flutterViewHandle)
+    $evidence.frontend.flutter_view_native_handle = '0x{0:X}' -f $flutterViewHandle.ToInt64()
     $knownNavigationLabels = @('観測', '追跡', '診断', '履歴', '評価ラボ', 'ホスト能力', '通知', 'Host操作')
     $observedLabels = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     $maximumObservedNodeCount = 0
@@ -707,17 +942,17 @@ public static class GuiShellExportSmokeWin32 {
     $uiDeadline = (Get-Date).AddSeconds(60)
     while ((Get-Date) -lt $uiDeadline -and $navRoot.Count -eq 0) {
       try {
-        $elements = @(Get-ControlViewDescendants -RootElement $window)
+        $elements = @(Get-ControlViewDescendants -RootElement $flutterViewElement)
       } catch {
         $elements = @()
       }
       if ($elements.Count -gt $maximumObservedNodeCount) {
         $maximumObservedNodeCount = $elements.Count
       }
-      $candidateNodes = @($window) + $elements
+      $candidateNodes = @($flutterViewElement) + $elements
       foreach ($node in $candidateNodes) {
         try {
-          $name = [string]$node.Current.Name
+          $name = Get-NormalizedFlutterSemanticsName -Name ([string]$node.Current.Name)
           if ($knownNavigationLabels -ccontains $name) { $null = $observedLabels.Add($name) }
         } catch {
           # Continue across nodes that disappear during UIA materialization.
@@ -725,7 +960,8 @@ public static class GuiShellExportSmokeWin32 {
       }
       $navRoot = @($candidateNodes | Where-Object {
         try {
-          $_.Current.Name -eq 'ナビゲーション' -or $_.Current.AutomationId -eq 'gui_shell.surface.navigation_rail'
+          (Get-NormalizedFlutterSemanticsName -Name ([string]$_.Current.Name)) -ceq 'ナビゲーション' -or
+            $_.Current.AutomationId -ceq 'gui_shell.surface.navigation_rail'
         } catch { $false }
       } | Select-Object -First 1)
       if ($navRoot.Count -eq 0) { Start-Sleep -Milliseconds 250 }
@@ -740,7 +976,7 @@ public static class GuiShellExportSmokeWin32 {
     $stage = 'enumerate live NavigationRail semantic children'
     $navigationElements = @(Get-ControlViewDescendants -RootElement $navRoot[0])
     $navigationNames = @($navigationElements | ForEach-Object {
-      try { [string]$_.Current.Name } catch { '' }
+      try { Get-NormalizedFlutterSemanticsName -Name ([string]$_.Current.Name) } catch { '' }
     } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     $includedSurfaces = @('観測', '追跡')
     foreach ($surface in $includedSurfaces) {
@@ -878,27 +1114,96 @@ public static class GuiShellExportSmokeWin32 {
 
   $stage = 'render selected Trace Inspector Broker data through the live Flutter consumer'
   $traceNavItem = $null
+  if ($evidence.frontend.ui_observation_status -cne 'passed' -or $navRoot.Count -ne 1) {
+    throw 'Trace Inspector navigation is unavailable because its live NavigationRail was not established'
+  }
+  $stage = 'activate the verified Flutter test window for bounded UI input'
+  if (-not [GuiShellExportSmokeWin32]::ActivateWindowForProcess(
+    $mainWindowHandle, [uint32]$frontendProcess.Id
+  )) {
+    throw 'Windows did not activate the verified Flutter test window'
+  }
+  $evidence.frontend.trace_navigation_window_activated = $true
+  $traceNavigationClicked = $false
+  $traceNavScrollLimit = 8
   $traceNavDeadline = (Get-Date).AddSeconds(15)
-  while ((Get-Date) -lt $traceNavDeadline -and $null -eq $traceNavItem) {
-    $navigationElements = @(Get-ControlViewDescendants -RootElement $window)
-    foreach ($item in $navigationElements) {
+  while ((Get-Date) -lt $traceNavDeadline -and -not $traceNavigationClicked) {
+    $flutterViewElement = [System.Windows.Automation.AutomationElement]::FromHandle($flutterViewHandle)
+    $currentViewElements = @(Get-ControlViewDescendants -RootElement $flutterViewElement)
+    $currentViewNodes = @($flutterViewElement) + $currentViewElements
+    $currentNavRoots = @($currentViewNodes | Where-Object {
       try {
-        if ($item.Current.Name -ceq '追跡' -and $item.Current.IsEnabled) {
-          $null = $item.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
-          $traceNavItem = $item
-          break
-        }
-      } catch {
-        # Continue until an enabled, invokable selected-module destination is observed.
-      }
+        (Get-NormalizedFlutterSemanticsName -Name ([string]$_.Current.Name)) -ceq 'ナビゲーション' -or
+          $_.Current.AutomationId -ceq 'gui_shell.surface.navigation_rail'
+      } catch { $false }
+    } | Select-Object -First 2)
+    if ($currentNavRoots.Count -ne 1) {
+      throw "live NavigationRail root changed during Trace selection (count=$($currentNavRoots.Count))"
     }
-    if ($null -eq $traceNavItem) { Start-Sleep -Milliseconds 200 }
+    $traceNavigationElements = @(Get-ControlViewDescendants -RootElement $currentNavRoots[0])
+    $traceNavMatches = @($traceNavigationElements | Where-Object {
+      try { (Get-NormalizedFlutterSemanticsName -Name ([string]$_.Current.Name)) -ceq '追跡' } catch { $false }
+    })
+    if ($traceNavMatches.Count -gt 1) {
+      throw 'multiple live Trace Inspector navigation labels were observed'
+    }
+    if ($traceNavMatches.Count -eq 1) {
+      $traceNavItem = $traceNavMatches[0]
+      if (-not $traceNavItem.Current.IsEnabled) {
+        throw 'live Trace Inspector navigation destination is disabled'
+      }
+      $targetRectangle = $traceNavItem.Current.BoundingRectangle
+      $navigationRectangle = $currentNavRoots[0].Current.BoundingRectangle
+      $windowRectangle = $window.Current.BoundingRectangle
+      $evidence.frontend.trace_navigation_last_target_rect = [ordered]@{
+        x = [double]$targetRectangle.X
+        y = [double]$targetRectangle.Y
+        width = [double]$targetRectangle.Width
+        height = [double]$targetRectangle.Height
+      }
+      $targetInNavigation = Test-UiRectangleWithin -OuterRectangle $navigationRectangle -InnerRectangle $targetRectangle
+      $targetInWindow = Test-UiRectangleWithin -OuterRectangle $windowRectangle -InnerRectangle $targetRectangle
+      if ($targetInNavigation -and $targetInWindow -and -not $traceNavItem.Current.IsOffscreen) {
+        $clickX = [int][Math]::Floor($targetRectangle.X + ($targetRectangle.Width / 2))
+        $clickY = [int][Math]::Floor($targetRectangle.Y + ($targetRectangle.Height / 2))
+        $stage = 'click the visible Trace Inspector destination in the verified foreground Flutter process'
+        if (-not [GuiShellExportSmokeWin32]::ClickScreenPointInForegroundProcess(
+          [uint32]$frontendProcess.Id, $clickX, $clickY
+        )) {
+          throw 'Trace Inspector pointer click was refused because the Flutter process was not foreground or SendInput failed'
+        }
+        $evidence.frontend.trace_navigation_target_in_view = $true
+        $evidence.frontend.trace_navigation_pointer_click_sent = $true
+        $evidence.frontend.trace_navigation_target_rect = [ordered]@{
+          x = [double]$targetRectangle.X
+          y = [double]$targetRectangle.Y
+          width = [double]$targetRectangle.Width
+          height = [double]$targetRectangle.Height
+        }
+        $traceNavigationClicked = $true
+      } else {
+        if ([int]$evidence.frontend.trace_navigation_pointer_scroll_events -ge $traceNavScrollLimit) {
+          throw 'Trace Inspector destination did not enter the visible NavigationRail after bounded scrolling'
+        }
+        $scrollX = [int][Math]::Floor($navigationRectangle.X + ($navigationRectangle.Width / 2))
+        $scrollY = [int][Math]::Floor($navigationRectangle.Y + ($navigationRectangle.Height / 2))
+        $stage = 'scroll the verified foreground NavigationRail to reveal Trace Inspector'
+        if (-not [GuiShellExportSmokeWin32]::SendMouseWheelToForegroundProcess(
+          [uint32]$frontendProcess.Id, $scrollX, $scrollY, -120
+        )) {
+          throw 'NavigationRail pointer scroll was refused because the Flutter process was not foreground or SendInput failed'
+        }
+        $evidence.frontend.trace_navigation_pointer_scroll_events =
+          [int]$evidence.frontend.trace_navigation_pointer_scroll_events + 1
+        Start-Sleep -Milliseconds 250
+      }
+    } else {
+      Start-Sleep -Milliseconds 200
+    }
   }
-  if ($null -eq $traceNavItem) {
-    throw 'selected Trace Inspector navigation destination was not invokable in the live product UI'
+  if (-not $traceNavigationClicked) {
+    throw 'Trace Inspector navigation destination was not available for a bounded live UI selection'
   }
-  $pattern = $traceNavItem.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
-  $pattern.Invoke()
 
   $traceUiDeadline = (Get-Date).AddSeconds(30)
   $traceUiNames = @()
@@ -906,9 +1211,9 @@ public static class GuiShellExportSmokeWin32 {
   $traceSpanCount = 0
   $traceSelectedOperationVisible = $false
   while ((Get-Date) -lt $traceUiDeadline) {
-    $traceUiElements = @(Get-ControlViewDescendants -RootElement $window)
+    $traceUiElements = @(Get-ControlViewDescendants -RootElement $flutterViewElement)
     $traceUiNames = @($traceUiElements | ForEach-Object {
-      try { [string]$_.Current.Name } catch { '' }
+      try { Get-NormalizedFlutterSemanticsName -Name ([string]$_.Current.Name) } catch { '' }
     } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     $traceUiText = $traceUiNames -join "`n"
     $spanMatch = [regex]::Match($traceUiText, 'Span:\s*([0-9]+)')

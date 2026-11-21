@@ -1693,7 +1693,7 @@
     },
     {
       "path": "docs/QE_2026-11-21/\u9032\u6357.md",
-      "sha256": "183c84b820639726ae76e730f7576687c202f94edd777a318610c5014ddf0200"
+      "sha256": "f7d3fe981fdb3f8aebcbefa95ceae69fb1060a9a8d4c342d9f8ed52f34bbd8cc"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -6165,7 +6165,7 @@
     },
     {
       "path": "tooling/tests/windows_export_portable_launch_smoke.ps1",
-      "sha256": "2a03c29b9b24ec75044a0b58fb4d3e341c6e14464e64773791eb5e139345cae7"
+      "sha256": "55b590d7b3903f73813e818c10a66401f3936dae01506f99bda22a7e4d53a652"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
