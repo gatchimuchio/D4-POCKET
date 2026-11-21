@@ -343,6 +343,43 @@ Static symbols
         errors = validate_comparison_evidence(evidence, schema)
         self.assertTrue(any("build command" in error for error in errors))
 
+    def test_schema_validation_rejects_launcher_command_feature_mismatch(self) -> None:
+        evidence = json.loads(
+            (ROOT / "examples/contracts/gui_shell_module_comparison_evidence.valid.json")
+            .read_text(encoding="utf-8")
+        )
+        schema = json.loads(
+            (ROOT / "specs/gui_shell_module_comparison_evidence.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        evidence["rust_binary_comparison"]["selected"][
+            "launcher_cargo_command"
+        ] = [
+            "module_history"
+            if item == "module_observability,module_trace_inspector"
+            else item
+            for item in evidence["rust_binary_comparison"]["selected"][
+                "launcher_cargo_command"
+            ]
+        ]
+        errors = validate_comparison_evidence(evidence, schema)
+        self.assertTrue(any("launcher build command" in error for error in errors))
+
+    def test_schema_validation_rejects_desktop_launcher_measurement_mismatch(self) -> None:
+        evidence = json.loads(
+            (ROOT / "examples/contracts/gui_shell_module_comparison_evidence.valid.json")
+            .read_text(encoding="utf-8")
+        )
+        schema = json.loads(
+            (ROOT / "specs/gui_shell_module_comparison_evidence.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        evidence["rust_binary_comparison"]["desktop_launcher_comparison"][
+            "binary_bytes_reduced"
+        ] = 0
+        errors = validate_comparison_evidence(evidence, schema)
+        self.assertTrue(any("launcher byte削減量" in error for error in errors))
+
     def test_schema_validation_rejects_removed_security_core_or_required_module(self) -> None:
         schema = json.loads(
             (ROOT / "specs/gui_shell_module_comparison_evidence.schema.json")

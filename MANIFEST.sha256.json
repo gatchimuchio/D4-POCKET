@@ -1649,7 +1649,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "1152d139b1696fe01cc10139a566478809dcc2079e2a4ebd95b4333bef31b4d6"
+      "sha256": "8bf59cc8cd63f28c529e91f2d771b344cfaccb6780f849959c03aaaee3b598b8"
     },
     {
       "path": "docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl",
@@ -2497,7 +2497,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_module_comparison_evidence.valid.json",
-      "sha256": "36c117361530ec2b7779be55e8ec332772780fd8a38478d0c946afe1695890ec"
+      "sha256": "63f1eee5be79bb0a4d9695ba1ca0aac0f593f556dd37ce66f9baf4bd6c039ee9"
     },
     {
       "path": "examples/contracts/gui_shell_preview.valid.json",
@@ -5373,7 +5373,7 @@
     },
     {
       "path": "specs/gui_shell_module_comparison_evidence.schema.json",
-      "sha256": "ea38981dd63292616e24e0734543f41e684c4462f7d5688968cc28d7a443105b"
+      "sha256": "5fb8fbd5e033c2a7cf832829328f5c534401c37f4da09faaba4167c5c4859b72"
     },
     {
       "path": "specs/gui_shell_preview.schema.json",
@@ -5813,7 +5813,7 @@
     },
     {
       "path": "tooling/compare_module_builds_windows.py",
-      "sha256": "f6d19e952b4a7ba5d442afda8bb5bbe68cd3cbf01461d6c00222e3c9f6c5a71f"
+      "sha256": "c1e2fb14fa2902660ebe91b05c8bd2aff54f2e25f88a52109a7c5e51a7e3f273"
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
@@ -6061,7 +6061,7 @@
     },
     {
       "path": "tooling/tests/test_compare_module_builds_windows.py",
-      "sha256": "f6699282b9be85277bb74da37d6606dd11d500c78f2589d36ef77fa528082fa0"
+      "sha256": "80bfdbb31d4f311b15a287f4e6505c25a65d4ce33899309593d986894cc9b4ed"
     },
     {
       "path": "tooling/tests/test_current_governance_check.py",

@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "evidence_type": "development_module_build_comparison",
   "evidence_source": "INTERNAL_STATE",
   "product_artifact_claimed": false,
@@ -11,7 +11,7 @@
   "worktree_clean": true,
   "target_platform": "windows",
   "build_mode": "release",
-  "build_scope": "desktop_flutter_and_rust_helper",
+  "build_scope": "desktop_flutter_rust_helper_and_launcher",
   "same_source_commit": true,
   "same_toolchain": true,
   "toolchain": {
@@ -348,11 +348,26 @@
         "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations"
       ],
       "cargo_command": [
-        "cargo", "rustc", "--color", "never", "--manifest-path",
-        "native/rust_helper/Cargo.toml", "--locked", "--offline", "--release",
-        "--target", "x86_64-pc-windows-msvc", "--no-default-features",
-        "--features", "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations", "--target-dir", "{isolated-target-dir}",
-        "--bin", "gui_shell_rust_helper", "--", "-C",
+        "cargo",
+        "rustc",
+        "--color",
+        "never",
+        "--manifest-path",
+        "native/rust_helper/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--release",
+        "--target",
+        "x86_64-pc-windows-msvc",
+        "--no-default-features",
+        "--features",
+        "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations",
+        "--target-dir",
+        "{isolated-target-dir}",
+        "--bin",
+        "gui_shell_rust_helper",
+        "--",
+        "-C",
         "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_rust_helper.exe.map"
       ],
       "build_duration_ms": 90000,
@@ -376,10 +391,23 @@
       },
       "runtime_dependency_tree": {
         "command": [
-          "cargo", "tree", "--color", "never", "--manifest-path",
-          "native/rust_helper/Cargo.toml", "--locked", "--offline", "--target",
-          "x86_64-pc-windows-msvc", "--edges", "normal", "--prefix", "none",
-          "--no-default-features", "--features", "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations"
+          "cargo",
+          "tree",
+          "--color",
+          "never",
+          "--manifest-path",
+          "native/rust_helper/Cargo.toml",
+          "--locked",
+          "--offline",
+          "--target",
+          "x86_64-pc-windows-msvc",
+          "--edges",
+          "normal",
+          "--prefix",
+          "none",
+          "--no-default-features",
+          "--features",
+          "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations"
         ],
         "entry_count": 12,
         "tree_file": {
@@ -387,6 +415,48 @@
           "size_bytes": 600,
           "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         }
+      },
+      "launcher_cargo_command": [
+        "cargo",
+        "rustc",
+        "--color",
+        "never",
+        "--manifest-path",
+        "native/rust_helper/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--release",
+        "--target",
+        "x86_64-pc-windows-msvc",
+        "--no-default-features",
+        "--features",
+        "module_setup_doctor,module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations",
+        "--target-dir",
+        "{isolated-target-dir}",
+        "--bin",
+        "gui_shell_desktop_launcher",
+        "--",
+        "-C",
+        "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_desktop_launcher.exe.map"
+      ],
+      "launcher_build_duration_ms": 45000,
+      "launcher_binary": {
+        "path": "baseline/rust/gui_shell_desktop_launcher.exe",
+        "size_bytes": 3072,
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "launcher_linker_map": {
+        "path": "baseline/rust/gui_shell_desktop_launcher.exe.map",
+        "size_bytes": 144,
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "launcher_symbol_inventory": {
+        "file": {
+          "path": "baseline/rust/desktop-launcher-public-symbols.txt",
+          "size_bytes": 28,
+          "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        "symbol_count": 1
       }
     },
     "selected": {
@@ -401,11 +471,26 @@
         "module_observability,module_trace_inspector"
       ],
       "cargo_command": [
-        "cargo", "rustc", "--color", "never", "--manifest-path",
-        "native/rust_helper/Cargo.toml", "--locked", "--offline", "--release",
-        "--target", "x86_64-pc-windows-msvc", "--no-default-features",
-        "--features", "module_observability,module_trace_inspector", "--target-dir",
-        "{isolated-target-dir}", "--bin", "gui_shell_rust_helper", "--", "-C",
+        "cargo",
+        "rustc",
+        "--color",
+        "never",
+        "--manifest-path",
+        "native/rust_helper/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--release",
+        "--target",
+        "x86_64-pc-windows-msvc",
+        "--no-default-features",
+        "--features",
+        "module_observability,module_trace_inspector",
+        "--target-dir",
+        "{isolated-target-dir}",
+        "--bin",
+        "gui_shell_rust_helper",
+        "--",
+        "-C",
         "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_rust_helper.exe.map"
       ],
       "build_duration_ms": 60000,
@@ -429,10 +514,23 @@
       },
       "runtime_dependency_tree": {
         "command": [
-          "cargo", "tree", "--color", "never", "--manifest-path",
-          "native/rust_helper/Cargo.toml", "--locked", "--offline", "--target",
-          "x86_64-pc-windows-msvc", "--edges", "normal", "--prefix", "none",
-          "--no-default-features", "--features", "module_observability,module_trace_inspector"
+          "cargo",
+          "tree",
+          "--color",
+          "never",
+          "--manifest-path",
+          "native/rust_helper/Cargo.toml",
+          "--locked",
+          "--offline",
+          "--target",
+          "x86_64-pc-windows-msvc",
+          "--edges",
+          "normal",
+          "--prefix",
+          "none",
+          "--no-default-features",
+          "--features",
+          "module_observability,module_trace_inspector"
         ],
         "entry_count": 12,
         "tree_file": {
@@ -440,6 +538,48 @@
           "size_bytes": 600,
           "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         }
+      },
+      "launcher_cargo_command": [
+        "cargo",
+        "rustc",
+        "--color",
+        "never",
+        "--manifest-path",
+        "native/rust_helper/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--release",
+        "--target",
+        "x86_64-pc-windows-msvc",
+        "--no-default-features",
+        "--features",
+        "module_observability,module_trace_inspector",
+        "--target-dir",
+        "{isolated-target-dir}",
+        "--bin",
+        "gui_shell_desktop_launcher",
+        "--",
+        "-C",
+        "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_desktop_launcher.exe.map"
+      ],
+      "launcher_build_duration_ms": 45000,
+      "launcher_binary": {
+        "path": "selected/rust/gui_shell_desktop_launcher.exe",
+        "size_bytes": 2560,
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "launcher_linker_map": {
+        "path": "selected/rust/gui_shell_desktop_launcher.exe.map",
+        "size_bytes": 112,
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "launcher_symbol_inventory": {
+        "file": {
+          "path": "selected/rust/desktop-launcher-public-symbols.txt",
+          "size_bytes": 28,
+          "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        "symbol_count": 1
       }
     },
     "comparison": {
@@ -548,6 +688,46 @@
               "size_bytes": 600,
               "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
             }
+          },
+          "launcher_cargo_command": [
+            "cargo",
+            "rustc",
+            "--color",
+            "never",
+            "--manifest-path",
+            "native/rust_helper/Cargo.toml",
+            "--locked",
+            "--offline",
+            "--release",
+            "--target",
+            "x86_64-pc-windows-msvc",
+            "--no-default-features",
+            "--target-dir",
+            "{isolated-target-dir}",
+            "--bin",
+            "gui_shell_desktop_launcher",
+            "--",
+            "-C",
+            "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_desktop_launcher.exe.map"
+          ],
+          "launcher_build_duration_ms": 45000,
+          "launcher_binary": {
+            "path": "no_optional_modules/rust/gui_shell_desktop_launcher.exe",
+            "size_bytes": 2560,
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          },
+          "launcher_linker_map": {
+            "path": "no_optional_modules/rust/gui_shell_desktop_launcher.exe.map",
+            "size_bytes": 112,
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          },
+          "launcher_symbol_inventory": {
+            "file": {
+              "path": "no_optional_modules/rust/desktop-launcher-public-symbols.txt",
+              "size_bytes": 28,
+              "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "symbol_count": 1
           }
         },
         "comparison_to_baseline": {
@@ -569,6 +749,27 @@
             "path": "no_optional_modules/rust/added-symbols.txt",
             "size_bytes": 1,
             "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+          }
+        },
+        "desktop_launcher_comparison_to_baseline": {
+          "baseline_binary_bytes": 3072,
+          "selected_binary_bytes": 2560,
+          "binary_bytes_reduced": 512,
+          "baseline_binary_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "selected_binary_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "binary_hash_changed": true,
+          "runtime_dependency_tree_identical": true,
+          "removed_symbol_count": 1,
+          "added_symbol_count": 1,
+          "removed_symbols_file": {
+            "path": "no_optional_modules/rust/removed-desktop-launcher-symbols.txt",
+            "size_bytes": 8,
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "added_symbols_file": {
+            "path": "no_optional_modules/rust/added-desktop-launcher-symbols.txt",
+            "size_bytes": 8,
+            "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
           }
         }
       },
@@ -670,6 +871,48 @@
               "size_bytes": 600,
               "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
             }
+          },
+          "launcher_cargo_command": [
+            "cargo",
+            "rustc",
+            "--color",
+            "never",
+            "--manifest-path",
+            "native/rust_helper/Cargo.toml",
+            "--locked",
+            "--offline",
+            "--release",
+            "--target",
+            "x86_64-pc-windows-msvc",
+            "--no-default-features",
+            "--features",
+            "module_history,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations",
+            "--target-dir",
+            "{isolated-target-dir}",
+            "--bin",
+            "gui_shell_desktop_launcher",
+            "--",
+            "-C",
+            "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_desktop_launcher.exe.map"
+          ],
+          "launcher_build_duration_ms": 45000,
+          "launcher_binary": {
+            "path": "without_setup_doctor/rust/gui_shell_desktop_launcher.exe",
+            "size_bytes": 2560,
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          },
+          "launcher_linker_map": {
+            "path": "without_setup_doctor/rust/gui_shell_desktop_launcher.exe.map",
+            "size_bytes": 112,
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+          },
+          "launcher_symbol_inventory": {
+            "file": {
+              "path": "without_setup_doctor/rust/desktop-launcher-public-symbols.txt",
+              "size_bytes": 28,
+              "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+            },
+            "symbol_count": 1
           }
         },
         "comparison_to_baseline": {
@@ -691,6 +934,27 @@
             "path": "without_setup_doctor/rust/added-symbols.txt",
             "size_bytes": 1,
             "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+          }
+        },
+        "desktop_launcher_comparison_to_baseline": {
+          "baseline_binary_bytes": 3072,
+          "selected_binary_bytes": 2560,
+          "binary_bytes_reduced": 512,
+          "baseline_binary_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "selected_binary_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "binary_hash_changed": true,
+          "runtime_dependency_tree_identical": true,
+          "removed_symbol_count": 1,
+          "added_symbol_count": 1,
+          "removed_symbols_file": {
+            "path": "without_setup_doctor/rust/removed-desktop-launcher-symbols.txt",
+            "size_bytes": 8,
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "added_symbols_file": {
+            "path": "without_setup_doctor/rust/added-desktop-launcher-symbols.txt",
+            "size_bytes": 8,
+            "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
           }
         }
       },
@@ -792,6 +1056,48 @@
               "size_bytes": 600,
               "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
             }
+          },
+          "launcher_cargo_command": [
+            "cargo",
+            "rustc",
+            "--color",
+            "never",
+            "--manifest-path",
+            "native/rust_helper/Cargo.toml",
+            "--locked",
+            "--offline",
+            "--release",
+            "--target",
+            "x86_64-pc-windows-msvc",
+            "--no-default-features",
+            "--features",
+            "module_setup_doctor,module_evaluation_lab,module_host_capabilities,module_notifications,module_observability,module_trace_inspector,module_host_operations",
+            "--target-dir",
+            "{isolated-target-dir}",
+            "--bin",
+            "gui_shell_desktop_launcher",
+            "--",
+            "-C",
+            "link-arg=/MAP:{comparison-temporary-directory}/gui_shell_desktop_launcher.exe.map"
+          ],
+          "launcher_build_duration_ms": 45000,
+          "launcher_binary": {
+            "path": "without_history/rust/gui_shell_desktop_launcher.exe",
+            "size_bytes": 2560,
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+          },
+          "launcher_linker_map": {
+            "path": "without_history/rust/gui_shell_desktop_launcher.exe.map",
+            "size_bytes": 112,
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "launcher_symbol_inventory": {
+            "file": {
+              "path": "without_history/rust/desktop-launcher-public-symbols.txt",
+              "size_bytes": 28,
+              "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+            },
+            "symbol_count": 1
           }
         },
         "comparison_to_baseline": {
@@ -814,12 +1120,54 @@
             "size_bytes": 1,
             "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
           }
+        },
+        "desktop_launcher_comparison_to_baseline": {
+          "baseline_binary_bytes": 3072,
+          "selected_binary_bytes": 2560,
+          "binary_bytes_reduced": 512,
+          "baseline_binary_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "selected_binary_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "binary_hash_changed": true,
+          "runtime_dependency_tree_identical": true,
+          "removed_symbol_count": 1,
+          "added_symbol_count": 1,
+          "removed_symbols_file": {
+            "path": "without_history/rust/removed-desktop-launcher-symbols.txt",
+            "size_bytes": 8,
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "added_symbols_file": {
+            "path": "without_history/rust/added-desktop-launcher-symbols.txt",
+            "size_bytes": 8,
+            "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+          }
         }
       }
-    ]
+    ],
+    "desktop_launcher_comparison": {
+      "baseline_binary_bytes": 3072,
+      "selected_binary_bytes": 2560,
+      "binary_bytes_reduced": 512,
+      "baseline_binary_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "selected_binary_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "binary_hash_changed": true,
+      "runtime_dependency_tree_identical": true,
+      "removed_symbol_count": 1,
+      "added_symbol_count": 1,
+      "removed_symbols_file": {
+        "path": "removed-desktop-launcher-symbols.txt",
+        "size_bytes": 8,
+        "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      "added_symbols_file": {
+        "path": "added-desktop-launcher-symbols.txt",
+        "size_bytes": 8,
+        "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+      }
+    }
   },
   "binary_pruning_verified": false,
-  "semantic_pruning_status": "flutter_aot_and_rust_helper_binary_observed; standalone_runtime_unverified",
+  "semantic_pruning_status": "flutter_aot_rust_helper_and_launcher_binaries_observed; standalone_runtime_unverified",
   "cold_start_status": "not_measured",
   "resource_comparison_status": "not_measured",
   "signed": false,

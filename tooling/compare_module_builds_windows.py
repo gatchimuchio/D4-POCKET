@@ -1,4 +1,4 @@
-"""同一commitにおけるFlutter AOTとRust helperのWindows Release比較補助。"""
+"""同一commitにおけるFlutter AOTとRust製品BinaryのWindows Release比較補助。"""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ from tooling.flutter_workspace import safe_flutter_temp_parent
 
 
 COMPARISON_SCHEMA = ROOT / "specs" / "gui_shell_module_comparison_evidence.schema.json"
-COMPARISON_EVIDENCE_VERSION = 4
+COMPARISON_EVIDENCE_VERSION = 5
 ANALYSIS_SENTINEL = "A summary of your Windows bundle analysis can be found at:"
 MAX_RECEIPT_BYTES = 1_000_000
 MAX_ANALYSIS_BYTES = 50_000_000
@@ -52,6 +52,7 @@ APP_EXECUTABLE = "gui_shell_desktop.exe"
 AOT_REPORT_ROOT = "app.so (Dart AOT)"
 DART_PACKAGE_ROOT = ("package:gui_shell_desktop", "package:gui_shell_desktop")
 RUST_HELPER_BINARY = "gui_shell_rust_helper.exe"
+RUST_DESKTOP_LAUNCHER_BINARY = "gui_shell_desktop_launcher.exe"
 RUST_HELPER_MANIFEST = "native/rust_helper/Cargo.toml"
 MAX_NATIVE_BINARY_BYTES = 512_000_000
 MAP_SYMBOL_LINE = re.compile(
@@ -666,6 +667,7 @@ def validate_rust_binary_comparison(
     baseline = comparison["baseline"]
     selected = comparison["selected"]
     summary = comparison["comparison"]
+    launcher_summary = comparison["desktop_launcher_comparison"]
     full_plan = _full_optional_plan(active_catalog)
     expected_baseline_arguments = cargo_feature_arguments(
         full_plan, target_platform="windows"
@@ -722,25 +724,46 @@ def validate_rust_binary_comparison(
         feature_arguments = run["cargo_feature_arguments"]
         for command_name, command in (
             ("build", run["cargo_command"]),
+            ("launcher build", run["launcher_cargo_command"]),
             ("dependency tree", run["runtime_dependency_tree"]["command"]),
         ):
             if not _contains_argument_sequence(command, feature_arguments):
                 errors.append(
                     f"Rust {label} {command_name} commandが記録済みfeature選択と一致しない"
                 )
+        if not _contains_argument_sequence(
+            run["cargo_command"], ["--bin", "gui_shell_rust_helper"]
+        ):
+            errors.append(f"Rust {label} helper build commandのtargetが不一致")
+        if not _contains_argument_sequence(
+            run["launcher_cargo_command"],
+            ["--bin", "gui_shell_desktop_launcher"],
+        ):
+            errors.append(f"Rust {label} launcher build commandのtargetが不一致")
 
-    def validate_pair(label: str, run: dict[str, Any], pair: dict[str, Any]) -> None:
-        expected_reduction = baseline["binary"]["size_bytes"] - run["binary"]["size_bytes"]
-        if pair["baseline_binary_bytes"] != baseline["binary"]["size_bytes"]:
+    def validate_pair(
+        label: str,
+        run: dict[str, Any],
+        pair: dict[str, Any],
+        *,
+        binary_key: str,
+        target_label: str,
+    ) -> None:
+        baseline_binary = baseline[binary_key]
+        run_binary = run[binary_key]
+        expected_reduction = baseline_binary["size_bytes"] - run_binary["size_bytes"]
+        if pair["baseline_binary_bytes"] != baseline_binary["size_bytes"]:
             errors.append(f"Rust {label} baseline byte数がartifact記録と一致しない")
-        if pair["selected_binary_bytes"] != run["binary"]["size_bytes"]:
+        if pair["selected_binary_bytes"] != run_binary["size_bytes"]:
             errors.append(f"Rust {label} variant byte数がartifact記録と一致しない")
         if pair["binary_bytes_reduced"] != expected_reduction:
-            errors.append(f"Rust {label} byte削減量をartifact記録から再計算できない")
-        expected_hash_changed = baseline["binary"]["sha256"] != run["binary"]["sha256"]
-        if pair["baseline_binary_sha256"] != baseline["binary"]["sha256"]:
+            errors.append(
+                f"Rust {label} {target_label} byte削減量をartifact記録から再計算できない"
+            )
+        expected_hash_changed = baseline_binary["sha256"] != run_binary["sha256"]
+        if pair["baseline_binary_sha256"] != baseline_binary["sha256"]:
             errors.append(f"Rust {label} baseline SHA-256がartifact記録と一致しない")
-        if pair["selected_binary_sha256"] != run["binary"]["sha256"]:
+        if pair["selected_binary_sha256"] != run_binary["sha256"]:
             errors.append(f"Rust {label} variant SHA-256がartifact記録と一致しない")
         if pair["binary_hash_changed"] is not expected_hash_changed:
             errors.append(f"Rust {label} hash変更状態がartifact記録と一致しない")
@@ -751,10 +774,30 @@ def validate_rust_binary_comparison(
         if pair["runtime_dependency_tree_identical"] is not expected_tree_identical:
             errors.append(f"Rust {label}依存tree比較が保存tree hashと一致しない")
 
-    validate_pair("selected", selected, summary)
+    validate_pair(
+        "selected", selected, summary, binary_key="binary", target_label="helper"
+    )
+    validate_pair(
+        "selected",
+        selected,
+        launcher_summary,
+        binary_key="launcher_binary",
+        target_label="launcher",
+    )
     for variant in variants:
         validate_pair(
-            variant["label"], variant["run"], variant["comparison_to_baseline"]
+            variant["label"],
+            variant["run"],
+            variant["comparison_to_baseline"],
+            binary_key="binary",
+            target_label="helper",
+        )
+        validate_pair(
+            variant["label"],
+            variant["run"],
+            variant["desktop_launcher_comparison_to_baseline"],
+            binary_key="launcher_binary",
+            target_label="launcher",
         )
     return errors
 
@@ -1061,6 +1104,9 @@ def _capture_rust_helper_run(
 ) -> dict[str, Any]:
     run_root = evidence_root / label / "rust"
     run_root.mkdir(parents=True, exist_ok=False)
+    shared_launcher_map_path = shared_linker_map_path.with_name(
+        f"{RUST_DESKTOP_LAUNCHER_BINARY}.map"
+    )
     feature_arguments = cargo_feature_arguments(plan, target_platform="windows")
     _cargo_tree_command, dependency_tree = _cargo_feature_tree(
         cargo=cargo,
@@ -1071,8 +1117,8 @@ def _capture_rust_helper_run(
     tree_path = run_root / "cargo-runtime-dependency-tree.txt"
     tree_path.write_text(dependency_tree, encoding="utf-8", newline="\n")
 
-    linker_map_path = run_root / f"{RUST_HELPER_BINARY}.map"
     started = time.perf_counter()
+    linker_map_path = run_root / f"{RUST_HELPER_BINARY}.map"
     command = [
         cargo,
         "rustc",
@@ -1111,6 +1157,58 @@ def _capture_rust_helper_run(
     symbol_path.write_text("".join(f"{symbol}\n" for symbol in symbols), encoding="utf-8", newline="\n")
     symbol_record = _file_record(symbol_path, evidence_root)
 
+    launcher_map_path = run_root / f"{RUST_DESKTOP_LAUNCHER_BINARY}.map"
+    launcher_started = time.perf_counter()
+    launcher_command = [
+        cargo,
+        "rustc",
+        "--color",
+        "never",
+        "--manifest-path",
+        RUST_HELPER_MANIFEST,
+        "--locked",
+        "--offline",
+        "--release",
+        "--target",
+        target,
+        *feature_arguments,
+        "--target-dir",
+        str(target_dir),
+        "--bin",
+        "gui_shell_desktop_launcher",
+        "--",
+        "-C",
+        f"link-arg=/MAP:{shared_launcher_map_path}",
+    ]
+    _cargo_process_output(
+        launcher_command,
+        environment,
+        label=f"{label} Rust desktop launcher Release build",
+    )
+    _clean_source_commit(expected_commit)
+    launcher_build_duration_ms = round((time.perf_counter() - launcher_started) * 1000)
+    launcher_binary_source = (
+        target_dir / target / "release" / RUST_DESKTOP_LAUNCHER_BINARY
+    )
+    launcher_binary_path = run_root / RUST_DESKTOP_LAUNCHER_BINARY
+    if not launcher_binary_source.is_file():
+        raise ValueError(f"{label} Rust desktop launcher Release binaryが生成されない")
+    shutil.copy2(launcher_binary_source, launcher_binary_path)
+    if not shared_launcher_map_path.is_file():
+        raise ValueError(f"{label} Rust desktop launcher linker mapが生成されない")
+    launcher_linker_map_path = run_root / f"{RUST_DESKTOP_LAUNCHER_BINARY}.map"
+    shutil.copy2(shared_launcher_map_path, launcher_linker_map_path)
+    launcher_binary = _native_binary_record(launcher_binary_path, evidence_root)
+    launcher_map_record = _file_record(launcher_linker_map_path, evidence_root)
+    launcher_symbols = _parse_linker_map_symbols(launcher_linker_map_path.read_bytes())
+    launcher_symbol_path = run_root / "desktop-launcher-public-symbols.txt"
+    launcher_symbol_path.write_text(
+        "".join(f"{symbol}\n" for symbol in launcher_symbols),
+        encoding="utf-8",
+        newline="\n",
+    )
+    launcher_symbol_record = _file_record(launcher_symbol_path, evidence_root)
+
     duration_ms = round((time.perf_counter() - started) * 1000)
     tree_record = _file_record(tree_path, evidence_root)
     tree_entries = [line.strip() for line in dependency_tree.splitlines() if line.strip()]
@@ -1135,15 +1233,43 @@ def _capture_rust_helper_run(
         "-C",
         f"link-arg=/MAP:{{comparison-temporary-directory}}/{RUST_HELPER_BINARY}.map",
     ]
+    launcher_command_template = [
+        "cargo",
+        "rustc",
+        "--color",
+        "never",
+        "--manifest-path",
+        RUST_HELPER_MANIFEST,
+        "--locked",
+        "--offline",
+        "--release",
+        "--target",
+        target,
+        *feature_arguments,
+        "--target-dir",
+        "{isolated-target-dir}",
+        "--bin",
+        "gui_shell_desktop_launcher",
+        "--",
+        "-C",
+        f"link-arg=/MAP:{{comparison-temporary-directory}}/{RUST_DESKTOP_LAUNCHER_BINARY}.map",
+    ]
     return {
         "label": label,
         "included_optional_module_ids": list(plan.included_optional_ids),
         "cargo_feature_arguments": feature_arguments,
         "cargo_command": command_template,
+        "launcher_cargo_command": launcher_command_template,
         "build_duration_ms": duration_ms,
+        "launcher_build_duration_ms": launcher_build_duration_ms,
         "binary": binary,
         "linker_map": map_record,
         "symbol_inventory": _symbol_inventory_record(symbol_record, symbols),
+        "launcher_binary": launcher_binary,
+        "launcher_linker_map": launcher_map_record,
+        "launcher_symbol_inventory": _symbol_inventory_record(
+            launcher_symbol_record, launcher_symbols
+        ),
         "runtime_dependency_tree": {
             "command": [
                 "cargo",
@@ -1166,6 +1292,7 @@ def _capture_rust_helper_run(
             "tree_file": tree_record,
         },
         "_symbols": symbols,
+        "_launcher_symbols": launcher_symbols,
         "_dependency_tree": dependency_tree,
     }
 
@@ -1178,36 +1305,57 @@ def _native_pair_comparison(
     removed_path: Path,
     added_path: Path,
 ) -> dict[str, Any]:
-    symbols = symbol_set_comparison(baseline["_symbols"], selected["_symbols"])
     baseline_tree = baseline["_dependency_tree"]
     selected_tree = selected["_dependency_tree"]
-    removed_path.write_text(
-        "".join(f"{symbol}\n" for symbol in symbols["removed_symbols"]),
-        encoding="utf-8",
-        newline="\n",
-    )
-    added_path.write_text(
-        "".join(f"{symbol}\n" for symbol in symbols["added_symbols"]),
-        encoding="utf-8",
-        newline="\n",
-    )
+
+    def compare_target(
+        binary_key: str,
+        symbol_key: str,
+        removed_target_path: Path,
+        added_target_path: Path,
+    ) -> dict[str, Any]:
+        symbols = symbol_set_comparison(baseline[symbol_key], selected[symbol_key])
+        removed_target_path.write_text(
+            "".join(f"{symbol}\n" for symbol in symbols["removed_symbols"]),
+            encoding="utf-8",
+            newline="\n",
+        )
+        added_target_path.write_text(
+            "".join(f"{symbol}\n" for symbol in symbols["added_symbols"]),
+            encoding="utf-8",
+            newline="\n",
+        )
+        baseline_binary = baseline[binary_key]
+        selected_binary = selected[binary_key]
+        return {
+            "baseline_binary_bytes": baseline_binary["size_bytes"],
+            "selected_binary_bytes": selected_binary["size_bytes"],
+            "binary_bytes_reduced": baseline_binary["size_bytes"]
+            - selected_binary["size_bytes"],
+            "baseline_binary_sha256": baseline_binary["sha256"],
+            "selected_binary_sha256": selected_binary["sha256"],
+            "binary_hash_changed": baseline_binary["sha256"]
+            != selected_binary["sha256"],
+            "runtime_dependency_tree_identical": hashlib.sha256(
+                baseline_tree.encode("utf-8")
+            ).hexdigest()
+            == hashlib.sha256(selected_tree.encode("utf-8")).hexdigest(),
+            "removed_symbol_count": len(symbols["removed_symbols"]),
+            "added_symbol_count": len(symbols["added_symbols"]),
+            "removed_symbols_file": _file_record(
+                removed_target_path, evidence_root
+            ),
+            "added_symbols_file": _file_record(added_target_path, evidence_root),
+        }
+
     return {
-        "baseline_binary_bytes": baseline["binary"]["size_bytes"],
-        "selected_binary_bytes": selected["binary"]["size_bytes"],
-        "binary_bytes_reduced": baseline["binary"]["size_bytes"]
-        - selected["binary"]["size_bytes"],
-        "baseline_binary_sha256": baseline["binary"]["sha256"],
-        "selected_binary_sha256": selected["binary"]["sha256"],
-        "binary_hash_changed": baseline["binary"]["sha256"]
-        != selected["binary"]["sha256"],
-        "runtime_dependency_tree_identical": hashlib.sha256(
-            baseline_tree.encode("utf-8")
-        ).hexdigest()
-        == hashlib.sha256(selected_tree.encode("utf-8")).hexdigest(),
-        "removed_symbol_count": len(symbols["removed_symbols"]),
-        "added_symbol_count": len(symbols["added_symbols"]),
-        "removed_symbols_file": _file_record(removed_path, evidence_root),
-        "added_symbols_file": _file_record(added_path, evidence_root),
+        "helper": compare_target("binary", "_symbols", removed_path, added_path),
+        "desktop_launcher": compare_target(
+            "launcher_binary",
+            "_launcher_symbols",
+            removed_path.with_name(f"launcher-{removed_path.name}"),
+            added_path.with_name(f"launcher-{added_path.name}"),
+        ),
     }
 
 
@@ -1279,6 +1427,7 @@ def _native_binary_comparison(
                 added_path=evidence_root / label / "rust" / "added-symbols.txt",
             )
             run.pop("_symbols")
+            run.pop("_launcher_symbols")
             run.pop("_dependency_tree")
             variant_runs.append(
                 {
@@ -1288,7 +1437,10 @@ def _native_binary_comparison(
                         variant_plan.included_optional_ids
                     ),
                     "run": run,
-                    "comparison_to_baseline": pair,
+                    "comparison_to_baseline": pair["helper"],
+                    "desktop_launcher_comparison_to_baseline": pair[
+                        "desktop_launcher"
+                    ],
                 }
             )
     _cargo_after, _rustc_after, final_toolchain_json = _rust_toolchain(environment)
@@ -1303,8 +1455,10 @@ def _native_binary_comparison(
         added_path=evidence_root / "added-rust-symbols.txt",
     )
     baseline.pop("_symbols")
+    baseline.pop("_launcher_symbols")
     baseline.pop("_dependency_tree")
     selected.pop("_symbols")
+    selected.pop("_launcher_symbols")
     selected.pop("_dependency_tree")
     return {
         "build_target": toolchain["target"],
@@ -1314,7 +1468,8 @@ def _native_binary_comparison(
         "toolchain": toolchain,
         "baseline": baseline,
         "selected": selected,
-        "comparison": comparison,
+        "comparison": comparison["helper"],
+        "desktop_launcher_comparison": comparison["desktop_launcher"],
         "pruning_variants": variant_runs,
         "binary_pruning_verified": False,
     }
@@ -1592,7 +1747,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         "worktree_clean": True,
         "target_platform": "windows",
         "build_mode": "release",
-        "build_scope": "desktop_flutter_and_rust_helper",
+        "build_scope": "desktop_flutter_rust_helper_and_launcher",
         "same_source_commit": True,
         "same_toolchain": True,
         "toolchain": versions,
@@ -1614,7 +1769,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
             baseline, selected
         ),
         "binary_pruning_verified": False,
-        "semantic_pruning_status": "flutter_aot_and_rust_helper_binary_observed; standalone_runtime_unverified",
+        "semantic_pruning_status": "flutter_aot_rust_helper_and_launcher_binaries_observed; standalone_runtime_unverified",
         "cold_start_status": "not_measured",
         "resource_comparison_status": "not_measured",
         "signed": False,
@@ -1664,6 +1819,12 @@ def main() -> int:
         "rust_helper_removed_symbol_count": evidence["rust_binary_comparison"][
             "comparison"
         ]["removed_symbol_count"],
+        "rust_desktop_launcher_binary_bytes_reduced": evidence[
+            "rust_binary_comparison"
+        ]["desktop_launcher_comparison"]["binary_bytes_reduced"],
+        "rust_desktop_launcher_removed_symbol_count": evidence[
+            "rust_binary_comparison"
+        ]["desktop_launcher_comparison"]["removed_symbol_count"],
         "binary_pruning_verified": False,
         "cold_start_status": "not_measured",
         "resource_comparison_status": "not_measured",
