@@ -140,7 +140,7 @@ def verify_agent_task_supervision_crash_same_package() -> None:
         or scratch_journal.get("hmac_present") is not True
     ):
         raise SystemExit("supervision後の認証済みscratch回復journalが不成立です")
-    live_audit = supervision_result.get("live_audit")
+    live_audit = supervision.get("live_audit")
     if not isinstance(live_audit, dict) or any(
         live_audit.get(key) != expected
         for key, expected in {

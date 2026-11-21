@@ -293,15 +293,15 @@ class LinuxWorkflowHelperTests(unittest.TestCase):
                     "descendant_groups_stopped": True,
                     "workspace_task_scratch_removed": True,
                     "scratch_recovery_journal": {"entries": 0, "hmac_present": True},
-                },
-                "live_audit": {
-                    "agent_task_started": 3,
-                    "agent_task_completed": 1,
-                    "agent_task_cancelled": 1,
-                    "agent_task_deadline_failed": 1,
-                    "agent_task_permission_grants": 3,
-                    "agent_task_owner_approvals": 3,
-                    "agent_task_scratch_cleanup_confirmed": 1,
+                    "live_audit": {
+                        "agent_task_started": 3,
+                        "agent_task_completed": 1,
+                        "agent_task_cancelled": 1,
+                        "agent_task_deadline_failed": 1,
+                        "agent_task_permission_grants": 3,
+                        "agent_task_owner_approvals": 3,
+                        "agent_task_scratch_cleanup_confirmed": 1,
+                    },
                 },
             }
             crash = {
@@ -363,6 +363,22 @@ class LinuxWorkflowHelperTests(unittest.TestCase):
                         SUMMARY_HELPER, operation, str(supervision_path), str(crash_path)
                     )
                     self.assertNotEqual(invalid.returncode, 0)
+
+            wrong_audit = {
+                **supervision,
+                "agent_task_supervision": {
+                    **supervision["agent_task_supervision"],
+                    "live_audit": {
+                        **supervision["agent_task_supervision"]["live_audit"],
+                        "agent_task_owner_approvals": 2,
+                    },
+                },
+            }
+            write_json(supervision_path, wrong_audit)
+            invalid_audit = run_helper(
+                SUMMARY_HELPER, operation, str(supervision_path), str(crash_path)
+            )
+            self.assertNotEqual(invalid_audit.returncode, 0)
 
     def test_unknown_operation_fails_closed(self) -> None:
         result = run_helper(EXPORT_HELPER, "not-an-operation")
