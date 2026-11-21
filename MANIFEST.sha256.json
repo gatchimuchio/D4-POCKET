@@ -104,6 +104,10 @@
       "sha256": "c5529fdf272f00ca824d517da5af60dcdae902b9cf7a8bfa476554cb677c2719"
     },
     {
+      "path": ".github/workflows/windows-manual-export-manifest-consumer.yml",
+      "sha256": "9b044b81e0c0302a2d6533924818fe2da3f5b48811387d1e6ffc49a9d2249c36"
+    },
+    {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
       "sha256": "6a7ef1c10d2b07b2e11a9456733ab6f6a4efc6a3f99b96a431f563e85fdb0fca"
     },
@@ -1662,6 +1666,10 @@
     {
       "path": "docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl",
       "sha256": "2df47c8523dfd3abd22d1a87bb12fdbf7408832369aabde0d01ed1390faa839e"
+    },
+    {
+      "path": "docs/QE_2026-11-21/evidence/W-A07-linux-hosted-same-package-44933825811.json",
+      "sha256": "edd18612dd2ffa50309e11928c12beb5501ff9218d4c531763718ff3644b1530"
     },
     {
       "path": "docs/QE_2026-11-21/evidence/W-E02-Windows-compare-manifest-fixture-060ebfa.json",
@@ -5849,7 +5857,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "ea66e92a3b9ced428abb536f361c830dd4dd9d4dd64c65abf7e071461f8b577d"
+      "sha256": "d64b800e5e08416e245428cdb0abd0e67751d2a45ae9e5d6d67270893fc855cb"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -6166,6 +6174,10 @@
     {
       "path": "tooling/tests/test_windows_export_setup_pipeline.py",
       "sha256": "ba1dd3a7d8724ecec43fe35029eb36284787185b46576a835a370cd06694ff58"
+    },
+    {
+      "path": "tooling/tests/windows_broker_export_manifest_compare.py",
+      "sha256": "39f47e7716b92873dc9f9884fe9e335c071e8c500473f64f0e80c481db989987"
     },
     {
       "path": "tooling/tests/windows_export_portable_launch_smoke.ps1",

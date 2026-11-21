@@ -110,6 +110,7 @@ from tooling.build_module_pruned_windows import (
 )
 from tooling.compare_module_builds_windows import (
     _safe_console_text,
+    _load_selection_input,
     all_optional_defines,
     comparison_summary,
     validate_comparison_evidence,
@@ -11459,11 +11460,28 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
     evidence = load_contract_fixture("gui_shell_module_comparison_evidence.valid.json")
     schema = load_schema("gui_shell_module_comparison_evidence.schema.json")
     receipt = load_contract_fixture("gui_shell_export_receipt.valid.json")
+    receipt_path = CONTRACT_EXAMPLES / "gui_shell_export_receipt.valid.json"
     catalog = _validate_catalog(
         json.loads((SPECS / "gui_shell_module_catalog.json").read_text(encoding="utf-8"))
     )
+    selection_input = _load_selection_input(
+        receipt_path=receipt_path, catalog=catalog
+    )
+    evidence["selection_input_trust"] = selection_input.selection_input_trust
+    evidence["source_receipt_sha256"] = selection_input.source_receipt_sha256
+    evidence["source_manifest_sha256"] = selection_input.source_manifest_sha256
+
+    def selection_input_for_receipt(value: dict):
+        with tempfile.TemporaryDirectory(prefix="d4p-comparison-receipt-") as temporary:
+            path = Path(temporary) / "receipt.json"
+            path.write_text(
+                json.dumps(value, ensure_ascii=False, separators=(",", ":")),
+                encoding="utf-8",
+            )
+            return _load_selection_input(receipt_path=path, catalog=catalog)
+
     errors = validate_comparison_evidence(
-        evidence, schema, receipt=receipt, catalog=catalog
+        evidence, schema, selection_input=selection_input, catalog=catalog
     )
     if evidence.get("baseline_selection") != "all_optional_default_enabled":
         errors.append("all-enabled baselineの選択条件が固定されていない")
@@ -11494,8 +11512,12 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
     none_plan["excluded_optional_module_ids"] = [
         module["module_id"] for module in catalog["optional_modules"]
     ]
+    none_selection_input = selection_input_for_receipt(none_receipt)
     none_evidence = copy.deepcopy(evidence)
     none_evidence["requested_optional_module_ids"] = []
+    none_evidence["selection_input_trust"] = none_selection_input.selection_input_trust
+    none_evidence["source_receipt_sha256"] = none_selection_input.source_receipt_sha256
+    none_evidence["source_manifest_sha256"] = none_selection_input.source_manifest_sha256
     none_evidence["included_module_ids"] = list(none_plan["included_module_ids"])
     none_evidence["excluded_optional_module_ids"] = list(
         none_plan["excluded_optional_module_ids"]
@@ -11527,16 +11549,20 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
         if argument not in {"--features", "module_observability,module_trace_inspector"}
     ]
     if validate_comparison_evidence(
-        none_evidence, schema, receipt=none_receipt, catalog=catalog
+        none_evidence,
+        schema,
+        selection_input=none_selection_input,
+        catalog=catalog,
     ):
         errors.append("任意ModuleなしのRelease build構成を比較証拠として受け入れない")
 
-    leaked_receipt = copy.deepcopy(none_receipt)
-    leaked_receipt["export_manifest"]["module_plan"]["included_module_ids"].append(
-        EXPECTED_OPTIONAL_IDS[0]
-    )
+    leaked_evidence = copy.deepcopy(none_evidence)
+    leaked_evidence["included_module_ids"].append(EXPECTED_OPTIONAL_IDS[0])
     if not validate_comparison_evidence(
-        none_evidence, schema, receipt=leaked_receipt, catalog=catalog
+        leaked_evidence,
+        schema,
+        selection_input=none_selection_input,
+        catalog=catalog,
     ):
         errors.append("任意Moduleなし構成で任意Moduleの包含漏れを拒否しない")
 
@@ -11547,7 +11573,9 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
 
     bad_claim = copy.deepcopy(evidence)
     bad_claim["binary_pruning_verified"] = True
-    if not validate_comparison_evidence(bad_claim, schema, receipt=receipt, catalog=catalog):
+    if not validate_comparison_evidence(
+        bad_claim, schema, selection_input=selection_input, catalog=catalog
+    ):
         errors.append("byte差分だけでbinary pruning完了を主張できる")
 
     bad_define = copy.deepcopy(evidence)
@@ -11556,12 +11584,16 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
         for item in bad_define["selected"]["build_command"]
         if item != "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true"
     ]
-    if not validate_comparison_evidence(bad_define, schema, receipt=receipt, catalog=catalog):
+    if not validate_comparison_evidence(
+        bad_define, schema, selection_input=selection_input, catalog=catalog
+    ):
         errors.append("記録済みModule defineと実build commandの不一致を受け入れた")
 
     bad_summary = copy.deepcopy(evidence)
     bad_summary["comparison"]["total_bytes_reduced"] += 1
-    if not validate_comparison_evidence(bad_summary, schema, receipt=receipt, catalog=catalog):
+    if not validate_comparison_evidence(
+        bad_summary, schema, selection_input=selection_input, catalog=catalog
+    ):
         errors.append("artifact byte数と矛盾する比較結果を受け入れた")
 
     bad_surface_retained = copy.deepcopy(evidence)
@@ -11570,7 +11602,10 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
     )
     bad_surface_retained["selected"]["aot_surface_libraries"].sort()
     if not validate_comparison_evidence(
-        bad_surface_retained, schema, receipt=receipt, catalog=catalog
+        bad_surface_retained,
+        schema,
+        selection_input=selection_input,
+        catalog=catalog,
     ):
         errors.append("選択外Setup Doctor libraryがFlutter AOT reportに残る結果を受け入れた")
 
@@ -11579,7 +11614,10 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
         "apps/desktop_flutter/lib/screens/trace_inspector.dart"
     )
     if not validate_comparison_evidence(
-        bad_surface_missing, schema, receipt=receipt, catalog=catalog
+        bad_surface_missing,
+        schema,
+        selection_input=selection_input,
+        catalog=catalog,
     ):
         errors.append("選択済みTrace Inspector libraryがFlutter AOT reportにない結果を受け入れた")
     return errors

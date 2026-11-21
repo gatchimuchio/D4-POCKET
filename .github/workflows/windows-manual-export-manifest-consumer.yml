@@ -1,0 +1,106 @@
+name: Windows Broker Export Manifest to Pruned Builder
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-export-manifest-consumer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  export-manifest-consumer:
+    runs-on: windows-2025
+    timeout-minutes: 120
+    steps:
+      - name: mainの固定commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: mainとclean状態を検証
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF -ne 'refs/heads/main') {
+            throw "W-E02 Export比較はmainだけで実行する: $env:GITHUB_REF"
+          }
+          $head = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $head -ne $env:GITHUB_SHA) {
+            throw "checkout HEAD ($head) と workflow SHA ($env:GITHUB_SHA) が一致しない"
+          }
+          $remoteMain = (git rev-parse refs/remotes/origin/main).Trim()
+          if ($LASTEXITCODE -ne 0 -or $remoteMain -ne $head) {
+            throw "origin/main ($remoteMain) と checkout HEAD ($head) が一致しない"
+          }
+          $changes = @(git status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0 -or $changes.Count -gt 0) {
+            $changes | Write-Output
+            throw 'W-E02 source tree must be clean'
+          }
+          "source_commit=$head" | Tee-Object -FilePath "$env:RUNNER_TEMP\w-e02-source.txt"
+          "runner=$env:ImageOS/$env:ImageVersion" | Tee-Object -FilePath "$env:RUNNER_TEMP\w-e02-runner.txt" -Append
+
+      - name: RustとFlutter toolchainを固定
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          rustup toolchain install 1.95.0 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup default 1.95.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $rustcVersion = (rustc --version).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $rustcVersion.StartsWith('rustc 1.95.0 ')) {
+            throw "Rust toolchain mismatch: $rustcVersion"
+          }
+          $cargoVersion = (cargo --version).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $cargoVersion.StartsWith('cargo 1.95.0 ')) {
+            throw "Cargo toolchain mismatch: $cargoVersion"
+          }
+          $flutterRoot = Join-Path $env:RUNNER_TEMP 'flutter'
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git $flutterRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $flutterCommit = (git -C $flutterRoot rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $flutterCommit -ne '559ffa3f75e7402d65a8def9c28389a9b2e6fe42') {
+            throw "Flutter checkout mismatch: $flutterCommit"
+          }
+          "$flutterRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          @(
+            "rustc=$rustcVersion"
+            "cargo=$cargoVersion"
+            "flutter_commit=$flutterCommit"
+            "python=$((python --version 2>&1).Trim())"
+          ) | Tee-Object -FilePath "$env:RUNNER_TEMP\w-e02-toolchain.txt" -Append
+
+      - name: Broker生成Manifestを同一Windows Builderへ渡す
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidence = Join-Path $env:RUNNER_TEMP 'd4p-w-e02-evidence'
+          python -X utf8 tooling/tests/windows_broker_export_manifest_compare.py `
+            --source-commit $env:GITHUB_SHA `
+            --evidence-dir $evidence
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: W-E02の機械証拠だけを保存
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: w-e02-windows-broker-export-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/d4p-w-e02-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: source treeのclean状態を再確認
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $changes = @(git status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0 -or $changes.Count -gt 0) {
+            $changes | Write-Output
+            throw 'W-E02 workflow modified the checked-out source tree'
+          }
