@@ -77,6 +77,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _select_folder_in_wayland_gtk_chooser,
     _set_public_text_by_keyboard,
     _set_public_text_by_wayland_keyboard,
+    _secret_service_item_inventory,
     _secret_service_item_labels,
     _secret_service_control_diagnostic,
     _secret_service_startup_diagnostic,
@@ -2127,6 +2128,82 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
         self.assertEqual(requested_properties.count("Label"), 2)
         self.assertNotIn("Secret", requested_properties)
         self.assertNotIn("Attributes", requested_properties)
+
+    def test_secret_service_inventory_reads_all_collection_metadata_only(self) -> None:
+        from types import SimpleNamespace
+
+        service_path = "/org/freedesktop/secrets"
+        collection_path = f"{service_path}/collection/test"
+        key_path = f"{collection_path}/item1"
+        ciphertext_path = f"{collection_path}/item2"
+        properties_read = []
+
+        class FakeProperties:
+            def __init__(self, path: str) -> None:
+                self.path = path
+
+            def Get(self, interface: str, property_name: str):
+                properties_read.append((self.path, interface, property_name))
+                if self.path == service_path and property_name == "Collections":
+                    return [collection_path]
+                if self.path == collection_path and property_name == "Items":
+                    return [key_path, ciphertext_path]
+                if property_name == "Label":
+                    return {
+                        key_path: "D4 Pocket credential key",
+                        ciphertext_path: "D4 Pocket credential ciphertext",
+                    }[self.path]
+                if property_name == "Attributes":
+                    return {
+                        key_path: {
+                            "application": "d4-pocket",
+                            "namespace": "hash-a",
+                            "record": "hash-b",
+                        },
+                        ciphertext_path: {
+                            "application": "other",
+                            "namespace": "hash-c",
+                            "record": "hash-d",
+                        },
+                    }[self.path]
+                raise AssertionError("想定外のSecret Service property要求です")
+
+            def GetSecret(self, *_args):
+                raise AssertionError("Secret Serviceからの秘密取得は禁止です")
+
+        class FakeBus:
+            def get_object(self, _service: str, path: str):
+                return path
+
+        fake_dbus = SimpleNamespace(
+            SessionBus=FakeBus,
+            Interface=lambda proxy, _interface: FakeProperties(proxy),
+            exceptions=SimpleNamespace(DBusException=type("DBusException", (Exception,), {})),
+        )
+        with patch.dict("sys.modules", {"dbus": fake_dbus}):
+            inventory = _secret_service_item_inventory()
+
+        self.assertEqual(len(inventory), 1)
+        self.assertEqual(inventory[0]["item_count"], 2)
+        self.assertEqual(
+            inventory[0]["items"],
+            [
+                {
+                    "label": "D4 Pocket credential ciphertext",
+                    "application_matches": False,
+                    "namespace_present": True,
+                    "record_present": True,
+                },
+                {
+                    "label": "D4 Pocket credential key",
+                    "application_matches": True,
+                    "namespace_present": True,
+                    "record_present": True,
+                },
+            ],
+        )
+        self.assertTrue(any(name == "Attributes" for _, _, name in properties_read))
+        self.assertFalse(any(name == "Secret" for _, _, name in properties_read))
 
     def test_secret_service_dbus_error_is_sanitized(self) -> None:
         from types import SimpleNamespace

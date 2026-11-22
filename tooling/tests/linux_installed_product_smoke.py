@@ -1861,10 +1861,16 @@ def _register_linux_provider_credential_in_installed_dialog(
         label_counts = {
             label: observed_labels.count(label) for label in sorted(set(observed_labels))
         }
+        try:
+            collection_inventory: object = _secret_service_item_inventory()
+        except Exception as error:
+            collection_inventory = {"inspection_error": type(error).__name__}
         raise RuntimeError(
             "installed Provider登録後のSecret Service項目数／labelが不正です: "
             f"expected_count={len(expected_labels)}, observed_count={len(observed_labels)}, "
-            f"label_counts={json.dumps(label_counts, ensure_ascii=True, sort_keys=True)}"
+            f"label_counts={json.dumps(label_counts, ensure_ascii=True, sort_keys=True)}, "
+            "all_collection_inventory="
+            f"{json.dumps(collection_inventory, ensure_ascii=True, sort_keys=True)}"
         )
     success = "登録receiptと一覧metadataを確認しました。秘密値は画面へ取得していません。"
     _find_accessible(success, root=registration_dialog, timeout=30)
@@ -1922,6 +1928,82 @@ def _secret_service_item_labels() -> list[str]:
         return labels
     except dbus.exceptions.DBusException:
         raise RuntimeError("秘密保管サービスのメタデータ検索に失敗しました") from None
+
+
+def _secret_service_item_inventory() -> list[dict[str, object]]:
+    """Return secret-free metadata from every isolated collection."""
+    try:
+        import dbus
+    except ImportError as error:
+        raise RuntimeError(
+            "秘密保管サービスのメタデータ検査にはpython3-dbusが必要です"
+        ) from error
+
+    try:
+        bus = dbus.SessionBus()
+        service_object = bus.get_object(
+            "org.freedesktop.secrets", "/org/freedesktop/secrets"
+        )
+        service_properties = dbus.Interface(
+            service_object, "org.freedesktop.DBus.Properties"
+        )
+        collection_paths = service_properties.Get(
+            "org.freedesktop.Secret.Service", "Collections"
+        )
+        inventory: list[dict[str, object]] = []
+        for collection_index, collection_path in enumerate(collection_paths):
+            collection_object = bus.get_object(
+                "org.freedesktop.secrets", str(collection_path)
+            )
+            collection_properties = dbus.Interface(
+                collection_object, "org.freedesktop.DBus.Properties"
+            )
+            item_paths = collection_properties.Get(
+                "org.freedesktop.Secret.Collection", "Items"
+            )
+            items: list[dict[str, object]] = []
+            for item_path in item_paths:
+                item_object = bus.get_object(
+                    "org.freedesktop.secrets", str(item_path)
+                )
+                item_properties = dbus.Interface(
+                    item_object, "org.freedesktop.DBus.Properties"
+                )
+                label = item_properties.Get(
+                    "org.freedesktop.Secret.Item", "Label"
+                )
+                attributes = item_properties.Get(
+                    "org.freedesktop.Secret.Item", "Attributes"
+                )
+                if (
+                    not isinstance(label, str)
+                    or not label
+                    or len(label) > 256
+                    or any(ord(character) < 0x20 for character in label)
+                    or not hasattr(attributes, "get")
+                ):
+                    raise RuntimeError("秘密保管サービス項目のmetadataが不正です")
+                items.append(
+                    {
+                        "label": label,
+                        "application_matches": str(
+                            attributes.get("application", "")
+                        )
+                        == "d4-pocket",
+                        "namespace_present": "namespace" in attributes,
+                        "record_present": "record" in attributes,
+                    }
+                )
+            inventory.append(
+                {
+                    "collection_index": collection_index,
+                    "item_count": len(items),
+                    "items": sorted(items, key=lambda item: str(item["label"])),
+                }
+            )
+        return inventory
+    except dbus.exceptions.DBusException:
+        raise RuntimeError("秘密保管サービスのcollection検査に失敗しました") from None
 
 
 def _secret_service_startup_diagnostic(
