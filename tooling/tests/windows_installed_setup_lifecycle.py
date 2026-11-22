@@ -120,23 +120,29 @@ def _assert_run_root(run_root: Path, runner_temp: Path) -> Path:
     return candidate.resolve(strict=True)
 
 
-def _cargo_test(command_name: str, test_filter: str, env: dict[str, str]) -> str:
-    output = _run(
-        [
-            "cargo",
-            "test",
-            "--locked",
-            "--manifest-path",
-            "native/rust_helper/Cargo.toml",
-            "--lib",
-            "--",
-            "--ignored",
-            "--exact",
-            test_filter,
-            "--test-threads=1",
-        ],
-        env=env,
-    )
+def _cargo_test(
+    command_name: str,
+    test_filter: str,
+    env: dict[str, str],
+    *,
+    show_test_output: bool = False,
+) -> str:
+    command = [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "native/rust_helper/Cargo.toml",
+        "--lib",
+        "--",
+        "--ignored",
+        "--exact",
+        test_filter,
+        "--test-threads=1",
+    ]
+    if show_test_output:
+        command.append("--nocapture")
+    output = _run(command, env=env)
     if not re.search(r"test result: ok\. 1 passed; 0 failed;", output):
         raise RuntimeError(f"{command_name} did not report exactly one passing test")
     return output
@@ -539,7 +545,12 @@ def run(source_commit: str, evidence_dir: Path, run_root: Path) -> dict[str, Any
                 "D4P_WINDOWS_ACCEPTANCE_UPDATE_PACKAGE": str(update_package_path),
             }
         )
-        seed_output = _cargo_test("Windows installed package seed", SEED_TEST, compile_env)
+        seed_output = _cargo_test(
+            "Windows installed package seed",
+            SEED_TEST,
+            compile_env,
+            show_test_output=True,
+        )
         seed_match = re.search(
             r"W-E04_WINDOWS_SEED app_id=(\S+) audit_store_id=(\S+) initial_version=(\S+) update_version=(\S+) initial_package_sha256=([0-9a-f]{64}) update_package_sha256=([0-9a-f]{64}) candidates_signature_verified=true package_cache_verified=true installed_root_absent=true",
             seed_output,

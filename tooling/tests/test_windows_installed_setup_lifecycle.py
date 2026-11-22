@@ -3,11 +3,13 @@ from __future__ import annotations
 import copy
 import unittest
 from typing import Any
+from unittest.mock import patch
 
 from tooling.tests.windows_installed_setup_lifecycle import (
     _EXPECTED_OWNER_DECISIONS,
     _REQUIRED_LIFECYCLE_FLAGS,
     _assert_lifecycle_evidence,
+    _cargo_test,
 )
 
 
@@ -112,6 +114,25 @@ class WindowsInstalledSetupEvidenceTests(unittest.TestCase):
         evidence["cleanup_errors"] = ["owned_process_cleanup_error"]
         with self.assertRaisesRegex(ValueError, "cleanup errors"):
             self.assert_valid(evidence)
+
+    def test_cargo_test_exposes_success_output_only_when_requested(self) -> None:
+        cargo_output = "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;\nW-E04_WINDOWS_SEED"
+        with patch(
+            "tooling.tests.windows_installed_setup_lifecycle._run",
+            return_value=cargo_output,
+        ) as run:
+            result = _cargo_test("seed", "seed_test", {})
+        self.assertEqual(result, cargo_output)
+        default_command = run.call_args.args[0]
+        self.assertNotIn("--nocapture", default_command)
+
+        with patch(
+            "tooling.tests.windows_installed_setup_lifecycle._run",
+            return_value=cargo_output,
+        ) as run:
+            _cargo_test("seed", "seed_test", {}, show_test_output=True)
+        visible_command = run.call_args.args[0]
+        self.assertEqual(visible_command[-1], "--nocapture")
 
 
 if __name__ == "__main__":
