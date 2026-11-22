@@ -1852,6 +1852,14 @@ def _register_linux_provider_credential_in_installed_dialog(
         target_server_id="openai_codex_cli",
         operation="登録",
     )
+    registration_status = _wait_for_provider_credential_registration_result(
+        registration_dialog, timeout=30
+    )
+    if registration_status != "registered":
+        raise RuntimeError(
+            "Provider登録処理が成功receiptへ到達しませんでした: "
+            f"outcome={registration_status}"
+        )
     observed_labels = sorted(_secret_service_item_labels())
     expected_labels = [
         "D4 Pocket credential ciphertext",
@@ -1872,8 +1880,6 @@ def _register_linux_provider_credential_in_installed_dialog(
             "all_collection_inventory="
             f"{json.dumps(collection_inventory, ensure_ascii=True, sort_keys=True)}"
         )
-    success = "登録receiptと一覧metadataを確認しました。秘密値は画面へ取得していません。"
-    _find_accessible(success, root=registration_dialog, timeout=30)
     snapshot = _accessible_snapshot(registration_dialog)
     if secret in snapshot or "資格情報ID" not in snapshot:
         raise RuntimeError("Provider登録後のAgent Center投影がID参照限定ではありません")
@@ -1883,6 +1889,33 @@ def _register_linux_provider_credential_in_installed_dialog(
     if len(credential_ids) != 1:
         raise RuntimeError("Provider登録後に選択済みCredential IDを一意に確認できません")
     return credential_ids.pop()
+
+
+def _wait_for_provider_credential_registration_result(
+    root, *, timeout: float = 30.0
+) -> str:
+    outcomes = (
+        (
+            "registered",
+            "登録receiptと一覧metadataを確認しました。秘密値は画面へ取得していません。",
+        ),
+        (
+            "missing_id",
+            "登録receipt後の一覧に対象IDがありません。選択を停止しました。",
+        ),
+        (
+            "uncertain",
+            "登録結果を確認できません。metadataを再取得します。自動再送しません。",
+        ),
+    )
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for _, accessible_name in _accessible_nodes(root, deadline=deadline):
+            for status, marker in outcomes:
+                if marker in accessible_name:
+                    return status
+        time.sleep(0.15)
+    raise RuntimeError("Provider資格情報の登録結果UIが時間内に確定しませんでした")
 
 
 def _secret_service_item_labels() -> list[str]:

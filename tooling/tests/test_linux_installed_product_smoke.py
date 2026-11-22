@@ -64,6 +64,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _resolve_regular_package,
     _read_task_scratch_recovery_state,
     _register_linux_provider_credential_in_installed_dialog,
+    _wait_for_provider_credential_registration_result,
     _installed_task_write_failure_diagnostics,
     _installed_task_history_diagnostics,
     _installed_task_response_fixture_diagnostics,
@@ -1682,6 +1683,10 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
                 "tooling.tests.linux_installed_product_smoke._enter_credential_and_answer_owner"
             ) as enter_secret,
             patch(
+                "tooling.tests.linux_installed_product_smoke._wait_for_provider_credential_registration_result",
+                return_value="registered",
+            ) as wait_registration,
+            patch(
                 "tooling.tests.linux_installed_product_smoke._secret_service_item_labels",
                 return_value=[
                     "D4 Pocket credential key",
@@ -1720,6 +1725,53 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
             target_server_id="openai_codex_cli",
             operation="登録",
         )
+        wait_registration.assert_called_once_with(registration_dialog, timeout=30)
+
+    def test_provider_registration_waiter_recognizes_terminal_ui_states(self) -> None:
+        states = {
+            "registered": "登録receiptと一覧metadataを確認しました。秘密値は画面へ取得していません。",
+            "missing_id": "登録receipt後の一覧に対象IDがありません。選択を停止しました。",
+            "uncertain": "登録結果を確認できません。metadataを再取得します。自動再送しません。",
+        }
+        for expected, accessible_name in states.items():
+            with self.subTest(expected=expected), patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_nodes",
+                return_value=[(object(), accessible_name)],
+            ), patch("tooling.tests.linux_installed_product_smoke.time.monotonic", return_value=0):
+                self.assertEqual(
+                    _wait_for_provider_credential_registration_result(
+                        object(), timeout=1
+                    ),
+                    expected,
+                )
+
+    def test_provider_registration_does_not_inspect_secret_service_before_success(self) -> None:
+        secret = "synthetic-provider-key-never-operational"
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=[object(), object()],
+            ),
+            patch("tooling.tests.linux_installed_product_smoke._activate_accessible"),
+            patch("tooling.tests.linux_installed_product_smoke._find_accessible"),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._enter_credential_and_answer_owner"
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._wait_for_provider_credential_registration_result",
+                return_value="uncertain",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._secret_service_item_labels"
+            ) as read_secret_service,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "成功receipt") as caught:
+                _register_linux_provider_credential_in_installed_dialog(
+                    {"D4P_TEST": "isolated"}, object(), secret
+                )
+
+        read_secret_service.assert_not_called()
+        self.assertNotIn(secret, str(caught.exception))
 
     def test_provider_registration_rejects_secret_in_ui_snapshot_without_echoing_it(self) -> None:
         secret = "synthetic-provider-key-never-operational"
@@ -1733,6 +1785,10 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
             patch("tooling.tests.linux_installed_product_smoke._find_accessible"),
             patch(
                 "tooling.tests.linux_installed_product_smoke._enter_credential_and_answer_owner"
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._wait_for_provider_credential_registration_result",
+                return_value="registered",
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._secret_service_item_labels",
