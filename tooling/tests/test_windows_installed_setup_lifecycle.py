@@ -143,6 +143,17 @@ class WindowsInstalledSetupEvidenceTests(unittest.TestCase):
             with self.subTest(caption=caption):
                 self.assertIn(caption, SETUP_LIFECYCLE_SCRIPT)
 
+    def test_setup_wizard_checks_all_process_windows_and_reports_bounded_controls(self) -> None:
+        setup_window_probe = SETUP_LIFECYCLE_SCRIPT.split(
+            "function Get-SetupWindowCandidates {", maxsplit=1
+        )[1].split("\nfunction Get-AuditSummary", maxsplit=1)[0]
+        self.assertIn("RootElement.FindAll", setup_window_probe)
+        self.assertIn("MainWindowHandle", setup_window_probe)
+        self.assertNotIn("RootElement.FindFirst", setup_window_probe)
+        self.assertIn("setup_ui_diagnostic", setup_window_probe)
+        self.assertIn("buttons=", setup_window_probe)
+        self.assertIn("Select-Object -First 16", setup_window_probe)
+
 
 if __name__ == "__main__":
     unittest.main()

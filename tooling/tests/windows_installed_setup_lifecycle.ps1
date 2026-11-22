@@ -449,30 +449,106 @@ function Invoke-CandidateAction {
   Start-Sleep -Milliseconds 500
 }
 
+function Get-SetupWindowCandidates {
+  param([int]$SetupProcessId)
+  $candidates = [System.Collections.Generic.List[object]]::new()
+  $seenHandles = [System.Collections.Generic.HashSet[int]]::new()
+
+  try {
+    $process = Get-Process -Id $SetupProcessId -ErrorAction Stop
+    $mainHandle = [int]$process.MainWindowHandle
+    if ($mainHandle -ne 0) {
+      $mainWindow = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$mainHandle)
+      $nativeHandle = [int]$mainWindow.Current.NativeWindowHandle
+      if ($nativeHandle -eq 0) { $nativeHandle = $mainHandle }
+      if ($seenHandles.Add($nativeHandle)) { $candidates.Add($mainWindow) }
+    }
+  } catch {
+    # The process main window may not be published before the Setup wizard appears.
+  }
+
+  try {
+    $condition = [System.Windows.Automation.PropertyCondition]::new(
+      [System.Windows.Automation.AutomationElement]::ProcessIdProperty, $SetupProcessId
+    )
+    $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+      [System.Windows.Automation.TreeScope]::Children, $condition
+    )
+    foreach ($window in $windows) {
+      $nativeHandle = 0
+      try { $nativeHandle = [int]$window.Current.NativeWindowHandle } catch {}
+      if ($nativeHandle -eq 0 -or $seenHandles.Add($nativeHandle)) { $candidates.Add($window) }
+    }
+  } catch {
+    # Keep any process MainWindowHandle candidate and collect it in the timeout diagnostic.
+  }
+
+  return $candidates.ToArray()
+}
+
+function Get-SetupActionDiagnostic {
+  param([int]$SetupProcessId, [object[]]$Windows)
+  $details = [System.Collections.Generic.List[string]]::new()
+  $process = Get-Process -Id $SetupProcessId -ErrorAction SilentlyContinue
+  if ($null -eq $process) {
+    $details.Add('process=exited')
+  } else {
+    $title = ([string]$process.MainWindowTitle -replace '[\r\n\t]+', ' ')
+    if ($title.Length -gt 120) { $title = $title.Substring(0, 120) }
+    $details.Add("process=alive main_window_handle=$([int]$process.MainWindowHandle) main_window_title='$title'")
+  }
+
+  $index = 0
+  foreach ($window in @($Windows | Select-Object -First 8)) {
+    $windowName = (Get-Name $window) -replace '[\r\n\t]+', ' '
+    if ($windowName.Length -gt 120) { $windowName = $windowName.Substring(0, 120) }
+    $windowClass = ''
+    $windowHandle = 0
+    try { $windowClass = [string]$window.Current.ClassName } catch {}
+    try { $windowHandle = [int]$window.Current.NativeWindowHandle } catch {}
+    $buttons = @(
+      Get-UiDescendants -Root $window -Limit 1024 |
+        Where-Object { (Get-ControlTypeName $_) -eq 'ControlType.Button' } |
+        ForEach-Object {
+          $buttonName = (Get-Name $_) -replace '[\r\n\t]+', ' '
+          if ($buttonName.Length -gt 96) { $buttonName = $buttonName.Substring(0, 96) }
+          if (-not [string]::IsNullOrWhiteSpace($buttonName)) {
+            $enabled = $false
+            try { $enabled = [bool]$_.Current.IsEnabled } catch {}
+            "$buttonName|enabled=$enabled"
+          }
+        } | Select-Object -First 16
+    )
+    $buttonSummary = if ($buttons.Count -eq 0) { '<none>' } else { [string]::Join(',', [string[]]$buttons) }
+    $details.Add("window[$index] name='$windowName' class='$windowClass' hwnd=$windowHandle buttons=[$buttonSummary]")
+    $index += 1
+  }
+
+  $diagnostic = [string]::Join('; ', $details.ToArray())
+  if ($diagnostic.Length -gt 2400) { $diagnostic = $diagnostic.Substring(0, 2400) }
+  return $diagnostic
+}
+
 function Wait-SetupAction {
   param([int]$SetupProcessId, [string[]]$Names, [int]$TimeoutSeconds = 60)
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  $windows = @()
   while ((Get-Date) -lt $deadline) {
-    $window = $null
-    try {
-      $window = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
-        [System.Windows.Automation.TreeScope]::Children,
-        [System.Windows.Automation.PropertyCondition]::new(
-          [System.Windows.Automation.AutomationElement]::ProcessIdProperty, $SetupProcessId
-        )
-      )
-    } catch {}
-    if ($null -ne $window) {
+    $windows = @(Get-SetupWindowCandidates -SetupProcessId $SetupProcessId)
+    foreach ($window in $windows) {
       foreach ($item in @(Get-UiDescendants -Root $window)) {
+        $enabled = $false
+        try { $enabled = [bool]$item.Current.IsEnabled } catch {}
         if ($Names -contains (Get-Name $item) -and
-            (Get-ControlTypeName $item) -eq 'ControlType.Button' -and $item.Current.IsEnabled) {
+            (Get-ControlTypeName $item) -eq 'ControlType.Button' -and $enabled) {
           return [pscustomobject]@{ Window = $window; Button = $item; Name = (Get-Name $item) }
         }
       }
     }
     Start-Sleep -Milliseconds 300
   }
-  throw 'Inno Setup wizard did not expose the expected enabled navigation action.'
+  $diagnostic = Get-SetupActionDiagnostic -SetupProcessId $SetupProcessId -Windows $windows
+  throw "Inno Setup wizard did not expose the expected enabled navigation action; setup_ui_diagnostic=$diagnostic"
 }
 
 function Get-AuditSummary {
