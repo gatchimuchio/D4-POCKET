@@ -1852,11 +1852,20 @@ def _register_linux_provider_credential_in_installed_dialog(
         target_server_id="openai_codex_cli",
         operation="登録",
     )
-    if sorted(_secret_service_item_labels()) != [
+    observed_labels = sorted(_secret_service_item_labels())
+    expected_labels = [
         "D4 Pocket credential ciphertext",
         "D4 Pocket credential key",
-    ]:
-        raise RuntimeError("installed Provider登録後のSecret Service key／ciphertext itemが不正です")
+    ]
+    if observed_labels != expected_labels:
+        label_counts = {
+            label: observed_labels.count(label) for label in sorted(set(observed_labels))
+        }
+        raise RuntimeError(
+            "installed Provider登録後のSecret Service項目数／labelが不正です: "
+            f"expected_count={len(expected_labels)}, observed_count={len(observed_labels)}, "
+            f"label_counts={json.dumps(label_counts, ensure_ascii=True, sort_keys=True)}"
+        )
     success = "登録receiptと一覧metadataを確認しました。秘密値は画面へ取得していません。"
     _find_accessible(success, root=registration_dialog, timeout=30)
     snapshot = _accessible_snapshot(registration_dialog)
@@ -10581,6 +10590,17 @@ def run_installed_smoke(
                     environment,
                     private_key_path,
                 )
+                preexisting_labels = sorted(_secret_service_item_labels())
+                if preexisting_labels:
+                    label_counts = {
+                        label: preexisting_labels.count(label)
+                        for label in sorted(set(preexisting_labels))
+                    }
+                    raise RuntimeError(
+                        "installed Provider受入れ開始前の隔離Secret Serviceが空ではありません: "
+                        f"item_count={len(preexisting_labels)}, "
+                        f"label_counts={json.dumps(label_counts, ensure_ascii=True, sort_keys=True)}"
+                    )
         elif acceptance_scope in {
             "mcp_tool_execution",
             "host_registration",
