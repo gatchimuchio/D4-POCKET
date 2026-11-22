@@ -481,9 +481,11 @@ def run(source_commit: str, evidence_dir: Path, run_root: Path) -> dict[str, Any
         capture_dir = run_root / "broker-export-capture"
         capture_dir.mkdir()
         receipt_path = capture_dir / captured_receipt_path.name
-        manifest_path = capture_dir / captured_manifest_path.name
+        manifest_path = capture_dir / export_summary["manifest_file_name"]
         shutil.copy2(captured_receipt_path, receipt_path)
         shutil.copy2(captured_manifest_path, manifest_path)
+        if _sha256(manifest_path.read_bytes()) != export_summary["manifest_sha256"]:
+            raise ValueError("copied Broker Manifest differs from the validated capture")
         resolved_capture_temp = capture_temp_dir.resolve(strict=True)
         if resolved_capture_temp.parent != capture_temp_root:
             raise RuntimeError("refusing to remove Owner capture outside the Windows temp root")
