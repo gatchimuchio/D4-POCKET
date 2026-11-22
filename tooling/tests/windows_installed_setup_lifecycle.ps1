@@ -38,6 +38,11 @@ $stage = 'validate scoped Windows runner paths'
 $failure = $null
 $result = 'failed'
 $setupProcess = $null
+$script:setupChildProcessId = $null
+$script:setupChildProcessImagePath = $null
+$script:setupChildProcessSessionId = $null
+$script:setupChildProcessStartTimeUtcTicks = $null
+$script:setupChildDiscoveryStatus = 'not_started'
 $testIdentityCleanup = $false
 $setupTempCleanup = $false
 $script:startMenuFolderExistedBeforeTest = $false
@@ -449,57 +454,187 @@ function Invoke-CandidateAction {
   Start-Sleep -Milliseconds 500
 }
 
+function Get-ValidatedSetupChildProcesses {
+  param([int]$SetupProcessId)
+  $validated = [System.Collections.Generic.List[object]]::new()
+  $observed = [System.Collections.Generic.List[string]]::new()
+  $parentProcess = Get-Process -Id $SetupProcessId -ErrorAction SilentlyContinue
+  if ($null -eq $parentProcess) {
+    $script:setupChildDiscoveryStatus = 'loader_exited'
+    return @()
+  }
+
+  $expectedImageName = [IO.Path]::ChangeExtension(
+    [IO.Path]::GetFileName($script:setupResolved), '.tmp'
+  )
+  $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([char[]]@('\', '/'))
+  try {
+    $directChildren = @(
+      Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $SetupProcessId" -ErrorAction Stop
+    )
+  } catch {
+    $script:setupChildDiscoveryStatus = 'direct_child_query_failed'
+    return @()
+  }
+
+  foreach ($childInfo in $directChildren) {
+    $imageName = [string]$childInfo.Name
+    $reason = 'rejected_name'
+    if ([int]$childInfo.ParentProcessId -eq $SetupProcessId -and
+        [string]::Equals($imageName, $expectedImageName, [StringComparison]::OrdinalIgnoreCase)) {
+      $reason = 'rejected_image_path'
+      if (-not [string]::IsNullOrWhiteSpace([string]$childInfo.ExecutablePath)) {
+        try {
+          $imagePath = [IO.Path]::GetFullPath([string]$childInfo.ExecutablePath)
+          $childDirectory = [IO.Path]::GetDirectoryName($imagePath)
+          $imageParentOfTempSubdirectory = [IO.Path]::GetDirectoryName($childDirectory)
+          $tempSubdirectoryParent = if ($imageParentOfTempSubdirectory) {
+            [IO.Path]::GetFullPath($imageParentOfTempSubdirectory).TrimEnd([char[]]@('\', '/'))
+          } else { '' }
+          if ([string]::Equals([IO.Path]::GetFileName($imagePath), $expectedImageName, [StringComparison]::OrdinalIgnoreCase) -and
+              [string]::Equals($tempSubdirectoryParent, $tempRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            $reason = 'rejected_process_identity'
+            $childProcess = Get-Process -Id ([int]$childInfo.ProcessId) -ErrorAction SilentlyContinue
+            if ($null -ne $childProcess -and $childProcess.SessionId -eq $parentProcess.SessionId) {
+              $reason = 'validated'
+              $validated.Add([pscustomobject]@{
+                ProcessId = [int]$childProcess.Id
+                ProcessName = [string]$childInfo.Name
+                ImagePath = $imagePath
+                SessionId = [int]$childProcess.SessionId
+                StartTimeUtcTicks = [long]$childProcess.StartTime.ToUniversalTime().Ticks
+                MainWindowHandle = [int]$childProcess.MainWindowHandle
+                MainWindowTitle = [string]$childProcess.MainWindowTitle
+              })
+            }
+          }
+        } catch {
+          $reason = 'rejected_process_identity'
+        }
+      } else {
+        $reason = 'image_path_unavailable'
+      }
+    }
+    $observedName = if ([string]::IsNullOrWhiteSpace($imageName)) { '<unknown>' } else { $imageName }
+    if ($observedName.Length -gt 96) { $observedName = $observedName.Substring(0, 96) }
+    $observed.Add("$observedName=$reason")
+  }
+
+  $summary = "direct_children=$($directChildren.Count);validated=$($validated.Count)"
+  if ($observed.Count -gt 0) {
+    $summary += ';observed=' + [string]::Join(',', [string[]]@($observed | Select-Object -First 4))
+  }
+  if ($summary.Length -gt 500) { $summary = $summary.Substring(0, 500) }
+  $script:setupChildDiscoveryStatus = $summary
+
+  if ($validated.Count -ne 1) { return @() }
+  if ($script:setupChildProcessId -and $script:setupChildProcessId -ne $validated[0].ProcessId) {
+    $script:setupChildDiscoveryStatus += ';child_pid_changed'
+    return @()
+  }
+  $script:setupChildProcessId = [int]$validated[0].ProcessId
+  $script:setupChildProcessImagePath = [string]$validated[0].ImagePath
+  $script:setupChildProcessSessionId = [int]$validated[0].SessionId
+  $script:setupChildProcessStartTimeUtcTicks = [long]$validated[0].StartTimeUtcTicks
+  return $validated.ToArray()
+}
+
+function Get-SetupProcessCandidates {
+  param([int]$SetupProcessId)
+  $candidates = [System.Collections.Generic.List[object]]::new()
+  $loader = Get-Process -Id $SetupProcessId -ErrorAction SilentlyContinue
+  if ($null -ne $loader) {
+    $candidates.Add([pscustomobject]@{
+      ProcessId = [int]$loader.Id
+      Role = 'setup_loader'
+      ImageName = [IO.Path]::GetFileName($script:setupResolved)
+      ImagePath = $script:setupResolved
+      SessionId = [int]$loader.SessionId
+    })
+  }
+  foreach ($child in @(Get-ValidatedSetupChildProcesses -SetupProcessId $SetupProcessId)) {
+    $candidates.Add([pscustomobject]@{
+      ProcessId = [int]$child.ProcessId
+      Role = 'validated_setup_child'
+      ImageName = [IO.Path]::GetFileName($child.ImagePath)
+      ImagePath = $child.ImagePath
+      SessionId = [int]$child.SessionId
+    })
+  }
+  return $candidates.ToArray()
+}
+
 function Get-SetupWindowCandidates {
   param([int]$SetupProcessId)
   $candidates = [System.Collections.Generic.List[object]]::new()
   $seenHandles = [System.Collections.Generic.HashSet[int]]::new()
-
-  try {
-    $process = Get-Process -Id $SetupProcessId -ErrorAction Stop
+  foreach ($processCandidate in @(Get-SetupProcessCandidates -SetupProcessId $SetupProcessId)) {
+    $process = Get-Process -Id $processCandidate.ProcessId -ErrorAction SilentlyContinue
+    if ($null -eq $process) { continue }
     $mainHandle = [int]$process.MainWindowHandle
     if ($mainHandle -ne 0) {
-      $mainWindow = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$mainHandle)
-      $nativeHandle = [int]$mainWindow.Current.NativeWindowHandle
-      if ($nativeHandle -eq 0) { $nativeHandle = $mainHandle }
-      if ($seenHandles.Add($nativeHandle)) { $candidates.Add($mainWindow) }
+      try {
+        $mainWindow = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$mainHandle)
+        $nativeHandle = [int]$mainWindow.Current.NativeWindowHandle
+        if ($nativeHandle -eq 0) { $nativeHandle = $mainHandle }
+        if ($seenHandles.Add($nativeHandle)) {
+          $candidates.Add([pscustomobject]@{
+            ProcessId = [int]$processCandidate.ProcessId
+            Role = [string]$processCandidate.Role
+            Window = $mainWindow
+          })
+        }
+      } catch {
+        # The process main window may not be published before the Setup wizard appears.
+      }
     }
-  } catch {
-    # The process main window may not be published before the Setup wizard appears.
-  }
 
-  try {
-    $condition = [System.Windows.Automation.PropertyCondition]::new(
-      [System.Windows.Automation.AutomationElement]::ProcessIdProperty, $SetupProcessId
-    )
-    $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
-      [System.Windows.Automation.TreeScope]::Children, $condition
-    )
-    foreach ($window in $windows) {
-      $nativeHandle = 0
-      try { $nativeHandle = [int]$window.Current.NativeWindowHandle } catch {}
-      if ($nativeHandle -eq 0 -or $seenHandles.Add($nativeHandle)) { $candidates.Add($window) }
+    try {
+      $condition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::ProcessIdProperty, [int]$processCandidate.ProcessId
+      )
+      $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+        [System.Windows.Automation.TreeScope]::Children, $condition
+      )
+      foreach ($window in $windows) {
+        $nativeHandle = 0
+        try { $nativeHandle = [int]$window.Current.NativeWindowHandle } catch {}
+        if ($nativeHandle -eq 0 -or $seenHandles.Add($nativeHandle)) {
+          $candidates.Add([pscustomobject]@{
+            ProcessId = [int]$processCandidate.ProcessId
+            Role = [string]$processCandidate.Role
+            Window = $window
+          })
+        }
+      }
+    } catch {
+      # Keep any process MainWindowHandle candidate and collect it in the timeout diagnostic.
     }
-  } catch {
-    # Keep any process MainWindowHandle candidate and collect it in the timeout diagnostic.
   }
-
   return $candidates.ToArray()
 }
 
 function Get-SetupActionDiagnostic {
   param([int]$SetupProcessId, [object[]]$Windows)
   $details = [System.Collections.Generic.List[string]]::new()
-  $process = Get-Process -Id $SetupProcessId -ErrorAction SilentlyContinue
-  if ($null -eq $process) {
-    $details.Add('process=exited')
-  } else {
+  $processCandidates = @(Get-SetupProcessCandidates -SetupProcessId $SetupProcessId)
+  if ($processCandidates.Count -eq 0) {
+    $details.Add('setup_loader=exited')
+  }
+  foreach ($candidate in $processCandidates) {
+    $process = Get-Process -Id $candidate.ProcessId -ErrorAction SilentlyContinue
+    if ($null -eq $process) { continue }
     $title = ([string]$process.MainWindowTitle -replace '[\r\n\t]+', ' ')
     if ($title.Length -gt 120) { $title = $title.Substring(0, 120) }
-    $details.Add("process=alive main_window_handle=$([int]$process.MainWindowHandle) main_window_title='$title'")
+    $imageName = [string]$candidate.ImageName
+    if ($imageName.Length -gt 96) { $imageName = $imageName.Substring(0, 96) }
+    $details.Add("process role=$($candidate.Role) pid=$($candidate.ProcessId) session=$($candidate.SessionId) image='$imageName' main_window_handle=$([int]$process.MainWindowHandle) main_window_title='$title'")
   }
+  $details.Add("child_discovery=$script:setupChildDiscoveryStatus")
 
   $index = 0
-  foreach ($window in @($Windows | Select-Object -First 8)) {
+  foreach ($windowCandidate in @($Windows | Select-Object -First 8)) {
+    $window = $windowCandidate.Window
     $windowName = (Get-Name $window) -replace '[\r\n\t]+', ' '
     if ($windowName.Length -gt 120) { $windowName = $windowName.Substring(0, 120) }
     $windowClass = ''
@@ -520,12 +655,12 @@ function Get-SetupActionDiagnostic {
         } | Select-Object -First 16
     )
     $buttonSummary = if ($buttons.Count -eq 0) { '<none>' } else { [string]::Join(',', [string[]]$buttons) }
-    $details.Add("window[$index] name='$windowName' class='$windowClass' hwnd=$windowHandle buttons=[$buttonSummary]")
+    $details.Add("window[$index] role=$($windowCandidate.Role) pid=$($windowCandidate.ProcessId) name='$windowName' class='$windowClass' hwnd=$windowHandle buttons=[$buttonSummary]")
     $index += 1
   }
 
   $diagnostic = [string]::Join('; ', $details.ToArray())
-  if ($diagnostic.Length -gt 2400) { $diagnostic = $diagnostic.Substring(0, 2400) }
+  if ($diagnostic.Length -gt 3000) { $diagnostic = $diagnostic.Substring(0, 3000) }
   return $diagnostic
 }
 
@@ -535,13 +670,20 @@ function Wait-SetupAction {
   $windows = @()
   while ((Get-Date) -lt $deadline) {
     $windows = @(Get-SetupWindowCandidates -SetupProcessId $SetupProcessId)
-    foreach ($window in $windows) {
+    foreach ($windowCandidate in $windows) {
+      $window = $windowCandidate.Window
       foreach ($item in @(Get-UiDescendants -Root $window)) {
         $enabled = $false
         try { $enabled = [bool]$item.Current.IsEnabled } catch {}
         if ($Names -contains (Get-Name $item) -and
             (Get-ControlTypeName $item) -eq 'ControlType.Button' -and $enabled) {
-          return [pscustomobject]@{ Window = $window; Button = $item; Name = (Get-Name $item) }
+          return [pscustomobject]@{
+            Window = $window
+            Button = $item
+            Name = (Get-Name $item)
+            ProcessId = [int]$windowCandidate.ProcessId
+            ProcessRole = [string]$windowCandidate.Role
+          }
         }
       }
     }
@@ -903,6 +1045,54 @@ try {
   $evidence.failure_message = $_.Exception.Message
 } finally {
   $cleanupErrors = [System.Collections.Generic.List[string]]::new()
+  try {
+    if ($script:setupChildProcessId) {
+      $childProcess = Get-Process -Id $script:setupChildProcessId -ErrorAction SilentlyContinue
+      if ($null -ne $childProcess) {
+        $childImagePath = ''
+        $childStartTimeUtcTicks = 0L
+        try { $childImagePath = [IO.Path]::GetFullPath([string]$childProcess.Path) } catch {}
+        try { $childStartTimeUtcTicks = [long]$childProcess.StartTime.ToUniversalTime().Ticks } catch {}
+        $sameChild = [string]::Equals(
+          $childImagePath, [string]$script:setupChildProcessImagePath, [StringComparison]::OrdinalIgnoreCase
+        ) -and
+          [int]$childProcess.SessionId -eq [int]$script:setupChildProcessSessionId -and
+          $childStartTimeUtcTicks -eq [long]$script:setupChildProcessStartTimeUtcTicks
+        if (-not $sameChild) {
+          $cleanupErrors.Add('setup_child_process_identity_changed')
+        } else {
+          [void]$childProcess.CloseMainWindow()
+          if (-not $childProcess.WaitForExit(10000)) {
+            $childProcess.Refresh()
+            if (-not $childProcess.HasExited) {
+              $currentChild = Get-Process -Id $script:setupChildProcessId -ErrorAction SilentlyContinue
+              $currentChildPath = ''
+              $currentChildStartTimeUtcTicks = 0L
+              if ($null -ne $currentChild) {
+                try { $currentChildPath = [IO.Path]::GetFullPath([string]$currentChild.Path) } catch {}
+                try { $currentChildStartTimeUtcTicks = [long]$currentChild.StartTime.ToUniversalTime().Ticks } catch {}
+              }
+              $sameChild = $null -ne $currentChild -and
+                [string]::Equals(
+                  $currentChildPath, [string]$script:setupChildProcessImagePath, [StringComparison]::OrdinalIgnoreCase
+                ) -and
+                [int]$currentChild.SessionId -eq [int]$script:setupChildProcessSessionId -and
+                $currentChildStartTimeUtcTicks -eq [long]$script:setupChildProcessStartTimeUtcTicks
+              if ($sameChild) {
+                Stop-Process -Id $script:setupChildProcessId -Force -ErrorAction Stop
+                if (-not $childProcess.WaitForExit(10000)) {
+                  $cleanupErrors.Add('setup_child_process_did_not_exit')
+                }
+              } else {
+                $cleanupErrors.Add('setup_child_process_identity_changed')
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch { $cleanupErrors.Add('setup_child_process_cleanup_error') }
+
   try {
     if ($setupProcess -and -not $setupProcess.HasExited) {
       $setupProcess.Refresh()

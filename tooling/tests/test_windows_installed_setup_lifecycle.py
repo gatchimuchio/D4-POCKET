@@ -143,16 +143,45 @@ class WindowsInstalledSetupEvidenceTests(unittest.TestCase):
             with self.subTest(caption=caption):
                 self.assertIn(caption, SETUP_LIFECYCLE_SCRIPT)
 
-    def test_setup_wizard_checks_all_process_windows_and_reports_bounded_controls(self) -> None:
+    def test_setup_child_must_match_loader_image_temp_directory_and_session(self) -> None:
+        child_probe = SETUP_LIFECYCLE_SCRIPT.split(
+            "function Get-ValidatedSetupChildProcesses {", maxsplit=1
+        )[1].split("\nfunction Get-SetupProcessCandidates", maxsplit=1)[0]
+        self.assertIn("Get-CimInstance -ClassName Win32_Process", child_probe)
+        self.assertIn("ParentProcessId = $SetupProcessId", child_probe)
+        self.assertIn("$childInfo.ParentProcessId -eq $SetupProcessId", child_probe)
+        self.assertIn("[IO.Path]::ChangeExtension", child_probe)
+        self.assertIn("[IO.Path]::GetTempPath()", child_probe)
+        self.assertIn("$tempSubdirectoryParent, $tempRoot", child_probe)
+        self.assertIn("$childProcess.SessionId -eq $parentProcess.SessionId", child_probe)
+        self.assertIn("$validated.Count -ne 1", child_probe)
+
+    def test_setup_wizard_scans_verified_loader_and_child_windows_with_bounded_diagnostics(self) -> None:
         setup_window_probe = SETUP_LIFECYCLE_SCRIPT.split(
             "function Get-SetupWindowCandidates {", maxsplit=1
-        )[1].split("\nfunction Get-AuditSummary", maxsplit=1)[0]
+        )[1].split("\nfunction Get-SetupActionDiagnostic", maxsplit=1)[0]
+        self.assertIn("Get-SetupProcessCandidates -SetupProcessId", setup_window_probe)
         self.assertIn("RootElement.FindAll", setup_window_probe)
         self.assertIn("MainWindowHandle", setup_window_probe)
         self.assertNotIn("RootElement.FindFirst", setup_window_probe)
-        self.assertIn("setup_ui_diagnostic", setup_window_probe)
-        self.assertIn("buttons=", setup_window_probe)
-        self.assertIn("Select-Object -First 16", setup_window_probe)
+
+        diagnostic_probe = SETUP_LIFECYCLE_SCRIPT.split(
+            "function Get-SetupActionDiagnostic {", maxsplit=1
+        )[1].split("\nfunction Wait-SetupAction", maxsplit=1)[0]
+        self.assertIn("child_discovery=", diagnostic_probe)
+        self.assertIn("setup_ui_diagnostic", SETUP_LIFECYCLE_SCRIPT)
+        self.assertIn("buttons=", diagnostic_probe)
+        self.assertIn("Select-Object -First 16", diagnostic_probe)
+
+    def test_setup_child_cleanup_precedes_loader_cleanup_and_checks_process_identity(self) -> None:
+        cleanup = SETUP_LIFECYCLE_SCRIPT.split("} finally {", maxsplit=1)[1]
+        child_cleanup = cleanup.index("if ($script:setupChildProcessId)")
+        loader_cleanup = cleanup.index("if ($setupProcess -and -not $setupProcess.HasExited)")
+        self.assertLess(child_cleanup, loader_cleanup)
+        self.assertIn("setupChildProcessImagePath", cleanup)
+        self.assertIn("setupChildProcessStartTimeUtcTicks", cleanup)
+        self.assertIn("setup_child_process_identity_changed", cleanup)
+        self.assertIn("Stop-Process -Id $script:setupChildProcessId -Force", cleanup)
 
 
 if __name__ == "__main__":
