@@ -402,6 +402,7 @@ def run(source_commit: str, evidence_dir: Path, run_root: Path) -> dict[str, Any
         raise FileExistsError("evidence directory already exists")
     evidence_dir.mkdir(parents=True)
     run_root = _assert_run_root(run_root, runner_temp)
+    capture_temp_dir: Path | None = None
 
     result: dict[str, Any] = {
         "version": 1,
@@ -442,34 +443,54 @@ def run(source_commit: str, evidence_dir: Path, run_root: Path) -> dict[str, Any
                 ],
             },
         )
-        capture_dir = run_root / "broker-export-capture"
-        capture_dir.mkdir()
+        capture_temp_root = Path(tempfile.gettempdir()).resolve(strict=True)
+        capture_temp_dir = Path(
+            tempfile.mkdtemp(
+                prefix="d4p-w-e04-owner-capture-",
+                dir=capture_temp_root,
+            )
+        ).resolve(strict=True)
+        if capture_temp_dir.parent != capture_temp_root:
+            raise ValueError("Owner capture directory must be a direct child of the Windows temp root")
         test_env = _child_environment(
             {
-                "GUI_SHELL_EXPORT_E2E_CAPTURE_DIR": str(capture_dir),
+                "GUI_SHELL_EXPORT_E2E_CAPTURE_DIR": str(capture_temp_dir),
                 "GUI_SHELL_EXPORT_E2E_UPDATE_TRUST_FILE": str(trust_input_path),
-                # Rustのstd::env::temp_dir()も検証済みの専用run rootへ束縛する。
-                "TEMP": str(run_root),
-                "TMP": str(run_root),
+                "TEMP": str(capture_temp_root),
+                "TMP": str(capture_temp_root),
             }
         )
 
         CURRENT_STAGE = "broker_native_export_owner_test"
         _cargo_test("Broker Export Owner test", EXPORT_TEST, test_env)
-        receipt_path = capture_dir / "d4_pocket_build_receipt.json"
-        manifest_path = capture_dir / "broker-generated-manifest.json"
-        if not receipt_path.is_file() or not manifest_path.is_file():
+        captured_receipt_path = capture_temp_dir / "d4_pocket_build_receipt.json"
+        captured_manifest_path = capture_temp_dir / "broker-generated-manifest.json"
+        if not captured_receipt_path.is_file() or not captured_manifest_path.is_file():
             raise FileNotFoundError("Broker Export test did not write its Receipt and Manifest")
-        capture_names = {item.name for item in capture_dir.iterdir()}
-        if capture_names != {receipt_path.name, manifest_path.name}:
+        capture_names = {item.name for item in capture_temp_dir.iterdir()}
+        if capture_names != {captured_receipt_path.name, captured_manifest_path.name}:
             raise ValueError("Broker Export capture contains unrequested files")
-        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-        manifest_bytes = manifest_path.read_bytes()
+        receipt = json.loads(captured_receipt_path.read_text(encoding="utf-8"))
+        manifest_bytes = captured_manifest_path.read_bytes()
         manifest = json.loads(manifest_bytes.decode("utf-8"))
         export_summary = _assert_export_capture(receipt, manifest, manifest_bytes)
         trust = manifest.get("update_trust")
         if not isinstance(trust, dict) or trust.get("public_key_der_hex") != TEST_PUBLIC_KEY_DER_HEX:
             raise ValueError("native Broker Export did not bind the public test key")
+
+        capture_dir = run_root / "broker-export-capture"
+        capture_dir.mkdir()
+        receipt_path = capture_dir / captured_receipt_path.name
+        manifest_path = capture_dir / captured_manifest_path.name
+        shutil.copy2(captured_receipt_path, receipt_path)
+        shutil.copy2(captured_manifest_path, manifest_path)
+        resolved_capture_temp = capture_temp_dir.resolve(strict=True)
+        if resolved_capture_temp.parent != capture_temp_root:
+            raise RuntimeError("refusing to remove Owner capture outside the Windows temp root")
+        shutil.rmtree(resolved_capture_temp)
+        if resolved_capture_temp.exists():
+            raise RuntimeError("Owner capture temp cleanup failed")
+        capture_temp_dir = None
 
         CURRENT_STAGE = "build_normal_release_bundle_and_setup"
         bundle_path = run_root / "normal-release-export"
@@ -674,6 +695,14 @@ def run(source_commit: str, evidence_dir: Path, run_root: Path) -> dict[str, Any
         _write_json(evidence_dir / "w-e04-windows-setup-installed-lifecycle.json", result)
         raise
     finally:
+        if capture_temp_dir is not None and capture_temp_dir.exists():
+            capture_temp_root = Path(tempfile.gettempdir()).resolve(strict=True)
+            resolved_capture_temp = capture_temp_dir.resolve(strict=True)
+            if resolved_capture_temp.parent != capture_temp_root:
+                raise RuntimeError("refusing to remove Owner capture outside the Windows temp root")
+            shutil.rmtree(resolved_capture_temp)
+            if resolved_capture_temp.exists():
+                raise RuntimeError("Owner capture temp cleanup failed")
         resolved = run_root.resolve(strict=True)
         if not resolved.is_relative_to(runner_temp) or resolved == runner_temp:
             raise RuntimeError("refusing to remove W-E04 run root outside RUNNER_TEMP")

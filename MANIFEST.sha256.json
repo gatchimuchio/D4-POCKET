@@ -1657,7 +1657,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "f698f354dd29d9351fb51f40f976405216aff9fa2be2170b5b6607969fe3e2fc"
+      "sha256": "1343c3cb33897e4789cf808cf88d75505f2810902941f0922c919984dec03576"
     },
     {
       "path": "docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl",
@@ -6261,7 +6261,7 @@
     },
     {
       "path": "tooling/tests/windows_installed_setup_lifecycle.py",
-      "sha256": "059b09710646d27c2adbf7d57b275bc2265940bccdb4161a1845b20e4fbb9b9c"
+      "sha256": "2921e75650c506c0db8c90b8a170ef9c0e38b213397301e5ef1963eaeb6b23c1"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
