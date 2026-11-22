@@ -54,7 +54,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          rustup toolchain install 1.95.0 --profile minimal
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           rustup default 1.95.0
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -65,6 +65,10 @@ jobs:
           $cargoVersion = (cargo --version).Trim()
           if ($LASTEXITCODE -ne 0 -or -not $cargoVersion.StartsWith('cargo 1.95.0 ')) {
             throw "Cargo toolchain mismatch: $cargoVersion"
+          }
+          $rustfmtVersion = (rustfmt --version).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $rustfmtVersion.StartsWith('rustfmt ')) {
+            throw "Pinned rustfmt component is unavailable: $rustfmtVersion"
           }
 
           $flutterRoot = Join-Path $env:RUNNER_TEMP 'flutter'
@@ -174,6 +178,7 @@ jobs:
           @(
             "D4P_W_E04_RUSTC_VERSION=$rustcVersion"
             "D4P_W_E04_CARGO_VERSION=$cargoVersion"
+            "D4P_W_E04_RUSTFMT_VERSION=$rustfmtVersion"
             "D4P_W_E04_FLUTTER_VERSION=$($flutterMachine.frameworkVersion)"
             "D4P_W_E04_FLUTTER_REVISION=$flutterCommit"
             "D4P_W_E04_ISCC_PATH=$isccPath"
@@ -182,6 +187,7 @@ jobs:
           @(
             "rustc=$rustcVersion"
             "cargo=$cargoVersion"
+            "rustfmt=$rustfmtVersion"
             "flutter=$($flutterMachine.frameworkVersion)"
             "flutter_revision=$flutterCommit"
             "dart=$($flutterMachine.dartSdkVersion)"
