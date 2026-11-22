@@ -169,6 +169,7 @@ jobs:
           if (($compilerHelp -join "`n") -notmatch '(?i)Inno Setup 6 Command-Line Compiler') {
             throw "The resolved executable did not identify as the Inno Setup 6 command-line compiler (exit=$compilerHelpExit): $($compilerHelp -join ' ')"
           }
+          $LASTEXITCODE = 0
 
           @(
             "D4P_W_E04_RUSTC_VERSION=$rustcVersion"
