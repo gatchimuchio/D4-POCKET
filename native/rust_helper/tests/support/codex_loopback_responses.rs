@@ -1567,7 +1567,7 @@ fn safe_r2_e2e_diagnostic(input: &Value) -> Option<Value> {
                 return None;
             }
             let summary = object.get("summary")?.as_object()?;
-            if summary.len() != 6 {
+            if summary.len() != 7 {
                 return None;
             }
             let exit_code = match summary.get("exit_code")? {
@@ -1644,6 +1644,46 @@ fn safe_r2_e2e_diagnostic(input: &Value) -> Option<Value> {
             ) {
                 return None;
             }
+            let windows_sandbox_setup_error_code =
+                summary.get("windows_sandbox_setup_error_code")?.as_str()?;
+            if !matches!(
+                windows_sandbox_setup_error_code,
+                "not_applicable"
+                    | "not_present"
+                    | "unreadable"
+                    | "malformed"
+                    | "unknown"
+                    | "orchestrator_sandbox_dir_create_failed"
+                    | "orchestrator_elevation_check_failed"
+                    | "orchestrator_elevation_required"
+                    | "orchestrator_payload_serialize_failed"
+                    | "orchestrator_helper_launch_failed"
+                    | "orchestrator_helper_launch_canceled"
+                    | "orchestrator_helper_exit_nonzero"
+                    | "orchestrator_helper_report_read_failed"
+                    | "orchestrator_helper_incomplete"
+                    | "helper_request_args_failed"
+                    | "helper_sandbox_dir_create_failed"
+                    | "helper_log_failed"
+                    | "helper_user_provision_failed"
+                    | "helper_users_group_create_failed"
+                    | "helper_user_create_or_update_failed"
+                    | "helper_dpapi_protect_failed"
+                    | "helper_users_file_write_failed"
+                    | "helper_setup_marker_write_failed"
+                    | "helper_sid_resolve_failed"
+                    | "helper_capability_sid_failed"
+                    | "helper_firewall_com_init_failed"
+                    | "helper_firewall_policy_access_failed"
+                    | "helper_firewall_policy_ineffective"
+                    | "helper_firewall_rule_create_or_add_failed"
+                    | "helper_firewall_rule_verify_failed"
+                    | "helper_read_acl_helper_spawn_failed"
+                    | "helper_sandbox_lock_failed"
+                    | "helper_unknown_error"
+            ) {
+                return None;
+            }
             let stderr_bytes = summary.get("stderr_bytes")?.as_u64()?;
             Some(json!({
                 "kind": "cli_failure",
@@ -1654,6 +1694,7 @@ fn safe_r2_e2e_diagnostic(input: &Value) -> Option<Value> {
                     "stdout_http_status": http_status,
                     "stderr_class": stderr_class,
                     "stderr_bytes": stderr_bytes.min(64 * 1024 * 1024),
+                    "windows_sandbox_setup_error_code": windows_sandbox_setup_error_code,
                 }
             }))
         }
@@ -1760,16 +1801,26 @@ mod tests {
                 "stdout_http_status": 401,
                 "stderr_class": "configuration",
                 "stderr_bytes": 100,
+                "windows_sandbox_setup_error_code": "not_applicable",
             },
         });
         let safe = safe_r2_e2e_diagnostic(&input).expect("許可分類だけを投影");
         assert_eq!(safe["summary"]["stdout_error_class"], "authentication");
         assert_eq!(safe["summary"]["stdout_http_status"], 401);
+        assert_eq!(
+            safe["summary"]["windows_sandbox_setup_error_code"],
+            "not_applicable"
+        );
         assert!(!safe.to_string().contains("secret"));
 
         let mut unknown_event = input.clone();
         unknown_event["summary"]["stdout_event_types"] = json!(["error", "private payload"]);
         assert!(safe_r2_e2e_diagnostic(&unknown_event).is_none());
+
+        let mut unknown_setup_code = input.clone();
+        unknown_setup_code["summary"]["windows_sandbox_setup_error_code"] =
+            json!("private path and message");
+        assert!(safe_r2_e2e_diagnostic(&unknown_setup_code).is_none());
 
         let task_failure = json!({
             "kind": "task_failure",
@@ -1861,6 +1912,7 @@ mod tests {
                 "stdout_http_status": 401,
                 "stderr_class": "configuration",
                 "stderr_bytes": 120,
+                "windows_sandbox_setup_error_code": "not_applicable",
             }
         }));
         assert!(valid.starts_with("HTTP/1.0 200 OK"), "{valid}");
@@ -1875,6 +1927,7 @@ mod tests {
                     "stdout_http_status": 401,
                     "stderr_class": "configuration",
                     "stderr_bytes": 120,
+                    "windows_sandbox_setup_error_code": "not_applicable",
                 }
             })]
         );

@@ -19,7 +19,7 @@ use cap_std::fs::Dir;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::env;
-#[cfg(all(feature = "r2-e2e", not(test)))]
+#[cfg(any(test, feature = "r2-e2e"))]
 use std::fs;
 use std::io::{Read, Write};
 #[cfg(feature = "r2-e2e")]
@@ -679,8 +679,72 @@ fn report_r2_e2e_cli_failure(
     stdout: &[u8],
     stderr: &[u8],
 ) {
-    let summary = loopback_test_safe_failure_summary(exit_code, stdout, stderr);
+    let mut summary = loopback_test_safe_failure_summary(exit_code, stdout, stderr);
+    summary["windows_sandbox_setup_error_code"] =
+        json!(if summary["stderr_class"] == "sandbox_setup" {
+            safe_windows_sandbox_setup_error_code(&test_api.codex_home)
+        } else {
+            "not_applicable"
+        });
     send_r2_e2e_diagnostic(test_api, json!({"kind": "cli_failure", "summary": summary}));
+}
+
+#[cfg(feature = "r2-e2e")]
+fn safe_windows_sandbox_setup_error_code(codex_home: &Path) -> &'static str {
+    let path = codex_home.join(".sandbox").join("setup_error.json");
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return "not_present",
+        Err(_) => return "unreadable",
+    };
+    safe_windows_sandbox_setup_error_code_from_bytes(&bytes)
+}
+
+#[cfg(any(test, feature = "r2-e2e"))]
+fn safe_windows_sandbox_setup_error_code_from_bytes(bytes: &[u8]) -> &'static str {
+    const ALLOWED_CODES: &[&str] = &[
+        "orchestrator_sandbox_dir_create_failed",
+        "orchestrator_elevation_check_failed",
+        "orchestrator_elevation_required",
+        "orchestrator_payload_serialize_failed",
+        "orchestrator_helper_launch_failed",
+        "orchestrator_helper_launch_canceled",
+        "orchestrator_helper_exit_nonzero",
+        "orchestrator_helper_report_read_failed",
+        "orchestrator_helper_incomplete",
+        "helper_request_args_failed",
+        "helper_sandbox_dir_create_failed",
+        "helper_log_failed",
+        "helper_user_provision_failed",
+        "helper_users_group_create_failed",
+        "helper_user_create_or_update_failed",
+        "helper_dpapi_protect_failed",
+        "helper_users_file_write_failed",
+        "helper_setup_marker_write_failed",
+        "helper_sid_resolve_failed",
+        "helper_capability_sid_failed",
+        "helper_firewall_com_init_failed",
+        "helper_firewall_policy_access_failed",
+        "helper_firewall_policy_ineffective",
+        "helper_firewall_rule_create_or_add_failed",
+        "helper_firewall_rule_verify_failed",
+        "helper_read_acl_helper_spawn_failed",
+        "helper_sandbox_lock_failed",
+        "helper_unknown_error",
+    ];
+    let Ok(report) = serde_json::from_slice::<Value>(bytes) else {
+        return "malformed";
+    };
+    report
+        .get("code")
+        .and_then(Value::as_str)
+        .and_then(|code| {
+            ALLOWED_CODES
+                .iter()
+                .copied()
+                .find(|allowed| *allowed == code)
+        })
+        .unwrap_or("unknown")
 }
 
 #[cfg(feature = "r2-e2e")]
@@ -2230,6 +2294,26 @@ mod tests {
     }
 
     #[test]
+    fn sandbox_setup診断は固定codeだけを抽出しmessageを漏らさない() {
+        let report =
+            br#"{"code":"helper_firewall_policy_access_failed","message":"PRIVATE_PATH PRIVATE_DETAIL"}"#;
+        assert_eq!(
+            safe_windows_sandbox_setup_error_code_from_bytes(report),
+            "helper_firewall_policy_access_failed"
+        );
+        assert_eq!(
+            safe_windows_sandbox_setup_error_code_from_bytes(
+                br#"{"code":"private_payload","message":"PRIVATE_PATH PRIVATE_DETAIL"}"#
+            ),
+            "unknown",
+        );
+        assert_eq!(
+            safe_windows_sandbox_setup_error_code_from_bytes(b"not-json"),
+            "malformed"
+        );
+    }
+
+    #[test]
     fn loopback失敗診断は許可分類とHTTP状態だけを抽出する() {
         let stdout = br#"{"type":"turn.failed","error":{"type":"api_error","code":"model_not_found","status_code":404,"message":"private model name and credential"}}"#;
         let summary = loopback_test_safe_failure_summary(Some(1), stdout, b"");
@@ -2450,8 +2534,7 @@ mod tests {
         let filesystem_override = loopback_args
             .windows(2)
             .find(|pair| {
-                pair[0] == "-c"
-                    && pair[1].starts_with("permissions.d4p-agent-task.filesystem={")
+                pair[0] == "-c" && pair[1].starts_with("permissions.d4p-agent-task.filesystem={")
             })
             .map(|pair| pair[1].as_str())
             .expect("loopback Task filesystem deny profile");
