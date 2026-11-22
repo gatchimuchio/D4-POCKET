@@ -94,6 +94,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _same_source_update_ca_environment,
     _trigger_export_from_installed_ui,
     _validate_export_update_trust_scope,
+    _export_update_trust_summary_markers,
     _visible_mcp_credential_ids,
     _installed_acceptance_runtime_directory,
     _wait_for_workspace_projection,
@@ -6519,6 +6520,25 @@ class LinuxAgentTaskFixtureSourceTests(unittest.TestCase):
 
 
 class ExportUpdateTrustHarnessTests(unittest.TestCase):
+    def test_owner_summary_markers_include_update_source_channel(self) -> None:
+        public_key_der = (
+            "302a300506032b6570032100"
+            "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+        )
+        fingerprint = "sha256:" + hashlib.sha256(
+            bytes.fromhex(public_key_der)[12:]
+        ).hexdigest()
+
+        self.assertEqual(
+            _export_update_trust_summary_markers(
+                (public_key_der, "https://updates.example.test/d4-pocket/stable")
+            ),
+            (
+                f"Ed25519公開鍵fingerprint: {fingerprint}",
+                "HTTPS配布元: stable: https://updates.example.test/d4-pocket/stable",
+            ),
+        )
+
     def test_export_update_trust_is_limited_to_update_lifecycle_harness(self) -> None:
         _validate_export_update_trust_scope("update_lifecycle", None)
         _validate_export_update_trust_scope(

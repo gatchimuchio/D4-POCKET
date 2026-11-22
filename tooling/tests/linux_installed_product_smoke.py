@@ -1594,6 +1594,17 @@ def _validate_export_update_trust_scope(
         raise RuntimeError("test Export update trust入力が不正です")
 
 
+def _export_update_trust_summary_markers(
+    update_trust: tuple[str, str],
+) -> tuple[str, str]:
+    public_key = bytes.fromhex(update_trust[0])[12:]
+    fingerprint = "sha256:" + hashlib.sha256(public_key).hexdigest()
+    return (
+        f"Ed25519公開鍵fingerprint: {fingerprint}",
+        f"HTTPS配布元: stable: {update_trust[1]}",
+    )
+
+
 def _trigger_export_from_installed_ui(
     environment: dict[str, str],
     window_id: str,
@@ -11976,13 +11987,8 @@ def run_installed_smoke(
             )
             export_summary_markers = ("対象platform: Linux",)
             if export_update_trust is not None:
-                public_key = bytes.fromhex(export_update_trust[0])[12:]
-                update_fingerprint = (
-                    "sha256:" + hashlib.sha256(public_key).hexdigest()
-                )
-                export_summary_markers += (
-                    f"Ed25519公開鍵fingerprint: {update_fingerprint}",
-                    f"HTTPS配布元: {export_update_trust[1]}",
+                export_summary_markers += _export_update_trust_summary_markers(
+                    export_update_trust
                 )
             _answer_owner_dialog(
                 environment,
