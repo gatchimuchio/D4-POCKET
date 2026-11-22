@@ -1,0 +1,157 @@
+name: Windows W-E03 Export Runtime developer verification
+
+'on':
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-w-e03-export-runtime-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - name: mainの固定Sourceをcheckout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Sourceと実行環境を固定
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF -ne 'refs/heads/main') { throw "Only main is accepted: $env:GITHUB_REF" }
+          $head = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $head -ne $env:GITHUB_SHA) { throw "checkout SHA mismatch: $head / $env:GITHUB_SHA" }
+          $remote = @(git ls-remote origin refs/heads/main)
+          if ($LASTEXITCODE -ne 0 -or $remote.Count -ne 1 -or $remote[0].Split("`t")[0] -ne $head) {
+            throw 'Local source is not the current GitHub main head'
+          }
+          $checkoutStatus = @(git status --porcelain --untracked-files=all)
+          if ($checkoutStatus.Count -ne 0) { throw 'checkout is not clean' }
+          $pythonVersion = (python --version 2>&1 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Python is unavailable on the hosted runner' }
+          @(
+            "source_commit=$head"
+            "runner_image=$env:ImageOS/$env:ImageVersion"
+            "python=$pythonVersion"
+          ) | Tee-Object -FilePath "$env:RUNNER_TEMP\windows-we03-environment.txt"
+          @(
+            '# Windows W-E03 Export Runtime developer verification'
+            "- Source: ``$head``; ref: ``$env:GITHUB_REF``; runner: ``$env:ImageOS/$env:ImageVersion``."
+            '- This workflow is manual only and uses a fresh untrusted Manifest-only input, isolated test identity, synthetic Owner fixture, local loopback Responses provider, and `r2-e2e` Broker overlay.'
+            '- It does not exercise real product Owner authority, the normal Release Broker Task capability, source-product stop/uninstall acceptance, E5/E6, signing, or release readiness.'
+            '- No Actions artifact is uploaded; the bounded JSON evidence is printed in the job log and summarized below.'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: RustとFlutterを固定版で用意
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          rustup toolchain install 1.95.0 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup default 1.95.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $rustcVersion = (rustc --version).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $rustcVersion.StartsWith('rustc 1.95.0 ')) { throw "Rust version mismatch: $rustcVersion" }
+          $cargoVersion = (cargo --version).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $cargoVersion.StartsWith('cargo 1.95.0 ')) { throw "Cargo version mismatch: $cargoVersion" }
+          cargo fetch --locked --manifest-path native/rust_helper/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $flutterRoot = Join-Path $env:RUNNER_TEMP 'flutter'
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git $flutterRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $flutterCommit = (git -C $flutterRoot rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $flutterCommit -ne '559ffa3f75e7402d65a8def9c28389a9b2e6fe42') {
+            throw "Flutter checkout mismatch: $flutterCommit"
+          }
+          "$flutterRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          @(
+            "GUI_SHELL_W_E03_RUSTC_VERSION=$rustcVersion"
+            "GUI_SHELL_W_E03_CARGO_VERSION=$cargoVersion"
+            "GUI_SHELL_W_E03_FLUTTER_COMMIT=$flutterCommit"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          & "$flutterRoot\bin\flutter.bat" --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: 固定Codex CLI Windows binaryを取得・検証
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cliRoot = Join-Path $env:RUNNER_TEMP 'd4p-codex-cli-0.166.0-win32-x64'
+          New-Item -ItemType Directory -Path $cliRoot | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP 'codex-0.166.0-win32-x64.tgz'
+          $uri = 'https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-win32-x64.tgz'
+          Invoke-WebRequest -Uri $uri -OutFile $archive
+          if (-not (Test-Path -LiteralPath $archive) -or (Get-Item -LiteralPath $archive).Length -eq 0) {
+            throw 'Codex CLI package download is missing or empty'
+          }
+          $expected = [Convert]::ToHexString([Convert]::FromBase64String('NS8Ps5oG5r19pCrMCUXwUqOui6odnUIoBlQkrjCJ+h1k6KiwCzC/+mI9d3nSZCqFoVONPBTmqyq8NYq3YaFGyA=='))
+          $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA512).Hash
+          if ($actual -ne $expected) { throw "Codex CLI package SHA-512 mismatch: $actual" }
+          tar.exe -xzf $archive -C $cliRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $codexCandidates = @(Get-ChildItem -LiteralPath $cliRoot -Filter 'codex.exe' -File -Recurse | Select-Object -ExpandProperty FullName)
+          if ($codexCandidates.Count -ne 1) { throw "Expected exactly one native codex.exe, found $($codexCandidates.Count)" }
+          $codex = [IO.Path]::GetFullPath($codexCandidates[0])
+          $version = (& $codex --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -ne 'codex-cli 0.166.0') { throw "Codex CLI version mismatch: $version" }
+          "GUI_SHELL_W_E03_CODEX_CLI=$codex" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          @(
+            "- Rust/Cargo: ``$rustcVersion`` / ``$cargoVersion``."
+            "- Flutter: ``$env:GUI_SHELL_W_E03_FLUTTER_COMMIT``."
+            "- Codex CLI: ``$version``; Windows package SHA-512 verified against the fixed npm integrity digest."
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Developer evidence validatorのunit test
+        shell: pwsh
+        run: python -B -X utf8 -m unittest -v tooling.tests.test_windows_we03_export_runtime
+
+      - name: Manifest-only Export Runtimeから実Codex Taskを実行
+        shell: pwsh
+        run: python -B -X utf8 tooling/tests/windows_we03_export_runtime.py --codex-cli "$env:GUI_SHELL_W_E03_CODEX_CLI"
+
+      - name: run-owned buildとCLI資産を回収しSourceを照合
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $errors = [System.Collections.Generic.List[string]]::new()
+          $flutter = Join-Path $env:RUNNER_TEMP 'flutter\bin\flutter.bat'
+          if (Test-Path -LiteralPath $flutter) {
+            Push-Location (Join-Path $env:GITHUB_WORKSPACE 'apps\desktop_flutter')
+            & $flutter clean
+            if ($LASTEXITCODE -ne 0) { $errors.Add("flutter clean exit=$LASTEXITCODE") }
+            Pop-Location
+          }
+          $runnerTemp = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\')
+          foreach ($name in @('flutter', 'd4p-codex-cli-0.166.0-win32-x64', 'codex-0.166.0-win32-x64.tgz')) {
+            $target = [IO.Path]::GetFullPath((Join-Path $runnerTemp $name))
+            if ([IO.Path]::GetDirectoryName($target).TrimEnd('\') -ne $runnerTemp) {
+              $errors.Add("refused cleanup outside RUNNER_TEMP: $target")
+              continue
+            }
+            if (Test-Path -LiteralPath $target) {
+              Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction Continue
+              if (Test-Path -LiteralPath $target) { $errors.Add("temporary asset remains: $target") }
+            }
+          }
+          $status = @(git -C $env:GITHUB_WORKSPACE status --porcelain --untracked-files=all)
+          if ($status.Count -ne 0) {
+            $errors.Add('source worktree is dirty after cleanup')
+            $status | Write-Output
+          }
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          @('- Run-owned Flutter build, Rust target, Codex package, Export runtime, fixture, and temporary evidence were removed or verified by the driver.') | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

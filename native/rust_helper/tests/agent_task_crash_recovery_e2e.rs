@@ -28,6 +28,7 @@ struct Fixture {
     workspace: PathBuf,
     workspace_config: PathBuf,
     codex: PathBuf,
+    broker_exe: PathBuf,
     responses_port: u16,
     broker: Option<Child>,
     normal: Option<BrokerEndpoint>,
@@ -45,6 +46,10 @@ impl Fixture {
         Self::new_with_settings(codex, None, "--expect-cancellation")
     }
 
+    fn new_success(codex: PathBuf) -> Self {
+        Self::new_with_settings(codex, None, "")
+    }
+
     fn with_deadline(codex: PathBuf, milliseconds: u64) -> Self {
         Self::new_with_settings(codex, Some(milliseconds), "--expect-deadline")
     }
@@ -57,6 +62,34 @@ impl Fixture {
         codex: PathBuf,
         task_execution_limit_ms: Option<u64>,
         expected_responses_shape: &'static str,
+    ) -> Self {
+        Self::new_with_settings_and_export_runtime(
+            codex,
+            task_execution_limit_ms,
+            expected_responses_shape,
+            None,
+        )
+    }
+
+    fn new_success_with_export_runtime(
+        codex: PathBuf,
+        broker_exe: PathBuf,
+        app_id: String,
+        audit_store_id: String,
+    ) -> Self {
+        Self::new_with_settings_and_export_runtime(
+            codex,
+            None,
+            "",
+            Some((broker_exe, app_id, audit_store_id)),
+        )
+    }
+
+    fn new_with_settings_and_export_runtime(
+        codex: PathBuf,
+        task_execution_limit_ms: Option<u64>,
+        expected_responses_shape: &'static str,
+        export_runtime: Option<(PathBuf, String, String)>,
     ) -> Self {
         assert!(codex.is_absolute() && codex.is_file(), "Codex CLIの実file");
         assert!(
@@ -101,15 +134,51 @@ impl Fixture {
             .to_string(),
         )
         .expect("Workspace起動設定");
+        let (store, broker_exe) = match export_runtime {
+            Some((helper, app_id, audit_store_id)) => {
+                assert!(helper.is_absolute(), "Export Broker helperは絶対path");
+                assert!(
+                    app_id.strip_prefix("d4-pocket-app-").is_some_and(|suffix| {
+                        suffix.len() == 32
+                            && suffix
+                                .bytes()
+                                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                    }),
+                    "Export App ID形式"
+                );
+                assert!(
+                    audit_store_id
+                        .strip_prefix("audit-store-")
+                        .is_some_and(|suffix| {
+                            suffix.len() == 32
+                                && suffix.bytes().all(|byte| {
+                                    byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+                                })
+                        }),
+                    "Export Audit Store ID形式"
+                );
+                let store = root
+                    .join("app-data")
+                    .join("apps")
+                    .join(app_id)
+                    .join("stores")
+                    .join(audit_store_id);
+                (store, helper)
+            }
+            None => (root.join("store"), PathBuf::from(BROKER_EXE)),
+        };
+        let broker_exe = broker_exe.canonicalize().expect("Broker helper完全path");
+        assert!(broker_exe.is_file(), "Broker helper実file");
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("一時loopback port");
         let responses_port = listener.local_addr().expect("一時port取得").port();
         drop(listener);
         let mut fixture = Self {
             root: root.clone(),
-            store: root.join("store"),
+            store,
             workspace,
             workspace_config,
             codex,
+            broker_exe,
             responses_port,
             broker: None,
             normal: None,
@@ -127,10 +196,14 @@ impl Fixture {
     }
 
     fn start_responses(&mut self) {
-        let mut child = Command::new(RESPONSES_EXE)
+        let mut command = Command::new(RESPONSES_EXE);
+        command
             .arg(&self.workspace)
-            .arg(self.responses_port.to_string())
-            .arg(self.expected_responses_shape)
+            .arg(self.responses_port.to_string());
+        if !self.expected_responses_shape.is_empty() {
+            command.arg(self.expected_responses_shape);
+        }
+        let mut child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -188,7 +261,7 @@ impl Fixture {
         let suffix = self.generation;
         let session_file = self.root.join(format!("normal-{suffix}.json"));
         let owner_file = self.root.join(format!("owner-{suffix}.json"));
-        let mut command = Command::new(BROKER_EXE);
+        let mut command = Command::new(&self.broker_exe);
         command
             .args(["broker-server", "--store-dir"])
             .arg(&self.store)
@@ -908,6 +981,359 @@ fn terminate_codex_root(pid: u32, executable: &Path) {
         co::WAIT::OBJECT_0,
         "Codex root process終了を確認"
     );
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+
+    hex::encode(Sha256::digest(bytes))
+}
+
+#[test]
+#[ignore = "WindowsのManifest-only Export runtime copyから隔離test identityで実Codex Tool Taskを確認するときに実行する"]
+fn exported_windows_runtime_completes_real_codex_task_with_isolated_identity() {
+    let required_path = |name: &str| {
+        let path = std::env::var_os(name)
+            .map(PathBuf::from)
+            .unwrap_or_else(|| panic!("{name}を絶対pathで指定"));
+        assert!(path.is_absolute(), "{name}は絶対path");
+        path
+    };
+    let export_root = fs::canonicalize(required_path("GUI_SHELL_W_E03_EXPORT_RUNTIME_ROOT"))
+        .expect("Export runtime copyを解決");
+    assert!(export_root.is_dir(), "Export runtime copyはdirectory");
+    let helper_destination = export_root
+        .join(".developer-verification")
+        .join("broker")
+        .join("gui_shell_rust_helper.exe");
+    let helper_parent = helper_destination
+        .parent()
+        .expect("Export runtime Broker親directory")
+        .to_path_buf();
+    fs::create_dir_all(&helper_parent).expect("run-owned test Broker directory");
+    let helper_parent = fs::canonicalize(helper_parent).expect("test Broker directoryを解決");
+    assert!(
+        helper_parent.starts_with(&export_root),
+        "test Broker overlayはExport runtime copy内"
+    );
+    assert!(
+        !helper_destination.exists(),
+        "既存Export runtime fileを上書きしない"
+    );
+    let mut compiled_helper = fs::File::open(BROKER_EXE).expect("r2-e2e Broker helper");
+    let mut helper_output = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&helper_destination)
+        .expect("test-only Broker overlayを新規作成");
+    std::io::copy(&mut compiled_helper, &mut helper_output).expect("test Brokerをoverlayへ複製");
+    helper_output
+        .sync_all()
+        .expect("test Broker overlayをflush");
+    drop(helper_output);
+    let helper = fs::canonicalize(&helper_destination).expect("Export runtime Brokerを解決");
+    assert!(
+        helper.is_file() && helper.starts_with(&export_root),
+        "Broker helperはExport runtime copy内"
+    );
+
+    let manifest_path = fs::canonicalize(required_path("GUI_SHELL_W_E03_MANIFEST_PATH"))
+        .expect("Export Manifestを解決");
+    assert!(manifest_path.is_file() && manifest_path.starts_with(&export_root));
+    let manifest_bytes = fs::read(&manifest_path).expect("未信頼Manifest bytes");
+    let manifest_sha256 = sha256_hex(&manifest_bytes);
+    assert_eq!(
+        manifest_sha256,
+        std::env::var("GUI_SHELL_W_E03_MANIFEST_SHA256").expect("Manifest SHA-256")
+    );
+    let manifest: Value = serde_json::from_slice(&manifest_bytes).expect("Manifest JSON");
+    let app_id = manifest["manifest"]["app_identity"]["app_id"]
+        .as_str()
+        .expect("Export App ID")
+        .to_owned();
+    let audit_store_id = manifest["manifest"]["audit_store"]["store_id"]
+        .as_str()
+        .expect("Export Audit Store ID")
+        .to_owned();
+    assert_eq!(
+        manifest["manifest"]["app_identity"]["target_platform"],
+        "windows"
+    );
+    assert_eq!(manifest["manifest"]["audit_store"]["inherited"], false);
+    assert_eq!(
+        manifest["manifest"]["inheritance_policy"]["authority"],
+        "none"
+    );
+    assert_eq!(
+        manifest["manifest"]["inheritance_policy"]["permission"],
+        "none"
+    );
+    assert_eq!(
+        manifest["manifest"]["inheritance_policy"]["approval"],
+        "none"
+    );
+    assert_eq!(
+        manifest["manifest"]["inheritance_policy"]["credential"],
+        "none"
+    );
+    assert_eq!(
+        manifest["manifest"]["inheritance_policy"]["audit_chain"],
+        "none"
+    );
+    assert_ne!(app_id, "d4-pocket-app-11111111111111111111111111111111");
+    assert_ne!(
+        audit_store_id,
+        "audit-store-22222222222222222222222222222222"
+    );
+    assert_eq!(
+        app_id,
+        std::env::var("GUI_SHELL_W_E03_APP_ID").expect("Export App ID env")
+    );
+    assert_eq!(
+        audit_store_id,
+        std::env::var("GUI_SHELL_W_E03_AUDIT_STORE_ID").expect("Export Audit Store ID env")
+    );
+
+    let source_commit = std::env::var("GUI_SHELL_W_E03_SOURCE_COMMIT").expect("source commit SHA");
+    assert!(
+        source_commit.len() == 40
+            && source_commit
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+        "source commit SHA形式"
+    );
+    let evidence_path = required_path("GUI_SHELL_W_E03_EVIDENCE_PATH");
+    assert!(evidence_path.parent().is_some_and(Path::is_dir));
+    assert!(!evidence_path.exists(), "既存の証拠を上書きしない");
+
+    let codex = fs::canonicalize(required_path("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI"))
+        .expect("実Codex CLIを解決");
+    assert!(codex.is_file(), "Codex CLI実file");
+    let helper_bytes = fs::read(&helper).expect("Export runtime Broker bytes");
+    let helper_sha256 = sha256_hex(&helper_bytes);
+    let mut fixture = Fixture::new_success_with_export_runtime(
+        codex.clone(),
+        helper.clone(),
+        app_id.clone(),
+        audit_store_id.clone(),
+    );
+    let normal = fixture.normal().clone();
+    let session = send_request(
+        &normal,
+        "対話開始",
+        json!({"実行系ID":RUNTIME_ID,"作業領域ID":WORKSPACE_ID}),
+    );
+    assert_eq!(session["status"], "accepted", "{session}");
+    let session_id = session["body"]["対話セッションID"]
+        .as_str()
+        .expect("Agent session ID")
+        .to_owned();
+    let task = json!({
+        "agent_runtime_id": RUNTIME_ID,
+        "session_id": session_id,
+        "workspace_id": WORKSPACE_ID,
+        "instruction": TASK_INSTRUCTION,
+    });
+    let permission = json!({
+        "agent_runtime_id": RUNTIME_ID,
+        "session_id": session_id,
+        "workspace_id": WORKSPACE_ID,
+    });
+    let permission_grant = send_request(
+        fixture.owner(),
+        "AgentTaskWorkspacePermissionGrant",
+        permission,
+    );
+    assert_eq!(permission_grant["status"], "accepted", "{permission_grant}");
+    let approval_grant = send_request(fixture.owner(), "AgentTaskOwnerApprovalGrant", task.clone());
+    assert_eq!(approval_grant["status"], "accepted", "{approval_grant}");
+
+    let processes_before_task = process_ids();
+    let broker_pid = fixture
+        .broker
+        .as_ref()
+        .expect("Export runtime Broker process")
+        .id();
+    let started = send_request(&normal, "AgentTask実行", task.clone());
+    assert_eq!(started["status"], "accepted", "{started}");
+    assert_eq!(started["body"]["status"], "running", "{started}");
+    let task_id = started["body"]["task_id"]
+        .as_str()
+        .expect("AgentTask ID")
+        .to_owned();
+    let mut process_tree = HashSet::new();
+    let deadline = Instant::now() + Duration::from_secs(120);
+    let terminal = loop {
+        let roots = newly_spawned_codex_root(broker_pid, &codex, &processes_before_task);
+        assert!(
+            roots.len() <= 1,
+            "今回の独立Brokerが起動したCodex rootは一意: {roots:?}"
+        );
+        if let Some(root_pid) = roots.first() {
+            process_tree.extend(process_tree_ids(*root_pid));
+        }
+        let state = send_request(&normal, "AgentTask状態", json!({"task_id":task_id}));
+        assert_eq!(state["status"], "accepted", "{state}");
+        if state["body"]["status"] != "running" {
+            break state;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "独立Export Runtime Taskの終端期限超過"
+        );
+        thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(terminal["body"]["status"], "completed", "{terminal}");
+    let result_hash = terminal["body"]["result_hash"]
+        .as_str()
+        .expect("completed Task positive result hash")
+        .to_owned();
+    assert!(
+        result_hash.strip_prefix("sha256:").is_some_and(|value| {
+            value.len() == 64
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        }),
+        "result hash形式"
+    );
+    assert!(
+        !process_tree.is_empty(),
+        "今回のBrokerが起動したCodex processを観測"
+    );
+    wait_for_process_tree_exit(&process_tree, Duration::from_secs(20));
+    assert_eq!(
+        fs::read(fixture.workspace.join("broker-real-codex-marker.txt"))
+            .expect("実Codex ToolによるWorkspace書込み"),
+        b"synthetic-task-write"
+    );
+    assert_eq!(
+        fs::read(fixture.workspace.join("private/fixture-secret.txt"))
+            .expect("secret boundary marker"),
+        b"synthetic-secret-content-never-returned"
+    );
+    assert_eq!(
+        fs::read(fixture.root.join("outside-read-marker.txt")).expect("Workspace外marker"),
+        b"synthetic outside marker"
+    );
+    assert!(!fixture.root.join("outside-write-marker.txt").exists());
+    assert!(scratch_directories(&fixture.workspace)
+        .expect("Workspace scratch一覧")
+        .is_empty());
+
+    let approval_replay = send_request(&normal, "AgentTask実行", task);
+    assert_eq!(
+        approval_replay["status"], "rejected",
+        "完了済みTaskの一回Approvalを再利用しない: {approval_replay}"
+    );
+    let approval_replay_audit_id = approval_replay["audit_event_id"]
+        .as_str()
+        .expect("Approval再利用拒否のAudit ID")
+        .to_owned();
+    fixture.stop_broker();
+    let responses_evidence = fixture.finish_responses();
+    assert_eq!(
+        responses_evidence["expected_request_shape"],
+        "completed_tool_write"
+    );
+    assert_eq!(responses_evidence["requests"], 2);
+    assert_eq!(responses_evidence["tool_call_sent"], true);
+    assert_eq!(responses_evidence["tool_result_received"], true);
+    assert_eq!(responses_evidence["workspace_marker_exists"], true);
+    assert_eq!(
+        responses_evidence["workspace_boundary_fixtures_valid_after_task"],
+        true
+    );
+    assert_eq!(responses_evidence["blocked_external_requests"], 0);
+
+    let audit_path = fixture.store.join("audit.jsonl");
+    let audit_bytes = fs::read(&audit_path).expect("独立Export Runtimeのdurable Audit");
+    let audit_text = String::from_utf8(audit_bytes.clone()).expect("Audit UTF-8");
+    assert!(
+        !audit_text.contains(TASK_INSTRUCTION),
+        "Task本文をAuditへ保存しない"
+    );
+    assert!(
+        !audit_text.contains("synthetic-secret-content-never-returned"),
+        "secretをAuditへ保存しない"
+    );
+    let (_, persisted) = BrokerPersistentStore::open_or_create(&fixture.store, "w-e03-verify")
+        .expect("Broker終了後に永続Audit chainを再検証");
+    let terminal_event = persisted
+        .audit_log
+        .events()
+        .iter()
+        .find(|event| {
+            event.request_id == task_id
+                && event.reason.starts_with("AgentTask履歴:")
+                && event.reason.contains("\"stage\":\"terminal\"")
+        })
+        .expect("completed Task terminal Audit");
+    let terminal_record: Value = serde_json::from_str(
+        terminal_event
+            .reason
+            .strip_prefix("AgentTask履歴:")
+            .expect("Task履歴Audit prefix"),
+    )
+    .expect("terminal Task履歴 JSON");
+    assert_eq!(terminal_record["status"], "completed");
+    assert_eq!(terminal_record["result_hash"], result_hash);
+    assert!(persisted.audit_log.events().iter().any(|event| {
+        event.operation == "AgentTaskWorkspacePermissionGrant"
+            && event.evidence_source == "FIXTURE"
+            && event.reason.contains("synthetic Owner fixture")
+    }));
+    assert!(persisted.audit_log.events().iter().any(|event| {
+        event.operation == "AgentTaskOwnerApprovalGrant"
+            && event.evidence_source == "FIXTURE"
+            && event.reason.contains("synthetic Owner fixture")
+    }));
+    assert!(persisted.audit_log.events().iter().any(|event| {
+        event.event_id == approval_replay_audit_id
+            && event.operation == "AgentTask実行"
+            && event.decision == "rejected"
+    }));
+
+    let evidence = json!({
+        "evidence_type": "d4_pocket_w_e03_windows_export_runtime_developer",
+        "evidence_class": "LIVE_RUNTIME",
+        "source_commit": source_commit,
+        "manifest_sha256": manifest_sha256,
+        "app_id": app_id,
+        "audit_store_id": audit_store_id,
+        "export_runtime_broker_relative_path": helper.strip_prefix(&export_root)
+            .expect("Broker path is bound to Export runtime root")
+            .to_string_lossy(),
+        "export_runtime_broker_sha256": helper_sha256,
+        "real_owner_authority": false,
+        "synthetic_owner_fixture": true,
+        "external_provider_requests": 0,
+        "task_status": "completed",
+        "task_result_hash": result_hash,
+        "workspace_marker_sha256": sha256_hex(b"synthetic-task-write"),
+        "outside_workspace_write": "denied",
+        "secret_value_exposed": false,
+        "approval_replay": "rejected",
+        "scratch_cleanup": "passed",
+        "codex_process_tree_cleanup": "passed",
+        "durable_audit_chain": "passed",
+        "durable_audit_event_count": persisted.audit_log.events().len(),
+        "durable_audit_sha256": sha256_hex(&audit_bytes),
+        "task_body_in_audit": false,
+        "scope_limit": "isolated r2-e2e Broker and synthetic Owner fixture; this does not establish normal Release UI, real Owner authority, or source-product stop/uninstall acceptance"
+    });
+    let evidence_bytes = serde_json::to_vec_pretty(&evidence).expect("bounded evidence JSON");
+    assert!(
+        evidence_bytes.len() <= 32 * 1024,
+        "W-E03 evidence size bound"
+    );
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&evidence_path)
+        .expect("新規evidence pathだけ作成")
+        .write_all(&evidence_bytes)
+        .expect("W-E03開発証拠を書込");
 }
 
 #[test]
