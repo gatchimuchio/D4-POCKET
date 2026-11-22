@@ -166,6 +166,7 @@ fn main() -> ExitCode {
         "tool_offered": server.tool_was_offered(),
         "tool_call_sent": server.tool_call_was_sent(),
         "tool_result_received": server.tool_result_was_received(),
+        "safe_agent_failure_diagnostics": server.r2_e2e_diagnostics(),
         "provider_failure_responses": server.provider_failure_responses(),
         "tool_output_diagnostics": server.tool_output_diagnostics(),
         "repeated_tool_call_rejections": server.repeated_tool_call_rejections(),

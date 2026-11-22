@@ -384,7 +384,7 @@ impl Fixture {
         self.owner = None;
     }
 
-    fn finish_responses(&mut self) -> Value {
+    fn collect_responses(&mut self) -> (Value, bool, Option<i32>) {
         let mut stdin = self.responses_stdin.take().expect("応答器の標準入力を取得");
         writeln!(stdin, "stop").expect("fixture停止要求");
         stdin.flush().expect("fixture停止要求flush");
@@ -413,10 +413,14 @@ impl Fixture {
             .expect("応答器processを取得")
             .wait()
             .expect("fixture終了待ち");
+        (evidence, status.success(), status.code())
+    }
+
+    fn finish_responses(&mut self) -> Value {
+        let (evidence, success, exit_code) = self.collect_responses();
         assert!(
-            status.success(),
-            "loopback fixture終了code={:?}; expected_shape={}; requests={}; tool_offered={}; tool_call_sent={}; tool_result_received={}; repeated_rejections={}; invalid_bodies={}; write_failures={}; incomplete={}; blocked_external={}; workspace_marker={}; boundary_valid={}",
-            status.code(),
+            success,
+            "loopback fixture終了code={exit_code:?}; expected_shape={}; requests={}; tool_offered={}; tool_call_sent={}; tool_result_received={}; repeated_rejections={}; invalid_bodies={}; write_failures={}; incomplete={}; blocked_external={}; workspace_marker={}; boundary_valid={}",
             evidence["expected_request_shape"],
             evidence["requests"],
             evidence["tool_offered"],
@@ -1183,7 +1187,27 @@ fn exported_windows_runtime_completes_real_codex_task_with_isolated_identity() {
         );
         thread::sleep(Duration::from_millis(50));
     };
-    assert_eq!(terminal["body"]["status"], "completed", "{terminal}");
+    if terminal["body"]["status"] != "completed" {
+        let (responses_evidence, fixture_success, fixture_exit_code) = fixture.collect_responses();
+        fixture.stop_broker();
+        panic!(
+            "Export Runtime Task failed without weakening the completion condition: task_status={}; fixture_success={fixture_success}; fixture_exit_code={fixture_exit_code:?}; expected_shape={}; requests={}; models={}; tool_offered={}; tool_call_sent={}; tool_result_received={}; tool_output_diagnostics={}; agent_failure_diagnostics={}; workspace_marker={}; blocked_external={}; invalid_bodies={}",
+            terminal["body"]["status"],
+            responses_evidence["expected_request_shape"],
+            responses_evidence["requests"],
+            responses_evidence["models"],
+            responses_evidence["tool_offered"],
+            responses_evidence["tool_call_sent"],
+            responses_evidence["tool_result_received"],
+            serde_json::to_string(&responses_evidence["tool_output_diagnostics"])
+                .unwrap_or_else(|_| "unavailable".to_owned()),
+            serde_json::to_string(&responses_evidence["safe_agent_failure_diagnostics"])
+                .unwrap_or_else(|_| "unavailable".to_owned()),
+            responses_evidence["workspace_marker_exists"],
+            responses_evidence["blocked_external_requests"],
+            responses_evidence["invalid_bodies"],
+        );
+    }
     let result_hash = terminal["body"]["result_hash"]
         .as_str()
         .expect("completed Task positive result hash")

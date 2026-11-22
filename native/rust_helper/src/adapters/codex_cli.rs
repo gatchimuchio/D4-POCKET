@@ -1787,7 +1787,7 @@ fn loopback_test_safe_failure_summary(
     exit_code: Option<i32>,
     stdout: &[u8],
     stderr: &[u8],
-) -> String {
+) -> Value {
     let events = stdout
         .split(|byte| *byte == b'\n')
         .filter_map(|line| serde_json::from_slice::<Value>(line).ok())
@@ -1805,13 +1805,14 @@ fn loopback_test_safe_failure_summary(
         .collect::<Vec<_>>();
     let (stdout_error_class, stdout_http_status) = summarize_loopback_test_stdout_error(&events);
     let stderr_class = classify_loopback_test_stderr(stderr);
-    format!(
-        "exit_code={exit_code:?}; stdout_event_types={event_types:?}; stdout_error_class={stdout_error_class}; stdout_http_status={}; stderr_class={stderr_class}; stderr_bytes={}",
-        stdout_http_status
-            .map(|status| status.to_string())
-            .unwrap_or_else(|| "none".to_owned()),
-        stderr.len()
-    )
+    json!({
+        "exit_code": exit_code,
+        "stdout_event_types": event_types,
+        "stdout_error_class": stdout_error_class,
+        "stdout_http_status": stdout_http_status,
+        "stderr_class": stderr_class,
+        "stderr_bytes": stderr.len(),
+    })
 }
 
 #[cfg(any(test, feature = "r2-e2e"))]
@@ -2180,14 +2181,17 @@ mod tests {
         let stderr = b"invalid TOML at PRIVATE_LOCAL_PATH api_key=PRIVATE_SECRET";
         let summary = loopback_test_safe_failure_summary(Some(2), stdout, stderr);
 
-        assert!(summary.contains("exit_code=Some(2)"));
-        assert!(summary.contains("stdout_event_types=[\"error\", \"other\"]"));
-        assert!(summary.contains("stdout_error_class=other; stdout_http_status=none"));
-        assert!(summary.contains("stderr_class=configuration"));
-        assert!(!summary.contains("PRIVATE_TASK_AND_SECRET"));
-        assert!(!summary.contains("unknown_sensitive_code"));
-        assert!(!summary.contains("PRIVATE_LOCAL_PATH"));
-        assert!(!summary.contains("PRIVATE_SECRET"));
+        assert_eq!(summary["exit_code"], 2);
+        assert_eq!(summary["stdout_event_types"], json!(["error", "other"]));
+        assert_eq!(summary["stdout_error_class"], "other");
+        assert_eq!(summary["stdout_http_status"], Value::Null);
+        assert_eq!(summary["stderr_class"], "configuration");
+        assert_eq!(summary["stderr_bytes"], stderr.len());
+        let serialized = summary.to_string();
+        assert!(!serialized.contains("PRIVATE_TASK_AND_SECRET"));
+        assert!(!serialized.contains("unknown_sensitive_code"));
+        assert!(!serialized.contains("PRIVATE_LOCAL_PATH"));
+        assert!(!serialized.contains("PRIVATE_SECRET"));
     }
 
     #[test]
@@ -2195,16 +2199,19 @@ mod tests {
         let stdout = br#"{"type":"turn.failed","error":{"type":"api_error","code":"model_not_found","status_code":404,"message":"private model name and credential"}}"#;
         let summary = loopback_test_safe_failure_summary(Some(1), stdout, b"");
 
-        assert!(summary.contains("stdout_error_class=model_unavailable; stdout_http_status=404"));
-        assert!(!summary.contains("private model name"));
-        assert!(!summary.contains("credential"));
-        assert!(!summary.contains("model_not_found"));
+        assert_eq!(summary["stdout_error_class"], "model_unavailable");
+        assert_eq!(summary["stdout_http_status"], 404);
+        let serialized = summary.to_string();
+        assert!(!serialized.contains("private model name"));
+        assert!(!serialized.contains("credential"));
+        assert!(!serialized.contains("model_not_found"));
 
         let missing_key = br#"{"type":"error","message":"Required environment variable OPENAI_API_KEY is missing; PRIVATE_DETAIL"}"#;
         let summary = loopback_test_safe_failure_summary(Some(1), missing_key, b"");
-        assert!(summary.contains("stdout_error_class=authentication"));
-        assert!(!summary.contains("OPENAI_API_KEY"));
-        assert!(!summary.contains("PRIVATE_DETAIL"));
+        assert_eq!(summary["stdout_error_class"], "authentication");
+        let serialized = summary.to_string();
+        assert!(!serialized.contains("OPENAI_API_KEY"));
+        assert!(!serialized.contains("PRIVATE_DETAIL"));
     }
 
     #[test]

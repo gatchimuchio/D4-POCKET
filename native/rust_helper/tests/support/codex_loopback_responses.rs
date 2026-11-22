@@ -8,6 +8,8 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 const MAX_REQUEST_BYTES: usize = 4 * 1024 * 1024;
+const MAX_R2_E2E_DIAGNOSTIC_BYTES: usize = 4096;
+const MAX_R2_E2E_DIAGNOSTICS: usize = 8;
 
 struct State {
     stop: AtomicBool,
@@ -42,6 +44,7 @@ struct State {
     tool_output_missing_call_id: AtomicUsize,
     tool_output_id_mismatches: AtomicUsize,
     tool_output_diagnostics: Mutex<Vec<Value>>,
+    r2_e2e_diagnostics: Mutex<Vec<Value>>,
     request_shapes: Mutex<Vec<String>>,
     repeated_tool_call_rejections: AtomicUsize,
     tool_call_count: AtomicUsize,
@@ -145,6 +148,7 @@ impl CodexLoopbackResponses {
             tool_output_missing_call_id: AtomicUsize::new(0),
             tool_output_id_mismatches: AtomicUsize::new(0),
             tool_output_diagnostics: Mutex::new(Vec::new()),
+            r2_e2e_diagnostics: Mutex::new(Vec::new()),
             request_shapes: Mutex::new(Vec::new()),
             repeated_tool_call_rejections: AtomicUsize::new(0),
             tool_call_count: AtomicUsize::new(0),
@@ -432,6 +436,14 @@ impl CodexLoopbackResponses {
     pub(crate) fn tool_output_diagnostics(&self) -> Vec<Value> {
         self.state
             .tool_output_diagnostics
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    pub(crate) fn r2_e2e_diagnostics(&self) -> Vec<Value> {
+        self.state
+            .r2_e2e_diagnostics
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone()
@@ -949,7 +961,8 @@ fn safe_tool_output_diagnostic(output: &Value) -> Value {
             error_fingerprints.push(fingerprint);
         }
     }
-    let probe_started = serialized_output.contains("D4P_R2_SYNTHETIC_PROBE_STARTED");
+    let probe_started = error_category != "process起動拒否"
+        && serialized_output.contains("D4P_R2_SYNTHETIC_PROBE_STARTED");
     let mut safe_preview = if error_category == "error兆候なし" {
         diagnostic_text.clone()
     } else {
@@ -1083,6 +1096,38 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         }
     }
     let path = target.split('?').next().unwrap_or(target);
+    if method.eq_ignore_ascii_case("POST") && path == "/__d4p_r2_e2e/diagnostics" {
+        if content_length > MAX_R2_E2E_DIAGNOSTIC_BYTES {
+            let _ = respond(&mut stream, 413, "application/json", b"{}");
+            return;
+        }
+        let body = match read_request_body(&mut reader, content_length, chunked) {
+            Ok(body) if body.len() <= MAX_R2_E2E_DIAGNOSTIC_BYTES => body,
+            _ => {
+                state.invalid_post_bodies.fetch_add(1, Ordering::SeqCst);
+                let _ = respond(&mut stream, 400, "application/json", b"{}");
+                return;
+            }
+        };
+        let diagnostic = serde_json::from_slice::<Value>(&body)
+            .ok()
+            .and_then(|value| safe_r2_e2e_diagnostic(&value));
+        let Some(diagnostic) = diagnostic else {
+            state.invalid_post_bodies.fetch_add(1, Ordering::SeqCst);
+            let _ = respond(&mut stream, 400, "application/json", b"{}");
+            return;
+        };
+        let mut diagnostics = state
+            .r2_e2e_diagnostics
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if diagnostics.len() < MAX_R2_E2E_DIAGNOSTICS {
+            diagnostics.push(diagnostic);
+        }
+        drop(diagnostics);
+        let _ = respond(&mut stream, 200, "application/json", b"{}");
+        return;
+    }
     if method.eq_ignore_ascii_case("GET")
         && (path.ends_with("/v1/models") || path.ends_with("/models"))
     {
@@ -1514,11 +1559,342 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
     }
 }
 
+fn safe_r2_e2e_diagnostic(input: &Value) -> Option<Value> {
+    let object = input.as_object()?;
+    match object.get("kind")?.as_str()? {
+        "cli_failure" => {
+            if object.len() != 2 {
+                return None;
+            }
+            let summary = object.get("summary")?.as_object()?;
+            if summary.len() != 6 {
+                return None;
+            }
+            let exit_code = match summary.get("exit_code")? {
+                Value::Null => Value::Null,
+                Value::Number(value)
+                    if value
+                        .as_i64()
+                        .is_some_and(|code| (-65_535..=65_535).contains(&code)) =>
+                {
+                    summary["exit_code"].clone()
+                }
+                _ => return None,
+            };
+            let event_types = summary
+                .get("stdout_event_types")?
+                .as_array()?
+                .iter()
+                .map(|value| {
+                    let value = value.as_str()?;
+                    matches!(
+                        value,
+                        "thread.started"
+                            | "turn.started"
+                            | "turn.completed"
+                            | "turn.failed"
+                            | "error"
+                            | "item.started"
+                            | "item.completed"
+                            | "other"
+                    )
+                    .then_some(value)
+                })
+                .collect::<Option<Vec<_>>>()?;
+            if event_types.len() > 32 {
+                return None;
+            }
+            let stdout_error_class = summary.get("stdout_error_class")?.as_str()?;
+            if !matches!(
+                stdout_error_class,
+                "none"
+                    | "authentication"
+                    | "model_unavailable"
+                    | "rate_limited"
+                    | "invalid_request"
+                    | "timeout"
+                    | "transport"
+                    | "service_error"
+                    | "other"
+            ) {
+                return None;
+            }
+            let http_status = match summary.get("stdout_http_status")? {
+                Value::Null => Value::Null,
+                Value::Number(value)
+                    if value
+                        .as_u64()
+                        .is_some_and(|status| (400..=599).contains(&status)) =>
+                {
+                    summary["stdout_http_status"].clone()
+                }
+                _ => return None,
+            };
+            let stderr_class = summary.get("stderr_class")?.as_str()?;
+            if !matches!(
+                stderr_class,
+                "empty"
+                    | "sandbox_setup"
+                    | "authentication"
+                    | "configuration"
+                    | "permission"
+                    | "transport"
+                    | "missing_dependency"
+                    | "other"
+            ) {
+                return None;
+            }
+            let stderr_bytes = summary.get("stderr_bytes")?.as_u64()?;
+            Some(json!({
+                "kind": "cli_failure",
+                "summary": {
+                    "exit_code": exit_code,
+                    "stdout_event_types": event_types,
+                    "stdout_error_class": stdout_error_class,
+                    "stdout_http_status": http_status,
+                    "stderr_class": stderr_class,
+                    "stderr_bytes": stderr_bytes.min(64 * 1024 * 1024),
+                }
+            }))
+        }
+        "task_failure" => {
+            if object.len() != 3 {
+                return None;
+            }
+            let stage = object.get("stage")?.as_str()?;
+            if !matches!(
+                stage,
+                "secret_path_validation"
+                    | "scratch_create"
+                    | "temporary_environment_bind"
+                    | "codex_task_execution"
+                    | "scratch_cleanup"
+            ) {
+                return None;
+            }
+            let failure_class = object.get("failure_class")?.as_str()?;
+            if !matches!(
+                failure_class,
+                "要求不正"
+                    | "実行系不在"
+                    | "権限拒否"
+                    | "セッション不一致"
+                    | "通信失敗"
+                    | "期限超過"
+                    | "応答不正"
+                    | "監査失敗"
+                    | "取消"
+                    | "実行系隔離済み"
+                    | "作業領域不在"
+                    | "AgentTask実行非対応"
+            ) {
+                return None;
+            }
+            Some(json!({
+                "kind": "task_failure",
+                "stage": stage,
+                "failure_class": failure_class,
+            }))
+        }
+        "os_failure" => {
+            if object.len() != 3 {
+                return None;
+            }
+            let stage = object.get("stage")?.as_str()?;
+            if !matches!(stage, "codex_process_spawn" | "codex_stdin_write") {
+                return None;
+            }
+            let error_kind = object.get("os_error_kind")?.as_str()?;
+            let error_kind = if matches!(
+                error_kind,
+                "NotFound"
+                    | "PermissionDenied"
+                    | "ConnectionRefused"
+                    | "ConnectionReset"
+                    | "ConnectionAborted"
+                    | "NotConnected"
+                    | "AddrInUse"
+                    | "AddrNotAvailable"
+                    | "BrokenPipe"
+                    | "AlreadyExists"
+                    | "WouldBlock"
+                    | "InvalidInput"
+                    | "InvalidData"
+                    | "TimedOut"
+                    | "WriteZero"
+                    | "Interrupted"
+                    | "Unsupported"
+                    | "UnexpectedEof"
+                    | "OutOfMemory"
+                    | "Other"
+            ) {
+                error_kind
+            } else {
+                "other"
+            };
+            Some(json!({
+                "kind": "os_failure",
+                "stage": stage,
+                "os_error_kind": error_kind,
+            }))
+        }
+        "missing_stdin_pipe" if object.len() == 1 => Some(json!({"kind": "missing_stdin_pipe"})),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Read;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn r2_e2e_failure_diagnostics_are_bounded_and_allowlisted() {
+        let input = json!({
+            "kind": "cli_failure",
+            "summary": {
+                "exit_code": 1,
+                "stdout_event_types": ["thread.started", "error"],
+                "stdout_error_class": "authentication",
+                "stdout_http_status": 401,
+                "stderr_class": "configuration",
+                "stderr_bytes": 100,
+            },
+        });
+        let safe = safe_r2_e2e_diagnostic(&input).expect("許可分類だけを投影");
+        assert_eq!(safe["summary"]["stdout_error_class"], "authentication");
+        assert_eq!(safe["summary"]["stdout_http_status"], 401);
+        assert!(!safe.to_string().contains("secret"));
+
+        let mut unknown_event = input.clone();
+        unknown_event["summary"]["stdout_event_types"] = json!(["error", "private payload"]);
+        assert!(safe_r2_e2e_diagnostic(&unknown_event).is_none());
+
+        let task_failure = json!({
+            "kind": "task_failure",
+            "stage": "codex_task_execution",
+            "failure_class": "通信失敗",
+            "private_detail": "must not pass",
+        });
+        assert!(safe_r2_e2e_diagnostic(&task_failure).is_none());
+
+        let task_failure = json!({
+            "kind": "task_failure",
+            "stage": "codex_task_execution",
+            "failure_class": "通信失敗",
+        });
+        let safe = safe_r2_e2e_diagnostic(&task_failure).expect("Task失敗分類");
+        assert_eq!(
+            safe,
+            json!({
+                "kind": "task_failure",
+                "stage": "codex_task_execution",
+                "failure_class": "通信失敗",
+            })
+        );
+    }
+
+    #[test]
+    fn r2_e2e_diagnostic_route_records_only_sanitized_failure_classification() {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("test用時刻")
+            .as_nanos();
+        let workspace = std::env::temp_dir().join(format!(
+            "d4p-r2-e2e-diagnostic-route-{}-{suffix}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&workspace).expect("test専用Workspaceを作成");
+        let server = CodexLoopbackResponses::start(&workspace).expect("loopback fixtureを開始");
+
+        let send = |request: &Value| {
+            let body = request.to_string();
+            let mut stream =
+                TcpStream::connect(("127.0.0.1", server.port())).expect("診断routeへ接続");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .expect("診断応答期限");
+            write!(
+                stream,
+                "POST /__d4p_r2_e2e/diagnostics HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                server.port(),
+                body.len(),
+                body
+            )
+            .expect("bounded diagnosticを送信");
+            let mut response = Vec::new();
+            let mut chunk = [0; 1024];
+            loop {
+                let size = stream.read(&mut chunk).expect("diagnostic responseを回収");
+                if size == 0 {
+                    break;
+                }
+                response.extend_from_slice(&chunk[..size]);
+                let Some(header_end) = response.windows(4).position(|part| part == b"\r\n\r\n")
+                else {
+                    continue;
+                };
+                let header = String::from_utf8_lossy(&response[..header_end]);
+                let content_length = header
+                    .lines()
+                    .find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        name.eq_ignore_ascii_case("content-length")
+                            .then(|| value.trim().parse::<usize>().ok())
+                            .flatten()
+                    })
+                    .expect("diagnostic response Content-Length");
+                if response.len() >= header_end + 4 + content_length {
+                    break;
+                }
+            }
+            String::from_utf8(response).expect("HTTP responseはUTF-8")
+        };
+
+        let valid = send(&json!({
+            "kind": "cli_failure",
+            "summary": {
+                "exit_code": 1,
+                "stdout_event_types": ["error"],
+                "stdout_error_class": "authentication",
+                "stdout_http_status": 401,
+                "stderr_class": "configuration",
+                "stderr_bytes": 120,
+            }
+        }));
+        assert!(valid.starts_with("HTTP/1.0 200 OK"), "{valid}");
+        assert_eq!(
+            server.r2_e2e_diagnostics(),
+            vec![json!({
+                "kind": "cli_failure",
+                "summary": {
+                    "exit_code": 1,
+                    "stdout_event_types": ["error"],
+                    "stdout_error_class": "authentication",
+                    "stdout_http_status": 401,
+                    "stderr_class": "configuration",
+                    "stderr_bytes": 120,
+                }
+            })]
+        );
+
+        let invalid = send(&json!({
+            "kind": "task_failure",
+            "stage": "codex_task_execution",
+            "failure_class": "通信失敗",
+            "private_detail": "synthetic-secret-content",
+        }));
+        assert!(invalid.starts_with("HTTP/1.0 400 Bad Request"), "{invalid}");
+        assert_eq!(server.invalid_post_bodies(), 1);
+        assert_eq!(server.blocked_external_requests(), 0);
+        let safe_diagnostics =
+            serde_json::to_string(&server.r2_e2e_diagnostics()).expect("safe diagnostic JSON");
+        assert!(!safe_diagnostics.contains("synthetic-secret"));
+
+        drop(server);
+        std::fs::remove_dir_all(workspace).expect("test専用Workspaceを削除");
+    }
 
     #[test]
     fn synthetic_probe_path_construction_uses_shell_compatible_path_cmdlets() {
