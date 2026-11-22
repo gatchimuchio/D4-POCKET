@@ -1505,6 +1505,19 @@ def _bounded_owner_text_diagnostics(values: list[str]) -> str:
     return " | ".join(observed)[:1800] or "(no accessible text)"
 
 
+def _navigation_page_is_selected(window, page_label: str) -> bool:
+    """既に選択中のNavigationRail宛先ならgroup dropdownを再操作しない。"""
+    try:
+        rail = _find_accessible("ナビゲーション", root=window, timeout=2)
+    except RuntimeError:
+        return False
+    deadline = time.monotonic() + 2
+    for node, accessible_name in _accessible_nodes(rail, deadline=deadline):
+        if page_label in accessible_name.strip() and _gtk_accessible_or_parent_selected(node):
+            return True
+    return False
+
+
 def _open_installed_navigation_page(
     environment: dict[str, str],
     window_id: str | None,
@@ -1517,6 +1530,8 @@ def _open_installed_navigation_page(
     if page_label is not None and (not page_label or len(page_label) > 64):
         raise RuntimeError("installed navigation page label is invalid")
     window = _find_accessible(WINDOW_TITLE, timeout=10)
+    if page_label is not None and _navigation_page_is_selected(window, page_label):
+        return window
     if window_id is not None and not _is_wayland_environment(environment):
         subprocess.run(
             ["xdotool", "windowactivate", "--sync", window_id],

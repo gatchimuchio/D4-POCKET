@@ -61,6 +61,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _find_workspace_inspector_control,
     _helper_exit_diagnostics,
     _open_mcp_center_from_installed_ui,
+    _open_installed_navigation_page,
     _resolve_regular_package,
     _read_task_scratch_recovery_state,
     _register_linux_provider_credential_in_installed_dialog,
@@ -712,6 +713,51 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         activate_keyboard.assert_not_called()
         scroll.assert_called_once_with({}, "0x42")
         self.assertEqual(run.call_args.args[0], ["xdotool", "windowactivate", "--sync", "0x42"])
+
+    def test_installed_navigation_reuses_already_selected_page(self) -> None:
+        window = object()
+        rail = object()
+        selected_page = object()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=(window, rail),
+            ) as find_accessible,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_nodes",
+                return_value=((selected_page, "設定"),),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._gtk_accessible_or_parent_selected",
+                return_value=True,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible"
+            ) as find_operable,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible"
+            ) as activate,
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run"
+            ) as run,
+        ):
+            self.assertIs(
+                _open_installed_navigation_page(
+                    {}, None, group="設定", page_label="設定"
+                ),
+                window,
+            )
+
+        self.assertEqual(
+            find_accessible.call_args_list,
+            [
+                call("D4 Pocket powered by GUI Shell", timeout=10),
+                call("ナビゲーション", root=window, timeout=2),
+            ],
+        )
+        find_operable.assert_not_called()
+        activate.assert_not_called()
+        run.assert_not_called()
 
     def test_keyboard_activation_sends_enter_only_after_target_focus(self) -> None:
         from unittest.mock import patch
@@ -2645,6 +2691,10 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 ),
             ) as find_accessible,
             patch(
+                "tooling.tests.linux_installed_product_smoke._navigation_page_is_selected",
+                return_value=False,
+            ),
+            patch(
                 "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
                 side_effect=(selector, operation_group, agent_page),
             ) as find_operable,
@@ -2717,6 +2767,10 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     object(),
                 ),
             ) as find_accessible,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._navigation_page_is_selected",
+                return_value=False,
+            ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
                 side_effect=(selector, operation_group, agent_page),

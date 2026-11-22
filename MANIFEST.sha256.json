@@ -6093,7 +6093,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "3dfef5a8e80730db7ea80f9e25bef7a4326702b4a64be882bd71507436ec3a22"
+      "sha256": "38edc4b3e9793d51539dfcb990a93628c2c0db1594e3e4ad9d0d1cd034e3144f"
     },
     {
       "path": "tooling/tests/linux_status_notifier_test.cc",
@@ -6165,7 +6165,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "f6d0dd93280ea68dfd6fe93938ca4d528f38acec891f34cafcc2a03020b25c4a"
+      "sha256": "5e5b58954df6d3c1428eecb74f6206ada6ebb76b6c29e5a1a5faf02c486a6847"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",
