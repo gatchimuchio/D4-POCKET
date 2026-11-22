@@ -4533,7 +4533,7 @@
     },
     {
       "path": "native/rust_helper/tests/agent_task_crash_recovery_e2e.rs",
-      "sha256": "a9cc8a0c69e100da930d197457dbefad84ef3ce501efe240258b93b07f693cf8"
+      "sha256": "3b64349565fc4d728b85060ef63090f57f4e8dc19f56692bd35adf2ed006f885"
     },
     {
       "path": "native/rust_helper/tests/agent_task_production_e2e.rs",

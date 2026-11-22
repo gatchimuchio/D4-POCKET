@@ -7,7 +7,7 @@ use gui_shell_rust_helper::broker::{
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -21,6 +21,28 @@ const TASK_INSTRUCTION: &str = "D4P_CRASH_TASK_SENTINEL: perform only the bounde
 const BROKER_EXE: &str = env!("CARGO_BIN_EXE_gui_shell_rust_helper");
 const RESPONSES_EXE: &str = env!("CARGO_BIN_EXE_gui_shell_r2_e2e_responses");
 const R2_E2E_TASK_EXECUTION_LIMIT_ENV: &str = "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS";
+
+fn read_bounded_stderr(path: &Path) -> String {
+    const MAX_BYTES: u64 = 8192;
+
+    let Ok(mut file) = fs::File::open(path) else {
+        return "<unavailable>".to_owned();
+    };
+    let Ok(length) = file.metadata().map(|metadata| metadata.len()) else {
+        return "<unavailable>".to_owned();
+    };
+    if file
+        .seek(SeekFrom::Start(length.saturating_sub(MAX_BYTES)))
+        .is_err()
+    {
+        return "<unavailable>".to_owned();
+    }
+    let mut bytes = Vec::new();
+    if file.take(MAX_BYTES).read_to_end(&mut bytes).is_err() {
+        return "<unavailable>".to_owned();
+    }
+    String::from_utf8_lossy(&bytes).into_owned()
+}
 
 fn setup_test_codex_home(codex_cli: &Path, codex_home: &Path) {
     let status = Command::new(codex_cli)
@@ -65,6 +87,7 @@ struct Fixture {
     broker_exe: PathBuf,
     responses_port: u16,
     broker: Option<Child>,
+    broker_stderr_path: Option<PathBuf>,
     normal: Option<BrokerEndpoint>,
     owner: Option<BrokerEndpoint>,
     responses: Option<Child>,
@@ -215,6 +238,7 @@ impl Fixture {
             broker_exe,
             responses_port,
             broker: None,
+            broker_stderr_path: None,
             normal: None,
             owner: None,
             responses: None,
@@ -261,8 +285,18 @@ impl Fixture {
     }
 
     fn start_broker(&mut self) {
-        let (child, session_file, owner_file) = self.spawn_broker_process(Stdio::null());
+        let next_generation = self.generation + 1;
+        let stderr_path = self
+            .root
+            .join(format!("broker-generation-{next_generation}.stderr"));
+        let stderr_file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&stderr_path)
+            .expect("Broker stderrをrun専用診断fileへ接続");
+        let (child, session_file, owner_file) = self.spawn_broker_process(Stdio::from(stderr_file));
         self.broker = Some(child);
+        self.broker_stderr_path = Some(stderr_path);
         self.normal = None;
         self.owner = None;
         let normal = self.wait_for_endpoint(&session_file);
@@ -274,6 +308,7 @@ impl Fixture {
 
     fn spawn_broker_process(&mut self, stderr: Stdio) -> (Child, PathBuf, PathBuf) {
         self.generation += 1;
+        self.broker_stderr_path = None;
         let generation_root = self
             .root
             .join(format!("broker-generation-{}", self.generation))
@@ -320,6 +355,13 @@ impl Fixture {
             .env_remove("OPENAI_API_KEY")
             .env_remove("CODEX_API_KEY")
             .env_remove("ANTHROPIC_API_KEY")
+            .env_remove("GEMINI_API_KEY")
+            .env_remove("GOOGLE_API_KEY")
+            .env_remove("AZURE_OPENAI_API_KEY")
+            .env_remove("GH_TOKEN")
+            .env_remove("GITHUB_TOKEN")
+            .env_remove("ACTIONS_RUNTIME_TOKEN")
+            .env_remove("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
             .stdout(Stdio::null())
             .stderr(stderr);
         if let Some(milliseconds) = self.task_execution_limit_ms {
@@ -378,10 +420,16 @@ impl Fixture {
                 }
             }
             if let Some(child) = self.broker.as_mut() {
-                assert!(
-                    child.try_wait().expect("Broker process状態").is_none(),
-                    "Brokerがendpoint生成前に終了"
-                );
+                if let Some(status) = child.try_wait().expect("Broker process状態") {
+                    let bounded_stderr = self
+                        .broker_stderr_path
+                        .as_ref()
+                        .map(|path| read_bounded_stderr(path))
+                        .unwrap_or_else(|| "<unavailable>".to_owned());
+                    panic!(
+                        "Brokerがendpoint生成前に終了: status={status:?}; bounded_stderr={bounded_stderr}"
+                    );
+                }
             }
             assert!(Instant::now() < deadline, "Broker endpoint生成期限超過");
             thread::sleep(Duration::from_millis(25));
