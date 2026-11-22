@@ -40,6 +40,10 @@ const TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES: &[&str] = &[
 const TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES: &[&str] = &["windows.sandbox=\"mxc\""];
 #[cfg(not(windows))]
 const TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES: &[&str] = &[];
+// Hosted loopback verification uses Codex's RestrictedToken sandbox; normal product Tasks keep MxC.
+#[cfg(all(windows, any(test, feature = "r2-e2e")))]
+const TASK_LOOPBACK_TEST_PERMISSION_PROFILE_PLATFORM_OVERRIDES: &[&str] =
+    &["windows.sandbox=\"unelevated\""];
 const TASK_PERMISSION_PROFILE_SUFFIX_OVERRIDES: &[&str] =
     &["permissions.d4p-agent-task.network.enabled=false"];
 const TASK_BASE_DENY_GLOBS: &[&str] = &["**/*.env", "**/.env.*", "**/.ssh/**", "**/secrets/**"];
@@ -1469,9 +1473,26 @@ fn build_codex_command_with_model_and_task_tool(
         for setting in project_config_overrides {
             task_command.arg("-c").arg(setting);
         }
+        #[cfg(any(test, feature = "r2-e2e"))]
+        let platform_overrides = {
+            #[cfg(windows)]
+            {
+                if test_responses_api.is_some() {
+                    TASK_LOOPBACK_TEST_PERMISSION_PROFILE_PLATFORM_OVERRIDES
+                } else {
+                    TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES
+            }
+        };
+        #[cfg(not(any(test, feature = "r2-e2e")))]
+        let platform_overrides = TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES;
         for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES
             .iter()
-            .chain(TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES.iter())
+            .chain(platform_overrides.iter())
         {
             task_command.arg("-c").arg(setting);
         }
@@ -2374,6 +2395,70 @@ mod tests {
             None,
         )
         .is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn loopback隔離TaskだけRestrictedTokenを使い通常TaskはMxCを維持する() {
+        let executable = Path::new(r"C:\codex.exe");
+        let workspace = Path::new(r"C:\workspace");
+        let scratch = workspace.join(".d4p-tmp-test");
+        let loopback = CodexCliTestResponses {
+            port: 43129,
+            codex_home: PathBuf::from(r"C:\synthetic\codex-home"),
+            requires_openai_auth: false,
+        };
+        let loopback_command = build_codex_command(
+            executable,
+            workspace,
+            CodexSandbox::WorkspaceWrite,
+            Some(&scratch),
+            &[],
+            Some(&loopback),
+        )
+        .expect("loopback fixture Task command");
+        let loopback_args: Vec<_> = loopback_command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect();
+        assert!(loopback_args
+            .windows(2)
+            .any(|pair| pair == ["-c", "windows.sandbox=\"unelevated\""]));
+        assert!(!loopback_args
+            .windows(2)
+            .any(|pair| pair == ["-c", "windows.sandbox=\"mxc\""]));
+        assert!(loopback_args.windows(2).any(|pair| {
+            pair[0] == "-c" && pair[1] == "permissions.d4p-agent-task.network.enabled=false"
+        }));
+        let filesystem_override = loopback_args
+            .windows(2)
+            .find(|pair| {
+                pair[0] == "-c"
+                    && pair[1].starts_with("permissions.d4p-agent-task.filesystem={")
+            })
+            .map(|pair| pair[1].as_str())
+            .expect("loopback Task filesystem deny profile");
+        assert!(filesystem_override.contains("\":root\"=\"deny\""));
+
+        let production_command = build_codex_command(
+            executable,
+            workspace,
+            CodexSandbox::WorkspaceWrite,
+            Some(&scratch),
+            &[],
+            None,
+        )
+        .expect("normal product Task command");
+        let production_args: Vec<_> = production_command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect();
+        assert!(production_args
+            .windows(2)
+            .any(|pair| pair == ["-c", "windows.sandbox=\"mxc\""]));
+        assert!(!production_args
+            .windows(2)
+            .any(|pair| pair == ["-c", "windows.sandbox=\"unelevated\""]));
     }
 
     #[test]
