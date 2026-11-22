@@ -448,6 +448,9 @@ def run(source_commit: str, evidence_dir: Path, run_root: Path) -> dict[str, Any
             {
                 "GUI_SHELL_EXPORT_E2E_CAPTURE_DIR": str(capture_dir),
                 "GUI_SHELL_EXPORT_E2E_UPDATE_TRUST_FILE": str(trust_input_path),
+                # Rustのstd::env::temp_dir()も検証済みの専用run rootへ束縛する。
+                "TEMP": str(run_root),
+                "TMP": str(run_root),
             }
         )
 
