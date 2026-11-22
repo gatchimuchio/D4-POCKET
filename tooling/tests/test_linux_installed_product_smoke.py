@@ -5013,6 +5013,7 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                         "mcp_function_calls": 0,
                         "mcp_function_outputs": 0,
                         "required_input_marker_observed": False,
+                        "tool_output": "PRIVATE_TOOL_OUTPUT_CANARY",
                         "request_shapes": [
                             {
                                 "input_items": 1,
@@ -5162,6 +5163,63 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
         self.assertNotIn(
             "mcp__d4p_task_request__d4_submit_mcp_tool_request", rendered
         )
+
+    def test_response_fixture_diagnostics_support_complete_task_without_raw_output(
+        self,
+    ) -> None:
+        responses_server = types.SimpleNamespace(
+            snapshot=lambda: {
+                "agent_task_diagnostics": [],
+                "rejections": [],
+                "scenarios": [
+                    {
+                        "name": "complete",
+                        "posts": 2,
+                        "tool_calls": 1,
+                        "tool_outputs": 1,
+                        "mcp_function_calls": 0,
+                        "mcp_function_outputs": 0,
+                        "required_input_marker_observed": False,
+                        "request_shapes": [
+                            {
+                                "input_items": 1,
+                                "function_call_output_items": 0,
+                                "exec_command_offered": True,
+                                "task_mcp_tool_offered": False,
+                                "task_mcp_tool_descriptors": [],
+                            },
+                            {
+                                "input_items": 2,
+                                "function_call_output_items": 1,
+                                "exec_command_offered": True,
+                                "task_mcp_tool_offered": False,
+                                "task_mcp_tool_descriptors": [],
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+
+        diagnostics = _installed_task_response_fixture_diagnostics(
+            responses_server, "complete", 0
+        )
+
+        self.assertEqual(diagnostics["state"], "read")
+        self.assertEqual(
+            diagnostics["scenario_counts"],
+            {
+                "responses_posts": 2,
+                "tool_calls": 1,
+                "tool_outputs": 1,
+                "mcp_function_calls": 0,
+                "mcp_function_outputs": 0,
+                "required_input_marker_observed": False,
+            },
+        )
+        rendered = json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)
+        self.assertNotIn("tool_output_sha256", rendered)
+        self.assertNotIn("PRIVATE_TOOL_OUTPUT_CANARY", rendered)
 
     def test_response_fixture_diagnostics_reject_unhashable_event_values(self) -> None:
         responses_server = types.SimpleNamespace(

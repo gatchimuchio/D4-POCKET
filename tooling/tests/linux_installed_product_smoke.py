@@ -5812,7 +5812,7 @@ def _installed_task_response_fixture_diagnostics(
 ) -> dict[str, object]:
     if (
         not isinstance(scenario_name, str)
-        or scenario_name not in {"mcp_proposal", "mcp_followup"}
+        or scenario_name not in {"complete", "mcp_proposal", "mcp_followup"}
         or type(first_diagnostic_index) is not int
         or first_diagnostic_index < 0
     ):
@@ -6264,6 +6264,12 @@ def _run_installed_agent_task_acceptance(
                 expected_status,
                 task_id=task_ids[-1],
                 timeout=wait_seconds,
+                diagnostic_audit_path=audit_store / "audit.jsonl",
+                diagnostic_response_fixture=(
+                    responses_server,
+                    "complete",
+                    0,
+                ),
             )
             result_hash_match = re.search(
                 r"結果hash:\s*(sha256:[0-9a-f]{64})", completed_snapshot
