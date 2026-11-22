@@ -5780,10 +5780,15 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
 
-    fn call(broker: &mut Broker, operation: BrokerOperation, payload: Value) -> BrokerResponse {
+    fn call_with_session(
+        broker: &mut Broker,
+        session_id: &str,
+        operation: BrokerOperation,
+        payload: Value,
+    ) -> BrokerResponse {
         let mut request = BrokerRequestEnvelope::command_envelope_at(
             "update-test",
-            "session-1",
+            session_id,
             &format!("nonce-{}", broker.audit_events().len()),
             &BrokerRequestEnvelope::current_issued_at(),
         );
@@ -5791,6 +5796,10 @@ mod tests {
         request.payload = Some(payload);
         request.refresh_payload_hash();
         broker.handle(request)
+    }
+
+    fn call(broker: &mut Broker, operation: BrokerOperation, payload: Value) -> BrokerResponse {
+        call_with_session(broker, "session-1", operation, payload)
     }
 
     #[cfg(target_os = "linux")]
@@ -8831,8 +8840,9 @@ mod tests {
         broker.set_desktop_product_install_local_app_data(local_app_data.clone());
         assert!(broker.updates.is_empty());
 
-        let checked = call(
+        let checked = call_with_session(
             &mut broker,
+            "windows-e04-seed",
             BrokerOperation::更新確認,
             json!({
                 "版": VERSION,
