@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "evidence_id": "W-E04-LINUX-INSTALLED-LIFECYCLE-ACTIONS-352",
+  "source": {
+    "workflow_run_url": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/45010590651",
+    "job_url": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/45010590651/job/137171841255",
+    "job_id": 137171841255,
+    "workflow": ".github/workflows/linux-manual-export-build.yml",
+    "event": "workflow_dispatch",
+    "run_number": 352,
+    "acceptance_scope": "debian_setup_lifecycle",
+    "conclusion": "success",
+    "duration_seconds": 688,
+    "job_duration_seconds": 682,
+    "branch": "codex/w-e03-linux-export-runtime-20261122-01",
+    "source_commit": "71c3b7dd9e84dc471bcd1c0229db684c765c7cfb"
+  },
+  "classification": {
+    "evidence_class": "HOSTED_OS_PRODUCT",
+    "runtime_evidence_class": "LIVE_RUNTIME",
+    "platform": "GitHub-hosted Ubuntu 24.04 amd64 with dbus-run-session and Xvfb/X11",
+    "authority_verified": false,
+    "real_owner_authority": false,
+    "owner_decisions": "run-scoped test identity and test-only Owner path",
+    "update_tls_and_signing_identity": "run-scoped test identity",
+    "formal_distribution_claimed": false,
+    "release_claimed": false
+  },
+  "lifecycle": {
+    "apt_installed_setup_package": true,
+    "initial_product_version": "0.1.1",
+    "update_candidate_version": "0.1.2",
+    "same_source_bundle_provenance_verified": true,
+    "package_hash_and_signature_verified_in_run": true,
+    "download_stage_activation_rejected_then_separately_approved": true,
+    "rollback_to_initial_version": true,
+    "installed_export_and_uninstall": true,
+    "user_data_preserved": true,
+    "durable_audit": true,
+    "owned_process_cleanup": true,
+    "workflow_step_10_release_build": "success",
+    "workflow_step_13_installed_setup_lifecycle": "success",
+    "workflow_step_14_package_owned_cleanup": "success",
+    "apt_setup_package_upgrade_reinstall_downgrade_purge_step_11": "skipped"
+  },
+  "output_artifacts": {
+    "downloadable_run_artifacts": false,
+    "exact_generated_package_hashes_in_repository": false,
+    "note": "The installed-acceptance helper verified candidate hash, size, signature, and source provenance in the run. The run exposed no downloadable artifact, so generated package hash values are not copied into this repository record."
+  },
+  "phase_status": {
+    "developer_verification": "PASS",
+    "w_e04": "OPEN",
+    "e2_e6_and_release": "NOT_CLOSED"
+  },
+  "limitations": [
+    "The hosted test used run-scoped test identities and did not exercise real Owner authority or production signing.",
+    "Xvfb/X11 on a GitHub-hosted runner does not establish behavior on a physical Linux desktop or compositor.",
+    "This run exercised APT installation of the Setup package and the installed product's Broker-mediated update, rollback, export, and uninstall. It did not run the separate APT Setup-package upgrade/reinstall/downgrade/purge scope.",
+    "This Developer verification does not close W-E04, E2, E3, E4, E5, E6, formal distribution, or Release."
+  ]
+}
