@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "evidence_id": "W-E04-LINUX-SETUP-APT-LIFECYCLE-ACTIONS-353",
+  "source": {
+    "workflow_run_url": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/45012218121",
+    "job_url": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/45012218121/job/137176802688",
+    "job_id": 137176802688,
+    "workflow": ".github/workflows/linux-manual-export-build.yml",
+    "event": "workflow_dispatch",
+    "run_number": 353,
+    "acceptance_scope": "debian_setup_package",
+    "conclusion": "success",
+    "started_at": "2026-11-22T10:23:35Z",
+    "completed_at": "2026-11-22T10:30:46Z",
+    "duration_seconds": 431,
+    "branch": "codex/w-e03-linux-export-runtime-20261122-01",
+    "source_commit": "29d758641d24147aadee2fe3993857dffc6f6387"
+  },
+  "classification": {
+    "evidence_class": "HOSTED_OS_PRODUCT",
+    "runtime_evidence_class": "LIVE_RUNTIME",
+    "platform": "GitHub-hosted Ubuntu 24.04 amd64 with Xvfb/X11",
+    "authority_verified": false,
+    "real_owner_authority": false,
+    "owner_decisions": "not exercised by this Setup package lifecycle scope",
+    "formal_distribution_claimed": false,
+    "release_claimed": false
+  },
+  "lifecycle": {
+    "apt_setup_package_install": true,
+    "apt_setup_package_upgrade": true,
+    "invalid_candidate_rejected_without_replacing_installed_version": true,
+    "apt_reinstall_recovery": true,
+    "apt_downgrade": true,
+    "apt_upgrade_after_downgrade": true,
+    "apt_purge": true,
+    "installed_launcher_opened_and_normally_closed": true,
+    "package_has_no_maintainer_scripts": true,
+    "isolated_xdg_user_data_sentinel_preserved": true,
+    "workflow_step_10_release_build": "success",
+    "workflow_step_11_apt_setup_package_lifecycle": "success",
+    "workflow_step_12_package_owned_cleanup": "success",
+    "workflow_post_checkout_clean": "success"
+  },
+  "output_artifacts": {
+    "downloadable_run_artifacts": false,
+    "package_hashes_and_source_tree_hash_reported_in_run_summary": true,
+    "exact_generated_package_hashes_persisted_in_repository": false,
+    "note": "The run summary reported the generated package and source-tree hashes. No downloadable workflow artifact was published, so those generated hash values are not independently retained in this repository evidence."
+  },
+  "phase_status": {
+    "developer_verification": "PASS",
+    "w_e04": "OPEN",
+    "e2_e6_and_release": "NOT_CLOSED"
+  },
+  "limitations": [
+    "This run verifies the Ubuntu 24.04 amd64 APT Setup package lifecycle under Xvfb/X11; it does not establish behavior on a physical Linux desktop or a different compositor.",
+    "The run-scoped Developer fixture does not establish real Owner authority, production signing, formal distribution, or Release readiness.",
+    "This scope covers Setup package installation, upgrade, invalid-candidate rejection, reinstall recovery, downgrade, purge, launcher normal exit, and preservation of isolated XDG user data. The product Broker-managed update/rollback/export/uninstall path is recorded separately in Actions #352.",
+    "This Developer verification does not close W-E04, E2, E3, E4, E5, E6, formal distribution, or Release."
+  ]
+}
