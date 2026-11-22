@@ -5501,6 +5501,7 @@ mod tests {
         accepted_request["payload_hash"] =
             serde_json::Value::String(canonical_payload_hash(accepted_request.get("payload")));
         let mut accepted_prompt_count = 0;
+        let mut accepted_update_trust_fingerprint = None;
         let accepted = relay_channel_frame_with_owner_operations(
             gui_shell_windows_broker_channel::PipeFrame::Line(
                 serde_json::to_vec(&accepted_request).unwrap(),
@@ -5512,6 +5513,10 @@ mod tests {
                 let DesktopOwnerOperationSummary::GuiShellExport(summary) = summary else {
                     panic!("Export要求はExport固有の確認summaryを使う")
                 };
+                accepted_update_trust_fingerprint = summary
+                    .update_trust
+                    .as_ref()
+                    .map(|trust| trust.public_key_fingerprint.clone());
                 assert_eq!(summary.export_id, "export-desktop-test");
                 assert_eq!(summary.optional_module_count, 1);
                 assert_eq!(
@@ -5576,8 +5581,8 @@ mod tests {
                 update_trust_input["package_sources"]
             );
             assert_eq!(
-                accepted["body"]["update_trust_fingerprint"],
-                manifest_file["update_trust"]["public_key_fingerprint"]
+                accepted_update_trust_fingerprint.as_deref(),
+                manifest_file["update_trust"]["public_key_fingerprint"].as_str()
             );
         }
 

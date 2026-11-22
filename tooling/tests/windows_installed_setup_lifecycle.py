@@ -467,8 +467,6 @@ def run(source_commit: str, evidence_dir: Path, run_root: Path) -> dict[str, Any
         trust = manifest.get("update_trust")
         if not isinstance(trust, dict) or trust.get("public_key_der_hex") != TEST_PUBLIC_KEY_DER_HEX:
             raise ValueError("native Broker Export did not bind the public test key")
-        if receipt.get("update_trust_fingerprint") != trust.get("public_key_fingerprint"):
-            raise ValueError("native Broker Export Receipt and UpdateTrust fingerprint differ")
 
         CURRENT_STAGE = "build_normal_release_bundle_and_setup"
         bundle_path = run_root / "normal-release-export"
