@@ -16,11 +16,11 @@ from tooling.current_governance_check import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ADOPTION_DIRECTORY = "docs/QE_2026-11-22"
+ADOPTION_DIRECTORY = "docs/QE_2026-11-23"
 DOCUMENT_PATHS = {
-    "製品仕様": f"{ADOPTION_DIRECTORY}/01_D4Pocket_SPEC_v9_NLC06.jsonl",
-    "統合工程": f"{ADOPTION_DIRECTORY}/02_D4Pocket_PLAN_v9_NLC06.jsonl",
-    "施工指示": f"{ADOPTION_DIRECTORY}/03_D4Pocket_CODEX_v9_NLC06.jsonl",
+    "製品仕様": f"{ADOPTION_DIRECTORY}/01_D4Pocket_SPEC_v9_NLC07.jsonl",
+    "統合工程": f"{ADOPTION_DIRECTORY}/02_D4Pocket_PLAN_v9_NLC07.jsonl",
+    "施工指示": f"{ADOPTION_DIRECTORY}/03_D4Pocket_CODEX_v9_NLC07.jsonl",
 }
 EXPECTED_RECORD_COUNTS = {"製品仕様": 438, "統合工程": 289, "施工指示": 1453}
 INDEX_PATH = "規定/正本索引.json"

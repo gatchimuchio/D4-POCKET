@@ -116,12 +116,16 @@
       "sha256": "afb786a5c610ef7ea0663e0df991ae348a1602d2bf8b7d900a272e5e754d1640"
     },
     {
+      "path": ".github/workflows/windows-manual-we03-export-runtime.yml",
+      "sha256": "429f5d0198e2ba5b98193168c289913425e29d7bce81bc21c63d03b6269e225e"
+    },
+    {
       "path": ".gitignore",
       "sha256": "8897105ba6dcc448b547d82a695cb40801e43a141e58ad3dbb6481fffe2befda"
     },
     {
       "path": "AGENTS.md",
-      "sha256": "0dbd01032c41b1c96cd63c682bd4af98aea251e1ea2ad06d9fb3a7ec4face329"
+      "sha256": "ab2a8cc4177c9782929925e333827d97ffe3c2e4d959a7bead3438cc60d9db93"
     },
     {
       "path": "AUDIT.md",
@@ -185,7 +189,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "597d7e263acb9f15b2990f1d9a3b644a7f48446a77fb429ebd59c95015e74d6b"
+      "sha256": "ed3073025bd463fca64baa6faab070a0014091d40ea7c3f0e0c05e90c1fab650"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -193,7 +197,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "88e73a96f2ae96d7fa1c4bf1ed03d4ea39eecf987b03fc9e7ac117e77f898847"
+      "sha256": "ba17c3e8f10022c9eaf31e41754653d05f46f09070aa5a64bc890bf68b58780d"
     },
     {
       "path": "SECURITY.md",
@@ -1657,7 +1661,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "1ab996b7b63ca452441db60fd5bc7657dab379fd708a070cf96b988641fdd4bc"
+      "sha256": "002b60c0d16fd139cd234dfe63a4a64b9b34b79542f57791dc7e08215ca22f5f"
     },
     {
       "path": "docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl",
@@ -4149,7 +4153,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "f44a638c487e78a49c58c2753f4bcea9919cbecf7d3cd241c834c27464b1c91b"
+      "sha256": "fc0061fb476e117e15783a14fbb7c674fc1e7e12ba9abc26397b6216486c76f4"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -4189,7 +4193,7 @@
     },
     {
       "path": "native/rust_helper/src/bin/r2_e2e_responses.rs",
-      "sha256": "bbfcbd1584fbf34a46c8bbd2e10da83f9ce02ff1be2c92d66827bde0c8dcc415"
+      "sha256": "32c14e457dd820822ecb2b5a516449c4bb04790d79bc6b5b27b2089b36a1c4ce"
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
@@ -4365,7 +4369,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "72540399593b3b29d9b774cf7b66af9057066966d05e0fe3adc7105fce38483d"
+      "sha256": "603e911b2314867eb738b86d493e356d1a328a7d6558bbcc6df40009b79cd75c"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -4513,7 +4517,7 @@
     },
     {
       "path": "native/rust_helper/tests/agent_task_crash_recovery_e2e.rs",
-      "sha256": "a7bfaf086a95260b79ba7f1f15bf713c6ed5e4c3c5c43fbec76b89db75f88b81"
+      "sha256": "614ad47bb8decaf735ae19f733cb488df5a33391dbcc0677a3a78d0a1991179b"
     },
     {
       "path": "native/rust_helper/tests/agent_task_production_e2e.rs",
@@ -4553,7 +4557,7 @@
     },
     {
       "path": "native/rust_helper/tests/support/codex_loopback_responses.rs",
-      "sha256": "dca5969b7ff3f33dcba69aded78a6525d56f5ad0e6f764330c155223dcdb3e91"
+      "sha256": "1521b5bae266d74b38597e84fb2197d0acc74fffe52e4b0442e481f01897f11b"
     },
     {
       "path": "native/rust_helper/tests/unit/agent_task_fixture_fs.rs",
@@ -5941,7 +5945,7 @@
     },
     {
       "path": "tooling/current_governance_check.py",
-      "sha256": "c3fddadee9ff9cf33e8ef73678070cf511c69109479a12b88b83d56000d8a997"
+      "sha256": "cc22e55e00275694a94a18e386c24bb2ee089d1427d061151963413babac4a13"
     },
     {
       "path": "tooling/device_link_live_check.py",
@@ -6169,7 +6173,7 @@
     },
     {
       "path": "tooling/tests/test_current_governance_check.py",
-      "sha256": "590c0c0bb4d19f5959a50788ff3a960768c8dda0e66cf811d4b3bf1ea3fd757e"
+      "sha256": "c9c727b21b724db3355958843163ca9edd338ee34779dddd99640346372e5a82"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -6245,7 +6249,11 @@
     },
     {
       "path": "tooling/tests/test_windows_installed_setup_lifecycle.py",
-      "sha256": "1c43e1f408528c36573a460f71f5ceddc5cfc7fdc53a9d258919445912f0d739"
+      "sha256": "f90b93dbe09b227719d94c439f38d70d30c72631956bb230ef616ccb5e6b33ad"
+    },
+    {
+      "path": "tooling/tests/test_windows_we03_export_runtime.py",
+      "sha256": "450e590d32ac0f84e11e99bb29fe981eef844a874f454353942f633f53b9d319"
     },
     {
       "path": "tooling/tests/windows_broker_export_manifest_compare.py",
@@ -6257,11 +6265,15 @@
     },
     {
       "path": "tooling/tests/windows_installed_setup_lifecycle.ps1",
-      "sha256": "3d10dfe3533e3c8c130e5094d47907ec36e98ac722e58f243eed66792bd2f458"
+      "sha256": "71d6dcd654ea1ccf00977e00c1a929a668a80c40884561c384ec91f389609723"
     },
     {
       "path": "tooling/tests/windows_installed_setup_lifecycle.py",
-      "sha256": "6cf1a90df2187fafa2c651712883423e7007608426eaedd6ece88c37810e447b"
+      "sha256": "5a2fa10e563ea8b739408947e83781d04882b70380e7e6c3e680cf9f4d84bc73"
+    },
+    {
+      "path": "tooling/tests/windows_we03_export_runtime.py",
+      "sha256": "8c0c9bcfaa470b1d035ee8b6585b518cdbbd7b00de397c54a23d734088743ed3"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
@@ -6293,7 +6305,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "cd0e9afe19277fe06029cf8ba7f1c3ad8f8147bde06d2cb976f32ad8505003eb"
+      "sha256": "21ad109f6deeb76c84de023331ec535d78d183629aa499868e5d819768f808ad"
     }
   ]
 }
