@@ -86,6 +86,34 @@ def _credential_free_environment() -> dict[str, str]:
     return environment
 
 
+def _task_e2e_environment(
+    base_environment: dict[str, str],
+    *,
+    codex_cli: Path,
+    runtime_root: Path,
+    manifest_path: Path,
+    manifest_sha256: str,
+    source_commit: str,
+    app_id: str,
+    audit_store_id: str,
+    evidence_path: Path,
+) -> dict[str, str]:
+    environment = base_environment.copy()
+    environment.update(
+        {
+            "GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI": str(codex_cli),
+            "GUI_SHELL_W_E03_EXPORT_RUNTIME_ROOT": str(runtime_root),
+            "GUI_SHELL_W_E03_MANIFEST_PATH": str(manifest_path),
+            "GUI_SHELL_W_E03_MANIFEST_SHA256": manifest_sha256,
+            "GUI_SHELL_W_E03_SOURCE_COMMIT": source_commit,
+            "GUI_SHELL_W_E03_APP_ID": app_id,
+            "GUI_SHELL_W_E03_AUDIT_STORE_ID": audit_store_id,
+            "GUI_SHELL_W_E03_EVIDENCE_PATH": str(evidence_path),
+        }
+    )
+    return environment
+
+
 def create_manifest_only_input(
     path: Path, *, app_id: str, audit_store_id: str
 ) -> tuple[bytes, str]:
@@ -287,16 +315,16 @@ def run(codex_cli: Path) -> dict[str, Any]:
         evidence_dir.mkdir()
         evidence_path = evidence_dir / "windows-we03-runtime.json"
 
-        environment = _credential_free_environment()
-        environment.update(
-            {
-                "GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI": str(codex_cli),
-                "GUI_SHELL_W_E03_EXPORT_RUNTIME_ROOT": str(runtime_root),
-                "GUI_SHELL_W_E03_MANIFEST_PATH": str(runtime_manifest),
-                "GUI_SHELL_W_E03_MANIFEST_SHA256": manifest_sha256,
-                "GUI_SHELL_W_E03_SOURCE_COMMIT": source_commit,
-                "GUI_SHELL_W_E03_EVIDENCE_PATH": str(evidence_path),
-            }
+        environment = _task_e2e_environment(
+            _credential_free_environment(),
+            codex_cli=codex_cli,
+            runtime_root=runtime_root,
+            manifest_path=runtime_manifest,
+            manifest_sha256=manifest_sha256,
+            source_commit=source_commit,
+            app_id=app_id,
+            audit_store_id=audit_store_id,
+            evidence_path=evidence_path,
         )
         cargo_command = [
             sys.executable,

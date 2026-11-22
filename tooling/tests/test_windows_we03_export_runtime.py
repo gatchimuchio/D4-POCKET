@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from tooling.tests.windows_we03_export_runtime import (
     _write_actions_summary,
+    _task_e2e_environment,
     create_manifest_only_input,
     validate_task_evidence,
 )
@@ -38,6 +39,29 @@ class WindowsWe03ExportRuntimeTests(unittest.TestCase):
                     app_id="d4-pocket-app-11111111111111111111111111111111",
                     audit_store_id="audit-store-fedcba9876543210fedcba9876543210",
                 )
+
+    def test_task_environment_binds_exported_manifest_identity(self) -> None:
+        app_id = "d4-pocket-app-0123456789abcdef0123456789abcdef"
+        audit_id = "audit-store-fedcba9876543210fedcba9876543210"
+        base = {"PATH": "C:\\runner\\bin"}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            environment = _task_e2e_environment(
+                base,
+                codex_cli=root / "codex.exe",
+                runtime_root=root / "runtime",
+                manifest_path=root / "runtime" / "product_manifest.json",
+                manifest_sha256="a" * 64,
+                source_commit="b" * 40,
+                app_id=app_id,
+                audit_store_id=audit_id,
+                evidence_path=root / "evidence.json",
+            )
+
+        self.assertEqual(environment["GUI_SHELL_W_E03_APP_ID"], app_id)
+        self.assertEqual(environment["GUI_SHELL_W_E03_AUDIT_STORE_ID"], audit_id)
+        self.assertEqual(environment["GUI_SHELL_W_E03_SOURCE_COMMIT"], "b" * 40)
+        self.assertNotIn("GUI_SHELL_W_E03_APP_ID", base)
 
     def test_task_evidence_requires_runtime_scope_and_real_owner_boundary(self) -> None:
         evidence = {
