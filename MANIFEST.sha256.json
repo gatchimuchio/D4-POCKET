@@ -96,6 +96,10 @@
       "sha256": "9ed433c0f4d2445ea2d02ee33aa76823e329a1bccc825c605cb7d3d2c51be3ed"
     },
     {
+      "path": ".github/workflows/linux-we03-export-runtime.yml",
+      "sha256": "5351338cfafbb619ca9e83760eb7fdf555440a04608cc36d400ccb595c126299"
+    },
+    {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
       "sha256": "1b01b890c5ee08493dae5c158615ed0e4baa2b96eb13398ba68f3c77b90945df"
     },
@@ -4333,7 +4337,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "1a826a5d95c55d8b8c3d1af0eba807be66c47c09db3efac771de6d86ff8432d5"
+      "sha256": "47784acf9fcf5ef781fcdd00dd87888a8e929138dcdd8d911793704c97b10da2"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -6104,6 +6108,10 @@
       "sha256": "ae0fc969429c3cfeba092fbf731f0c4b2af6316172d4f222da7fdcf67bb29e05"
     },
     {
+      "path": "tooling/tests/linux_we03_export_runtime.py",
+      "sha256": "33a97bf70c38f477f7f31eeb1d8892b6c571873430738d20261bfc391e72f0a8"
+    },
+    {
       "path": "tooling/tests/macos_export_installer_smoke.py",
       "sha256": "50fc4397232651c6268dc9a5444e6a88945bee29cc8f85c379f2ae3717697d27"
     },
@@ -6174,6 +6182,10 @@
     {
       "path": "tooling/tests/test_linux_update_catalog_fixture.py",
       "sha256": "eabc94adff83591e51769d43c488a4cbb95e62b30107a2dd1b0b7603eb479daf"
+    },
+    {
+      "path": "tooling/tests/test_linux_we03_export_runtime.py",
+      "sha256": "c02ddaa262e6add842ffcc3a78a5ea2711664cce09a983bfb1f6bb26fd49ea1d"
     },
     {
       "path": "tooling/tests/test_linux_workflow_helpers.py",

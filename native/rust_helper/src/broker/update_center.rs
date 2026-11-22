@@ -5293,8 +5293,34 @@ mod tests {
         )
     }
 
-    const INSTALL_APP_ID: &str = "d4-pocket-app-11111111111111111111111111111111";
-    const INSTALL_AUDIT_ID: &str = "audit-store-22222222222222222222222222222222";
+    const INSTALL_APP_ID: &str = match option_env!("GUI_SHELL_PRODUCT_APP_ID") {
+        Some(value) => value,
+        None => "d4-pocket-app-11111111111111111111111111111111",
+    };
+    const INSTALL_AUDIT_ID: &str = match option_env!("GUI_SHELL_PRODUCT_AUDIT_STORE_ID") {
+        Some(value) => value,
+        None => "audit-store-22222222222222222222222222222222",
+    };
+
+    #[cfg(target_os = "linux")]
+    fn assert_install_test_identity_is_well_formed() {
+        fn valid(value: &str, prefix: &str) -> bool {
+            value.strip_prefix(prefix).is_some_and(|suffix| {
+                suffix.len() == 32
+                    && suffix
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            })
+        }
+
+        assert_eq!(
+            option_env!("GUI_SHELL_PRODUCT_APP_ID").is_some(),
+            option_env!("GUI_SHELL_PRODUCT_AUDIT_STORE_ID").is_some(),
+            "test-only installed product identity must be supplied as a complete pair"
+        );
+        assert!(valid(INSTALL_APP_ID, "d4-pocket-app-"));
+        assert!(valid(INSTALL_AUDIT_ID, "audit-store-"));
+    }
 
     #[test]
     fn linux_installed_catalog_fixture_signature_is_canonical_and_valid() {
@@ -8580,6 +8606,8 @@ mod tests {
     fn linux_installed_acceptance_stages_real_export_and_registers_entry() {
         use ring::signature::{Ed25519KeyPair, KeyPair};
         use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+
+        assert_install_test_identity_is_well_formed();
 
         let package_path = std::path::PathBuf::from(
             std::env::var_os("D4P_LINUX_ACCEPTANCE_PACKAGE")

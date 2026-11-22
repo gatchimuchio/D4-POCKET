@@ -1,0 +1,140 @@
+name: Linux W-E03 isolated Export Runtime verification
+
+'on':
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-we03-export-runtime-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  installed-independent-export:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: 対象commitをclean checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: run専用検証rootを作成
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_root="$RUNNER_TEMP/d4p-linux-we03-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          test ! -e "$expected_root"
+          mkdir -m 700 -- "$expected_root"
+          printf 'D4P_EXPORT_ROOT=%s\n' "$expected_root" >> "$GITHUB_ENV"
+          printf 'D4P_FLUTTER_ROOT=%s/flutter\n' "$expected_root" >> "$GITHUB_ENV"
+          printf '%s/bin\n' "$expected_root/flutter" >> "$GITHUB_PATH"
+
+      - name: Linux Desktop／GTK／AT-SPI環境を導入
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            at-spi2-core bubblewrap clang cmake dbus-daemon g++ gnome-keyring \
+            libglib2.0-bin libgtk-3-dev ninja-build openbox pkg-config \
+            python3-dbus python3-pyatspi strace xdotool xvfb
+
+      - name: Codex process sandbox capability gate
+        id: sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe="$D4P_EXPORT_ROOT/bwrap-preflight.txt"
+          if bwrap --unshare-user --unshare-pid --unshare-net --die-with-parent \
+            --ro-bind / / --dev /dev --proc /proc -- /bin/true >"$probe" 2>&1; then
+            printf 'available=true\n' >> "$GITHUB_OUTPUT"
+            printf '\n- Codex sandbox: rootless user／PID／network namespaces are available.\n' >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf 'available=false\n' >> "$GITHUB_OUTPUT"
+            printf '\n- W-E03 runtime: NOT_RUN; hosted runner denied the required Codex sandbox. Product behavior is not marked FAIL.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Flutter／Rust toolchainを固定
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          case "$GITHUB_REF" in
+            refs/heads/main|refs/heads/codex/*) ;;
+            *) echo 'mainまたは明示された検証codex branch以外を拒否した'; exit 1 ;;
+          esac
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$D4P_FLUTTER_ROOT"
+          flutter_commit="$(git -C "$D4P_FLUTTER_ROOT" rev-parse HEAD)"
+          test "$flutter_commit" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+          flutter precache --linux
+          flutter --version --machine
+          rustc --version
+          cargo --version
+          printf '\n- Source commit: `%s`; Flutter: `3.44.0` (`%s`); Rust: `%s`.\n' \
+            "$GITHUB_SHA" "$flutter_commit" "$(rustc --version)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: pinned Codex CLIを検証rootへ取得
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="$D4P_EXPORT_ROOT/codex-cli-0.163.0-alpha.10.2-linux-x64"
+          test ! -e "$package_dir"
+          mkdir -m 0700 "$package_dir"
+          curl --fail --location --output "$package_dir/package.tgz" \
+            https://registry.npmjs.org/@openai/codex/-/codex-0.163.0-alpha.10.2-linux-x64.tgz
+          digest="$(openssl dgst -sha512 -binary "$package_dir/package.tgz" | openssl base64 -A)"
+          test "$digest" = 'S3Om6e/GIhhheqWmc/aRCGM55ibvhnpYKq1gJ4bwCYeCNEtXEd7+L8xa5aX+JVmV0wL1oOFZi/R/R8iSLriHTA=='
+          tar -xzf "$package_dir/package.tgz" -C "$package_dir"
+          cli="$(find "$package_dir/package" -type f -name codex -print -quit)"
+          test -n "$cli" && test -f "$cli"
+          chmod 0700 "$cli"
+          printf 'D4P_LINUX_TASK_CODEX_CLI=%s\n' "$cli" >> "$GITHUB_ENV"
+          printf '\n- Codex CLI package `0.163.0-alpha.10.2` SHA-512 verified; runtime is restricted to a run-owned loopback Responses fixture.\n' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 元D4のExport／Uninstall source productをbuild
+        shell: bash
+        env:
+          D4P_ACCEPTANCE_SCOPE: update_lifecycle
+        run: bash tooling/linux_manual_export_build.sh
+
+      - name: UI Export Manifestから独立Productをbuild／install／実Tool Task
+        if: ${{ steps.sandbox.outputs.available == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_we03_export_runtime.py \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --codex-cli "$D4P_LINUX_TASK_CODEX_CLI"
+
+      - name: W-E03 installed Runtimeが実行されたことを確認
+        if: ${{ steps.sandbox.outputs.available != 'true' }}
+        shell: bash
+        run: |
+          echo 'W-E03 installed Runtime is NOT_RUN because the hosted runner did not provide the required Codex sandbox.'
+          exit 1
+
+      - name: run専用生成物を照合してcleanup
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_root="$RUNNER_TEMP/d4p-linux-we03-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [ -e "$expected_root" ] || [ -L "$expected_root" ]; then
+            test "${D4P_EXPORT_ROOT:-}" = "$expected_root"
+            test ! -L "$expected_root"
+            resolved_root="$(realpath -e -- "$expected_root")"
+            resolved_runner_temp="$(realpath -e -- "$RUNNER_TEMP")"
+            test "$(dirname "$resolved_root")" = "$resolved_runner_temp"
+            rm -rf -- "$resolved_root"
+          fi
+          test ! -e "$expected_root"
+          test ! -L "$expected_root"
+          printf '\n- Run-owned build, test identity, Codex CLI, and acceptance roots were removed from the hosted runner.\n' >> "$GITHUB_STEP_SUMMARY"
