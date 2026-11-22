@@ -16,13 +16,13 @@ from tooling.current_governance_check import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ADOPTION_DIRECTORY = "docs/QE_2026-11-21"
+ADOPTION_DIRECTORY = "docs/QE_2026-11-22"
 DOCUMENT_PATHS = {
-    "製品仕様": f"{ADOPTION_DIRECTORY}/01_D4Pocket_SPEC_v9_NLC04.jsonl",
-    "統合工程": f"{ADOPTION_DIRECTORY}/02_D4Pocket_PLAN_v9_NLC04.jsonl",
-    "施工指示": f"{ADOPTION_DIRECTORY}/03_D4Pocket_CODEX_v9_NLC04.jsonl",
+    "製品仕様": f"{ADOPTION_DIRECTORY}/01_D4Pocket_SPEC_v9_NLC05.jsonl",
+    "統合工程": f"{ADOPTION_DIRECTORY}/02_D4Pocket_PLAN_v9_NLC05.jsonl",
+    "施工指示": f"{ADOPTION_DIRECTORY}/03_D4Pocket_CODEX_v9_NLC05.jsonl",
 }
-EXPECTED_RECORD_COUNTS = {"製品仕様": 437, "統合工程": 288, "施工指示": 1448}
+EXPECTED_RECORD_COUNTS = {"製品仕様": 438, "統合工程": 289, "施工指示": 1453}
 INDEX_PATH = "規定/正本索引.json"
 
 
@@ -69,6 +69,22 @@ class NLC構造検査Tests(ActualDocumentsMixin, unittest.TestCase):
                 records = validate_nlc(raw)
                 self.assertEqual(EXPECTED_RECORD_COUNTS[role], len(records))
                 self.assertEqual("日本語", records["文書/宣言"]["基底言語"])
+
+    def test_開発検証と実製品Owner受入が分離されている(self) -> None:
+        spec = self.documents["製品仕様"]["統治/開発検証と製品Owner受入の分離"]
+        plan = self.documents["統合工程"]["工程/開発検証と製品Owner受入の分離"]
+        instruction = self.documents["施工指示"]["具体化/開発検証分離"]
+        self.assertIn("実製品Owner画面のクリックを要求してはならない", spec["規定"])
+        self.assertIn("native Owner確認", spec["規定"])
+        self.assertIn("E1〜E3", plan["規定"])
+        self.assertIn("W-E03施工も停止しない", plan["規定"])
+        self.assertIn("real_owner_authority=false", instruction["規定"])
+        self.assertIn("test-only制御を通常Release", instruction["規定"])
+        for key in ("結線/W-E02", "結線/W-E03"):
+            self.assertIn(spec["識別"], self.documents["製品仕様"][key]["意味参照"])
+            self.assertIn(plan["識別"], self.documents["統合工程"][key]["意味参照"])
+        for key in ("施工/W-E02", "施工/W-E03"):
+            self.assertIn(instruction["識別"], self.documents["施工指示"][key]["意味参照"])
 
     def test_BOMを拒否する(self) -> None:
         with self.assertRaises(Invalid):

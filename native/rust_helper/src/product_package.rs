@@ -1537,21 +1537,44 @@ mod tests {
         );
         fs::remove_dir_all(linux_path.parent().unwrap()).unwrap();
 
-        let mut invalid_files = linux_files_for_test();
-        invalid_files.push(("app/foreign_payload", b"not-linux"));
-        let invalid_bytes = package_with_platform(invalid_files, ProductPackagePlatform::Linux);
-        let invalid_path = write_temp(&invalid_bytes, "linux-cross-platform-payload");
-        assert_eq!(
-            extract_verified_package(
-                &invalid_path,
-                &invalid_path.parent().unwrap().join("invalid-stage"),
-                linux_expectation(Some("1.2.3")),
-            )
-            .unwrap_err()
-            .0,
-            "package_path_outside_payload"
-        );
-        fs::remove_dir_all(invalid_path.parent().unwrap()).unwrap();
+        #[cfg(unix)]
+        {
+            let mut invalid_files = linux_files_for_test();
+            invalid_files.push(("app/foreign_payload", b"not-linux"));
+            let invalid_bytes = package_with_platform(invalid_files, ProductPackagePlatform::Linux);
+            let invalid_path = write_temp(&invalid_bytes, "linux-cross-platform-payload");
+            assert_eq!(
+                extract_verified_package(
+                    &invalid_path,
+                    &invalid_path.parent().unwrap().join("invalid-stage"),
+                    linux_expectation(Some("1.2.3")),
+                )
+                .unwrap_err()
+                .0,
+                "package_path_outside_payload"
+            );
+            fs::remove_dir_all(invalid_path.parent().unwrap()).unwrap();
+        }
+
+        #[cfg(windows)]
+        {
+            let mut invalid_files = files_for_test();
+            invalid_files.push(("data/foreign_payload", b"not-windows"));
+            let invalid_bytes =
+                package_with_platform(invalid_files, ProductPackagePlatform::Windows);
+            let invalid_path = write_temp(&invalid_bytes, "windows-cross-platform-payload");
+            assert_eq!(
+                extract_verified_package(
+                    &invalid_path,
+                    &invalid_path.parent().unwrap().join("invalid-stage"),
+                    expectation(Some("1.2.3")),
+                )
+                .unwrap_err()
+                .0,
+                "package_path_outside_payload"
+            );
+            fs::remove_dir_all(invalid_path.parent().unwrap()).unwrap();
+        }
     }
 
     #[cfg(unix)]

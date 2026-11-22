@@ -1,8 +1,8 @@
 # GUI Shell ロードマップ
 
-## 現行統合製品工程（2026-11-21 v9 NLC04）
+## 現行統合製品工程（2026-11-22 v9 NLC05）
 
-現行正本は[製品仕様書 v9](docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl)・[統合工程表 v9](docs/QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl)・[施工指示書 v9](docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl)とし、採用範囲・原文固定は[v9採用記録](docs/QE_2026-11-21/採用記録.md)に従う。製品進捗は[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)を対象・時点・未閉包ごとに保持する。今回の採用でv9候補の状態は再評価しておらず、旧E/W/N状態を自動転記しない。工程の開始・退出・独立線継続は現行工程表・施工指示書だけを適用し、旧台帳を番号順schedulerへ変換しない。
+現行正本は[製品仕様書 v9](docs/QE_2026-11-22/01_D4Pocket_SPEC_v9_NLC05.jsonl)・[統合工程表 v9](docs/QE_2026-11-22/02_D4Pocket_PLAN_v9_NLC05.jsonl)・[施工指示書 v9](docs/QE_2026-11-22/03_D4Pocket_CODEX_v9_NLC05.jsonl)とし、採用範囲・原文固定は[v9 NLC05採用記録](docs/QE_2026-11-22/採用記録.md)に従う。製品進捗は[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)を対象・時点・未閉包ごとに保持する。NLC05の採用では製品状態を再評価しておらず、旧E/W/N状態を自動転記しない。工程の開始・退出・独立線継続は現行工程表・施工指示書だけを適用し、旧台帳を番号順schedulerへ変換しない。NLC05はDeveloper verificationを隔離・未信頼証拠として実製品Owner受入から分離し、Owner画面待ちで独立W-E02/W-E03施工を止めない。実製品認可・該当受入・E5/E6条件は従来どおり未成立を保持する。
 
 ### 履歴：2026-11-16 v8・2026-11-19 v8R2（非現行）
 
@@ -106,7 +106,7 @@ QE段階・BUILD_BATCH・結合後QC／QAの共通方法論はOwner採用済み�
 
 是正追補（2026-10-22、`D4-AUD-F01`）: C32の参照path正規化とroot外拒否を修正し、有限是正を`VERIFIED`として閉鎖した。Windows／WSL Ubuntuで対象6試験が各PASSし、変更していないC32対応表のPOSIX偽不在256件は0件となった。[F01是正記録](docs/specs/final-development-audit.md)を参照。製品状態と既存Release Gateを保持し、次は`D4-AUD-F03`の実績文書同期へ進む。
 
-履歴注記（2026-10-22）：QE方法論・工程・BUILD_BATCHの運用および`D4-AUD-20261022`是正手順は、[採用記録付き2026-10-22 QE統合3点](docs/QE_2026-10-22/採用記録.md)に採用記録とともに保持し、共通QE方法論として適用する。本書は工程履歴・製品ロードマップを保持する。製品要求・工程・施工の現行正本は冒頭の[v9採用記録](docs/QE_2026-11-21/採用記録.md)に束縛した三点であり、証拠状態はv8継続施工証拠・v5継続N/W受入証拠と分離する。[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)はrev5当時の機能受入れ・証拠履歴を保持する。2026-10-22当時に記録したCLOSED／FAIL、Linux native必須性、正式Q0〜Q7 `DEFERRED`、通常Release `task_execution=unsupported`／`release_ready=false`はその時点の状態として保持し、v9候補への再評価を文書採用で代替しない。出荷判定にはRelease Registryと対象候補の実証が別途必要である。以下の小単位ごとの運用記述に旧方式の残差がある場合、施工・検証・Git閉包の単位はv9工程表・施工指示書と現行AGENTS.mdに従う。
+履歴注記（2026-10-22）：QE方法論・工程・BUILD_BATCHの運用および`D4-AUD-20261022`是正手順は、[採用記録付き2026-10-22 QE統合3点](docs/QE_2026-10-22/採用記録.md)に採用記録とともに保持し、共通QE方法論として適用する。本書は工程履歴・製品ロードマップを保持する。製品要求・工程・施工の現行正本は冒頭の[v9 NLC05採用記録](docs/QE_2026-11-22/採用記録.md)に束縛した三点であり、証拠状態はv8継続施工証拠・v5継続N/W受入証拠と分離する。[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)はrev5当時の機能受入れ・証拠履歴を保持する。2026-10-22当時に記録したCLOSED／FAIL、Linux native必須性、正式Q0〜Q7 `DEFERRED`、通常Release `task_execution=unsupported`／`release_ready=false`はその時点の状態として保持し、v9候補への再評価を文書採用で代替しない。出荷判定にはRelease Registryと対象候補の実証が別途必要である。以下の小単位ごとの運用記述に旧方式の残差がある場合、施工・検証・Git閉包の単位はv9工程表・施工指示書と現行AGENTS.mdに従う。
 
 現行追補（2026-10-22、Linux導入済みMCP受入れ実行 #107）: 手動起動した`workflow_dispatch`の[実行 #107](https://github.com/gatchimuchio/D4-POCKET/actions/runs/39688466328)は検査対象のcommit `bf2a51ac955eb5b9d7b6ecccdf0a21ee0875b96c`で実行対象の処理段階がPASSした（ロールバック／書き出し／アンインストールと資格情報保管庫の受入れ段階は対象外SKIP）。導入済み製品バージョン `0.1.0`のパッケージのSHA-256は`8115cbd53177b1d507846ddb37d6e659b58b5d65d8deb0536fc63029bd14dec2`。Ubuntu 24.04 ホスト型Xvfb／X11の導入済みGTK製品から、新規要求に対するnative Owner確認の拒否ではstdio子プロセスが起動せず、別要求のOwner許可後に固定`/usr/bin/python3`の合成MCP子プロセスを起動し、`server/discover`／`tools/list`／一回だけのOwner承認付き`tools/call`を通過した。UIは`LIVE_RUNTIME`の結果ハッシュ／内容種別／監査受領票だけを表示し、結果本文はUI・Audit・ログ・受入れ記録に露出しなかった。切断拒否は子プロセス群を維持し、別のOwner許可でBroker接続を除去して所有プロセス群を停止した。導入済みアプリの通常終了、実行用ルート清掃、実行後に変更のない作業ツリー、45件を記録したファイル保存型監査連鎖／anchor HMAC検証もPASSした。成果物は生成されていない。対象はローカル合成サーバー、未署名の試験用識別情報、自動AT-SPI／キーボードによるX11受入れに限る。Wayland描画、外部Provider／資格情報注入、正式署名／配布、Linux製品全体の完成は示さない。このMCP導入済み利用経路は受入れ済みとして再試験せず、Linux必須対象の未成立の利用経路を現行進捗から続行する。`linux_native_product_support=unresolved`、通常リリース `task_execution=unsupported`、`release_ready=false`を維持する。
 

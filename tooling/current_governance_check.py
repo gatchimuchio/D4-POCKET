@@ -275,14 +275,14 @@ def governance_errors(root: Path = ROOT) -> list[str]:
         index = parse_json((root / INDEX_PATH).read_text(encoding="utf-8"))
         require(type(index) is dict, "正本索引の型")
         adoption = index.get("現行施工採用")
-        require(type(adoption) is dict and adoption.get("識別") == "D4Pocket-v9-NLC04-20261121", "現行採用接続なし/版不一致")
+        require(type(adoption) is dict and adoption.get("識別") == "D4Pocket-v9-NLC05-20261122", "現行採用接続なし/版不一致")
         require(adoption.get("継続受入証拠台帳") == CONTINUING_ACCEPTANCE_LEDGER, "継続受入証拠台帳の接続不一致")
         adoption_path = repository_file(root, adoption.get("採用記録"))
         adopted_text = adoption_path.read_text(encoding="utf-8")
         agents = repository_file(root, "AGENTS.md").read_text(encoding="utf-8")
         repository_file(root, adoption.get("継続施工記録"))
         repository_file(root, adoption.get("継続受入証拠台帳"))
-        require(adoption_path.name in agents and adoption_path.parent.as_posix().endswith("docs/QE_2026-11-21"), "AGENTS採用記録接続不一致")
+        require(adoption_path.name in agents and adoption_path.parent.as_posix().endswith("docs/QE_2026-11-22"), "AGENTS採用記録接続不一致")
         entries = adoption.get("三点")
         require(type(entries) is list and len(entries) == 3, "三点の件数不一致")
         require({entry.get("役割") for entry in entries if type(entry) is dict} == set(ROLES), "三点の役割重複/不足")
@@ -303,7 +303,7 @@ def governance_errors(root: Path = ROOT) -> list[str]:
             require(path.name in adopted_text and entry["SHA256"] in adopted_text, f"{role}: 採用記録との同一性不足")
             documents[role] = by
         validate_bindings(documents)
-        require(set(adoption.get("明示具体化", [])) == {"具体化/Export選択集合", "具体化/受入段階", "施工読取/採用と時点"}, "明示具体化の採用接続不足")
+        require(set(adoption.get("明示具体化", [])) == {"具体化/Export選択集合", "具体化/受入段階", "施工読取/採用と時点", "具体化/開発検証分離"}, "明示具体化の採用接続不足")
         for ident in adoption["明示具体化"]:
             require(ident in documents["施工指示"], f"採用した明示具体化なし: {ident}")
         for role, kind in (("製品仕様", "仕様"), ("統合工程", "工程")):
@@ -321,7 +321,7 @@ def main() -> int:
         for error in errors:
             print(f"  - {error}")
         return 1
-    print("現行三点整合検査が合格: 437/288/1448記録、54施工線、46操作、71検査、257要件対応。製品QA・出荷GOは未判定。")
+    print("現行三点整合検査が合格: 438/289/1453記録、54施工線、46操作、71検査、257要件対応。製品QA・出荷GOは未判定。")
     return 0
 
 
