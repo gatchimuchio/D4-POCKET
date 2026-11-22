@@ -112,6 +112,10 @@
       "sha256": "6a7ef1c10d2b07b2e11a9456733ab6f6a4efc6a3f99b96a431f563e85fdb0fca"
     },
     {
+      "path": ".github/workflows/windows-manual-setup-lifecycle.yml",
+      "sha256": "f0e3c0f7913d12e2180eeacf8d2bde176799e3198bb84a02d5b06779c10e1802"
+    },
+    {
       "path": ".gitignore",
       "sha256": "8897105ba6dcc448b547d82a695cb40801e43a141e58ad3dbb6481fffe2befda"
     },
@@ -4361,7 +4365,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "2b7ff65981e6fe7cc9824302429e887a864874e71a40bc3b9cbf5df2a02e41b0"
+      "sha256": "72540399593b3b29d9b774cf7b66af9057066966d05e0fe3adc7105fce38483d"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -4389,7 +4393,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "191e5f7db915621037b59a60239fe8f7f51cef8e4368e503983f181aa71cd9fd"
+      "sha256": "72710c454da3d76a5686d7df4b22f5490ebb861f3705f480b71a615fe3c12358"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -6240,12 +6244,24 @@
       "sha256": "ba1dd3a7d8724ecec43fe35029eb36284787185b46576a835a370cd06694ff58"
     },
     {
+      "path": "tooling/tests/test_windows_installed_setup_lifecycle.py",
+      "sha256": "1c43e1f408528c36573a460f71f5ceddc5cfc7fdc53a9d258919445912f0d739"
+    },
+    {
       "path": "tooling/tests/windows_broker_export_manifest_compare.py",
       "sha256": "39f47e7716b92873dc9f9884fe9e335c071e8c500473f64f0e80c481db989987"
     },
     {
       "path": "tooling/tests/windows_export_portable_launch_smoke.ps1",
       "sha256": "230113ef6385c2ef10533641005acfb2a5ac2c5c7e3a0552342ffa675841e0b4"
+    },
+    {
+      "path": "tooling/tests/windows_installed_setup_lifecycle.ps1",
+      "sha256": "3d10dfe3533e3c8c130e5094d47907ec36e98ac722e58f243eed66792bd2f458"
+    },
+    {
+      "path": "tooling/tests/windows_installed_setup_lifecycle.py",
+      "sha256": "6503ce0d7d6c43402f696f8b938c404284d1b11f0c80a6749ea7c9c3938d69f4"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",

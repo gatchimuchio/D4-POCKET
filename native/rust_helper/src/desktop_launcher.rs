@@ -8,13 +8,13 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use crate::audit_hash::sha256_tagged;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -22,13 +22,13 @@ use crate::broker::export_center::{self, OwnerConfirmationSummary as ExportConfi
 #[cfg(test)]
 use crate::broker::ipc_server::run_loopback_server_cancellable;
 use crate::broker::ipc_server::{BrokerServerError, DesktopOwnerOperationRequest};
-use crate::broker::protocol::{canonical_payload_hash, request_issued_at_is_current};
 #[cfg(feature = "module_evaluation_lab")]
 use crate::broker::protocol::{
-    owner_delete_confirmation_summary, owner_recovery_confirmation_summary,
-    owner_registration_confirmation_summary, OwnerDeleteConfirmationSummary,
-    OwnerRecoveryConfirmationSummary, OwnerRegistrationConfirmationSummary,
+    OwnerDeleteConfirmationSummary, OwnerRecoveryConfirmationSummary,
+    OwnerRegistrationConfirmationSummary, owner_delete_confirmation_summary,
+    owner_recovery_confirmation_summary, owner_registration_confirmation_summary,
 };
+use crate::broker::protocol::{canonical_payload_hash, request_issued_at_is_current};
 use crate::broker::{
     BrokerCredentialRole, BrokerEndpoint, BrokerOperation, BrokerRequestEnvelope,
     BrokerServerConfig,
@@ -1265,9 +1265,9 @@ fn ensure_store_directory(runtime_dir: &Path) -> Result<PathBuf, DesktopLaunchEr
             Err(error) if error.kind() == ErrorKind::AlreadyExists => {}
             Err(_) => {
                 return Err(DesktopLaunchError::new(
-                        "BROKER_STORE_UNAVAILABLE",
-                        "Brokerの保存領域を準備できません。空き容量とフォルダーのアクセス権を確認してください。",
-                    ));
+                    "BROKER_STORE_UNAVAILABLE",
+                    "Brokerの保存領域を準備できません。空き容量とフォルダーのアクセス権を確認してください。",
+                ));
             }
         },
         Err(_) => {
@@ -2915,7 +2915,7 @@ fn confirm_owner_operation(
     summary: &DesktopOwnerOperationSummary,
     product_identity: Option<&ProductRuntimeIdentity>,
 ) -> bool {
-    use winsafe::{co, prelude::*, HWND};
+    use winsafe::{HWND, co, prelude::*};
 
     let text = owner_confirmation_text_for_identity(summary, product_identity);
     matches!(
@@ -2945,8 +2945,8 @@ fn owner_confirmation_text_for_identity(
         DesktopOwnerOperationSummary::GuiShellEditProposal(text) => text.clone(),
         DesktopOwnerOperationSummary::GuiShellEditApply(text) => text.clone(),
         DesktopOwnerOperationSummary::GuiShellExport(summary) => {
-            let target_platform = export_center::target_platform_label(&summary.target_platform)
-                .unwrap_or("不明");
+            let target_platform =
+                export_center::target_platform_label(&summary.target_platform).unwrap_or("不明");
             let export_path = match product_identity {
                 Some(identity) => format!(
                     r"%LOCALAPPDATA%\D4Pocket\apps\{}\stores\{}\exports\<新規App ID>.json",
@@ -3073,8 +3073,10 @@ fn owner_confirmation_text_for_identity(
             payload_hash,
         } => format!(
             "完了したAgent Taskの結果を一回だけ表示するApprovalを発行しますか？\n\nTask ID: {}\n確定結果hash: {}\nContent Exposure: {}\n範囲: このTaskと結果hashに限定、5分以内に一回だけ取得\n\n`full`はAgentが返した本文全体を表示し、秘密情報や危険な指示を含む可能性があります。Agentのtest結果・主張はBroker検証済みではありません。画面の表示範囲を確認してください。これはTask実行ApprovalでもWorkspace読取許可でもなく、Permission・Credential・Authorityを与えません。Auditには本文を保存しません。\n\npayload hash:\n{}",
-            owner_confirmation_value(task_id), owner_confirmation_value(result_hash),
-            owner_confirmation_value(content_visibility), payload_hash
+            owner_confirmation_value(task_id),
+            owner_confirmation_value(result_hash),
+            owner_confirmation_value(content_visibility),
+            payload_hash
         ),
         DesktopOwnerOperationSummary::WorkspaceContentApproval {
             workspace_id,
@@ -3228,11 +3230,21 @@ fn owner_confirmation_text_for_identity(
             payload_hash,
         } => {
             let effect = match operation.as_str() {
-                "検証" => "Broker所有の署名trustと正本byteを再検証します。結果により検証状態を更新しますが、有効化や実行はしません。",
-                "有効化" => "Broker内catalog状態を有効へ変更します。実行系processや外部fileは起動・変更せず、Permission、Approval、Trustを新たに付与しません。",
-                "無効化" => "Broker内catalog状態を無効へ変更します。既に起動中のprocessは停止しません。Permission、Approval、Credentialは変更しません。",
-                "隔離" => "Broker内catalog状態を隔離へ変更し、対象Runtime IDの新たな利用を拒否します。既に起動中のprocessや外部fileは変更しません。",
-                "削除" => "無効化済みcatalog recordだけを削除します。外部artifactのfile削除やprocess停止は行いません。",
+                "検証" => {
+                    "Broker所有の署名trustと正本byteを再検証します。結果により検証状態を更新しますが、有効化や実行はしません。"
+                }
+                "有効化" => {
+                    "Broker内catalog状態を有効へ変更します。実行系processや外部fileは起動・変更せず、Permission、Approval、Trustを新たに付与しません。"
+                }
+                "無効化" => {
+                    "Broker内catalog状態を無効へ変更します。既に起動中のprocessは停止しません。Permission、Approval、Credentialは変更しません。"
+                }
+                "隔離" => {
+                    "Broker内catalog状態を隔離へ変更し、対象Runtime IDの新たな利用を拒否します。既に起動中のprocessや外部fileは変更しません。"
+                }
+                "削除" => {
+                    "無効化済みcatalog recordだけを削除します。外部artifactのfile削除やprocess停止は行いません。"
+                }
                 _ => "未対応操作のため、状態は変更しません。",
             };
             format!(
@@ -3401,12 +3413,14 @@ fn owner_confirmation_text_for_identity(
                     owner_confirmation_value(&confirmation.app_id),
                     owner_confirmation_value(&confirmation.audit_store_id),
                     owner_confirmation_value(&confirmation.version_directory.display().to_string()),
-                    owner_confirmation_value(&confirmation.start_menu_shortcut_path.display().to_string()),
+                    owner_confirmation_value(
+                        &confirmation.start_menu_shortcut_path.display().to_string()
+                    ),
                     owner_confirmation_value(&confirmation.summary),
                     payload_hash
                 )
             }
-        },
+        }
         DesktopOwnerOperationSummary::ProductUninstall { payload_hash } => {
             let root = product_identity
                 .and_then(|identity| {
@@ -3434,9 +3448,7 @@ fn owner_confirmation_text_for_identity(
             owner_confirmation_value(&confirmation.product_version),
             confirmation.package_sha256,
             owner_confirmation_value(&confirmation.product_root.display().to_string()),
-            owner_confirmation_value(
-                &confirmation.start_menu_shortcut_path.display().to_string()
-            ),
+            owner_confirmation_value(&confirmation.start_menu_shortcut_path.display().to_string()),
             payload_hash
         ),
         #[cfg(feature = "module_evaluation_lab")]
@@ -3445,10 +3457,7 @@ fn owner_confirmation_text_for_identity(
             payload_hash,
         } => format!(
             "指定した回帰Caseの保存暗号文を削除しますか？\n\n回帰Case ID: {}\n定義hash: {}\n暗号文hash: {}\n\n削除前にBrokerが登録AuditとProtectedStoreを再照合します。削除後のfile不在と結果Auditが確認された場合だけ確定します。媒体の物理消去は保証しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
-            summary.case_id,
-            summary.definition_hash,
-            summary.ciphertext_hash,
-            payload_hash
+            summary.case_id, summary.definition_hash, summary.ciphertext_hash, payload_hash
         ),
         #[cfg(feature = "module_evaluation_lab")]
         DesktopOwnerOperationSummary::RegressionCaseRecovery {
@@ -3456,8 +3465,7 @@ fn owner_confirmation_text_for_identity(
             payload_hash,
         } => format!(
             "指定回帰Caseの未確定削除状態を照合しますか？\n\n回帰Case ID: {}\n\nこの操作は削除を実行しません。Brokerが永続AuditとProtectedStoreの現在状態を照合します。自動再削除は行いません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
-            summary.case_id,
-            payload_hash
+            summary.case_id, payload_hash
         ),
         #[cfg(feature = "module_evaluation_lab")]
         DesktopOwnerOperationSummary::RegressionCaseRegistration {
@@ -4620,7 +4628,7 @@ mod tests {
         forbidden_text: Option<&str>,
     ) -> bool {
         use std::process::Stdio;
-        use winsafe::{co, HwKbMouse, HWND, KEYBDINPUT};
+        use winsafe::{HWND, HwKbMouse, KEYBDINPUT, co};
 
         const IDYES: u16 = 6;
         const IDNO: u16 = 7;
@@ -5472,41 +5480,58 @@ mod tests {
             "desktop-export-owner-dialog-yes",
             "desktop-export-owner-dialog-yes-nonce",
         );
+        if let Some(update_trust_path) = std::env::var_os("GUI_SHELL_EXPORT_E2E_UPDATE_TRUST_FILE")
+        {
+            let update_trust_path = PathBuf::from(update_trust_path);
+            let update_trust_metadata = fs::symlink_metadata(&update_trust_path).unwrap();
+            assert!(update_trust_path.is_absolute());
+            assert!(update_trust_metadata.is_file());
+            assert!(!update_trust_metadata.file_type().is_symlink());
+            assert!(!is_reparse_point(&update_trust_metadata));
+            assert!(update_trust_metadata.len() <= 8 * 1024);
+            let update_trust: serde_json::Value =
+                serde_json::from_slice(&fs::read(update_trust_path).unwrap()).unwrap();
+            assert!(update_trust.is_object());
+            accepted_request["payload"]["update_trust"] = update_trust;
+            accepted_request["payload_hash"] =
+                serde_json::Value::String(canonical_payload_hash(accepted_request.get("payload")));
+        }
         accepted_request["payload"]["compose_manifest"]["compose_id"] =
             serde_json::Value::String(PRIVATE_COMPOSE_ID_MARKER.to_string());
         accepted_request["payload_hash"] =
             serde_json::Value::String(canonical_payload_hash(accepted_request.get("payload")));
         let mut accepted_prompt_count = 0;
-        let accepted =
-            relay_channel_frame_with_owner_operations(
-                gui_shell_windows_broker_channel::PipeFrame::Line(
-                    serde_json::to_vec(&accepted_request).unwrap(),
-                ),
-                &broker_endpoint,
-                Some(&owner_operation_tx),
-                |summary| {
-                    accepted_prompt_count += 1;
-                    let DesktopOwnerOperationSummary::GuiShellExport(summary) = summary else {
-                        panic!("Export要求はExport固有の確認summaryを使う")
-                    };
-                    assert_eq!(summary.export_id, "export-desktop-test");
-                    assert_eq!(summary.optional_module_count, 1);
-                    assert_eq!(
-                        summary.payload_hash,
-                        accepted_request["payload_hash"].as_str().unwrap()
-                    );
-                    assert!(!owner_confirmation_text(
-                        &DesktopOwnerOperationSummary::GuiShellExport(summary.clone())
-                    )
-                    .contains(PRIVATE_COMPOSE_ID_MARKER));
-                    automate_native_owner_confirmation(
-                        &DesktopOwnerOperationSummary::GuiShellExport(summary.clone()),
-                        true,
-                        Some(PRIVATE_COMPOSE_ID_MARKER),
-                    )
-                },
-            )
-            .unwrap();
+        let accepted = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&accepted_request).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                accepted_prompt_count += 1;
+                let DesktopOwnerOperationSummary::GuiShellExport(summary) = summary else {
+                    panic!("Export要求はExport固有の確認summaryを使う")
+                };
+                assert_eq!(summary.export_id, "export-desktop-test");
+                assert_eq!(summary.optional_module_count, 1);
+                assert_eq!(
+                    summary.payload_hash,
+                    accepted_request["payload_hash"].as_str().unwrap()
+                );
+                assert!(
+                    !owner_confirmation_text(&DesktopOwnerOperationSummary::GuiShellExport(
+                        summary.clone()
+                    ))
+                    .contains(PRIVATE_COMPOSE_ID_MARKER)
+                );
+                automate_native_owner_confirmation(
+                    &DesktopOwnerOperationSummary::GuiShellExport(summary.clone()),
+                    true,
+                    Some(PRIVATE_COMPOSE_ID_MARKER),
+                )
+            },
+        )
+        .unwrap();
         let accepted: serde_json::Value = serde_json::from_slice(&accepted).unwrap();
         assert_eq!(accepted_prompt_count, 1);
         assert_eq!(accepted["status"], "accepted");
@@ -5541,6 +5566,20 @@ mod tests {
             manifest_file["manifest"]["audit_store"]["store_id"],
             accepted["body"]["export_manifest"]["audit_store"]["store_id"]
         );
+        if let Some(update_trust_input) = accepted_request["payload"].get("update_trust") {
+            assert_eq!(
+                manifest_file["update_trust"]["public_key_der_hex"],
+                update_trust_input["public_key_der_hex"]
+            );
+            assert_eq!(
+                manifest_file["update_trust"]["package_sources"],
+                update_trust_input["package_sources"]
+            );
+            assert_eq!(
+                accepted["body"]["update_trust_fingerprint"],
+                manifest_file["update_trust"]["public_key_fingerprint"]
+            );
+        }
 
         if let Some(capture_dir) = std::env::var_os("GUI_SHELL_EXPORT_E2E_CAPTURE_DIR") {
             let capture_dir = PathBuf::from(capture_dir);
@@ -6068,21 +6107,19 @@ mod tests {
             provider_credential_input_request("credential-window-test", "nonce-2");
         extra_secret["payload"]["秘密値"] = json!("secret-marker");
         extra_secret["payload_hash"] = json!(canonical_payload_hash(extra_secret.get("payload")));
-        assert!(provider_credential_input_candidate(
-            extra_secret.to_string().as_bytes(),
-            &endpoint
-        )
-        .is_none());
+        assert!(
+            provider_credential_input_candidate(extra_secret.to_string().as_bytes(), &endpoint)
+                .is_none()
+        );
 
         let mut wrong_target =
             provider_credential_input_request("credential-window-test", "nonce-3");
         wrong_target["payload"]["接続対象"] = json!("other-provider");
         wrong_target["payload_hash"] = json!(canonical_payload_hash(wrong_target.get("payload")));
-        assert!(provider_credential_input_candidate(
-            wrong_target.to_string().as_bytes(),
-            &endpoint
-        )
-        .is_none());
+        assert!(
+            provider_credential_input_candidate(wrong_target.to_string().as_bytes(), &endpoint)
+                .is_none()
+        );
 
         let mut stale = provider_credential_input_request("credential-window-test", "nonce-4");
         stale["issued_at"] = json!("2000-01-01T00:00:00Z");
@@ -6729,13 +6766,15 @@ mod tests {
         server.join().unwrap().unwrap();
         let mut unavailable_endpoint = endpoint.clone();
         unavailable_endpoint.port = 0;
-        assert!(relay_channel_frame(
-            gui_shell_windows_broker_channel::PipeFrame::Line(
-                serde_json::to_vec(&request).unwrap()
-            ),
-            &unavailable_endpoint,
-        )
-        .is_none());
+        assert!(
+            relay_channel_frame(
+                gui_shell_windows_broker_channel::PipeFrame::Line(
+                    serde_json::to_vec(&request).unwrap()
+                ),
+                &unavailable_endpoint,
+            )
+            .is_none()
+        );
         let audit = fs::read_to_string(store_dir.join("audit.jsonl")).unwrap();
         assert!(audit.contains("broker_request_malformed"));
         assert!(audit.contains("broker_request_oversized"));
@@ -6917,13 +6956,15 @@ mod tests {
                     };
                     assert_eq!(summary.case_id, "cccccccccccccccccccccccccccccccc");
                     assert_eq!(payload_hash, recovery["payload_hash"].as_str().unwrap());
-                    assert!(owner_confirmation_text(
-                        &DesktopOwnerOperationSummary::RegressionCaseRecovery {
-                            summary: (*summary).clone(),
-                            payload_hash: (*payload_hash).clone(),
-                        },
-                    )
-                    .contains("自動再削除は行いません"));
+                    assert!(
+                        owner_confirmation_text(
+                            &DesktopOwnerOperationSummary::RegressionCaseRecovery {
+                                summary: (*summary).clone(),
+                                payload_hash: (*payload_hash).clone(),
+                            },
+                        )
+                        .contains("自動再削除は行いません")
+                    );
                     true
                 },
             )
@@ -7174,9 +7215,11 @@ mod tests {
             declined_task_approval["error"]["code"],
             "desktop_native_owner_confirmation_required"
         );
-        assert!(!declined_task_approval
-            .to_string()
-            .contains(declined_instruction));
+        assert!(
+            !declined_task_approval
+                .to_string()
+                .contains(declined_instruction)
+        );
 
         let confirmed_permission = desktop_owner_request(
             "AgentTaskWorkspacePermissionGrant",
@@ -7282,9 +7325,11 @@ mod tests {
             denied_unregistered_approval["error"]["code"],
             "作業領域不在"
         );
-        assert!(!denied_unregistered_approval
-            .to_string()
-            .contains(unregistered_instruction));
+        assert!(
+            !denied_unregistered_approval
+                .to_string()
+                .contains(unregistered_instruction)
+        );
 
         let mut changed_hash = desktop_export_request(
             "desktop-export-changed-hash",
@@ -7629,14 +7674,16 @@ mod tests {
             .iter()
             .find(|agent| agent["adapter_id"] == "codex-cli")
             .expect("native確認後の実CLI metadataが通常IPC projectionへ出る");
-        assert!(agent["capabilities"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|capability| {
-                capability["capability_id"] == "task_execution"
-                    && capability["support"]["status"] == "unsupported"
-            }));
+        assert!(
+            agent["capabilities"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|capability| {
+                    capability["capability_id"] == "task_execution"
+                        && capability["support"]["status"] == "unsupported"
+                })
+        );
 
         let session_start = desktop_owner_request(
             "対話開始",
@@ -7870,9 +7917,11 @@ mod tests {
         let normalized = normalize_channel_request(valid, "broker-session-owned");
         let normalized: serde_json::Value = serde_json::from_slice(&normalized).unwrap();
         assert_eq!(normalized["session_id"], "broker-session-owned");
-        assert!(normalized
-            .get("desktop_channel_session_id_forbidden")
-            .is_none());
+        assert!(
+            normalized
+                .get("desktop_channel_session_id_forbidden")
+                .is_none()
+        );
 
         let forged = br#"{"request_id":"r2","operation":"health","session_id":"fake"}"#;
         let forged = normalize_channel_request(forged, "broker-session-owned");
@@ -7915,9 +7964,11 @@ mod tests {
         let app_id = "d4-pocket-app-0123456789abcdef0123456789abcdef";
         let audit_store_id = "audit-store-fedcba9876543210fedcba9876543210";
         assert!(product_runtime_identity(None, None).unwrap().is_none());
-        assert!(product_runtime_identity(Some(app_id), Some(audit_store_id))
-            .unwrap()
-            .is_some());
+        assert!(
+            product_runtime_identity(Some(app_id), Some(audit_store_id))
+                .unwrap()
+                .is_some()
+        );
 
         for (candidate_app_id, candidate_store_id) in [
             (Some(app_id), None),
@@ -7954,20 +8005,24 @@ mod tests {
         assert_ne!(first_runtime, second_runtime);
         assert!(first_runtime.starts_with(&root));
         assert!(second_runtime.starts_with(&root));
-        assert!(first_runtime.ends_with(
-            Path::new("D4Pocket")
-                .join("apps")
-                .join(&first.app_id)
-                .join("stores")
-                .join(&first.audit_store_id)
-        ));
-        assert!(second_runtime.ends_with(
-            Path::new("D4Pocket")
-                .join("apps")
-                .join(&second.app_id)
-                .join("stores")
-                .join(&second.audit_store_id)
-        ));
+        assert!(
+            first_runtime.ends_with(
+                Path::new("D4Pocket")
+                    .join("apps")
+                    .join(&first.app_id)
+                    .join("stores")
+                    .join(&first.audit_store_id)
+            )
+        );
+        assert!(
+            second_runtime.ends_with(
+                Path::new("D4Pocket")
+                    .join("apps")
+                    .join(&second.app_id)
+                    .join("stores")
+                    .join(&second.audit_store_id)
+            )
+        );
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -7994,13 +8049,15 @@ mod tests {
         let expected = runtime_directory_with_identity(&root, identity.as_ref()).unwrap();
         assert_eq!(runtime, expected);
         if let Some(identity) = identity {
-            assert!(runtime.ends_with(
-                Path::new("D4Pocket")
-                    .join("apps")
-                    .join(identity.app_id)
-                    .join("stores")
-                    .join(identity.audit_store_id)
-            ));
+            assert!(
+                runtime.ends_with(
+                    Path::new("D4Pocket")
+                        .join("apps")
+                        .join(identity.app_id)
+                        .join("stores")
+                        .join(identity.audit_store_id)
+                )
+            );
         } else {
             assert!(runtime.ends_with(Path::new("GUI-Shell").join("broker").join("desktop")));
         }
@@ -8080,8 +8137,10 @@ mod tests {
             "b".repeat(64)
         )));
         assert!(text.contains("HTTPS配布元: stable: https://updates.example.com/d4-pocket/stable"));
-        assert!(owner_confirmation_text(&summary)
-            .contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
+        assert!(
+            owner_confirmation_text(&summary)
+                .contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports")
+        );
         assert!(owner_confirmation_text(&summary).contains("対象platform: Windows"));
     }
 
@@ -9097,7 +9156,9 @@ mod tests {
         assert!(confirmation.contains("Runtime 1件・Agent 1件・Tool 1件"));
         assert!(confirmation.contains("Permission=not_generated / Approval=not_requested"));
         assert!(confirmation.contains(&format!("Manifest hash: sha256:{}", "a".repeat(64))));
-        assert!(confirmation.contains(&format!("Catalog snapshot hash: sha256:{}", "b".repeat(64))));
+        assert!(
+            confirmation.contains(&format!("Catalog snapshot hash: sha256:{}", "b".repeat(64)))
+        );
         assert!(confirmation.contains(&format!(
             "Connection binding hash: sha256:{}",
             "c".repeat(64)
@@ -9711,8 +9772,10 @@ mod tests {
         );
         let (_, summary) = owner_operation_candidate(revoked.to_string().as_bytes(), &endpoint)
             .expect("Workspace失効はnative確認候補");
-        assert!(owner_confirmation_text(&summary)
-            .contains("現在の読取許可とBroker内baselineを破棄します"));
+        assert!(
+            owner_confirmation_text(&summary)
+                .contains("現在の読取許可とBroker内baselineを破棄します")
+        );
 
         let escalated = request(
             "desktop-workspace-escalated",

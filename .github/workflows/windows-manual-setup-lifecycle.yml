@@ -1,0 +1,202 @@
+name: Windows normal Setup and installed lifecycle (manual)
+
+'on': workflow_dispatch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-setup-lifecycle-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  installed-setup-lifecycle:
+    runs-on: windows-2025
+    timeout-minutes: 180
+    steps:
+      - name: mainの固定commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: mainとclean状態を検証
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF -ne 'refs/heads/main') {
+            throw "W-E04 Windows lifecycleはmainだけで実行する: $env:GITHUB_REF"
+          }
+          $head = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $head -ne $env:GITHUB_SHA) {
+            throw "checkout HEAD ($head) とworkflow SHA ($env:GITHUB_SHA) が一致しない"
+          }
+          $remoteMain = (git rev-parse refs/remotes/origin/main).Trim()
+          if ($LASTEXITCODE -ne 0 -or $remoteMain -ne $head) {
+            throw "origin/main ($remoteMain) とcheckout HEAD ($head) が一致しない"
+          }
+          $branch = (git branch --show-current).Trim()
+          if ($branch -eq '') {
+            git switch --create main $head
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } elseif ($branch -ne 'main') {
+            throw "W-E04 lifecycle checkout branch must be main: $branch"
+          }
+          $changes = @(git status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0 -or $changes.Count -gt 0) {
+            $changes | Write-Output
+            throw 'W-E04 lifecycle source tree must be clean'
+          }
+          "source_commit=$head" | Tee-Object -FilePath "$env:RUNNER_TEMP\w-e04-source.txt"
+          "runner=$env:ImageOS/$env:ImageVersion" | Tee-Object -FilePath "$env:RUNNER_TEMP\w-e04-source.txt" -Append
+
+      - name: 固定Rust／Flutter toolchainとInno Setupを用意
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          rustup toolchain install 1.95.0 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup default 1.95.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $rustcVersion = (rustc --version).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $rustcVersion.StartsWith('rustc 1.95.0 ')) {
+            throw "Rust toolchain mismatch: $rustcVersion"
+          }
+          $cargoVersion = (cargo --version).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $cargoVersion.StartsWith('cargo 1.95.0 ')) {
+            throw "Cargo toolchain mismatch: $cargoVersion"
+          }
+
+          $flutterRoot = Join-Path $env:RUNNER_TEMP 'flutter'
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git $flutterRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $flutterCommit = (git -C $flutterRoot rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $flutterCommit -ne '559ffa3f75e7402d65a8def9c28389a9b2e6fe42') {
+            throw "Flutter checkout mismatch: $flutterCommit"
+          }
+          $flutterExecutable = Join-Path $flutterRoot 'bin\flutter.bat'
+          & $flutterExecutable --version
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Flutter first-run initialization failed' }
+          $flutterMachineLines = & $flutterExecutable --version --machine
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Flutter machine-version query failed' }
+          $flutterMachine = ($flutterMachineLines -join "`n").Trim() | ConvertFrom-Json -ErrorAction Stop
+          if ($flutterMachine.frameworkVersion -ne '3.44.0' -or
+              $flutterMachine.frameworkRevision -ne $flutterCommit -or
+              [string]::IsNullOrWhiteSpace($flutterMachine.dartSdkVersion)) {
+            throw 'Pinned Flutter version identity mismatch'
+          }
+          "$flutterRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          'FLUTTER_SUPPRESS_ANALYTICS=true' | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          $inno = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+          if ($null -eq $inno) {
+            $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+            $knownPaths = @(
+              (Join-Path $programFilesX86 'Inno Setup 6\ISCC.exe'),
+              (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe')
+            )
+            $innoPath = $knownPaths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+            if (-not $innoPath) {
+              choco install innosetup --yes --no-progress
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              $inno = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+              if ($null -eq $inno) {
+                $innoPath = $knownPaths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+              }
+            }
+            if ($innoPath) { $isccPath = (Resolve-Path -LiteralPath $innoPath).Path }
+            elseif ($inno) { $isccPath = $inno.Source }
+          } else {
+            $isccPath = $inno.Source
+          }
+          if (-not $isccPath -or -not (Test-Path -LiteralPath $isccPath -PathType Leaf)) {
+            throw 'Inno Setup 6 ISCC.exe was not found after setup.'
+          }
+          $isccPath = (Resolve-Path -LiteralPath $isccPath).Path
+          $isccInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($isccPath)
+          $isccVersion = if ($isccInfo.ProductVersion) { $isccInfo.ProductVersion } else { $isccInfo.FileVersion }
+          if ($isccVersion -notmatch '^6\.') { throw "Inno Setup major version must be 6: $isccVersion" }
+
+          @(
+            "D4P_W_E04_RUSTC_VERSION=$rustcVersion"
+            "D4P_W_E04_CARGO_VERSION=$cargoVersion"
+            "D4P_W_E04_FLUTTER_VERSION=$($flutterMachine.frameworkVersion)"
+            "D4P_W_E04_FLUTTER_REVISION=$flutterCommit"
+            "D4P_W_E04_ISCC_PATH=$isccPath"
+            "D4P_W_E04_ISCC_VERSION=$isccVersion"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          @(
+            "rustc=$rustcVersion"
+            "cargo=$cargoVersion"
+            "flutter=$($flutterMachine.frameworkVersion)"
+            "flutter_revision=$flutterCommit"
+            "dart=$($flutterMachine.dartSdkVersion)"
+            "inno_setup=$isccVersion"
+          ) | Tee-Object -FilePath "$env:RUNNER_TEMP\w-e04-toolchain.txt"
+
+      - name: Flutter依存をlockfileから復元
+        shell: pwsh
+        working-directory: apps/desktop_flutter
+        run: |
+          $ErrorActionPreference = 'Stop'
+          flutter pub get --enforce-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path -LiteralPath '.dart_tool/package_config.json' -PathType Leaf)) {
+            throw 'Flutter dependency restore did not create package_config.json'
+          }
+
+      - name: W-E04検証コードの構文・形式を確認
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -B -X utf8 -m py_compile tooling/tests/windows_installed_setup_lifecycle.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -X utf8 -m unittest tooling.tests.test_windows_installed_setup_lifecycle
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path -LiteralPath 'tooling/tests/windows_installed_setup_lifecycle.ps1'),
+            [ref]$tokens,
+            [ref]$parseErrors
+          ) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | ForEach-Object { Write-Error $_.Message }
+            throw 'PowerShell lifecycle test has parser errors'
+          }
+          rustfmt --edition 2024 --check native/rust_helper/src/broker/update_center.rs native/rust_helper/src/desktop_launcher.rs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: normal Setupと導入済みLifecycleを実行
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidence = Join-Path $env:RUNNER_TEMP 'd4p-w-e04-evidence'
+          $runRoot = Join-Path $env:RUNNER_TEMP 'd4p-w-e04-run'
+          python -X utf8 tooling/tests/windows_installed_setup_lifecycle.py `
+            --source-commit $env:GITHUB_SHA `
+            --evidence-dir $evidence `
+            --run-root $runRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: W-E04機械証拠JSONのみ保存
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: w-e04-windows-setup-lifecycle-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/d4p-w-e04-evidence/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: source treeのclean状態を再確認
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $changes = @(git status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0 -or $changes.Count -gt 0) {
+            $changes | Write-Output
+            throw 'W-E04 workflow modified the checked-out source tree'
+          }

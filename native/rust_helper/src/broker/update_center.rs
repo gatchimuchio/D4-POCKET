@@ -7,12 +7,12 @@
 #![allow(non_snake_case)]
 
 use super::protocol::{
-    Broker, BrokerError, BrokerOperation, BrokerResponse, BrokerStatus, OwnerConfirmationSource,
-    EVIDENCE_SOURCE_INTERNAL_STATE,
+    Broker, BrokerError, BrokerOperation, BrokerResponse, BrokerStatus,
+    EVIDENCE_SOURCE_INTERNAL_STATE, OwnerConfirmationSource,
 };
 use super::store::{BrokerPersistentStore, BrokerStoreError};
 use crate::audit_hash::sha256_tagged;
-use crate::update_verification::{verify_signed_update_signature, SignedUpdateCandidate};
+use crate::update_verification::{SignedUpdateCandidate, verify_signed_update_signature};
 #[cfg(windows)]
 use cap_fs_ext::OsMetadataExt as _;
 use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
@@ -20,11 +20,11 @@ use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::fs::MetadataExt as _;
 use cap_std::fs::OpenOptions;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
+use std::sync::{Arc, mpsc};
 use std::thread::JoinHandle;
 
 const VERSION: u64 = 1;
@@ -5610,13 +5610,15 @@ mod tests {
         let mut no_source_trust = configured_product_trust();
         no_source_trust.package_sources.clear();
         let no_source_json = serde_json::to_string(&no_source_trust).unwrap();
-        assert!(resolve_build_update_trust(
-            Some(INSTALL_APP_ID),
-            Some(INSTALL_AUDIT_ID),
-            Some(&no_source_json),
-            || Ok(None)
-        )
-        .is_err());
+        assert!(
+            resolve_build_update_trust(
+                Some(INSTALL_APP_ID),
+                Some(INSTALL_AUDIT_ID),
+                Some(&no_source_json),
+                || Ok(None)
+            )
+            .is_err()
+        );
         assert!(resolve_build_update_trust(None, None, Some(&valid_json), || Ok(None)).is_err());
     }
 
@@ -6032,10 +6034,12 @@ mod tests {
             0o755
         );
         assert_previous_remains_active();
-        assert!(broker
-            .audit_events()
-            .iter()
-            .any(|event| { event.operation == OP_APPLY && event.decision == "queued" }));
+        assert!(
+            broker
+                .audit_events()
+                .iter()
+                .any(|event| { event.operation == OP_APPLY && event.decision == "queued" })
+        );
         assert!(broker.audit_events().iter().any(|event| {
             event.request_id == "linux-update-apply:complete"
                 && event.operation == OP_APPLY
@@ -6167,12 +6171,14 @@ mod tests {
         )
         .unwrap();
         assert_eq!(active.current.product_version, "1.1.0");
-        assert!(std::fs::read_to_string(&desktop_entry_path)
-            .unwrap()
-            .contains(&format!(
-                "Exec=\"{}\"",
-                plan.root.join("gui_shell_desktop_launcher").display()
-            )));
+        assert!(
+            std::fs::read_to_string(&desktop_entry_path)
+                .unwrap()
+                .contains(&format!(
+                    "Exec=\"{}\"",
+                    plan.root.join("gui_shell_desktop_launcher").display()
+                ))
+        );
         assert!(broker.audit_events().iter().any(|event| {
             event.request_id == "linux-update-activation:complete"
                 && event.operation == OP_ACTIVATE
@@ -6320,8 +6326,8 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn product_launch_repair_restores_only_missing_entries_after_current_trust_and_owner_confirmation(
-    ) {
+    fn product_launch_repair_restores_only_missing_entries_after_current_trust_and_owner_confirmation()
+     {
         let unique = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -6924,14 +6930,18 @@ mod tests {
             .iter()
             .find(|event| event.event_id == accepted.audit_event_id)
             .expect("Linux製品のアンインストール認可Audit");
-        assert!(acceptance_audit
-            .reason
-            .contains("対応するplatform起動項目だけ"));
+        assert!(
+            acceptance_audit
+                .reason
+                .contains("対応するplatform起動項目だけ")
+        );
         assert!(!acceptance_audit.reason.contains("Start Menu"));
         assert_eq!(ticket.len(), 64);
-        assert!(!serde_json::to_string(broker.audit_events())
-            .unwrap()
-            .contains(&ticket));
+        assert!(
+            !serde_json::to_string(broker.audit_events())
+                .unwrap()
+                .contains(&ticket)
+        );
         assert!(product_root.exists());
         assert_eq!(std::fs::read(&audit_marker).unwrap(), b"keep");
 
@@ -7220,13 +7230,17 @@ mod tests {
         assert_eq!(event.evidence_source, "EXTERNAL_EVIDENCE");
         assert!(event.reason.contains("catalog_hashes=sha256:"));
         assert!(event.reason.contains("Capability=更新候補取得"));
-        assert!(event
-            .reason
-            .contains("Permission=Broker所有trust.package_sources"));
+        assert!(
+            event
+                .reason
+                .contains("Permission=Broker所有trust.package_sources")
+        );
         assert!(event.reason.contains("Approval=明示操作"));
-        assert!(event
-            .reason
-            .contains("RecoveryAction=失敗時は既存候補を保持"));
+        assert!(
+            event
+                .reason
+                .contains("RecoveryAction=失敗時は既存候補を保持")
+        );
     }
 
     #[test]
@@ -7260,9 +7274,11 @@ mod tests {
         assert_eq!(response.status, BrokerStatus::Rejected);
         let error = response.error.unwrap();
         assert_eq!(error.code, "update_signature_invalid");
-        assert!(error
-            .message
-            .contains("RecoveryAction=失敗時は既存候補を保持"));
+        assert!(
+            error
+                .message
+                .contains("RecoveryAction=失敗時は既存候補を保持")
+        );
         assert_eq!(broker.updates, previous);
         assert_eq!(
             broker.audit_events().last().unwrap().reason,
@@ -7870,10 +7886,12 @@ mod tests {
             std::fs::read(target.join("app").join("gui_shell_desktop.exe")).unwrap(),
             b"d"
         );
-        assert!(broker
-            .audit_events()
-            .iter()
-            .any(|event| { event.operation == OP_APPLY && event.decision == "queued" }));
+        assert!(
+            broker
+                .audit_events()
+                .iter()
+                .any(|event| { event.operation == OP_APPLY && event.decision == "queued" })
+        );
         assert!(broker.audit_events().iter().any(|event| {
             event.request_id == "desktop-update-apply:complete"
                 && event.operation == OP_APPLY
@@ -8023,9 +8041,11 @@ mod tests {
         );
         assert!(!package_path.exists());
         assert!(activation_confirmation.start_menu_shortcut_path.is_file());
-        assert!(product_root
-            .join("gui_shell_desktop_launcher.exe")
-            .is_file());
+        assert!(
+            product_root
+                .join("gui_shell_desktop_launcher.exe")
+                .is_file()
+        );
         let selected_launcher = crate::product_bootstrapper::resolve_active_version_launcher(
             &install_root,
             INSTALL_APP_ID,
@@ -8043,13 +8063,15 @@ mod tests {
         assert_eq!(active_record["product_version"], "1.1.0");
         assert_eq!(active_record["previous"]["product_version"], "1.0.0");
         assert!(target.is_dir());
-        assert!(install_root
-            .join("Programs")
-            .join("D4 Pocket")
-            .join(INSTALL_APP_ID)
-            .join("versions")
-            .join(&previous_stage_name)
-            .is_dir());
+        assert!(
+            install_root
+                .join("Programs")
+                .join("D4 Pocket")
+                .join(INSTALL_APP_ID)
+                .join("versions")
+                .join(&previous_stage_name)
+                .is_dir()
+        );
         let shortcut_bytes =
             std::fs::read(&activation_confirmation.start_menu_shortcut_path).unwrap();
         assert!(broker.audit_events().iter().any(|event| {
@@ -8420,10 +8442,12 @@ mod tests {
             job["失敗code"].as_str(),
             Some("update_download_dns_failed" | "update_download_network_failed")
         ));
-        assert!(broker
-            .audit_events()
-            .iter()
-            .any(|event| { event.operation == OP_DOWNLOAD && event.decision == "failed" }));
+        assert!(
+            broker
+                .audit_events()
+                .iter()
+                .any(|event| { event.operation == OP_DOWNLOAD && event.decision == "failed" })
+        );
         drop(broker);
         drop(package_directory);
         std::fs::remove_dir_all(root).unwrap();
@@ -8598,6 +8622,262 @@ mod tests {
         assert_eq!(execution.status, BrokerStatus::Rejected);
         assert_eq!(execution.error.unwrap().code, "update_trust_unconfigured");
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "isolated Windows Setup lifecycle: seed signed real-product packages in the per-user Broker store"]
+    fn windows_installed_acceptance_seeds_signed_candidates_and_packages() {
+        use ring::signature::{Ed25519KeyPair, KeyPair};
+
+        fn is_reparse_point(metadata: &std::fs::Metadata) -> bool {
+            use std::os::windows::fs::MetadataExt;
+            metadata.file_attributes() & 0x400 != 0
+        }
+
+        fn checked_child_directory(parent: &std::path::Path, name: &str) -> std::path::PathBuf {
+            let path = parent.join(name);
+            match std::fs::symlink_metadata(&path) {
+                Ok(metadata) => {
+                    assert!(
+                        metadata.is_dir() && !is_reparse_point(&metadata),
+                        "unsafe seed directory: {path:?}"
+                    );
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    std::fs::create_dir(&path).unwrap();
+                    let metadata = std::fs::symlink_metadata(&path).unwrap();
+                    assert!(
+                        metadata.is_dir() && !is_reparse_point(&metadata),
+                        "unsafe created seed directory: {path:?}"
+                    );
+                }
+                Err(error) => panic!("seed directory cannot be inspected: {path:?}: {error}"),
+            }
+            path
+        }
+
+        fn read_package(path: &std::path::Path) -> (Vec<u8>, Value, Value, String) {
+            assert!(path.is_absolute(), "package path must be absolute");
+            let metadata = std::fs::symlink_metadata(path).unwrap();
+            assert!(metadata.is_file() && !metadata.file_type().is_symlink());
+            assert!(!is_reparse_point(&metadata));
+            let package = std::fs::read(path).unwrap();
+            assert!(package.len() >= 12);
+            assert_eq!(&package[..8], b"D4PKG01\n");
+            let manifest_length =
+                usize::try_from(u32::from_le_bytes(package[8..12].try_into().unwrap())).unwrap();
+            let manifest_end = 12usize.checked_add(manifest_length).unwrap();
+            assert!(manifest_end <= package.len());
+            let package_manifest: Value =
+                serde_json::from_slice(&package[12..manifest_end]).unwrap();
+            let mut offset = manifest_end;
+            let mut product_manifest = None;
+            for file in package_manifest["files"].as_array().unwrap() {
+                let length = usize::try_from(file["byte_length"].as_u64().unwrap()).unwrap();
+                let end = offset.checked_add(length).unwrap();
+                assert!(end <= package.len());
+                if file["path"] == "product_manifest.json" {
+                    product_manifest =
+                        Some(serde_json::from_slice::<Value>(&package[offset..end]).unwrap());
+                }
+                offset = end;
+            }
+            assert_eq!(offset, package.len());
+            let product_manifest =
+                product_manifest.expect("D4PKG must contain product_manifest.json");
+            let package_version = package_manifest["product_version"]
+                .as_str()
+                .expect("D4PKG product_version")
+                .to_owned();
+            assert_eq!(package_manifest["app_id"], INSTALL_APP_ID);
+            assert_eq!(package_manifest["audit_store_id"], INSTALL_AUDIT_ID);
+            assert_eq!(
+                product_manifest["manifest"]["app_identity"]["app_id"],
+                INSTALL_APP_ID
+            );
+            assert_eq!(
+                product_manifest["manifest"]["audit_store"]["store_id"],
+                INSTALL_AUDIT_ID
+            );
+            assert_eq!(
+                product_manifest["manifest"]["app_identity"]["target_platform"],
+                "windows"
+            );
+            (package, package_manifest, product_manifest, package_version)
+        }
+
+        assert!(valid_product_identity(INSTALL_APP_ID, "d4-pocket-app-"));
+        assert!(valid_product_identity(INSTALL_AUDIT_ID, "audit-store-"));
+        let initial_path = std::path::PathBuf::from(
+            std::env::var_os("D4P_WINDOWS_ACCEPTANCE_INITIAL_PACKAGE")
+                .expect("initial D4PKG path is required"),
+        );
+        let update_path = std::path::PathBuf::from(
+            std::env::var_os("D4P_WINDOWS_ACCEPTANCE_UPDATE_PACKAGE")
+                .expect("update D4PKG path is required"),
+        );
+        let (initial_package, initial_outer, initial_manifest, initial_version) =
+            read_package(&initial_path);
+        let (update_package, update_outer, update_manifest, update_version) =
+            read_package(&update_path);
+        assert_ne!(initial_version, update_version);
+        assert_eq!(initial_outer["files"], update_outer["files"]);
+        assert_eq!(
+            initial_manifest["update_trust"],
+            update_manifest["update_trust"]
+        );
+
+        let key_der = hex::decode(
+            "302e020100300506032b6570042204209d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+        )
+        .unwrap();
+        let signing_key = Ed25519KeyPair::from_pkcs8_maybe_unchecked(&key_der).unwrap();
+        let public_der = [
+            0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
+        ]
+        .into_iter()
+        .chain(signing_key.public_key().as_ref().iter().copied())
+        .collect::<Vec<_>>();
+        let fingerprint = sha256_tagged(signing_key.public_key().as_ref());
+        let trust: UpdateTrust =
+            serde_json::from_value(initial_manifest["update_trust"].clone()).unwrap();
+        assert_eq!(trust.version, TRUST_VERSION);
+        assert_eq!(trust.algorithm, "Ed25519");
+        assert_eq!(trust.public_key_der_hex, hex::encode(public_der));
+        assert_eq!(trust.public_key_fingerprint, fingerprint);
+        assert_eq!(trust.package_sources.len(), 1);
+        assert_eq!(trust.package_sources[0].channel, "stable");
+        assert_eq!(
+            trust.package_sources[0].base_url,
+            "https://updates.example.com/d4-pocket/stable"
+        );
+
+        let make_candidate = |update_id: &str,
+                              current_version: &str,
+                              offered_version: &str,
+                              summary: &str,
+                              rollback_available: bool,
+                              package: &[u8]| {
+            let package_sha256 = hex::encode(Sha256::digest(package));
+            let signed_bytes = serde_json::to_vec(&SignedManifest {
+                version: CANDIDATE_VERSION,
+                update_id,
+                current_version,
+                offered_version,
+                channel: "stable",
+                summary,
+                package_sha256: &package_sha256,
+                package_size_bytes: package.len() as u64,
+                rollback_available,
+            })
+            .unwrap();
+            let signature = signing_key.sign(&signed_bytes);
+            UpdateCandidateDocument {
+                version: CANDIDATE_VERSION,
+                update_id: update_id.into(),
+                current_version: current_version.into(),
+                offered_version: offered_version.into(),
+                channel: "stable".into(),
+                summary: summary.into(),
+                package_sha256: Some(package_sha256),
+                package_size_bytes: Some(package.len() as u64),
+                signed_bytes_hex: hex::encode(signed_bytes),
+                signature_hex: hex::encode(signature.as_ref()),
+                signer_fingerprint: fingerprint.clone(),
+                rollback_available,
+            }
+        };
+        let initial_candidate = make_candidate(
+            "windows-e04-first-install",
+            "0.0.0",
+            &initial_version,
+            "Windows Setup installed lifecycle developer verification",
+            false,
+            &initial_package,
+        );
+        let update_candidate = make_candidate(
+            "windows-e04-update",
+            &initial_version,
+            &update_version,
+            "Windows Setup update and rollback developer verification",
+            true,
+            &update_package,
+        );
+
+        let local_app_data = super::super::product_install::current_user_local_app_data().unwrap();
+        let root_metadata = std::fs::symlink_metadata(&local_app_data).unwrap();
+        assert!(root_metadata.is_dir() && !root_metadata.file_type().is_symlink());
+        assert!(!is_reparse_point(&root_metadata));
+        let app_root = local_app_data
+            .join("D4Pocket")
+            .join("apps")
+            .join(INSTALL_APP_ID);
+        assert!(
+            !app_root.exists(),
+            "generated Export identity already has runtime data: {app_root:?}"
+        );
+        let d4_root = checked_child_directory(&local_app_data, "D4Pocket");
+        let apps_root = checked_child_directory(&d4_root, "apps");
+        let isolated_app_root = checked_child_directory(&apps_root, INSTALL_APP_ID);
+        let stores_root = checked_child_directory(&isolated_app_root, "stores");
+        let audit_root = checked_child_directory(&stores_root, INSTALL_AUDIT_ID);
+        let store_root = checked_child_directory(&audit_root, "store");
+        let mut broker = Broker::new_persistent("windows-e04-seed", &store_root).unwrap();
+        assert_eq!(broker.update_trust.as_ref(), Some(&trust));
+        broker
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
+        broker.set_desktop_product_install_local_app_data(local_app_data.clone());
+        assert!(broker.updates.is_empty());
+
+        let checked = call(
+            &mut broker,
+            BrokerOperation::更新確認,
+            json!({
+                "版": VERSION,
+                "候補": [initial_candidate, update_candidate],
+            }),
+        );
+        assert_eq!(checked.status, BrokerStatus::Accepted, "{checked:?}");
+        for update_id in ["windows-e04-first-install", "windows-e04-update"] {
+            let record: UpdateRecord =
+                serde_json::from_value(broker.updates.get(update_id).unwrap().clone()).unwrap();
+            assert_eq!(record.signature_status, "verified");
+            assert_eq!(record.candidate.signer_fingerprint, fingerprint);
+        }
+
+        let package_directory = broker.state_store.open_update_package_directory().unwrap();
+        drop(package_directory);
+        for package in [&initial_package, &update_package] {
+            let digest = hex::encode(Sha256::digest(package));
+            let path = store_root
+                .join("update_packages")
+                .join(format!("{digest}.pkg"));
+            assert!(!path.exists(), "cached test package path already exists");
+            std::fs::write(&path, package).unwrap();
+            let metadata = std::fs::symlink_metadata(&path).unwrap();
+            assert!(metadata.is_file() && !metadata.file_type().is_symlink());
+            assert_eq!(metadata.len(), package.len() as u64);
+            assert_eq!(
+                hex::encode(Sha256::digest(std::fs::read(path).unwrap())),
+                digest
+            );
+        }
+        let fixed_install_root = local_app_data
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(INSTALL_APP_ID);
+        assert!(!fixed_install_root.exists());
+        println!(
+            "W-E04_WINDOWS_SEED app_id={} audit_store_id={} initial_version={} update_version={} initial_package_sha256={} update_package_sha256={} candidates_signature_verified=true package_cache_verified=true installed_root_absent=true",
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+            initial_version,
+            update_version,
+            hex::encode(Sha256::digest(&initial_package)),
+            hex::encode(Sha256::digest(&update_package)),
+        );
     }
 
     #[cfg(target_os = "linux")]
@@ -8937,9 +9217,11 @@ mod tests {
         );
         assert_eq!(activated.body.as_ref().unwrap()["起動"], "not_started");
         assert!(desktop_entry_path.is_file());
-        assert!(std::fs::read_to_string(&desktop_entry_path)
-            .unwrap()
-            .contains(&format!("Exec=\"{}\"", fixed_launcher.display())));
+        assert!(
+            std::fs::read_to_string(&desktop_entry_path)
+                .unwrap()
+                .contains(&format!("Exec=\"{}\"", fixed_launcher.display()))
+        );
         assert!(!stored_package.exists());
         assert!(broker.audit_events().iter().any(|event| {
             event.request_id == "linux-installed-acceptance-activate:complete"
