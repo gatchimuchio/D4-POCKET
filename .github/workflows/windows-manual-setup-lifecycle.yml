@@ -166,8 +166,8 @@ jobs:
           }
           $compilerHelp = @(& $isccPath '/?' 2>&1)
           $compilerHelpExit = $LASTEXITCODE
-          if ($compilerHelpExit -ne 0) {
-            throw "The resolved Inno Setup compiler help command failed (exit=$compilerHelpExit): $($compilerHelp -join ' ')"
+          if (($compilerHelp -join "`n") -notmatch '(?i)Inno Setup 6 Command-Line Compiler') {
+            throw "The resolved executable did not identify as the Inno Setup 6 command-line compiler (exit=$compilerHelpExit): $($compilerHelp -join ' ')"
           }
 
           @(
