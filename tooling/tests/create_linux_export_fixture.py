@@ -5,12 +5,25 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_ID = "d4-pocket-app-11111111111111111111111111111111"
 AUDIT_STORE_ID = "audit-store-22222222222222222222222222222222"
+APP_ID_PATTERN = re.compile(r"d4-pocket-app-[0-9a-f]{32}\Z")
+AUDIT_STORE_ID_PATTERN = re.compile(r"audit-store-[0-9a-f]{32}\Z")
+
+
+def _validate_test_identity(app_id: str, audit_store_id: str) -> None:
+    if not isinstance(app_id, str) or APP_ID_PATTERN.fullmatch(app_id) is None:
+        raise ValueError("test App identityの形式が不正です")
+    if (
+        not isinstance(audit_store_id, str)
+        or AUDIT_STORE_ID_PATTERN.fullmatch(audit_store_id) is None
+    ):
+        raise ValueError("test Audit Store identityの形式が不正です")
 
 
 def linux_export_pair(
@@ -18,7 +31,10 @@ def linux_export_pair(
     update_trust_base_url: str = "https://updates.example.invalid/d4/stable",
     *,
     include_host_operations: bool = False,
+    app_id: str = APP_ID,
+    audit_store_id: str = AUDIT_STORE_ID,
 ) -> tuple[bytes, bytes]:
+    _validate_test_identity(app_id, audit_store_id)
     receipt: dict[str, Any] = json.loads(
         (ROOT / "examples/contracts/gui_shell_export_receipt.valid.json").read_text(
             encoding="utf-8"
@@ -31,9 +47,9 @@ def linux_export_pair(
     )
     export_id = "export-linux-build-fixture"
     for document in (receipt["export_manifest"], manifest_file["manifest"]):
-        document["app_identity"]["app_id"] = APP_ID
+        document["app_identity"]["app_id"] = app_id
         document["app_identity"]["target_platform"] = "linux"
-        document["audit_store"]["store_id"] = AUDIT_STORE_ID
+        document["audit_store"]["store_id"] = audit_store_id
         document["distribution_metadata"]["target_platform"] = "linux"
     if include_host_operations:
         module_plan = manifest_file["manifest"].get("module_plan")
@@ -84,8 +100,8 @@ def linux_export_pair(
     manifest_raw = json.dumps(
         manifest_file, ensure_ascii=False, separators=(",", ":")
     ).encode("utf-8")
-    receipt["manifest_file"]["file_name"] = f"{APP_ID}.json"
-    receipt["manifest_file"]["path"] = f"/tmp/{APP_ID}.json"
+    receipt["manifest_file"]["file_name"] = f"{app_id}.json"
+    receipt["manifest_file"]["path"] = f"/tmp/{app_id}.json"
     receipt["manifest_file"]["byte_length"] = len(manifest_raw)
     receipt["manifest_file"]["sha256"] = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
     receipt_raw = json.dumps(
@@ -100,17 +116,28 @@ def write_fixture(
     update_trust_base_url: str = "https://updates.example.invalid/d4/stable",
     *,
     include_host_operations: bool = False,
-) -> tuple[Path, Path]:
+    app_id: str = APP_ID,
+    audit_store_id: str = AUDIT_STORE_ID,
+    manifest_only: bool = False,
+) -> tuple[Path | None, Path]:
+    _validate_test_identity(app_id, audit_store_id)
+    if manifest_only and (app_id == APP_ID or audit_store_id == AUDIT_STORE_ID):
+        raise ValueError(
+            "独立Manifest-only fixtureには既定D4とは別のApp/Audit Store identityが必要です"
+        )
     output_dir.mkdir(mode=0o700, parents=False, exist_ok=False)
     receipt_raw, manifest_raw = linux_export_pair(
         update_trust_public_key_der,
         update_trust_base_url,
         include_host_operations=include_host_operations,
+        app_id=app_id,
+        audit_store_id=audit_store_id,
     )
-    receipt = output_dir / "d4_pocket_export_receipt.json"
-    manifest = output_dir / f"{APP_ID}.json"
-    with receipt.open("xb") as target:
-        target.write(receipt_raw)
+    receipt = None if manifest_only else output_dir / "d4_pocket_export_receipt.json"
+    manifest = output_dir / f"{app_id}.json"
+    if receipt is not None:
+        with receipt.open("xb") as target:
+            target.write(receipt_raw)
     with manifest.open("xb") as target:
         target.write(manifest_raw)
     return receipt, manifest
@@ -124,6 +151,13 @@ def main() -> int:
     parser.add_argument("--update-trust-public-key-der", type=Path)
     parser.add_argument("--update-trust-base-url")
     parser.add_argument("--include-host-operations", action="store_true")
+    parser.add_argument("--app-id", default=APP_ID)
+    parser.add_argument("--audit-store-id", default=AUDIT_STORE_ID)
+    parser.add_argument(
+        "--manifest-only",
+        action="store_true",
+        help="Authorityを含まない未信頼Manifestだけを書き、Broker Receiptは作らない",
+    )
     args = parser.parse_args()
     update_trust_public_key_der = (
         args.update_trust_public_key_der.read_bytes()
@@ -135,14 +169,18 @@ def main() -> int:
         update_trust_public_key_der,
         args.update_trust_base_url or "https://updates.example.invalid/d4/stable",
         include_host_operations=args.include_host_operations,
+        app_id=args.app_id,
+        audit_store_id=args.audit_store_id,
+        manifest_only=args.manifest_only,
     )
     print(
         json.dumps(
             {
                 "fixture_only": True,
                 "owner_authorization_verified": False,
-                "receipt": str(receipt),
+                "receipt": str(receipt) if receipt is not None else None,
                 "manifest": str(manifest),
+                "manifest_only": args.manifest_only,
             },
             separators=(",", ":"),
         )
