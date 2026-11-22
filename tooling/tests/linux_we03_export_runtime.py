@@ -301,6 +301,47 @@ def _assert_independent_task(result: dict[str, Any], package_sha256: str) -> dic
     return task
 
 
+def _assert_independent_crash_recovery(
+    result: dict[str, Any], package_sha256: str
+) -> dict[str, Any]:
+    crash = result.get("agent_task_normal_release_crash_recovery")
+    loopback = crash.get("loopback") if isinstance(crash, dict) else None
+    scenarios = loopback.get("scenarios") if isinstance(loopback, dict) else None
+    if (
+        result.get("acceptance_scope") != "agent_task_normal_release_crash_recovery"
+        or result.get("package_sha256") != package_sha256
+        or result.get("installed_app_exit")
+        != "normal_window_close_and_owned_process_cleanup"
+        or not isinstance(crash, dict)
+        or crash.get("normal_release_codex_configuration") is not True
+        or not isinstance(crash.get("task_id"), str)
+        or crash.get("task_descendant_group_stopped") is not True
+        or crash.get("scratch_retained_until_recovery") is not True
+        or crash.get("scratch_removed_after_restart_and_workspace_registration") is not True
+        or crash.get("task_recovery_status") != "suspended"
+        or crash.get("old_approval_reused") is not False
+        or crash.get("positive_result_after_crash") is not False
+        or crash.get("codex_home_after_broker_restart")
+        != "fresh_run_owned_empty_fixture"
+        or not isinstance(crash.get("audit_chain"), dict)
+        or not isinstance(result.get("durable_audit_after_broker_restart"), dict)
+        or not isinstance(scenarios, list)
+        or len(scenarios) != 1
+        or not isinstance(scenarios[0], dict)
+        or scenarios[0].get("name") != "crash"
+        or (
+            scenarios[0].get("posts"),
+            scenarios[0].get("tool_calls"),
+            scenarios[0].get("tool_outputs"),
+        )
+        != (1, 1, 0)
+    ):
+        raise RuntimeError(
+            "Independent Export installed crash-recovery evidence is incomplete"
+        )
+    return crash
+
+
 def _run_command(command: list[str], *, cwd: Path) -> str:
     completed = subprocess.run(
         command,
@@ -442,12 +483,27 @@ def run(temp_root: Path, private_key: Path, codex_cli: Path) -> dict[str, Any]:
             update_package=Path(package_info["path"]),
             codex_cli=codex_cli,
         )
+        independent_crash_result = _run_smoke(
+            smoke,
+            scope="agent_task_normal_release_crash_recovery",
+            package=Path(package_info["path"]),
+            temp_root=temp_root,
+            acceptance_root=temp_root / "independent-product-crash-acceptance",
+            private_key_path=private_key,
+            update_package=Path(package_info["path"]),
+            codex_cli=codex_cli,
+        )
     finally:
         smoke.APP_ID = SOURCE_APP_ID
         smoke.AUDIT_ID = SOURCE_AUDIT_ID
     task = _assert_independent_task(independent_result, package_info["package_sha256"])
+    crash = _assert_independent_crash_recovery(
+        independent_crash_result, package_info["package_sha256"]
+    )
     if (temp_root / "independent-product-acceptance").exists():
         raise RuntimeError("Independent product installed acceptance root survived cleanup")
+    if (temp_root / "independent-product-crash-acceptance").exists():
+        raise RuntimeError("Independent product crash acceptance root survived cleanup")
 
     return {
         "version": 1,
@@ -504,6 +560,24 @@ def run(temp_root: Path, private_key: Path, codex_cli: Path) -> dict[str, Any]:
                 independent_result.get("durable_audit_after_normal_exit"), dict
             ),
             "installed_app_exit": independent_result["installed_app_exit"],
+        },
+        "independent_crash_recovery": {
+            "acceptance_scope": independent_crash_result["acceptance_scope"],
+            "package_sha256": independent_crash_result["package_sha256"],
+            "task_id": crash["task_id"],
+            "task_descendant_group_stopped": crash["task_descendant_group_stopped"],
+            "scratch_retained_until_recovery": crash["scratch_retained_until_recovery"],
+            "scratch_removed_after_restart_and_workspace_registration": crash[
+                "scratch_removed_after_restart_and_workspace_registration"
+            ],
+            "task_recovery_status": crash["task_recovery_status"],
+            "old_approval_reused": crash["old_approval_reused"],
+            "positive_result_after_crash": crash["positive_result_after_crash"],
+            "loopback": crash["loopback"],
+            "durable_audit_after_broker_restart": isinstance(
+                independent_crash_result.get("durable_audit_after_broker_restart"), dict
+            ),
+            "installed_app_exit": independent_crash_result["installed_app_exit"],
         },
         "limitations": [
             "Automated test-only native Owner path; no real Owner authority was exercised.",

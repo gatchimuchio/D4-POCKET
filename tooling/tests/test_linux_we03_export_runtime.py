@@ -16,6 +16,7 @@ from tooling.tests.linux_we03_export_runtime import (
     TEST_UPDATE_SOURCE_URL,
     _copy_ui_manifest,
     _last_smoke_result,
+    _assert_independent_crash_recovery,
     validate_developer_update_trust,
     validate_builder_output,
     validate_manifest_bytes,
@@ -261,6 +262,43 @@ class LinuxWe03ExportRuntimeTests(unittest.TestCase):
         )
         with self.assertRaises(RuntimeError):
             _last_smoke_result(text, "update_lifecycle")
+
+    def test_independent_crash_recovery_evidence_is_bound_to_candidate_and_no_replay(self) -> None:
+        package_hash = "a" * 64
+        result = {
+            "acceptance_scope": "agent_task_normal_release_crash_recovery",
+            "package_sha256": package_hash,
+            "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
+            "durable_audit_after_broker_restart": {"integrity": "verified"},
+            "agent_task_normal_release_crash_recovery": {
+                "normal_release_codex_configuration": True,
+                "task_id": "task-linux-export-crash",
+                "task_descendant_group_stopped": True,
+                "scratch_retained_until_recovery": True,
+                "scratch_removed_after_restart_and_workspace_registration": True,
+                "task_recovery_status": "suspended",
+                "old_approval_reused": False,
+                "positive_result_after_crash": False,
+                "codex_home_after_broker_restart": "fresh_run_owned_empty_fixture",
+                "audit_chain": {"integrity": "verified"},
+                "loopback": {
+                    "scenarios": [
+                        {
+                            "name": "crash",
+                            "posts": 1,
+                            "tool_calls": 1,
+                            "tool_outputs": 0,
+                        }
+                    ]
+                },
+            },
+        }
+        crash = _assert_independent_crash_recovery(result, package_hash)
+        self.assertEqual(crash["task_recovery_status"], "suspended")
+
+        result["package_sha256"] = "b" * 64
+        with self.assertRaisesRegex(RuntimeError, "crash-recovery evidence"):
+            _assert_independent_crash_recovery(result, package_hash)
 
     def test_ui_manifest_capture_preserves_exact_bytes(self) -> None:
         raw = self.manifest_bytes()

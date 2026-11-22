@@ -6643,6 +6643,7 @@ def _run_installed_agent_task_crash_recovery_acceptance(
     acceptance_root: Path,
     broker_executable: Path,
     restart_application: Callable[[], str],
+    normal_release: bool = False,
 ) -> dict[str, object]:
     _fixture_root, workspace, _outside_file = _write_linux_agent_task_fixture(
         acceptance_root
@@ -6852,7 +6853,10 @@ def _run_installed_agent_task_crash_recovery_acceptance(
     ):
         raise RuntimeError("Broker crash後にTask tool結果が送られていないことを確認できません")
 
-    configured_codex_home = Path(environment["GUI_SHELL_R2_E2E_CODEX_HOME"])
+    codex_home_environment_key = (
+        "CODEX_HOME" if normal_release else "GUI_SHELL_R2_E2E_CODEX_HOME"
+    )
+    configured_codex_home = Path(environment[codex_home_environment_key])
     if configured_codex_home.is_symlink():
         raise RuntimeError("Broker crash前の合成Codex HOMEがsymlinkです")
     previous_codex_home = configured_codex_home.resolve(strict=True)
@@ -6863,21 +6867,22 @@ def _run_installed_agent_task_crash_recovery_acceptance(
     if not previous_codex_home.is_dir():
         raise RuntimeError("Broker crash前の合成Codex HOMEが通常directoryではありません")
 
-    post_crash_fixture_root = (
-        acceptance_root
-        / "post-crash-cli-identity"
-        / "D4Pocket-R2-E2E-SYNTHETIC"
+    post_crash_fixture_root = acceptance_root / "post-crash-cli-identity" / (
+        "D4Pocket-LINUX-NORMAL-RELEASE"
+        if normal_release
+        else "D4Pocket-R2-E2E-SYNTHETIC"
     )
     post_crash_fixture_root.mkdir(mode=0o700, parents=True, exist_ok=False)
-    (post_crash_fixture_root / "OWNER-APPROVED-SYNTHETIC.txt").write_text(
-        "Run-owned test identity only; no provider credentials.\n",
-        encoding="utf-8",
-    )
+    if not normal_release:
+        (post_crash_fixture_root / "OWNER-APPROVED-SYNTHETIC.txt").write_text(
+            "Run-owned test identity only; no provider credentials.\n",
+            encoding="utf-8",
+        )
     post_crash_codex_home = post_crash_fixture_root / "codex-home"
     post_crash_codex_home.mkdir(mode=0o700)
     if next(post_crash_codex_home.iterdir(), None) is not None:
         raise RuntimeError("Broker crash後の合成Codex HOMEが初期状態で空ではありません")
-    environment["GUI_SHELL_R2_E2E_CODEX_HOME"] = str(post_crash_codex_home)
+    environment[codex_home_environment_key] = str(post_crash_codex_home)
 
     restarted_window_id = restart_application()
     new_window = register_workspace(restarted_window_id)
@@ -6967,6 +6972,7 @@ def _run_installed_agent_task_crash_recovery_acceptance(
             raise RuntimeError("synthetic secret canaryが再起動後のinstalled UI logへ漏えいしました")
     return {
         "task_id": task_id,
+        "normal_release_codex_configuration": normal_release,
         "broker_image": str(broker_executable),
         "broker_killed_by": "SIGKILL_after_executable_and_start_time_recheck",
         "task_descendant_group_stopped": True,
@@ -10589,6 +10595,7 @@ def run_installed_smoke(
         "agent_task_supervision",
         "agent_mcp_followup",
         "agent_task_normal_release",
+        "agent_task_normal_release_crash_recovery",
         "agent_task_crash_recovery",
         "provider_credential_binding",
         "runtime_provenance",
@@ -10624,6 +10631,7 @@ def run_installed_smoke(
         "agent_task_supervision",
         "agent_mcp_followup",
         "agent_task_normal_release",
+        "agent_task_normal_release_crash_recovery",
         "agent_task_crash_recovery",
         "provider_credential_binding",
     }:
@@ -10720,12 +10728,16 @@ def run_installed_smoke(
             "agent_task_supervision",
             "agent_mcp_followup",
             "agent_task_normal_release",
+            "agent_task_normal_release_crash_recovery",
             "agent_task_crash_recovery",
             "provider_credential_binding",
         }:
             if resolved_codex_cli is None:
                 raise RuntimeError("Agent Task acceptanceのCodex CLI pathがありません")
-            normal_release_task = acceptance_scope == "agent_task_normal_release"
+            normal_release_task = acceptance_scope in {
+                "agent_task_normal_release",
+                "agent_task_normal_release_crash_recovery",
+            }
             synthetic_root = acceptance_root / (
                 "D4Pocket-LINUX-NORMAL-RELEASE"
                 if normal_release_task
@@ -10797,6 +10809,7 @@ def run_installed_smoke(
             "agent_task_supervision",
             "agent_mcp_followup",
             "agent_task_normal_release",
+            "agent_task_normal_release_crash_recovery",
             "agent_task_crash_recovery",
             "provider_credential_binding",
             "runtime_provenance",
@@ -11864,9 +11877,15 @@ def run_installed_smoke(
                 )
                 return
 
-            if acceptance_scope == "agent_task_crash_recovery":
+            if acceptance_scope in {
+                "agent_task_crash_recovery",
+                "agent_task_normal_release_crash_recovery",
+            }:
                 if resolved_codex_cli is None or responses_server is None:
                     raise RuntimeError("Agent Task crash recovery fixtureの初期化が不足しています")
+                normal_release_crash = (
+                    acceptance_scope == "agent_task_normal_release_crash_recovery"
+                )
 
                 def restart_after_broker_crash() -> str:
                     nonlocal desktop_process
@@ -11893,6 +11912,7 @@ def run_installed_smoke(
                     acceptance_root=acceptance_root,
                     broker_executable=helper,
                     restart_application=restart_after_broker_crash,
+                    normal_release=normal_release_crash,
                 )
                 current_window_id = _visible_product_window(environment)
                 if current_window_id is None:
@@ -11919,7 +11939,11 @@ def run_installed_smoke(
                             "installed_entry": str(entries[0]),
                             "product_version": record["product_version"],
                             "package_sha256": record["package_sha256"],
-                            "agent_task_crash_recovery": crash_evidence,
+                            (
+                                "agent_task_normal_release_crash_recovery"
+                                if normal_release_crash
+                                else "agent_task_crash_recovery"
+                            ): crash_evidence,
                             "durable_audit_after_broker_restart": durable_audit,
                             "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
                         },
@@ -12378,6 +12402,7 @@ def run_installed_smoke(
             "agent_task_supervision",
             "agent_mcp_followup",
             "agent_task_normal_release",
+            "agent_task_normal_release_crash_recovery",
             "agent_task_crash_recovery",
             "provider_credential_binding",
         }:
@@ -12639,6 +12664,7 @@ def main() -> int:
             "agent_task_supervision",
             "agent_mcp_followup",
             "agent_task_normal_release",
+            "agent_task_normal_release_crash_recovery",
             "agent_task_crash_recovery",
             "provider_credential_binding",
             "runtime_provenance",

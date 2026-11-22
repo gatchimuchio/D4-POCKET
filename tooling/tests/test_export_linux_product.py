@@ -230,6 +230,32 @@ class LinuxExportInputTests(unittest.TestCase):
         self.assertEqual(manifest_hash, hashlib.sha256(manifest_raw).hexdigest())
         self.assertIn("core.security_broker", plan.included_module_ids)
 
+    def test_untrusted_linux_export_manifest_rejects_credential_and_approval_reuse(self) -> None:
+        _receipt_raw, manifest_raw = linux_export_pair()
+        base = json.loads(manifest_raw.decode("utf-8"))
+        manifest_name = (
+            base["manifest"]["app_identity"]["app_id"] + ".json"
+        )
+        attempts = (
+            ("credential policy", ("inheritance_policy", "credential"), "reuse_source"),
+            ("approval policy", ("inheritance_policy", "approval"), "reuse_source"),
+            ("credential material", ("credential",), "D4P_SYNTHETIC_CREDENTIAL_CANARY"),
+            ("approval material", ("approval",), "D4P_SYNTHETIC_APPROVAL_CANARY"),
+        )
+        for label, path, value in attempts:
+            with self.subTest(label=label):
+                candidate = json.loads(json.dumps(base))
+                target = candidate["manifest"]
+                for key in path[:-1]:
+                    target = target[key]
+                target[path[-1]] = value
+                with self.assertRaisesRegex(ValueError, "Schema"):
+                    validate_export_manifest_only_input(
+                        json.dumps(candidate, ensure_ascii=False).encode("utf-8"),
+                        manifest_name,
+                        target_platform="linux",
+                    )
+
     def test_linux_fixture_can_embed_bounded_ephemeral_update_trust(self) -> None:
         public_der = bytes.fromhex("302a300506032b6570032100") + bytes(range(32))
         receipt_raw, manifest_raw = linux_export_pair(public_der)
