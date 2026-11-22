@@ -12,8 +12,11 @@ from tooling.tests.linux_we03_export_runtime import (
     AUDIT_ID_PATTERN,
     SOURCE_APP_ID,
     SOURCE_AUDIT_ID,
+    TEST_UPDATE_PUBLIC_KEY_DER_HEX,
+    TEST_UPDATE_SOURCE_URL,
     _copy_ui_manifest,
     _last_smoke_result,
+    validate_developer_update_trust,
     validate_builder_output,
     validate_manifest_bytes,
 )
@@ -79,6 +82,37 @@ class LinuxWe03ExportRuntimeTests(unittest.TestCase):
         self.document["manifest"]["app_identity"]["app_id"] = "d4-pocket-app-ABC"
         with self.assertRaises(ValueError):
             validate_manifest_bytes(self.manifest_bytes())
+
+    def test_developer_update_trust_is_bound_to_the_ui_manifest(self) -> None:
+        public_key = bytes.fromhex(TEST_UPDATE_PUBLIC_KEY_DER_HEX)[12:]
+        fingerprint = f"sha256:{hashlib.sha256(public_key).hexdigest()}"
+        self.document["update_trust"] = {
+            "version": 2,
+            "algorithm": "Ed25519",
+            "public_key_der_hex": TEST_UPDATE_PUBLIC_KEY_DER_HEX,
+            "public_key_fingerprint": fingerprint,
+            "package_sources": [
+                {"channel": "stable", "base_url": TEST_UPDATE_SOURCE_URL}
+            ],
+        }
+        self.assertEqual(
+            validate_developer_update_trust(self.manifest_bytes()), fingerprint
+        )
+
+    def test_developer_update_trust_rejects_missing_or_changed_test_identity(self) -> None:
+        with self.assertRaises(ValueError):
+            validate_developer_update_trust(self.manifest_bytes())
+        self.document["update_trust"] = {
+            "version": 2,
+            "algorithm": "Ed25519",
+            "public_key_der_hex": TEST_UPDATE_PUBLIC_KEY_DER_HEX,
+            "public_key_fingerprint": "sha256:" + "0" * 64,
+            "package_sources": [
+                {"channel": "stable", "base_url": TEST_UPDATE_SOURCE_URL}
+            ],
+        }
+        with self.assertRaises(ValueError):
+            validate_developer_update_trust(self.manifest_bytes())
 
     def test_identity_patterns_are_strict(self) -> None:
         self.assertIsNotNone(APP_ID_PATTERN.fullmatch(self.app_id))

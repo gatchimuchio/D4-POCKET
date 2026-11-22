@@ -25,6 +25,11 @@ SOURCE_APP_ID = "d4-pocket-app-11111111111111111111111111111111"
 SOURCE_AUDIT_ID = "audit-store-22222222222222222222222222222222"
 APP_ID_PATTERN = re.compile(r"d4-pocket-app-[0-9a-f]{32}\Z")
 AUDIT_ID_PATTERN = re.compile(r"audit-store-[0-9a-f]{32}\Z")
+TEST_UPDATE_PUBLIC_KEY_DER_HEX = (
+    "302a300506032b6570032100"
+    "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+)
+TEST_UPDATE_SOURCE_URL = "https://updates.example.com/d4-pocket/stable"
 
 
 def validate_manifest_bytes(
@@ -73,6 +78,30 @@ def validate_manifest_bytes(
         "audit_store_id": audit_id,
         "manifest_sha256": hashlib.sha256(raw).hexdigest(),
     }
+
+
+def validate_developer_update_trust(raw: bytes) -> str:
+    """W-E03用の隔離test trustがUI Export Manifestに固定されたことを確認する。"""
+    try:
+        document = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise ValueError("Export Manifestのtest update trustがJSONではありません") from error
+    trust = document.get("update_trust") if isinstance(document, dict) else None
+    expected_key = bytes.fromhex(TEST_UPDATE_PUBLIC_KEY_DER_HEX)
+    fingerprint = f"sha256:{hashlib.sha256(expected_key[12:]).hexdigest()}"
+    if (
+        not isinstance(trust, dict)
+        or trust.get("version") != 2
+        or trust.get("algorithm") != "Ed25519"
+        or trust.get("public_key_der_hex") != TEST_UPDATE_PUBLIC_KEY_DER_HEX
+        or trust.get("public_key_fingerprint") != fingerprint
+        or trust.get("package_sources")
+        != [{"channel": "stable", "base_url": TEST_UPDATE_SOURCE_URL}]
+    ):
+        raise ValueError(
+            "installed UI Export Manifestにrun-only test update trustが固定されていません"
+        )
+    return fingerprint
 
 
 def _read_regular_file(path: Path) -> bytes:
@@ -335,6 +364,10 @@ def run(temp_root: Path, private_key: Path, codex_cli: Path) -> dict[str, Any]:
             acceptance_root=temp_root / "source-product-acceptance",
             private_key_path=private_key,
             update_package=rollback_package,
+            export_update_trust=(
+                TEST_UPDATE_PUBLIC_KEY_DER_HEX,
+                TEST_UPDATE_SOURCE_URL,
+            ),
         )
     finally:
         smoke._verify_export_manifest = original_verify
@@ -351,6 +384,7 @@ def run(temp_root: Path, private_key: Path, codex_cli: Path) -> dict[str, Any]:
     manifest_file = capture_root / capture[0]["file"]
     manifest_raw = _read_regular_file(manifest_file)
     manifest_identity = validate_manifest_bytes(manifest_raw)
+    update_trust_fingerprint = validate_developer_update_trust(manifest_raw)
     if manifest_identity != {
         key: capture[0][key]
         for key in ("app_id", "audit_store_id", "manifest_sha256")
@@ -447,6 +481,12 @@ def run(temp_root: Path, private_key: Path, codex_cli: Path) -> dict[str, Any]:
             "package_byte_length": package_info["package_byte_length"],
             "app_id": manifest_identity["app_id"],
             "audit_store_id": manifest_identity["audit_store_id"],
+            "update_trust": {
+                "source": "installed_ui_test_owner_fixture",
+                "public_key_fingerprint": update_trust_fingerprint,
+                "package_source": TEST_UPDATE_SOURCE_URL,
+                "private_key_in_product": False,
+            },
             "credential_permission_approval_audit_inherited": False,
         },
         "independent_runtime": {

@@ -1572,10 +1572,52 @@ def _open_installed_navigation_page(
     return _find_accessible(WINDOW_TITLE, timeout=10)
 
 
-def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: str) -> None:
+def _validate_export_update_trust_scope(
+    acceptance_scope: str,
+    update_trust: tuple[str, str] | None,
+) -> None:
+    if update_trust is None:
+        return
+    if acceptance_scope != "update_lifecycle":
+        raise RuntimeError("test Export update trustはupdate_lifecycle harness専用です")
+    if (
+        not isinstance(update_trust, tuple)
+        or len(update_trust) != 2
+        or any(
+            not isinstance(value, str)
+            or not value
+            or len(value) > 256
+            or any(ord(character) < 0x20 for character in value)
+            for value in update_trust
+        )
+    ):
+        raise RuntimeError("test Export update trust入力が不正です")
+
+
+def _trigger_export_from_installed_ui(
+    environment: dict[str, str],
+    window_id: str,
+    *,
+    update_trust: tuple[str, str] | None = None,
+) -> None:
     window = _open_installed_navigation_page(
         environment, window_id, group="設定", page_label="設定"
     )
+    if update_trust is not None:
+        public_key_label = "Ed25519 SPKI公開鍵（DER、小文字hex）"
+        source_url_label = "HTTPS配布元base URL"
+        try:
+            _find_accessible(public_key_label, root=window, timeout=0.5)
+        except RuntimeError:
+            _activate_named_control_by_keyboard(
+                "更新署名trust（上級者向け）", environment, window_id
+            )
+        _set_public_text_by_keyboard(
+            window, public_key_label, update_trust[0], environment, window_id
+        )
+        _set_public_text_by_keyboard(
+            window, source_url_label, update_trust[1], environment, window_id
+        )
     _activate_named_control_by_keyboard(
         "Owner確認してManifest fileを生成", environment, window_id
     )
@@ -10487,7 +10529,9 @@ def run_installed_smoke(
     update_catalog: Path | None = None,
     mcp_result_case: str = "a",
     mcp_tool_calls: int = 1,
+    export_update_trust: tuple[str, str] | None = None,
 ) -> None:
+    _validate_export_update_trust_scope(acceptance_scope, export_update_trust)
     needs_x11 = acceptance_scope not in {
         "wayland_rendering",
         "wayland_workspace_selection",
@@ -11927,11 +11971,23 @@ def run_installed_smoke(
                 )
                 return
 
-            _trigger_export_from_installed_ui(environment, window_id)
+            _trigger_export_from_installed_ui(
+                environment, window_id, update_trust=export_update_trust
+            )
+            export_summary_markers = ("対象platform: Linux",)
+            if export_update_trust is not None:
+                public_key = bytes.fromhex(export_update_trust[0])[12:]
+                update_fingerprint = (
+                    "sha256:" + hashlib.sha256(public_key).hexdigest()
+                )
+                export_summary_markers += (
+                    f"Ed25519公開鍵fingerprint: {update_fingerprint}",
+                    f"HTTPS配布元: {export_update_trust[1]}",
+                )
             _answer_owner_dialog(
                 environment,
                 "拒否",
-                expected_summary_markers=("対象platform: Linux",),
+                expected_summary_markers=export_summary_markers,
             )
             _find_accessible("GUI Shell独立App書出しは受理されませんでした", timeout=20)
             if any(export_root.iterdir()):
@@ -12056,11 +12112,13 @@ def run_installed_smoke(
                 timeout=10,
             )
 
-            _trigger_export_from_installed_ui(environment, window_id)
+            _trigger_export_from_installed_ui(
+                environment, window_id, update_trust=export_update_trust
+            )
             _answer_owner_dialog(
                 environment,
                 "許可",
-                expected_summary_markers=("対象platform: Linux",),
+                expected_summary_markers=export_summary_markers,
             )
             _find_accessible("独立Manifest fileを保存しました", timeout=30)
             manifest_evidence = _verify_export_manifest(export_root)

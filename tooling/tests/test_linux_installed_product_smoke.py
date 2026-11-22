@@ -92,6 +92,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_workspace_projection,
     _update_source_host,
     _same_source_update_ca_environment,
+    _trigger_export_from_installed_ui,
+    _validate_export_update_trust_scope,
     _visible_mcp_credential_ids,
     _installed_acceptance_runtime_directory,
     _wait_for_workspace_projection,
@@ -6514,6 +6516,58 @@ class LinuxAgentTaskFixtureSourceTests(unittest.TestCase):
 
             for path, original_contents in secret_files.items():
                 self.assertEqual(path.read_text(encoding="utf-8"), original_contents)
+
+
+class ExportUpdateTrustHarnessTests(unittest.TestCase):
+    def test_export_update_trust_is_limited_to_update_lifecycle_harness(self) -> None:
+        _validate_export_update_trust_scope("update_lifecycle", None)
+        _validate_export_update_trust_scope(
+            "update_lifecycle", ("public-key", "https://example.test/source")
+        )
+        with self.assertRaisesRegex(RuntimeError, "update_lifecycle"):
+            _validate_export_update_trust_scope(
+                "agent_task_normal_release",
+                ("public-key", "https://example.test/source"),
+            )
+        with self.assertRaisesRegex(RuntimeError, "入力が不正"):
+            _validate_export_update_trust_scope(
+                "update_lifecycle", ["public-key", "https://example.test/source"]
+            )
+
+    def test_export_ui_opens_advanced_trust_and_enters_public_values(self) -> None:
+        window = object()
+        environment = {"DISPLAY": ":99"}
+        update_trust = ("public-key", "https://example.test/source")
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._open_installed_navigation_page",
+                return_value=window,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=RuntimeError("advanced fields are collapsed"),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_named_control_by_keyboard"
+            ) as activate,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._set_public_text_by_keyboard"
+            ) as set_text,
+        ):
+            _trigger_export_from_installed_ui(
+                environment, "0x123", update_trust=update_trust
+            )
+
+        self.assertEqual(activate.call_count, 2)
+        self.assertEqual(activate.call_args_list[0].args[0], "更新署名trust（上級者向け）")
+        self.assertEqual(activate.call_args_list[1].args[0], "Owner確認してManifest fileを生成")
+        self.assertEqual(set_text.call_count, 2)
+        self.assertEqual(set_text.call_args_list[0].args[1:3], (
+            "Ed25519 SPKI公開鍵（DER、小文字hex）", "public-key"
+        ))
+        self.assertEqual(set_text.call_args_list[1].args[1:3], (
+            "HTTPS配布元base URL", "https://example.test/source"
+        ))
 
 
 if __name__ == "__main__":
