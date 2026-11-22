@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "evidence_id": "W-E03-LINUX-EXPORT-RUNTIME-ACTIONS-351",
+  "source": {
+    "workflow_run_url": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/45006851879",
+    "job_id": 137160259806,
+    "workflow": ".github/workflows/linux-manual-export-build.yml",
+    "event": "workflow_dispatch",
+    "acceptance_scope": "w_e03_export_runtime",
+    "conclusion": "success",
+    "duration_seconds": 1101,
+    "task_step_duration_seconds": 716,
+    "branch": "codex/w-e03-linux-export-runtime-20261122-01",
+    "source_commit": "32d4158aaefd44e624d5005698130dd86536c00d"
+  },
+  "classification": {
+    "evidence_class": "HOSTED_OS_PRODUCT",
+    "runtime_evidence_class": "LIVE_RUNTIME",
+    "platform": "GitHub-hosted Ubuntu 22.04 x86_64, X11/Xvfb",
+    "authority_verified": false,
+    "real_owner_authority": false,
+    "external_provider_requests": 0,
+    "codex_cli": "@openai/codex 0.163.0-alpha.10.2",
+    "provider_fixture": "run-owned loopback Responses fixture"
+  },
+  "source_product": {
+    "active_product_version": "0.1.1",
+    "package_sha256": "7ece56397b27485b7e6adfaba4efac7c659b6428cea3e7303fc45207d52001b2",
+    "ui_generated_manifest_sha256": "ccc8525dc102560976a19401955ecdcebe6f03710be25e5cdae11ee7dae2823a",
+    "app_id": "d4-pocket-app-1f51ed8fe885960f6c9af59cad93868d",
+    "audit_store_id": "audit-store-25631ece6599c08e0d3a9dbc92a88063",
+    "update_lifecycle": "passed",
+    "uninstall": {
+      "product_root": "removed",
+      "desktop_entry": "removed",
+      "audit_store": "retained_outside_product_root",
+      "user_data": "retained_outside_product_root"
+    },
+    "owned_processes": "all_stopped",
+    "audit_durable_after_broker_restart": true
+  },
+  "independent_export": {
+    "selection_input_source": "manifest_file_untrusted",
+    "source_receipt_sha256": null,
+    "source_manifest_sha256": "ccc8525dc102560976a19401955ecdcebe6f03710be25e5cdae11ee7dae2823a",
+    "build_evidence_sha256": "bbbc9449cf4b589e6ac85d9929bc0e881d858c1c442dffe814514cf9164a2a8c",
+    "package_sha256": "9ec3986022e389a392b9745e5e8dfa9d62c34d116f218d766b4c5a8f438ce619",
+    "package_byte_length": 55494463,
+    "app_id": "d4-pocket-app-1f51ed8fe885960f6c9af59cad93868d",
+    "audit_store_id": "audit-store-25631ece6599c08e0d3a9dbc92a88063",
+    "credential_permission_approval_audit_inherited": false,
+    "update_trust_source": "installed_ui_test_owner_fixture",
+    "private_key_in_product": false
+  },
+  "independent_runtime": {
+    "source_app_uninstalled_before_runtime": true,
+    "acceptance_scope": "agent_task_normal_release",
+    "package_sha256": "9ec3986022e389a392b9745e5e8dfa9d62c34d116f218d766b4c5a8f438ce619",
+    "task_scenarios": ["complete"],
+    "terminal_statuses": ["completed"],
+    "positive_result_hash": "sha256:fb29f95e3daecc4ac9f862818043abdbc0b5485cc26cb9757b1df4ae4b7ba136",
+    "workspace_write": true,
+    "secret_and_outside_reads_denied": true,
+    "workspace_task_scratch_removed": true,
+    "descendant_groups_stopped": true,
+    "durable_audit_after_normal_exit": true,
+    "installed_app_exit": "normal_window_close_and_owned_process_cleanup"
+  },
+  "independent_crash_recovery": {
+    "acceptance_scope": "agent_task_normal_release_crash_recovery",
+    "package_sha256": "9ec3986022e389a392b9745e5e8dfa9d62c34d116f218d766b4c5a8f438ce619",
+    "task_id": "aa6984d123b4bceb574577d09494382c",
+    "task_descendant_group_stopped": true,
+    "scratch_retained_until_recovery": true,
+    "scratch_removed_after_restart_and_workspace_registration": true,
+    "task_recovery_status": "suspended",
+    "old_approval_reused": false,
+    "positive_result_after_crash": false,
+    "durable_audit_after_broker_restart": true,
+    "loopback_crash_scenario": {
+      "posts": 1,
+      "tool_calls": 1,
+      "tool_outputs": 0,
+      "model_requests": 0,
+      "mcp_function_calls": 0,
+      "mcp_function_outputs": 0
+    },
+    "installed_app_exit": "normal_window_close_and_owned_process_cleanup"
+  },
+  "phase_status": {
+    "developer_verification": "PASS",
+    "w_e03": "OPEN",
+    "real_product_owner_acceptance": "NOT_ESTABLISHED",
+    "e2_e6_and_release": "NOT_CLOSED"
+  },
+  "limitations": [
+    "Automated test-only native Owner path; no real Owner authority was exercised.",
+    "Codex CLI used the run-owned loopback Responses fixture; no external Provider was contacted.",
+    "This does not close W-E03, E2/E3/E4/E5/E6, formal distribution, or Release."
+  ]
+}
