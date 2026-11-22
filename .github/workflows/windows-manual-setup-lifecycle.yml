@@ -88,29 +88,33 @@ jobs:
           "$flutterRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           'FLUTTER_SUPPRESS_ANALYTICS=true' | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-          $inno = Get-Command ISCC.exe -ErrorAction SilentlyContinue
-          if ($null -eq $inno) {
+          function Find-InnoSetup6Compiler {
             $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
-            $knownPaths = @(
-              (Join-Path $programFilesX86 'Inno Setup 6\ISCC.exe'),
-              (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe')
-            )
-            $innoPath = $knownPaths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
-            if (-not $innoPath) {
-              choco install innosetup --yes --no-progress
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-              $inno = Get-Command ISCC.exe -ErrorAction SilentlyContinue
-              if ($null -eq $inno) {
-                $innoPath = $knownPaths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
-              }
+            $candidates = @()
+            if ($programFilesX86) { $candidates += Join-Path $programFilesX86 'Inno Setup 6\ISCC.exe' }
+            if ($env:ProgramFiles) { $candidates += Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe' }
+            $pathCommand = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+            if ($pathCommand) { $candidates += $pathCommand.Source }
+
+            foreach ($candidate in $candidates | Select-Object -Unique) {
+              if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
+              $candidatePath = (Resolve-Path -LiteralPath $candidate).Path
+              $candidateInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($candidatePath)
+              $candidateVersion = if ($candidateInfo.ProductVersion) { $candidateInfo.ProductVersion } else { $candidateInfo.FileVersion }
+              if ($candidateVersion -match '^6\.') { return $candidatePath }
             }
-            if ($innoPath) { $isccPath = (Resolve-Path -LiteralPath $innoPath).Path }
-            elseif ($inno) { $isccPath = $inno.Source }
-          } else {
-            $isccPath = $inno.Source
+            return $null
+          }
+
+          $isccPath = Find-InnoSetup6Compiler
+
+          if (-not $isccPath) {
+            choco install innosetup --version=6.7.1 --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $isccPath = Find-InnoSetup6Compiler
           }
           if (-not $isccPath -or -not (Test-Path -LiteralPath $isccPath -PathType Leaf)) {
-            throw 'Inno Setup 6 ISCC.exe was not found after setup.'
+            throw 'A real Inno Setup 6 ISCC.exe was not found; a PATH shim is not accepted.'
           }
           $isccPath = (Resolve-Path -LiteralPath $isccPath).Path
           $isccInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($isccPath)

@@ -113,7 +113,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-setup-lifecycle.yml",
-      "sha256": "f0e3c0f7913d12e2180eeacf8d2bde176799e3198bb84a02d5b06779c10e1802"
+      "sha256": "3e96597625ea3c6425694ac0c6592a9aa878b9171ee8a7e113561f4dc5e6ecb4"
     },
     {
       "path": ".gitignore",
