@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import unittest
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -18,6 +19,9 @@ APP_ID = "d4-pocket-app-" + "1" * 32
 AUDIT_STORE_ID = "audit-store-" + "2" * 32
 INITIAL_PACKAGE_SHA256 = "3" * 64
 UPDATE_PACKAGE_SHA256 = "4" * 64
+SETUP_LIFECYCLE_SCRIPT = Path(__file__).with_name(
+    "windows_installed_setup_lifecycle.ps1"
+).read_text(encoding="utf-8")
 
 
 def valid_lifecycle_evidence() -> dict[str, Any]:
@@ -133,6 +137,11 @@ class WindowsInstalledSetupEvidenceTests(unittest.TestCase):
             _cargo_test("seed", "seed_test", {}, show_test_output=True)
         visible_command = run.call_args.args[0]
         self.assertEqual(visible_command[-1], "--nocapture")
+
+    def test_inno_setup_accepts_japanese_mnemonic_button_names(self) -> None:
+        for caption in ("次へ(&N) >", "インストール(&I)", "完了(&F)"):
+            with self.subTest(caption=caption):
+                self.assertIn(caption, SETUP_LIFECYCLE_SCRIPT)
 
 
 if __name__ == "__main__":

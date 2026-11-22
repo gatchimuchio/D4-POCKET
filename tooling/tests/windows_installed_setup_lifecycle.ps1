@@ -624,9 +624,9 @@ try {
   $setupHash = (Get-FileHash -LiteralPath $setupResolved -Algorithm SHA256).Hash.ToLowerInvariant()
   $setupProcess = Start-Process -FilePath $setupResolved -PassThru
   $evidence.setup_executed = $true
-  $next = Wait-SetupAction -SetupProcessId $setupProcess.Id -Names @('次へ >', '次へ', 'Next >', 'Next')
+  $next = Wait-SetupAction -SetupProcessId $setupProcess.Id -Names @('次へ(&N) >', '次へ >', '次へ', 'Next >', 'Next')
   Invoke-UiElement $next.Button
-  $install = Wait-SetupAction -SetupProcessId $setupProcess.Id -Names @('インストール', 'Install')
+  $install = Wait-SetupAction -SetupProcessId $setupProcess.Id -Names @('インストール(&I)', 'インストール', 'Install')
   Invoke-UiElement $install.Button
 
   $stage = 'observe setup-launched Product window before Broker install'
@@ -675,7 +675,7 @@ try {
   if (-not (Test-Path -LiteralPath $script:startMenuShortcut -PathType Leaf)) {
     throw 'Start Menu shortcut was not registered by first-install activation.'
   }
-  $setupFinish = Wait-SetupAction -SetupProcessId $setupProcess.Id -Names @('完了', 'Finish') -TimeoutSeconds 45
+  $setupFinish = Wait-SetupAction -SetupProcessId $setupProcess.Id -Names @('完了(&F)', '完了', 'Finish') -TimeoutSeconds 45
   Invoke-UiElement $setupFinish.Button
   if (-not $setupProcess.WaitForExit(30000)) {
     throw 'Normal Setup process did not exit after the initial installed-version handoff.'
