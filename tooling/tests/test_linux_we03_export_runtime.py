@@ -87,7 +87,7 @@ class LinuxWe03ExportRuntimeTests(unittest.TestCase):
         public_key = bytes.fromhex(TEST_UPDATE_PUBLIC_KEY_DER_HEX)[12:]
         fingerprint = f"sha256:{hashlib.sha256(public_key).hexdigest()}"
         self.document["update_trust"] = {
-            "version": 2,
+            "版": 2,
             "algorithm": "Ed25519",
             "public_key_der_hex": TEST_UPDATE_PUBLIC_KEY_DER_HEX,
             "public_key_fingerprint": fingerprint,
@@ -103,10 +103,24 @@ class LinuxWe03ExportRuntimeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_developer_update_trust(self.manifest_bytes())
         self.document["update_trust"] = {
-            "version": 2,
+            "版": 2,
             "algorithm": "Ed25519",
             "public_key_der_hex": TEST_UPDATE_PUBLIC_KEY_DER_HEX,
             "public_key_fingerprint": "sha256:" + "0" * 64,
+            "package_sources": [
+                {"channel": "stable", "base_url": TEST_UPDATE_SOURCE_URL}
+            ],
+        }
+        with self.assertRaises(ValueError):
+            validate_developer_update_trust(self.manifest_bytes())
+
+    def test_developer_update_trust_requires_the_japanese_schema_version_field(self) -> None:
+        public_key = bytes.fromhex(TEST_UPDATE_PUBLIC_KEY_DER_HEX)[12:]
+        self.document["update_trust"] = {
+            "version": 2,
+            "algorithm": "Ed25519",
+            "public_key_der_hex": TEST_UPDATE_PUBLIC_KEY_DER_HEX,
+            "public_key_fingerprint": f"sha256:{hashlib.sha256(public_key).hexdigest()}",
             "package_sources": [
                 {"channel": "stable", "base_url": TEST_UPDATE_SOURCE_URL}
             ],

@@ -91,7 +91,7 @@ def validate_developer_update_trust(raw: bytes) -> str:
     fingerprint = f"sha256:{hashlib.sha256(expected_key[12:]).hexdigest()}"
     if (
         not isinstance(trust, dict)
-        or trust.get("version") != 2
+        or trust.get("版") != 2
         or trust.get("algorithm") != "Ed25519"
         or trust.get("public_key_der_hex") != TEST_UPDATE_PUBLIC_KEY_DER_HEX
         or trust.get("public_key_fingerprint") != fingerprint
