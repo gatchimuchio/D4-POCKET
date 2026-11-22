@@ -168,6 +168,7 @@ def validate_task_evidence(
         or evidence.get("export_runtime_broker_relative_path") != expected_helper_relative_path
         or evidence.get("real_owner_authority") is not False
         or evidence.get("synthetic_owner_fixture") is not True
+        or evidence.get("windows_sandbox_setup") != "passed"
         or evidence.get("external_provider_requests") != 0
         or evidence.get("task_status") != "completed"
         or not isinstance(result_hash, str)
@@ -221,6 +222,7 @@ def _write_actions_summary(record: dict[str, Any]) -> None:
         f"- Export tree SHA-256: `{export['artifact_tree_sha256']}`; bytes: {export['artifact_total_bytes']}.",
         f"- Fresh App ID / Audit Store ID: `{export['app_id']}` / `{export['audit_store_id']}`.",
         f"- Test-only Broker SHA-256: `{task['test_broker_sha256']}`; Codex CLI: `{record['codex_cli_version']}`.",
+        f"- Isolated Windows Codex sandbox setup: `{task['windows_sandbox_setup']}`.",
         f"- Real Codex Task: `{task['task_status']}`; result hash: `{task['task_result_hash']}`.",
         f"- Workspace boundary / one-shot Approval / process and scratch cleanup / durable Audit: `{task['outside_workspace_write']}` / `{task['approval_replay']}` / `{task['codex_process_tree_cleanup']}` + `{task['scratch_cleanup']}` / `{task['audit_chain']}`.",
         f"- Run-owned temporary root cleanup: `{task['run_root_cleanup']}`.",
@@ -382,6 +384,7 @@ def run(codex_cli: Path) -> dict[str, Any]:
             "independent_runtime": {
                 "task_status": evidence["task_status"],
                 "task_result_hash": evidence["task_result_hash"],
+                "windows_sandbox_setup": evidence["windows_sandbox_setup"],
                 "test_broker_sha256": evidence["export_runtime_broker_sha256"],
                 "test_broker_is_r2_e2e_overlay": True,
                 "workspace_marker_sha256": evidence["workspace_marker_sha256"],

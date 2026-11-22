@@ -117,7 +117,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-we03-export-runtime.yml",
-      "sha256": "429f5d0198e2ba5b98193168c289913425e29d7bce81bc21c63d03b6269e225e"
+      "sha256": "e929802d65389e30fde2098b8a0587a9699a9ab19fd1b11d4bd900417c8dab6a"
     },
     {
       "path": ".gitignore",
@@ -1766,6 +1766,22 @@
     {
       "path": "docs/QE_2026-11-22/\u63a1\u7528\u8a18\u9332_NLC06.md",
       "sha256": "eb629cb28fd0977bc6f00454f2fad0f6e4eb01fb5778e412f8fa171324348994"
+    },
+    {
+      "path": "docs/QE_2026-11-23/01_D4Pocket_SPEC_v9_NLC07.jsonl",
+      "sha256": "be140b09cebaec128cd1a4684f72f5d22afa9dc1fe39b5db81aefb5bbada96e9"
+    },
+    {
+      "path": "docs/QE_2026-11-23/02_D4Pocket_PLAN_v9_NLC07.jsonl",
+      "sha256": "1c2ab16fa9a70728443a320efd71bce1c3dbae299ad07a28da204c0393d72b41"
+    },
+    {
+      "path": "docs/QE_2026-11-23/03_D4Pocket_CODEX_v9_NLC07.jsonl",
+      "sha256": "0fdc00219aaaf8814a0690588b16f85b66e3d9f63305816f3a16412de603a391"
+    },
+    {
+      "path": "docs/QE_2026-11-23/\u63a1\u7528\u8a18\u9332_NLC07.md",
+      "sha256": "eb33cf0a74b9dc5adb306a3bd4f03cf209327d2a04c044e8c31b019423f41aae"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4517,7 +4533,7 @@
     },
     {
       "path": "native/rust_helper/tests/agent_task_crash_recovery_e2e.rs",
-      "sha256": "614ad47bb8decaf735ae19f733cb488df5a33391dbcc0677a3a78d0a1991179b"
+      "sha256": "a9cc8a0c69e100da930d197457dbefad84ef3ce501efe240258b93b07f693cf8"
     },
     {
       "path": "native/rust_helper/tests/agent_task_production_e2e.rs",
@@ -6253,7 +6269,7 @@
     },
     {
       "path": "tooling/tests/test_windows_we03_export_runtime.py",
-      "sha256": "450e590d32ac0f84e11e99bb29fe981eef844a874f454353942f633f53b9d319"
+      "sha256": "ba2edb1221cd202c3137838b1e57fa80f016a1ad41e7b137fcb979529ae3e008"
     },
     {
       "path": "tooling/tests/windows_broker_export_manifest_compare.py",
@@ -6273,7 +6289,7 @@
     },
     {
       "path": "tooling/tests/windows_we03_export_runtime.py",
-      "sha256": "8c0c9bcfaa470b1d035ee8b6585b518cdbbd7b00de397c54a23d734088743ed3"
+      "sha256": "d63f01c8831ef098ac5d9e95fbe74c9c2694abfe978ebbed47767a46fb361f2f"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",

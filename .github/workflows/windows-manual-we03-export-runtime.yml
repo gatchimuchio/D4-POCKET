@@ -29,6 +29,11 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+          if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            throw 'The ephemeral Windows runner is not elevated for test-only Codex sandbox provisioning.'
+          }
           if ($env:GITHUB_REF -ne 'refs/heads/main') { throw "Only main is accepted: $env:GITHUB_REF" }
           $head = (git rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0 -or $head -ne $env:GITHUB_SHA) { throw "checkout SHA mismatch: $head / $env:GITHUB_SHA" }
@@ -49,6 +54,7 @@ jobs:
             '# Windows W-E03 Export Runtime developer verification'
             "- Source: ``$head``; ref: ``$env:GITHUB_REF``; runner: ``$env:ImageOS/$env:ImageVersion``."
             '- This workflow is manual only and uses a fresh untrusted Manifest-only input, isolated test identity, synthetic Owner fixture, local loopback Responses provider, and `r2-e2e` Broker overlay.'
+            '- The pinned Codex CLI provisions each dedicated test CODEX_HOME on this elevated disposable hosted runner; any runner-level setup ends with the hosted VM and does not change the Owner PC or production authority.'
             '- It does not exercise real product Owner authority, the normal Release Broker Task capability, source-product stop/uninstall acceptance, E5/E6, signing, or release readiness.'
             '- No Actions artifact is uploaded; the bounded JSON evidence is printed in the job log and summarized below.'
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

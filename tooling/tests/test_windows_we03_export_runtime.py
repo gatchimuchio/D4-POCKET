@@ -75,6 +75,7 @@ class WindowsWe03ExportRuntimeTests(unittest.TestCase):
             "export_runtime_broker_sha256": "c" * 64,
             "real_owner_authority": False,
             "synthetic_owner_fixture": True,
+            "windows_sandbox_setup": "passed",
             "external_provider_requests": 0,
             "task_status": "completed",
             "task_result_hash": "sha256:" + "d" * 64,
@@ -99,6 +100,17 @@ class WindowsWe03ExportRuntimeTests(unittest.TestCase):
         )
         self.assertIs(verified, evidence)
 
+        evidence["windows_sandbox_setup"] = "not_run"
+        with self.assertRaisesRegex(ValueError, "bounded contract"):
+            validate_task_evidence(
+                evidence,
+                source_commit="a" * 40,
+                manifest_sha256="b" * 64,
+                app_id=evidence["app_id"],
+                audit_store_id=evidence["audit_store_id"],
+                expected_helper_relative_path=evidence["export_runtime_broker_relative_path"],
+            )
+        evidence["windows_sandbox_setup"] = "passed"
         evidence["real_owner_authority"] = True
         with self.assertRaisesRegex(ValueError, "bounded contract"):
             validate_task_evidence(
@@ -123,6 +135,7 @@ class WindowsWe03ExportRuntimeTests(unittest.TestCase):
             },
             "independent_runtime": {
                 "test_broker_sha256": "d" * 64,
+                "windows_sandbox_setup": "passed",
                 "task_status": "completed",
                 "task_result_hash": "sha256:" + "e" * 64,
                 "outside_workspace_write": "denied",

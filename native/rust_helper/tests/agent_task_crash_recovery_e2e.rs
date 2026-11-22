@@ -22,6 +22,40 @@ const BROKER_EXE: &str = env!("CARGO_BIN_EXE_gui_shell_rust_helper");
 const RESPONSES_EXE: &str = env!("CARGO_BIN_EXE_gui_shell_r2_e2e_responses");
 const R2_E2E_TASK_EXECUTION_LIMIT_ENV: &str = "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS";
 
+fn setup_test_codex_home(codex_cli: &Path, codex_home: &Path) {
+    let status = Command::new(codex_cli)
+        .args([
+            "sandbox",
+            "setup",
+            "--elevated",
+            "--current-user",
+            "--codex-home",
+        ])
+        .arg(codex_home)
+        .current_dir(codex_home)
+        .env("CODEX_HOME", codex_home)
+        .env_remove("OPENAI_API_KEY")
+        .env_remove("CODEX_API_KEY")
+        .env_remove("ANTHROPIC_API_KEY")
+        .env_remove("GEMINI_API_KEY")
+        .env_remove("GOOGLE_API_KEY")
+        .env_remove("AZURE_OPENAI_API_KEY")
+        .env_remove("GH_TOKEN")
+        .env_remove("GITHUB_TOKEN")
+        .env_remove("ACTIONS_RUNTIME_TOKEN")
+        .env_remove("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .expect("test専用Codex HomeのWindows sandbox初期化processを起動");
+    assert!(
+        status.success(),
+        "test専用Codex Homeの公式Windows sandbox初期化に失敗: exit={:?}; production Owner UIやsandbox緩和で代替しない",
+        status.code()
+    );
+}
+
 struct Fixture {
     root: PathBuf,
     store: PathBuf,
@@ -252,6 +286,7 @@ impl Fixture {
         .expect("合成試験用基点目印を書き込む");
         let codex_home = generation_root.join("codex-home");
         fs::create_dir(&codex_home).expect("世代ごとの空CODEX_HOME");
+        setup_test_codex_home(&self.codex, &codex_home);
 
         let runtime = format!(
             "{RUNTIME_ID}={}={}",
@@ -1331,6 +1366,7 @@ fn exported_windows_runtime_completes_real_codex_task_with_isolated_identity() {
         "export_runtime_broker_sha256": helper_sha256,
         "real_owner_authority": false,
         "synthetic_owner_fixture": true,
+        "windows_sandbox_setup": "passed",
         "external_provider_requests": 0,
         "task_status": "completed",
         "task_result_hash": result_hash,
