@@ -506,6 +506,7 @@ def run(source_commit: str, evidence_dir: Path, run_root: Path) -> dict[str, Any
             update_package_path=update_package_path,
         )
         setup_output = run_root / "setup-output"
+        setup_output.mkdir()
         iscc_path = os.environ.get("D4P_W_E04_ISCC_PATH")
         setup_summary = build_windows_installer.build_windows_installer(
             bundle_path,
