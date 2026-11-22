@@ -10449,6 +10449,8 @@ def _run_rust_test(
             "--test-threads=1",
         ]
     )
+    if name == RUST_STAGE_TEST:
+        command.append("--nocapture")
     completed = subprocess.run(
         command,
         cwd=ROOT,
@@ -10465,7 +10467,9 @@ def _run_rust_test(
     if completed.stderr:
         print(completed.stderr[-12000:], file=sys.stderr, end="")
     if completed.returncode != 0:
-        raise RuntimeError(f"導入済み受入れRust試験に失敗しました: {name}")
+        raise RuntimeError(
+            f"導入済み受入れRust試験に失敗しました: {name} (exit={completed.returncode})"
+        )
 
 
 def run_installed_smoke(

@@ -8607,6 +8607,14 @@ mod tests {
         use ring::signature::{Ed25519KeyPair, KeyPair};
         use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 
+        let diagnostic_started = std::time::Instant::now();
+        let diagnostic = |stage: &str| {
+            eprintln!(
+                "Linux installed staging diagnostic: stage={stage} elapsed_ms={}",
+                diagnostic_started.elapsed().as_millis()
+            );
+        };
+        diagnostic("start");
         assert_install_test_identity_is_well_formed();
 
         let package_path = std::path::PathBuf::from(
@@ -8629,6 +8637,7 @@ mod tests {
         let package_metadata = std::fs::symlink_metadata(&package_path).unwrap();
         assert!(package_metadata.is_file() && !package_metadata.file_type().is_symlink());
         let package = std::fs::read(&package_path).unwrap();
+        diagnostic("package_read");
         assert!(package.len() >= 12);
         assert_eq!(&package[..8], b"D4PKG01\n");
         let manifest_bytes = u32::from_le_bytes(package[8..12].try_into().unwrap()) as usize;
@@ -8650,6 +8659,7 @@ mod tests {
         }
         assert_eq!(payload_offset, package.len());
         let product_manifest = product_manifest.expect("packageの製品manifestが必要です");
+        diagnostic("manifest_validated");
         let offered_version = manifest["product_version"].as_str().unwrap().to_owned();
         assert_eq!(manifest["app_id"], INSTALL_APP_ID);
         assert_eq!(manifest["audit_store_id"], INSTALL_AUDIT_ID);
@@ -8743,6 +8753,7 @@ mod tests {
         let candidate_hash =
             crate::broker::protocol::canonical_payload_hash(Some(&candidate_value));
         let mut broker = Broker::new_persistent("session-1", &store_root).unwrap();
+        diagnostic("broker_opened");
         broker.update_trust = Some(trust);
         broker
             .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
@@ -8764,6 +8775,7 @@ mod tests {
             json!({"版": VERSION, "候補": [candidate]}),
         );
         assert_eq!(checked.status, BrokerStatus::Accepted, "{checked:?}");
+        diagnostic("candidate_accepted");
 
         let package_directory = broker
             .state_store
@@ -8776,6 +8788,7 @@ mod tests {
             .join(format!("{digest}.pkg"));
         std::fs::write(&stored_package, &package).unwrap();
         std::fs::set_permissions(&stored_package, std::fs::Permissions::from_mode(0o644)).unwrap();
+        diagnostic("package_seeded");
 
         if seed_only {
             let plan = super::super::product_install::plan_product_install(
@@ -8858,11 +8871,13 @@ mod tests {
             unconfirmed_apply.error.unwrap().code,
             "desktop_native_owner_confirmation_required"
         );
+        diagnostic("unauthorized_apply_rejected");
         let applied = broker.desktop_owner_operation_json_with_update_confirmation(
             &apply_envelope("linux-installed-acceptance-apply"),
             None,
             Some(apply_confirmation),
         );
+        diagnostic("apply_returned");
         assert_eq!(applied.status, BrokerStatus::Accepted, "{applied:?}");
         assert_eq!(applied.body.as_ref().unwrap()["導入状態"], "version_staged");
 
@@ -8907,12 +8922,14 @@ mod tests {
             unconfirmed_activation.error.unwrap().code,
             "desktop_native_owner_confirmation_required"
         );
+        diagnostic("unauthorized_activation_rejected");
         let activated = broker.desktop_owner_operation_json_with_update_confirmations(
             &activation_envelope("linux-installed-acceptance-activate"),
             None,
             None,
             Some(activation_confirmation),
         );
+        diagnostic("activation_returned");
         assert_eq!(activated.status, BrokerStatus::Accepted, "{activated:?}");
         assert_eq!(
             activated.body.as_ref().unwrap()["有効化"],

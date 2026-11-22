@@ -4333,7 +4333,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "47784acf9fcf5ef781fcdd00dd87888a8e929138dcdd8d911793704c97b10da2"
+      "sha256": "2b7ff65981e6fe7cc9824302429e887a864874e71a40bc3b9cbf5df2a02e41b0"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -6093,7 +6093,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "38edc4b3e9793d51539dfcb990a93628c2c0db1594e3e4ad9d0d1cd034e3144f"
+      "sha256": "8c7432d6953626a9fa0174a88d7ee017a5e1fb75398da39327e22940290280ad"
     },
     {
       "path": "tooling/tests/linux_status_notifier_test.cc",
