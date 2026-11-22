@@ -93,6 +93,23 @@ jobs:
             $candidates = @()
             if ($programFilesX86) { $candidates += Join-Path $programFilesX86 'Inno Setup 6\ISCC.exe' }
             if ($env:ProgramFiles) { $candidates += Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe' }
+            $localAppData = [Environment]::GetFolderPath('LocalApplicationData')
+            if ($localAppData) { $candidates += Join-Path $localAppData 'Programs\Inno Setup 6\ISCC.exe' }
+
+            $uninstallRoots = @(
+              'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+              'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
+              'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+              'HKCU:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+            )
+            foreach ($root in $uninstallRoots) {
+              $installedApps = Get-ItemProperty -Path $root -ErrorAction SilentlyContinue |
+                Where-Object { $_.DisplayName -like 'Inno Setup*' -and $_.InstallLocation }
+              foreach ($installedApp in $installedApps) {
+                $candidates += Join-Path $installedApp.InstallLocation 'ISCC.exe'
+              }
+            }
+
             $pathCommand = Get-Command ISCC.exe -ErrorAction SilentlyContinue
             if ($pathCommand) { $candidates += $pathCommand.Source }
 
@@ -109,7 +126,7 @@ jobs:
           $isccPath = Find-InnoSetup6Compiler
 
           if (-not $isccPath) {
-            choco install innosetup --version=6.7.1 --yes --no-progress
+            choco install innosetup --version=6.7.1 --yes --no-progress --force
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $isccPath = Find-InnoSetup6Compiler
           }
