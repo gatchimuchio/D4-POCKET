@@ -117,37 +117,58 @@ jobs:
               }
             }
 
-            $pathCommand = Get-Command ISCC.exe -ErrorAction SilentlyContinue
-            if ($pathCommand) { $candidates += $pathCommand.Source }
-
             foreach ($candidate in $candidates | Select-Object -Unique) {
               if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
                 Write-Host "Inno Setup compiler candidate missing: $candidate"
                 continue
               }
               $candidatePath = (Resolve-Path -LiteralPath $candidate).Path
-              $candidateInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($candidatePath)
-              $candidateVersion = if ($candidateInfo.ProductVersion) { $candidateInfo.ProductVersion } else { $candidateInfo.FileVersion }
-              if ($candidateVersion -match '^6\.') { return $candidatePath }
-              Write-Host "Inno Setup compiler candidate rejected: path=$candidatePath version=$candidateVersion"
+              return $candidatePath
             }
             return $null
           }
 
-          $isccPath = Find-InnoSetup6Compiler
+          function Get-ChocolateyInnoSetupVersion {
+            $chocolateyRoot = $env:ChocolateyInstall
+            if (-not $chocolateyRoot -and $env:ProgramData) {
+              $chocolateyRoot = Join-Path $env:ProgramData 'chocolatey'
+            }
+            if (-not $chocolateyRoot) { return $null }
 
-          if (-not $isccPath) {
+            $nuspecPath = Join-Path $chocolateyRoot 'lib\innosetup\innosetup.nuspec'
+            if (-not (Test-Path -LiteralPath $nuspecPath -PathType Leaf)) { return $null }
+            try {
+              [xml]$nuspec = Get-Content -LiteralPath $nuspecPath -Raw
+              $packageId = $nuspec.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='id']")
+              $packageVersion = $nuspec.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='version']")
+              if (-not $packageId -or $packageId.InnerText -ine 'innosetup' -or -not $packageVersion) { return $null }
+              return [string]$packageVersion.InnerText
+            } catch {
+              Write-Host "Chocolatey Inno Setup package metadata could not be read: $($_.Exception.Message)"
+              return $null
+            }
+          }
+
+          $isccPath = Find-InnoSetup6Compiler
+          $isccVersion = Get-ChocolateyInnoSetupVersion
+
+          if (-not $isccPath -or $isccVersion -ne '6.7.1') {
             choco install innosetup --version=6.7.1 --yes --no-progress --force
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $isccPath = Find-InnoSetup6Compiler
+            $isccVersion = Get-ChocolateyInnoSetupVersion
           }
           if (-not $isccPath -or -not (Test-Path -LiteralPath $isccPath -PathType Leaf)) {
-            throw 'A real Inno Setup 6 ISCC.exe was not found; a PATH shim is not accepted.'
+            throw 'The installed Inno Setup compiler executable was not found in a real installation directory.'
           }
-          $isccPath = (Resolve-Path -LiteralPath $isccPath).Path
-          $isccInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($isccPath)
-          $isccVersion = if ($isccInfo.ProductVersion) { $isccInfo.ProductVersion } else { $isccInfo.FileVersion }
-          if ($isccVersion -notmatch '^6\.') { throw "Inno Setup major version must be 6: $isccVersion" }
+          if ($isccVersion -ne '6.7.1') {
+            throw "Pinned Chocolatey Inno Setup package version 6.7.1 was not verified: $isccVersion"
+          }
+          $compilerHelp = @(& $isccPath '/?' 2>&1)
+          $compilerHelpExit = $LASTEXITCODE
+          if ($compilerHelpExit -ne 0) {
+            throw "The resolved Inno Setup compiler help command failed (exit=$compilerHelpExit): $($compilerHelp -join ' ')"
+          }
 
           @(
             "D4P_W_E04_RUSTC_VERSION=$rustcVersion"
