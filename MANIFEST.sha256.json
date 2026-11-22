@@ -117,7 +117,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "a5d700b500ad4aebfa1ae59fe67dc83ae3f5d6d8c24bb4400baff173f363bb32"
+      "sha256": "0dbd01032c41b1c96cd63c682bd4af98aea251e1ea2ad06d9fb3a7ec4face329"
     },
     {
       "path": "AUDIT.md",
@@ -169,7 +169,7 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "b30c764cc8b2e76908cabf01693ca35dad5eca6297c83ed54718365846cba947"
+      "sha256": "6f996b33bf0037bc791c94ce2a4d0abe0affc10bc9895b0f7fbf6690783d16ae"
     },
     {
       "path": "NOTICE",
@@ -181,7 +181,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "dc5ee591320f510d541692348abf9d49498d152b18f3b1279e3ae92f0e2c2309"
+      "sha256": "597d7e263acb9f15b2990f1d9a3b644a7f48446a77fb429ebd59c95015e74d6b"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -189,7 +189,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "13638342ae0b66c9c931f5212b23522687ca6d77d5858dd7af85dc92628738fc"
+      "sha256": "88e73a96f2ae96d7fa1c4bf1ed03d4ea39eecf987b03fc9e7ac117e77f898847"
     },
     {
       "path": "SECURITY.md",
@@ -1653,7 +1653,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "0bd7ddd0165efcf5d19d6ff5f0a5011e9455607f98d040be40090dc0f2ffef20"
+      "sha256": "7177e411c37a3a259ad225ab94ec7e5f57e2303ad3c0849243fd66b5911f0dc1"
     },
     {
       "path": "docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl",
@@ -1720,16 +1720,44 @@
       "sha256": "a308f819d7081a7d1eb479d08cbb9e3b9545a9f87d502997d675dae5f2f15374"
     },
     {
+      "path": "docs/QE_2026-11-22/01_D4Pocket_SPEC_v9_NLC06.jsonl",
+      "sha256": "3f2f2875c3d1fda0971fe35a9d1b8ee94053bfbc25c0699c2587bc096066f863"
+    },
+    {
       "path": "docs/QE_2026-11-22/02_D4Pocket_PLAN_v9_NLC05.jsonl",
       "sha256": "577c8028157462c8314882074c5e002ed3ce0c7b72914e3456563a77cdb57b2d"
+    },
+    {
+      "path": "docs/QE_2026-11-22/02_D4Pocket_PLAN_v9_NLC06.jsonl",
+      "sha256": "9826e58de24fbc39085cb9d47ff460474af97aa3061ad1aaf3926e5a527f5288"
     },
     {
       "path": "docs/QE_2026-11-22/03_D4Pocket_CODEX_v9_NLC05.jsonl",
       "sha256": "80b41343b6c374befd6c932cbe0fa1a48b7b690d1733a872f30c1cfbb1409f1a"
     },
     {
+      "path": "docs/QE_2026-11-22/03_D4Pocket_CODEX_v9_NLC06.jsonl",
+      "sha256": "05c3ebc1e7e97549e04aae56cbcba090a873cf3e34e02e1fd1e1294fa1fc3ae5"
+    },
+    {
+      "path": "docs/QE_2026-11-22/evidence/W-E03-linux-export-runtime-45006851879.json",
+      "sha256": "2482fe2c5dbd0a7f89cf8e8501442442f40d09227c200a072c370736a8382a5a"
+    },
+    {
+      "path": "docs/QE_2026-11-22/evidence/W-E04-linux-installed-lifecycle-45010590651.json",
+      "sha256": "2948872d564df04bf00b8a64165608397a023451bbb3c0da783e9ac2715ec44e"
+    },
+    {
+      "path": "docs/QE_2026-11-22/evidence/W-E04-linux-setup-apt-lifecycle-45012218121.json",
+      "sha256": "fcf9060536c777f07b38d79c6c3207b38edf02c2240709aabba5f93232885fbc"
+    },
+    {
       "path": "docs/QE_2026-11-22/\u63a1\u7528\u8a18\u9332.md",
       "sha256": "acd2fa0ceef3dc7ac65643d7d3f38fef3944d2defb5d0b9bba9f5d4e6f2a80e8"
+    },
+    {
+      "path": "docs/QE_2026-11-22/\u63a1\u7528\u8a18\u9332_NLC06.md",
+      "sha256": "eb629cb28fd0977bc6f00454f2fad0f6e4eb01fb5778e412f8fa171324348994"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5909,7 +5937,7 @@
     },
     {
       "path": "tooling/current_governance_check.py",
-      "sha256": "51ea27f5811c06880502ab4d5746ea268195f41cc6958813dfa58bcc9d600344"
+      "sha256": "c3fddadee9ff9cf33e8ef73678070cf511c69109479a12b88b83d56000d8a997"
     },
     {
       "path": "tooling/device_link_live_check.py",
@@ -6093,7 +6121,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "8c7432d6953626a9fa0174a88d7ee017a5e1fb75398da39327e22940290280ad"
+      "sha256": "62ab77b59f58c3a9b782e99771bf9d66c3be8805af4c84aa56cd3a8608c083f8"
     },
     {
       "path": "tooling/tests/linux_status_notifier_test.cc",
@@ -6105,7 +6133,7 @@
     },
     {
       "path": "tooling/tests/linux_we03_export_runtime.py",
-      "sha256": "33a97bf70c38f477f7f31eeb1d8892b6c571873430738d20261bfc391e72f0a8"
+      "sha256": "23d22ab639153d63c9a0f92e658f2be79f1f47a397c396185e23f83b4ede9b03"
     },
     {
       "path": "tooling/tests/macos_export_installer_smoke.py",
@@ -6137,11 +6165,11 @@
     },
     {
       "path": "tooling/tests/test_current_governance_check.py",
-      "sha256": "6abfa872307858c872e46cd4de0d20ae030b5b99f7d16ae04cfc02c63ba1e379"
+      "sha256": "590c0c0bb4d19f5959a50788ff3a960768c8dda0e66cf811d4b3bf1ea3fd757e"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
-      "sha256": "e122fed2650db5b61ee32dedeb2d2ed0d8b59cc4a53f06c48a6ba54bf4d80ccd"
+      "sha256": "cb92659b6174689926be341a1d4bc34b97deec37c3a2bdd476676cdf071b29e0"
     },
     {
       "path": "tooling/tests/test_export_macos_product.py",
@@ -6165,7 +6193,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "5e5b58954df6d3c1428eecb74f6206ada6ebb76b6c29e5a1a5faf02c486a6847"
+      "sha256": "dc8bfc766d37811c7df0ce43187c9c14c2827aec74e4283ecab59b66b277f70a"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",
@@ -6181,7 +6209,7 @@
     },
     {
       "path": "tooling/tests/test_linux_we03_export_runtime.py",
-      "sha256": "c02ddaa262e6add842ffcc3a78a5ea2711664cce09a983bfb1f6bb26fd49ea1d"
+      "sha256": "a76ef54fa28db60e983e09e9f4e101de9849a3915eb006f30b7a1e211efbbfa0"
     },
     {
       "path": "tooling/tests/test_linux_workflow_helpers.py",
@@ -6249,7 +6277,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "ff2864646d022ab4fa1a9069432610af810193326e08b83c523c7ca14131b072"
+      "sha256": "cd0e9afe19277fe06029cf8ba7f1c3ad8f8147bde06d2cb976f32ad8505003eb"
     }
   ]
 }

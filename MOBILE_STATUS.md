@@ -1,10 +1,10 @@
 # Mobile 状態
 
-## 現行の対象・証拠境界（2026-11-21 v9 NLC04）
+## 現行要求・過去QA証拠の境界（2026-11-22 v9 NLC06）
 
-現行正本は[仕様 v9](docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl)・[工程 v9](docs/QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl)・[施工指示 v9](docs/QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl)、採用の範囲は[v9採用記録](docs/QE_2026-11-21/採用記録.md)に従う。Android／iOSは必須対象で、Android Emulator／iOS Simulator上のinstalled製品QAと、正式identity・署名・配布の成立を分ける。iOS Simulator実行物とDevice配布物のSHA・ABI・署名も分離し、Simulatorを実Deviceの証拠にしない。非Windows物理端末の取得を施工・QAの必須条件にしない。
+現行要求の正本は[仕様 v9 NLC06](docs/QE_2026-11-22/01_D4Pocket_SPEC_v9_NLC06.jsonl)・[工程 v9 NLC06](docs/QE_2026-11-22/02_D4Pocket_PLAN_v9_NLC06.jsonl)・[施工指示 v9 NLC06](docs/QE_2026-11-22/03_D4Pocket_CODEX_v9_NLC06.jsonl)、採用範囲は[v9 NLC06採用記録](docs/QE_2026-11-22/採用記録_NLC06.md)に従う。この文書にあるQA状態は過去に記録した対象・時点を保持し、NLC06採用による再判定ではない。Android／iOSは必須対象で、Android Emulator／iOS Simulator上のinstalled製品QAと、正式identity・署名・配布の成立を分ける。iOS Simulator実行物とDevice配布物のSHA・ABI・署名も分離し、Simulatorを実Deviceの証拠にしない。非Windows物理端末の取得を施工・QAの必須条件にしない。
 
-[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)は旧対象・時点の履歴と未閉包を保持する。今回、v9候補のMobile製品状態・QAは再評価していない。以下の日時付き本文の「現行」「現在」も当時の意味に限り、過去のP13・build・端末証拠やFAILを現候補へ付け替えない。
+[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)は旧対象・時点の履歴と未閉包を保持する。今回、現行v9のMobile製品状態・QAは再評価していない。以下の日時付き本文の「現行」「現在」も当時の意味に限り、過去のP13・build・端末証拠やFAILを現行NLC06へ付け替えない。
 
 ## v5の対象・受入状態（履歴、2026-11-14、非現行）
 

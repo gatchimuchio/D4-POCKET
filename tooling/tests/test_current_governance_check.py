@@ -18,9 +18,9 @@ from tooling.current_governance_check import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADOPTION_DIRECTORY = "docs/QE_2026-11-22"
 DOCUMENT_PATHS = {
-    "製品仕様": f"{ADOPTION_DIRECTORY}/01_D4Pocket_SPEC_v9_NLC05.jsonl",
-    "統合工程": f"{ADOPTION_DIRECTORY}/02_D4Pocket_PLAN_v9_NLC05.jsonl",
-    "施工指示": f"{ADOPTION_DIRECTORY}/03_D4Pocket_CODEX_v9_NLC05.jsonl",
+    "製品仕様": f"{ADOPTION_DIRECTORY}/01_D4Pocket_SPEC_v9_NLC06.jsonl",
+    "統合工程": f"{ADOPTION_DIRECTORY}/02_D4Pocket_PLAN_v9_NLC06.jsonl",
+    "施工指示": f"{ADOPTION_DIRECTORY}/03_D4Pocket_CODEX_v9_NLC06.jsonl",
 }
 EXPECTED_RECORD_COUNTS = {"製品仕様": 438, "統合工程": 289, "施工指示": 1453}
 INDEX_PATH = "規定/正本索引.json"
@@ -76,10 +76,18 @@ class NLC構造検査Tests(ActualDocumentsMixin, unittest.TestCase):
         instruction = self.documents["施工指示"]["具体化/開発検証分離"]
         self.assertIn("実製品Owner画面のクリックを要求してはならない", spec["規定"])
         self.assertIn("native Owner確認", spec["規定"])
-        self.assertIn("E1〜E3", plan["規定"])
-        self.assertIn("W-E03施工も停止しない", plan["規定"])
+        self.assertIn("実製品Permission/Approval", spec["規定"])
+        self.assertIn("E1〜E4", plan["規定"])
+        self.assertIn("W-E03の独立施工はW-E02の実製品Owner受入待ちで停止しない", plan["規定"])
         self.assertIn("real_owner_authority=false", instruction["規定"])
-        self.assertIn("test-only制御を通常Release", instruction["規定"])
+        self.assertIn("test-only制御は通常Release", instruction["規定"])
+        export = self.documents["施工指示"]["操作/Export計画"]
+        self.assertIn("Owner本人の画面操作を待たない", export["規定"])
+        self.assertIn("--manifest-file", export["操作列"][2])
+        self.assertIn("実製品の書出し作用", export["操作列"][3])
+        stop = self.documents["施工指示"]["施工/停止再開"]
+        self.assertNotIn("本人Gate", stop["規定"])
+        self.assertIn("独立施工を続ける", stop["規定"])
         for key in ("結線/W-E02", "結線/W-E03"):
             self.assertIn(spec["識別"], self.documents["製品仕様"][key]["意味参照"])
             self.assertIn(plan["識別"], self.documents["統合工程"][key]["意味参照"])
