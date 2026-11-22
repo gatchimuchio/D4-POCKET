@@ -40,10 +40,11 @@ const TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES: &[&str] = &[
 const TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES: &[&str] = &["windows.sandbox=\"mxc\""];
 #[cfg(not(windows))]
 const TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES: &[&str] = &[];
-// Hosted loopback verification uses Codex's RestrictedToken sandbox; normal product Tasks keep MxC.
+// The isolated loopback profile enforces deny-read paths, which require Codex's elevated sandbox.
+// Normal product Tasks continue to use MxC.
 #[cfg(all(windows, any(test, feature = "r2-e2e")))]
 const TASK_LOOPBACK_TEST_PERMISSION_PROFILE_PLATFORM_OVERRIDES: &[&str] =
-    &["windows.sandbox=\"unelevated\""];
+    &["windows.sandbox=\"elevated\""];
 const TASK_PERMISSION_PROFILE_SUFFIX_OVERRIDES: &[&str] =
     &["permissions.d4p-agent-task.network.enabled=false"];
 const TASK_BASE_DENY_GLOBS: &[&str] = &["**/*.env", "**/.env.*", "**/.ssh/**", "**/secrets/**"];
@@ -1926,6 +1927,12 @@ fn classify_loopback_test_stderr(stderr: &[u8]) -> &'static str {
     let stderr = String::from_utf8_lossy(stderr).to_ascii_lowercase();
     if stderr.is_empty() {
         "empty"
+    } else if stderr.contains("cannot enforce split filesystem read restrictions")
+        || stderr.contains("cannot enforce deny-read restrictions")
+        || stderr.contains("cannot enforce split writable root sets")
+        || stderr.contains("cannot reopen writable descendants")
+    {
+        "sandbox_policy_incompatible"
     } else if stderr.contains("bwrap") || stderr.contains("sandbox") {
         "sandbox_setup"
     } else if stderr.contains("unauthorized")
@@ -2213,6 +2220,13 @@ mod tests {
         assert!(!serialized.contains("unknown_sensitive_code"));
         assert!(!serialized.contains("PRIVATE_LOCAL_PATH"));
         assert!(!serialized.contains("PRIVATE_SECRET"));
+
+        let incompatible_sandbox = b"windows unelevated restricted-token sandbox cannot enforce split filesystem read restrictions directly; refusing to run unsandboxed";
+        let summary = loopback_test_safe_failure_summary(Some(1), b"", incompatible_sandbox);
+        assert_eq!(summary["stderr_class"], "sandbox_policy_incompatible");
+        let serialized = summary.to_string();
+        assert!(!serialized.contains("restricted-token"));
+        assert!(!serialized.contains("refusing to run unsandboxed"));
     }
 
     #[test]
@@ -2399,7 +2413,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn loopback隔離TaskだけRestrictedTokenを使い通常TaskはMxCを維持する() {
+    fn loopback隔離TaskだけElevatedを使い通常TaskはMxCを維持する() {
         let executable = Path::new(r"C:\codex.exe");
         let workspace = Path::new(r"C:\workspace");
         let scratch = workspace.join(".d4p-tmp-test");
@@ -2423,10 +2437,13 @@ mod tests {
             .collect();
         assert!(loopback_args
             .windows(2)
-            .any(|pair| pair == ["-c", "windows.sandbox=\"unelevated\""]));
+            .any(|pair| pair == ["-c", "windows.sandbox=\"elevated\""]));
         assert!(!loopback_args
             .windows(2)
             .any(|pair| pair == ["-c", "windows.sandbox=\"mxc\""]));
+        assert!(!loopback_args
+            .windows(2)
+            .any(|pair| pair == ["-c", "windows.sandbox=\"unelevated\""]));
         assert!(loopback_args.windows(2).any(|pair| {
             pair[0] == "-c" && pair[1] == "permissions.d4p-agent-task.network.enabled=false"
         }));
@@ -2458,7 +2475,7 @@ mod tests {
             .any(|pair| pair == ["-c", "windows.sandbox=\"mxc\""]));
         assert!(!production_args
             .windows(2)
-            .any(|pair| pair == ["-c", "windows.sandbox=\"unelevated\""]));
+            .any(|pair| pair == ["-c", "windows.sandbox=\"elevated\""]));
     }
 
     #[test]
