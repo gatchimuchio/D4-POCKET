@@ -10,6 +10,7 @@ name: Linux manual product build and installed acceptance
         options:
           - product_build
           - update_lifecycle
+          - w_e03_export_runtime
           - credential_vault
           - mcp_tool_execution
           - mcp_credential_binding
@@ -45,8 +46,8 @@ concurrency:
 jobs:
   export-build:
     # The hosted Ubuntu 24.04 image denies bubblewrap loopback setup for Task scopes; keep those on the previously capable Ubuntu 22.04 image.
-    runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_supervision_crash_same_package' || inputs.acceptance_scope == 'agent_mcp_followup' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
-    timeout-minutes: 120
+    runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_supervision_crash_same_package' || inputs.acceptance_scope == 'agent_mcp_followup' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' || inputs.acceptance_scope == 'w_e03_export_runtime') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
+    timeout-minutes: ${{ inputs.acceptance_scope == 'w_e03_export_runtime' && 180 || 120 }}
     steps:
       - name: 対象commitをclean checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -88,7 +89,7 @@ jobs:
 
       - name: Codex Linux sandbox capability gate
         id: codex_sandbox
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_supervision_crash_same_package' || inputs.acceptance_scope == 'agent_mcp_followup' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_supervision_crash_same_package' || inputs.acceptance_scope == 'agent_mcp_followup' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' || inputs.acceptance_scope == 'w_e03_export_runtime' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -111,6 +112,13 @@ jobs:
         shell: bash
         run: |
           echo 'agent_mcp_followup cannot pass without the real Codex sandbox; LIVE_RUNTIME was not executed.'
+          exit 1
+
+      - name: W-E03 Export Runtime requires LIVE_RUNTIME sandbox
+        if: ${{ inputs.acceptance_scope == 'w_e03_export_runtime' && steps.codex_sandbox.outputs.available != 'true' }}
+        shell: bash
+        run: |
+          echo 'W-E03 installed Runtime is NOT_RUN because the hosted runner did not provide the required Codex sandbox.'
           exit 1
 
       - name: Flutter／Rust toolchainを固定
@@ -137,7 +145,7 @@ jobs:
           clang --version | head -n 1
           weston --version
           runner_label="ubuntu-24.04"
-          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision_crash_same_package' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_mcp_followup' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_normal_release' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ]; then
+          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision_crash_same_package' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_mcp_followup' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_normal_release' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ] || [ '${{ inputs.acceptance_scope }}' = 'w_e03_export_runtime' ]; then
             runner_label="ubuntu-22.04"
           fi
           {
@@ -176,7 +184,7 @@ jobs:
       - name: Broker-shaped non-authority fixtureからLinux Release buildとscope別launcher起動
         shell: bash
         env:
-          D4P_ACCEPTANCE_SCOPE: ${{ inputs.acceptance_scope }}
+          D4P_ACCEPTANCE_SCOPE: ${{ inputs.acceptance_scope == 'w_e03_export_runtime' && 'update_lifecycle' || inputs.acceptance_scope }}
         run: bash tooling/linux_manual_export_build.sh
       - name: Ubuntu 24.04 APT setup package install／update／rollback／uninstall
         if: ${{ inputs.acceptance_scope == 'debian_setup_package' }}
@@ -390,7 +398,7 @@ jobs:
           fi
 
       - name: 固定版Linux Codex CLIを検証rootへ取得
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_supervision_crash_same_package' || inputs.acceptance_scope == 'agent_mcp_followup' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_supervision_crash_same_package' || inputs.acceptance_scope == 'agent_mcp_followup' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' || inputs.acceptance_scope == 'w_e03_export_runtime' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -409,6 +417,16 @@ jobs:
             printf '\n- Codex CLI interface source: pinned `@openai/codex 0.163.0-alpha.10.2 linux-x64` package, SHA-512 verified against the fixed digest. No operational API credential is installed or used.\n'
             printf -- '- The CLI runs only against the run-owned loopback Responses fixture in this workflow. The dedicated Provider scope generates a synthetic run-only key for that fixture; it never contacts an external Provider. The artifact is stored under the exact runner temporary root and removed by the existing final cleanup step.\n'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: installed UI Exportから独立Linux Productを起動しCodex Tool Taskを実行
+        if: ${{ inputs.acceptance_scope == 'w_e03_export_runtime' && steps.codex_sandbox.outputs.available == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_we03_export_runtime.py \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --codex-cli "$D4P_LINUX_TASK_CODEX_CLI"
 
       - name: installed GTK UIでRollback／Export／Uninstallを受入れる
         if: ${{ inputs.acceptance_scope == 'update_lifecycle' }}
