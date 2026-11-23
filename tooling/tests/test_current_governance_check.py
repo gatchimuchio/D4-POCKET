@@ -18,9 +18,9 @@ from tooling.current_governance_check import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADOPTION_DIRECTORY = "docs/QE_2026-11-23"
 DOCUMENT_PATHS = {
-    "製品仕様": f"{ADOPTION_DIRECTORY}/01_D4Pocket_SPEC_v9_NLC07.jsonl",
-    "統合工程": f"{ADOPTION_DIRECTORY}/02_D4Pocket_PLAN_v9_NLC07.jsonl",
-    "施工指示": f"{ADOPTION_DIRECTORY}/03_D4Pocket_CODEX_v9_NLC07.jsonl",
+    "製品仕様": f"{ADOPTION_DIRECTORY}/01_D4Pocket_SPEC_v9_NLC08.jsonl",
+    "統合工程": f"{ADOPTION_DIRECTORY}/02_D4Pocket_PLAN_v9_NLC08.jsonl",
+    "施工指示": f"{ADOPTION_DIRECTORY}/03_D4Pocket_CODEX_v9_NLC08.jsonl",
 }
 EXPECTED_RECORD_COUNTS = {"製品仕様": 438, "統合工程": 289, "施工指示": 1453}
 INDEX_PATH = "規定/正本索引.json"
@@ -77,10 +77,21 @@ class NLC構造検査Tests(ActualDocumentsMixin, unittest.TestCase):
         self.assertIn("実製品Owner画面のクリックを要求してはならない", spec["規定"])
         self.assertIn("native Owner確認", spec["規定"])
         self.assertIn("実製品Permission/Approval", spec["規定"])
+        self.assertIn("公式sandbox setupの直前", spec["規定"])
+        self.assertIn("初期化前の空条件を再適用せず", spec["規定"])
+        self.assertIn("auth.json", spec["規定"])
+        self.assertIn("Owner本人の画面操作", spec["規定"])
         self.assertIn("E1〜E4", plan["規定"])
         self.assertIn("W-E03の独立施工はW-E02の実製品Owner受入待ちで停止しない", plan["規定"])
+        self.assertIn("setup直前の空状態", plan["規定"])
+        self.assertIn("sandbox_users.json", plan["規定"])
+        self.assertIn("Ownerへ物理操作を求めず", plan["規定"])
         self.assertIn("real_owner_authority=false", instruction["規定"])
         self.assertIn("test-only制御は通常Release", instruction["規定"])
+        self.assertIn("setup直前には使い捨て通常directoryが空", instruction["規定"])
+        self.assertIn("setup成功後", instruction["規定"])
+        self.assertIn("空判定を初期化後に再適用せず", instruction["規定"])
+        self.assertIn("未知objectは拒否", instruction["規定"])
         export = self.documents["施工指示"]["操作/Export計画"]
         self.assertIn("Owner本人の画面操作を待たない", export["規定"])
         self.assertIn("--manifest-file", export["操作列"][2])

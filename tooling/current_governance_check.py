@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[1]
 INDEX_PATH = "規定/正本索引.json"
 CONTINUING_ACCEPTANCE_LEDGER = "docs/QE_2026-11-14/進捗.md"
-CURRENT_ADOPTION_ID = "D4Pocket-v9-NLC07-20261123"
+CURRENT_ADOPTION_ID = "D4Pocket-v9-NLC08-20261123"
 CURRENT_ADOPTION_DIRECTORY = "docs/QE_2026-11-23"
 ROLES = {"製品仕様": "仕様", "統合工程": "工程", "施工指示": "施工"}
 REFERENCE_FIELDS = {
@@ -323,7 +323,7 @@ def main() -> int:
         for error in errors:
             print(f"  - {error}")
         return 1
-    print("現行三点整合検査が合格: 438/289/1453記録、54施工線、46操作、71検査、257要件対応。NLC07の隔離Runtime前提準備/製品Owner境界を確認。製品QA・出荷GOは未判定。")
+    print("現行三点整合検査が合格: 438/289/1453記録、54施工線、46操作、71検査、257要件対応。NLC08の隔離Runtime初期化前後/製品Owner境界を確認。製品QA・出荷GOは未判定。")
     return 0
 
 

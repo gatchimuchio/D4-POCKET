@@ -125,7 +125,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "ab2a8cc4177c9782929925e333827d97ffe3c2e4d959a7bead3438cc60d9db93"
+      "sha256": "91b8dd89f3df5f8d11fb0eddcff2032dee077ade731369fc8d38b1ea8426d04c"
     },
     {
       "path": "AUDIT.md",
@@ -189,7 +189,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "ed3073025bd463fca64baa6faab070a0014091d40ea7c3f0e0c05e90c1fab650"
+      "sha256": "f2cda56ad2fda674fe1a411b7e6794d0ff2017243fbd10d5dcf7f3c3e5a09b1b"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -197,7 +197,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "ba17c3e8f10022c9eaf31e41754653d05f46f09070aa5a64bc890bf68b58780d"
+      "sha256": "21fff86f3810678e539d6de0840714371fc86fd268b2a6d25e008d93724e8ae2"
     },
     {
       "path": "SECURITY.md",
@@ -1661,7 +1661,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "002b60c0d16fd139cd234dfe63a4a64b9b34b79542f57791dc7e08215ca22f5f"
+      "sha256": "aaa1848b15f3b0cea366662a0c158130dc25bfc81302d4daad53ed6a88e8c9e5"
     },
     {
       "path": "docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl",
@@ -4169,7 +4169,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "fc0061fb476e117e15783a14fbb7c674fc1e7e12ba9abc26397b6216486c76f4"
+      "sha256": "7ffc56dbef8286e82cc185c0ea9c1ae1f2d385bdbf9eaf4cd918c59dc7833153"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -4533,7 +4533,7 @@
     },
     {
       "path": "native/rust_helper/tests/agent_task_crash_recovery_e2e.rs",
-      "sha256": "3b64349565fc4d728b85060ef63090f57f4e8dc19f56692bd35adf2ed006f885"
+      "sha256": "d892f56c65065a013e5eaa33003be1d0f8ae932f4bf4edd514e95be62a8758c7"
     },
     {
       "path": "native/rust_helper/tests/agent_task_production_e2e.rs",
@@ -5961,7 +5961,7 @@
     },
     {
       "path": "tooling/current_governance_check.py",
-      "sha256": "cc22e55e00275694a94a18e386c24bb2ee089d1427d061151963413babac4a13"
+      "sha256": "7908e60d15898c67a1da617b24cd83c1c8dc2574ce532124731a7f93fe16d92b"
     },
     {
       "path": "tooling/device_link_live_check.py",
@@ -6189,7 +6189,7 @@
     },
     {
       "path": "tooling/tests/test_current_governance_check.py",
-      "sha256": "c9c727b21b724db3355958843163ca9edd338ee34779dddd99640346372e5a82"
+      "sha256": "6d4844f619ab5a3124e5ca3734f0d5c16a0bd46ecaf3bda34b849c9c7d4c86b0"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -6321,7 +6321,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "21ad109f6deeb76c84de023331ec535d78d183629aa499868e5d819768f808ad"
+      "sha256": "7e2de0342ca06ea25045420fd0c8cc674041457a5e548f78bb90cbe12b4487a4"
     }
   ]
 }

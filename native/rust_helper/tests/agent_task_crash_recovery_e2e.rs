@@ -45,6 +45,13 @@ fn read_bounded_stderr(path: &Path) -> String {
 }
 
 fn setup_test_codex_home(codex_cli: &Path, codex_home: &Path) {
+    assert!(
+        fs::read_dir(codex_home)
+            .expect("sandbox setup直前のCODEX_HOMEを読む")
+            .next()
+            .is_none(),
+        "公式sandbox setup前のCODEX_HOMEは空である"
+    );
     let status = Command::new(codex_cli)
         .args([
             "sandbox",

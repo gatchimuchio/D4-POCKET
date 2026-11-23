@@ -148,6 +148,200 @@ struct CodexCliTestResponses {
     requires_openai_auth: bool,
 }
 
+#[cfg(feature = "r2-e2e")]
+fn loopback_test_metadata_is_reparse(metadata: &fs::Metadata) -> bool {
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+        return metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+#[cfg(feature = "r2-e2e")]
+fn loopback_test_safe_entry_name(name: &str) -> String {
+    if name.len() <= 80
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+    {
+        name.to_owned()
+    } else {
+        "<non-ascii-or-long>".into()
+    }
+}
+
+#[cfg(feature = "r2-e2e")]
+fn loopback_test_directory_entries(
+    directory: &Path,
+) -> Result<Vec<(String, PathBuf, fs::Metadata)>, String> {
+    let entries =
+        fs::read_dir(directory).map_err(|_| "R2 loopback試験CODEX_HOME directoryを検査できない")?;
+    let mut output = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|_| "R2 loopback試験CODEX_HOME entryを検査できない")?;
+        let name = entry
+            .file_name()
+            .into_string()
+            .map_err(|_| "R2 loopback試験CODEX_HOMEに非UTF-8 entryがある")?;
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|_| "R2 loopback試験CODEX_HOME entryを検査できない")?;
+        if loopback_test_metadata_is_reparse(&metadata) {
+            return Err("R2 loopback試験CODEX_HOMEにsymlink/reparse entryがある".into());
+        }
+        output.push((name, path, metadata));
+        if output.len() > 32 {
+            return Err("R2 loopback試験CODEX_HOME entry数が上限を超えた".into());
+        }
+    }
+    output.sort_by(|left, right| left.0.cmp(&right.0));
+    Ok(output)
+}
+
+#[cfg(feature = "r2-e2e")]
+fn loopback_test_regular_file(path: &Path) -> Result<(), String> {
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|_| "R2 loopback試験CODEX_HOMEの公式sandbox fileがない")?;
+    if !metadata.is_file() || loopback_test_metadata_is_reparse(&metadata) {
+        return Err("R2 loopback試験CODEX_HOMEの公式sandbox file typeが不正".into());
+    }
+    Ok(())
+}
+
+#[cfg(feature = "r2-e2e")]
+fn loopback_test_config_is_elevated_only(config: &str) -> bool {
+    let normalized = config.replace("\r\n", "\n");
+    let lines: Vec<&str> = normalized
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    lines == ["[windows]", "sandbox = \"elevated\""]
+}
+
+#[cfg(feature = "r2-e2e")]
+fn loopback_test_sandbox_log_name(name: &str) -> bool {
+    if let Some(date) = name
+        .strip_prefix("sandbox.")
+        .and_then(|value| value.strip_suffix(".log"))
+    {
+        let bytes = date.as_bytes();
+        return bytes.len() == 10
+            && bytes[4] == b'-'
+            && bytes[7] == b'-'
+            && bytes
+                .iter()
+                .enumerate()
+                .all(|(index, byte)| matches!(index, 4 | 7) || byte.is_ascii_digit());
+    }
+    name.strip_prefix("sandbox-")
+        .and_then(|value| value.strip_suffix(".log"))
+        .is_some_and(|random| {
+            random.len() == 16 && random.bytes().all(|byte| byte.is_ascii_hexdigit())
+        })
+}
+
+#[cfg(feature = "r2-e2e")]
+fn validate_loopback_test_codex_home(codex_home: &Path) -> Result<(), String> {
+    let root_metadata = fs::symlink_metadata(codex_home)
+        .map_err(|_| "R2 loopback試験CODEX_HOME directoryを検査できない")?;
+    if !root_metadata.is_dir() || loopback_test_metadata_is_reparse(&root_metadata) {
+        return Err("R2 loopback試験CODEX_HOME rootが通常directoryではない".into());
+    }
+    let mut config_seen = false;
+    let mut sandbox_seen = false;
+    let mut secrets_seen = false;
+    for (name, path, metadata) in loopback_test_directory_entries(codex_home)? {
+        match name.as_str() {
+            "config.toml" => {
+                loopback_test_regular_file(&path)?;
+                if metadata.len() > 4096 {
+                    return Err("R2 loopback試験CODEX_HOME config.toml type/sizeが不正".into());
+                }
+                let config = fs::read_to_string(&path)
+                    .map_err(|_| "R2 loopback試験CODEX_HOME config.tomlを検査できない")?;
+                if !loopback_test_config_is_elevated_only(&config) {
+                    return Err(
+                        "R2 loopback試験CODEX_HOME config.tomlがsandbox専用設定ではない".into(),
+                    );
+                }
+                config_seen = true;
+            }
+            ".sandbox" => {
+                if !metadata.is_dir() {
+                    return Err("R2 loopback試験CODEX_HOME .sandbox typeが不正".into());
+                }
+                let mut marker_seen = false;
+                for (child_name, child_path, _child_metadata) in
+                    loopback_test_directory_entries(&path)?
+                {
+                    if child_name == "setup_marker.json" {
+                        loopback_test_regular_file(&child_path)?;
+                        marker_seen = true;
+                    } else if loopback_test_sandbox_log_name(&child_name) {
+                        loopback_test_regular_file(&child_path)?;
+                    } else {
+                        return Err(format!(
+                            "R2 loopback試験CODEX_HOME .sandbox許可外entry: {}",
+                            loopback_test_safe_entry_name(&child_name)
+                        ));
+                    }
+                }
+                if !marker_seen {
+                    return Err("R2 loopback試験CODEX_HOME sandbox markerがない".into());
+                }
+                sandbox_seen = true;
+            }
+            ".sandbox-secrets" => {
+                if !metadata.is_dir() {
+                    return Err("R2 loopback試験CODEX_HOME .sandbox-secrets typeが不正".into());
+                }
+                let children = loopback_test_directory_entries(&path)?;
+                if children.len() != 1 || children[0].0 != "sandbox_users.json" {
+                    let names = children
+                        .iter()
+                        .map(|(child, _, _)| loopback_test_safe_entry_name(child))
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    return Err(format!(
+                        "R2 loopback試験CODEX_HOME .sandbox-secrets許可外entry: {names}"
+                    ));
+                }
+                loopback_test_regular_file(&children[0].1)?;
+                secrets_seen = true;
+            }
+            ".sandbox-bin" => {
+                if !metadata.is_dir() {
+                    return Err("R2 loopback試験CODEX_HOME .sandbox-bin typeが不正".into());
+                }
+                if !loopback_test_directory_entries(&path)?.is_empty() {
+                    return Err(
+                        "R2 loopback試験CODEX_HOME setup直後の.sandbox-binが空ではない".into(),
+                    );
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "R2 loopback試験CODEX_HOME root許可外entry: {}",
+                    loopback_test_safe_entry_name(&name)
+                ));
+            }
+        }
+    }
+    if !config_seen || !sandbox_seen || !secrets_seen {
+        return Err("R2 loopback試験CODEX_HOMEの公式sandbox状態が不足".into());
+    }
+    Ok(())
+}
+
 #[cfg(all(feature = "r2-e2e", not(test)))]
 fn loopback_responses_from_environment() -> Result<Option<CodexCliTestResponses>, String> {
     const PORT_ENV: &str = "GUI_SHELL_R2_E2E_RESPONSES_PORT";
@@ -169,7 +363,7 @@ fn loopback_responses_from_environment() -> Result<Option<CodexCliTestResponses>
             }
             let metadata = fs::symlink_metadata(&codex_home)
                 .map_err(|_| "R2 loopback試験CODEX_HOMEを確認できない")?;
-            if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            if !metadata.is_dir() || loopback_test_metadata_is_reparse(&metadata) {
                 return Err("R2 loopback試験CODEX_HOMEが通常directoryではない".into());
             }
             if !codex_home.parent().is_some_and(|parent| {
@@ -179,15 +373,7 @@ fn loopback_responses_from_environment() -> Result<Option<CodexCliTestResponses>
             }) {
                 return Err("R2 loopback試験fixture rootを確認できない".into());
             }
-            if fs::read_dir(&codex_home)
-                .map_err(|_| "R2 loopback試験CODEX_HOMEを検査できない")?
-                .next()
-                .transpose()
-                .map_err(|_| "R2 loopback試験CODEX_HOMEを検査できない")?
-                .is_some()
-            {
-                return Err("R2 loopback試験CODEX_HOMEに既存fileがある".into());
-            }
+            validate_loopback_test_codex_home(&codex_home)?;
             Ok(Some(CodexCliTestResponses {
                 port,
                 codex_home,
@@ -2182,6 +2368,85 @@ mod tests {
     const BRACKET_SECRET_SUBTREE_GLOB: &str = "private/vault[[]ab[]].json/**";
     const BRACE_SECRET_GLOB: &str = "private/x[{]y[}].json";
     const BRACE_SECRET_SUBTREE_GLOB: &str = "private/x[{]y[}].json/**";
+
+    #[cfg(all(feature = "r2-e2e", any(windows, target_os = "linux")))]
+    fn create_official_loopback_codex_home(
+    ) -> (super::codex_cli_fixture::FixtureTempDirectory, PathBuf) {
+        let fixture = super::codex_cli_fixture::FixtureTempDirectory::create();
+        let codex_home = fixture.path().join("codex-home");
+        fs::create_dir(&codex_home).expect("隔離CODEX_HOME");
+        fs::write(
+            codex_home.join("config.toml"),
+            "[windows]\nsandbox = \"elevated\"\n",
+        )
+        .expect("sandbox限定設定");
+        let sandbox = codex_home.join(".sandbox");
+        fs::create_dir(&sandbox).expect("公式sandbox状態");
+        fs::write(sandbox.join("setup_marker.json"), b"{}").expect("sandbox setup marker");
+        fs::write(
+            sandbox.join("sandbox.2026-11-23.log"),
+            b"synthetic setup log",
+        )
+        .expect("sandbox log");
+        let secrets = codex_home.join(".sandbox-secrets");
+        fs::create_dir(&secrets).expect("sandbox secret metadata");
+        fs::write(secrets.join("sandbox_users.json"), b"{}").expect("sandbox user metadata");
+        fs::create_dir(codex_home.join(".sandbox-bin")).expect("empty sandbox bin");
+        (fixture, codex_home)
+    }
+
+    #[cfg(all(feature = "r2-e2e", any(windows, target_os = "linux")))]
+    #[test]
+    fn loopback_test_CODEX_HOMEは公式sandbox初期化後の限定状態を受理する() {
+        let (_fixture, codex_home) = create_official_loopback_codex_home();
+        validate_loopback_test_codex_home(&codex_home).expect("公式sandbox初期化後の状態");
+
+        fs::write(
+            codex_home.join("config.toml"),
+            "[windows]\nsandbox = \"elevated\"\nmodel = \"unexpected\"\n",
+        )
+        .expect("余計な設定を作る");
+        assert!(validate_loopback_test_codex_home(&codex_home).is_err());
+    }
+
+    #[cfg(all(feature = "r2-e2e", any(windows, target_os = "linux")))]
+    #[test]
+    fn loopback_test_CODEX_HOMEは認証履歴未知entryを拒否する() {
+        for forbidden in ["auth.json", "history.jsonl", "session.jsonl"] {
+            let (_fixture, codex_home) = create_official_loopback_codex_home();
+            fs::write(codex_home.join(forbidden), b"synthetic forbidden data").expect("禁止entry");
+            assert!(
+                validate_loopback_test_codex_home(&codex_home).is_err(),
+                "{forbidden}を拒否"
+            );
+        }
+
+        let (_fixture, codex_home) = create_official_loopback_codex_home();
+        fs::write(
+            codex_home.join(".sandbox-secrets").join("unexpected.json"),
+            b"synthetic forbidden metadata",
+        )
+        .expect("未知secret metadata");
+        assert!(validate_loopback_test_codex_home(&codex_home).is_err());
+
+        let (_fixture, codex_home) = create_official_loopback_codex_home();
+        fs::write(codex_home.join(".sandbox").join("unexpected.bin"), b"x")
+            .expect("未知sandbox entry");
+        assert!(validate_loopback_test_codex_home(&codex_home).is_err());
+    }
+
+    #[cfg(all(feature = "r2-e2e", any(windows, target_os = "linux")))]
+    #[test]
+    fn loopback_test_CODEX_HOMEはsandbox_binの空状態だけを許可する() {
+        let (_fixture, codex_home) = create_official_loopback_codex_home();
+        validate_loopback_test_codex_home(&codex_home).expect("空のsandbox-binを許可");
+        fs::write(
+            codex_home.join(".sandbox-bin").join("unexpected.exe"),
+            b"synthetic executable",
+        )
+        .expect("未知helper");
+        assert!(validate_loopback_test_codex_home(&codex_home).is_err());
+    }
 
     fn debug_task_context(
         context: &crate::broker::agent_task_scratch::AgentTaskScratchContext,
