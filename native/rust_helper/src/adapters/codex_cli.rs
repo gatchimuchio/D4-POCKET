@@ -872,6 +872,11 @@ fn report_r2_e2e_cli_failure(
         } else {
             "not_applicable"
         });
+    summary["windows_sandbox_runtime_error_class"] =
+        json!(safe_windows_sandbox_runtime_error_class(stderr));
+    summary["windows_sandbox_win32_error_code"] = safe_windows_sandbox_win32_error_code(stderr)
+        .map(Value::from)
+        .unwrap_or(Value::Null);
     send_r2_e2e_diagnostic(test_api, json!({"kind": "cli_failure", "summary": summary}));
 }
 
@@ -931,6 +936,52 @@ fn safe_windows_sandbox_setup_error_code_from_bytes(bytes: &[u8]) -> &'static st
                 .find(|allowed| *allowed == code)
         })
         .unwrap_or("unknown")
+}
+
+#[cfg(any(test, feature = "r2-e2e"))]
+fn safe_windows_sandbox_runtime_error_class(stderr: &[u8]) -> &'static str {
+    let stderr = String::from_utf8_lossy(stderr).to_ascii_lowercase();
+    if stderr.contains("setup refresh failed to launch helper")
+        || stderr.contains("spawn setup refresh")
+    {
+        "setup_refresh_launch_failed"
+    } else if stderr.contains("setup refresh had errors")
+        || stderr.contains("setup refresh completed with errors")
+    {
+        "setup_refresh_failed"
+    } else if stderr.contains("runtime read/execute validation failed") {
+        "runtime_access_validation_failed"
+    } else if stderr.contains("createprocessasuserw failed:") {
+        "create_process_as_user_failed"
+    } else if stderr.contains("createprocesswithlogonw failed:") {
+        "create_process_with_logon_failed"
+    } else if stderr.contains("windows sandbox join error") {
+        "sandbox_worker_join_failed"
+    } else if stderr.contains("windows sandbox:") || stderr.contains("windows sandbox failed:") {
+        "windows_sandbox_runtime_failed"
+    } else {
+        "no_known_windows_sandbox_marker"
+    }
+}
+
+#[cfg(any(test, feature = "r2-e2e"))]
+fn safe_windows_sandbox_win32_error_code(stderr: &[u8]) -> Option<u32> {
+    let stderr = String::from_utf8_lossy(stderr);
+    [
+        "CreateProcessAsUserW failed: ",
+        "CreateProcessWithLogonW failed: ",
+    ]
+    .iter()
+    .find_map(|marker| {
+        let start = stderr.find(marker)? + marker.len();
+        let digits = stderr[start..]
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .collect::<String>();
+        (!digits.is_empty())
+            .then(|| digits.parse::<u32>().ok())
+            .flatten()
+    })
 }
 
 #[cfg(feature = "r2-e2e")]
@@ -2183,8 +2234,6 @@ fn classify_loopback_test_stderr(stderr: &[u8]) -> &'static str {
         || stderr.contains("cannot reopen writable descendants")
     {
         "sandbox_policy_incompatible"
-    } else if stderr.contains("bwrap") || stderr.contains("sandbox") {
-        "sandbox_setup"
     } else if stderr.contains("unauthorized")
         || stderr.contains("authentication")
         || stderr.contains("api key")
@@ -2208,6 +2257,8 @@ fn classify_loopback_test_stderr(stderr: &[u8]) -> &'static str {
         "transport"
     } else if stderr.contains("no such file") || stderr.contains("not found") {
         "missing_dependency"
+    } else if stderr.contains("bwrap") || stderr.contains("sandbox") {
+        "sandbox_setup"
     } else {
         "other"
     }
@@ -2550,6 +2601,12 @@ mod tests {
         assert!(!serialized.contains("PRIVATE_LOCAL_PATH"));
         assert!(!serialized.contains("PRIVATE_SECRET"));
 
+        let configuration_mentions_sandbox = b"invalid sandbox config.toml setting PRIVATE_DETAIL";
+        let summary =
+            loopback_test_safe_failure_summary(Some(1), b"", configuration_mentions_sandbox);
+        assert_eq!(summary["stderr_class"], "configuration");
+        assert!(!summary.to_string().contains("PRIVATE_DETAIL"));
+
         let incompatible_sandbox = b"windows unelevated restricted-token sandbox cannot enforce split filesystem read restrictions directly; refusing to run unsandboxed";
         let summary = loopback_test_safe_failure_summary(Some(1), b"", incompatible_sandbox);
         assert_eq!(summary["stderr_class"], "sandbox_policy_incompatible");
@@ -2576,6 +2633,36 @@ mod tests {
             safe_windows_sandbox_setup_error_code_from_bytes(b"not-json"),
             "malformed"
         );
+    }
+
+    #[test]
+    fn Windows_sandbox失敗診断は固定分類とWin32番号だけを抽出する() {
+        let refresh_failure =
+            b"windows sandbox: setup refresh had errors; PRIVATE_PATH PRIVATE_DETAIL";
+        assert_eq!(
+            safe_windows_sandbox_runtime_error_class(refresh_failure),
+            "setup_refresh_failed"
+        );
+        assert_eq!(safe_windows_sandbox_win32_error_code(refresh_failure), None);
+
+        let process_failure = b"windows sandbox: CreateProcessAsUserW failed: 5 (Access is denied.) | cwd=PRIVATE_PATH cmd=PRIVATE_COMMAND";
+        assert_eq!(
+            safe_windows_sandbox_runtime_error_class(process_failure),
+            "create_process_as_user_failed"
+        );
+        assert_eq!(
+            safe_windows_sandbox_win32_error_code(process_failure),
+            Some(5)
+        );
+
+        let diagnostic = json!({
+            "class": safe_windows_sandbox_runtime_error_class(process_failure),
+            "win32_error_code": safe_windows_sandbox_win32_error_code(process_failure),
+        });
+        let serialized = diagnostic.to_string();
+        assert!(!serialized.contains("PRIVATE_PATH"));
+        assert!(!serialized.contains("PRIVATE_COMMAND"));
+        assert!(!serialized.contains("Access is denied"));
     }
 
     #[test]
