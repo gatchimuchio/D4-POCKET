@@ -468,14 +468,7 @@ fn retain_current_notification_states(
 
 fn build_record(event: &BrokerAuditEvent, source: &str, target: &str) -> NotificationRecord {
     let severity = severity_for(source, &event.decision);
-    let title = format!("{source}の状態更新");
-    let summary = match event.decision.as_str() {
-        "accepted" => format!("{source}操作を受け付けました。"),
-        "rejected" => format!("{source}操作が拒否されました。監査ビューアーで確認してください。"),
-        "suspended" => format!("{source}操作を保留しました。復旧手順を確認してください。"),
-        "failed" => format!("{source}操作に失敗しました。状態と復旧手順を確認してください。"),
-        _ => format!("{source}操作の結果を確認してください。"),
-    };
+    let (title, summary) = title_and_summary(event, source);
     let created_order = event
         .event_id
         .strip_prefix("broker-audit-")
@@ -556,8 +549,19 @@ fn notification_hash(event: &BrokerAuditEvent, source: &str, target: &str) -> St
     canonical_payload_hash(Some(&record))
 }
 
-fn build_hash_projection(event: &BrokerAuditEvent, source: &str, target: &str) -> Value {
-    let severity = severity_for(source, &event.decision);
+fn title_and_summary(event: &BrokerAuditEvent, source: &str) -> (String, String) {
+    if event.operation == "全Runtime停止要求" {
+        let summary = match event.decision.as_str() {
+            "accepted" => "Brokerは停止要求を受け付けました。このReceiptではRuntimeは停止しておらず、Owner再承認が必要です。問題一覧で確認してください。",
+            "rejected" => "停止要求は拒否されました。Runtime状態を確認し、必要なら監査ビューアーを開いてください。",
+            "suspended" => "停止要求は保留されました。Runtime停止は確認できていません。問題一覧で状態を確認してください。",
+            "failed" => "停止要求の処理に失敗しました。Runtime状態と復旧手順を確認してください。",
+            _ => "停止要求の結果を確認できません。Runtime状態を問題一覧で確認してください。",
+        };
+        return ("Runtime停止要求".to_string(), summary.to_string());
+    }
+
+    let title = format!("{source}の状態更新");
     let summary = match event.decision.as_str() {
         "accepted" => format!("{source}操作を受け付けました。"),
         "rejected" => format!("{source}操作が拒否されました。監査ビューアーで確認してください。"),
@@ -565,12 +569,18 @@ fn build_hash_projection(event: &BrokerAuditEvent, source: &str, target: &str) -
         "failed" => format!("{source}操作に失敗しました。状態と復旧手順を確認してください。"),
         _ => format!("{source}操作の結果を確認してください。"),
     };
+    (title, summary)
+}
+
+fn build_hash_projection(event: &BrokerAuditEvent, source: &str, target: &str) -> Value {
+    let severity = severity_for(source, &event.decision);
+    let (title, summary) = title_and_summary(event, source);
     json!({
         "版": VERSION,
         "通知ID": format!("notification-{}", event.event_id),
         "source": source,
         "severity": severity,
-        "タイトル": format!("{source}の状態更新"),
+        "タイトル": title,
         "概要": summary,
         "作成順": event.event_id.strip_prefix("broker-audit-").and_then(|value| value.parse::<u64>().ok()).unwrap_or(0),
         "関連監査ID": event.event_id,
@@ -584,6 +594,9 @@ fn build_hash_projection(event: &BrokerAuditEvent, source: &str, target: &str) -
 fn source_for_operation(operation: &str) -> Option<(&'static str, &'static str)> {
     if operation.starts_with("通知") {
         return None;
+    }
+    if operation == "全Runtime停止要求" {
+        return Some(("Runtime", "problems"));
     }
     if operation == "AgentTaskWorkspacePermissionGrant" {
         return Some(("Permission", "permission"));

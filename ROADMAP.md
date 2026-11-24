@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：W-C09 Notification CenterからProblemsへの停止要求案内（2026-11-25）
+
+基準main `e6eac58fc7f359985fea45305ea95b241a9153ef`。Rust Notification Centerが`全Runtime停止要求`のBroker Audit eventをRuntime通知へ投影し、Problemsへ画面遷移する経路を追加する。受理通知はRuntimeが停止していないこととOwner再承認が必要なことを固定summaryで示す。通知に要求payloadや対象内容を追加せず、遷移は画面移動のみ。
+
+これはNotification CenterのProducer／Schema／Flutter route結線に限る。Trayの実Receiptを別画面へ引き継ぐHost／Task現在性と共有表示状態は未成立のため、W-C09全体は未完了。Schema検査は189 Schema／183正常例／250負例でPASS、現行五文書整合は344／320／311／401／488行でPASS、Manifestと`git diff --check`もPASS。隔離Rust `cargo check --locked --offline`はexit 0（既存箇所のwarning 9件）、隔離Desktop Flutter analyzeはexit 0・source SHA-256 `383e688592dd667696686cbef9f3fdab2f431aa698f3c247bfed316d004ffed9`・workspace cleanup PASS。Unit/E2E・品質QA・Installed Runtimeは未実施。
+
 ## 現行統合製品工程（2026-11-24 v11）
 
 現行正本は[要求仕様 v11](docs/V11_2026-11-24/01_D4Pocket_REQUIREMENTS_v11_JA.jsonl)・[設計仕様 v11](docs/V11_2026-11-24/02_D4Pocket_DESIGN_v11_JA.jsonl)・[実装開発工程 v11](docs/V11_2026-11-24/03_D4Pocket_IMPLEMENTATION_PLAN_v11_JA.jsonl)・[品質工程 v11](docs/V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl)・[実装開発実行指示 v11](docs/V11_2026-11-24/05_D4Pocket_IMPLEMENTATION_INSTRUCTIONS_v11_JA.jsonl)であり、採用範囲・原文固定は[v11採用記録](docs/V11_2026-11-24/採用記録.md)、常設施工方法は[AGENTS.md](AGENTS.md)に従う。v11は原要求188件（実装152・品質専用36）、本番結線54件、対象OS5種を保持し、実装・ビルドと独立品質業務を分離する。過去の進捗・検査・Release Blockerは対象SHAと時点に結合した履歴として保持し、v11採用だけで現在の実装完成・品質合格・公開を成立扱いしない。以下の過去記録は各見出しの対象版・時点に限る。

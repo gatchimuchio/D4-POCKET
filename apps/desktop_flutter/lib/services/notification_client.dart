@@ -222,7 +222,7 @@ bool _validNotificationRoute(String source, String target) => switch (source) {
       'Evaluation' => target == 'evaluation',
       'Recovery' => target == 'recovery',
       'Audit' => target == 'audit',
-      'Runtime' => target == 'runtime',
+      'Runtime' => target == 'runtime' || target == 'problems',
       _ => false,
     };
 

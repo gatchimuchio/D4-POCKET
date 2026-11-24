@@ -15,7 +15,7 @@
     "作成順": { "type": "integer", "minimum": 1 },
     "関連監査ID": { "type": "string", "minLength": 1, "maxLength": 128 },
     "関連監査hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-    "遷移先": { "enum": ["dashboard", "approval", "permission", "runtime", "audit", "recovery", "device", "agent", "settings", "evaluation"] },
+    "遷移先": { "enum": ["dashboard", "approval", "permission", "runtime", "audit", "recovery", "device", "agent", "settings", "evaluation", "problems"] },
     "状態": { "enum": ["unread", "read"] },
     "通知hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "表示範囲": { "const": "summary" },

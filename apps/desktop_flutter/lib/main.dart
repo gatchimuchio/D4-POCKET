@@ -904,6 +904,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       'agent' => 5,
       'settings' => 11,
       'evaluation' => 14,
+      'problems' => 9,
       _ => 0,
     };
     if (!mounted) return;

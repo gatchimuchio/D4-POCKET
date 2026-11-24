@@ -14,6 +14,8 @@ Desktop Flutterの通知画面 → 通常認証済みBroker IPC → Rust Notific
 
 提供する操作は`通知一覧`、`通知既読`、`通知破棄`、`通知全既読`である。既読・破棄は現在の通知hashへ結合し、再起動後もBrokerが再読込する。通知の「開く」は既存GUI画面へのnavigationだけで、sensitive actionを直接実行しない。
 
+`全Runtime停止要求`の監査eventはRuntime通知としてProblemsへ案内する。受理時のsummaryは停止要求の受付、Runtime未停止、Owner再承認の必要を明示する。通知には要求payloadや対象内容を含めず、開く操作はProblemsへの画面遷移だけを行う。
+
 ## 上限と失敗
 
 監査走査は直近4096 event、返却は最大256件に制限する。通知表示状態の未知field、重複ID、hash不正、malformed file、stale hashはfail-closedで扱う。native Windows toastは既存Broker host capabilityが未接続のため、本単位では実装済みと主張しない。

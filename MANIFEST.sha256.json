@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "c2c608cdb61f7b21f5dd362d81d88926d69dea069bc1454f86d3b97ee7edd430"
+      "sha256": "2e7779fab88c18edc0c32c57179cbbb5bdd629d166420f435eb047fe9abd98dc"
     },
     {
       "path": "SECURITY.md",
@@ -241,7 +241,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "b70a7d2b622fbe37fba06f79c3486a6747e085598c251c96b540c053cfe01d55"
+      "sha256": "eba0c3488d8eb1633739b80c0e6de5cd7b039961dc3ef02fb28db37e0a5b9473"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -437,7 +437,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/notification_client.dart",
-      "sha256": "f0e3878d0b6107b7ed2958ab5a0c1bb256feee6b505a54bd32cdf6c42beb3082"
+      "sha256": "af813d3eef177941e20943830de12418875466af46ff3654cc25670b57efeec0"
     },
     {
       "path": "apps/desktop_flutter/lib/services/observation_client.dart",
@@ -2141,7 +2141,7 @@
     },
     {
       "path": "docs/specs/notification-center.md",
-      "sha256": "642a170000cf97375bc703efdfbbb17c51dd6d5633d9a06fa097fea87e02fc42"
+      "sha256": "43334669bd7d0d12877b3c8e17208ca23507d261dfc193663ad9df90afe13bd5"
     },
     {
       "path": "docs/specs/observability-center.md",
@@ -4405,7 +4405,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/notification_center.rs",
-      "sha256": "19327f66d31fe8f116749941ffed82b419fcdaeb123a19ce14e1d4c3e04ee534"
+      "sha256": "f368ce9998af66c2753b1d077f4dc30ee44c7fdb3011471514140eafe9798cb3"
     },
     {
       "path": "native/rust_helper/src/broker/observation_center.rs",
@@ -5697,7 +5697,7 @@
     },
     {
       "path": "specs/notification.schema.json",
-      "sha256": "b137d9054642caca36b92f24edc039f5b5e8b2c349da87c9e7cff69a9d40609f"
+      "sha256": "f3c9d508862a8b4737eeacd08028a8a85573a487c1d3791ece2a59e3a2cc50d8"
     },
     {
       "path": "specs/notification_action.schema.json",
