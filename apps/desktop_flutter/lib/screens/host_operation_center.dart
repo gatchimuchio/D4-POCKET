@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/generated_contracts.dart';
+import '../module_features.dart';
 import '../services/shell_core_client.dart';
 import '../services/host_registration_client.dart';
 import 'shared.dart';
@@ -27,14 +28,18 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
   late List<HostRegistryRecord> _hosts;
   String? _candidateHostId;
   bool _busy = false;
+  late List<HostCapabilityRecord> _hostCapabilities;
+  bool _capabilityRefreshing = false;
+  String _capabilityMessage = 'Brokerの現在能力は読取表示です。remote Hostの能力は推測しません。';
   String _message = _initialMessage;
   int _clientGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    final hosts = widget.client.getSnapshot().hosts;
-    _setHosts(hosts);
+    final snapshot = widget.client.getSnapshot();
+    _setHosts(snapshot.hosts);
+    _setHostCapabilities(snapshot.hostCapabilities);
   }
 
   void _setHosts(List<HostRegistryRecord> hosts) {
@@ -43,26 +48,37 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
     _candidateHostId = _activeHostId;
   }
 
+  void _setHostCapabilities(List<HostCapabilityRecord> capabilities) {
+    _hostCapabilities = List<HostCapabilityRecord>.unmodifiable(capabilities);
+  }
+
   @override
   void didUpdateWidget(covariant HostOperationCenter oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final oldHosts = oldWidget.client.getSnapshot().hosts;
-    final hosts = widget.client.getSnapshot().hosts;
+    final oldSnapshot = oldWidget.client.getSnapshot();
+    final snapshot = widget.client.getSnapshot();
     if (identical(
             oldWidget.client.brokerTransport, widget.client.brokerTransport) &&
-        identical(oldHosts, hosts)) {
+        oldWidget.client.mode == widget.client.mode &&
+        identical(oldSnapshot.hosts, snapshot.hosts) &&
+        identical(oldSnapshot.hostCapabilities, snapshot.hostCapabilities)) {
       return;
     }
 
     _clientGeneration++;
-    _setHosts(hosts);
+    _setHosts(snapshot.hosts);
+    _setHostCapabilities(snapshot.hostCapabilities);
     _busy = false;
+    _capabilityRefreshing = false;
     _message = _initialMessage;
+    _capabilityMessage = 'Brokerの現在能力は読取表示です。remote Hostの能力は推測しません。';
   }
 
   @override
   Widget build(BuildContext context) {
     final snapshot = widget.client.getSnapshot();
+    final displaySnapshot =
+        snapshot.copyWith(hostCapabilities: _hostCapabilities);
     final hosts = _hosts;
     final selected = _findHost(hosts, _candidateHostId ?? _activeHostId);
     final active = _findHost(hosts, _activeHostId);
@@ -92,6 +108,19 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
             'ローカル実測は、認証済みBrokerから受理したsnapshotでHost IDが一致する場合だけに限定します。',
           ),
         ),
+        _CurrentHostCapabilityPanel(
+          capabilities: _hostCapabilities,
+          brokerObserved: snapshot.snapshotSource == 'broker',
+          refreshing: _capabilityRefreshing,
+          message: _capabilityMessage,
+          onRefresh: snapshot.snapshotSource == 'broker' &&
+                  widget.client.mode == 'broker' &&
+                  widget.client.brokerTransport != null &&
+                  kGuiShellModuleHostCapabilities &&
+                  !_capabilityRefreshing
+              ? _refreshCurrentHostCapability
+              : null,
+        ),
         if (hosts.isEmpty)
           const BorderedPanel(
             child: Text('登録済みHostがありません。Runtime／Agent一覧も未観測です。'),
@@ -109,7 +138,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
                 selected == null || _busy || selected.hostId == _activeHostId
                     ? null
                     : () => _switchHost(selected),
-            snapshot: snapshot,
+            snapshot: displaySnapshot,
           ),
         const BorderedPanel(
           child: Text(
@@ -119,6 +148,33 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
         ),
       ],
     );
+  }
+
+  Future<void> _refreshCurrentHostCapability() async {
+    final generation = _clientGeneration;
+    final client = widget.client;
+    setState(() {
+      _capabilityRefreshing = true;
+      _capabilityMessage = '認証済みBrokerから現在Host能力を取得しています。';
+    });
+    try {
+      final capability = await client.refreshCurrentHostCapability();
+      if (!mounted || generation != _clientGeneration) return;
+      setState(() {
+        _hostCapabilities = List<HostCapabilityRecord>.unmodifiable([capability]);
+        _capabilityMessage = 'Brokerの現在Host能力を再取得しました。';
+      });
+    } on Object {
+      if (!mounted || generation != _clientGeneration) return;
+      setState(() {
+        _capabilityMessage =
+            '能力の更新を確認できません。表示値は最後に受理したBroker応答時点のものです。';
+      });
+    } finally {
+      if (mounted && generation == _clientGeneration) {
+        setState(() => _capabilityRefreshing = false);
+      }
+    }
   }
 
   Future<void> _switchHost(HostRegistryRecord host) async {
@@ -586,4 +642,107 @@ HostRegistryRecord? _findHost(
     if (host.hostId == hostId) return host;
   }
   return null;
+}
+
+String _hostCapabilityStatusLabel(String status) => switch (status) {
+      'ready' => '利用可能',
+      'degraded' => '制限付き',
+      'unavailable' => '利用不可',
+      'suspended' => '停止中',
+      'failed' => '失敗',
+      _ => '不明',
+    };
+
+String _hostCapabilityEvidenceLabel(String source) => switch (source) {
+      'CONFIG' => '設定由来',
+      'INTERNAL_STATE' => '内部状態',
+      'LIVE_RUNTIME' => '実行中の観測',
+      'EXTERNAL_EVIDENCE' => '外部証拠',
+      'FIXTURE' => '試験fixture',
+      _ => '証拠種別不明',
+    };
+
+class _CurrentHostCapabilityPanel extends StatelessWidget {
+  const _CurrentHostCapabilityPanel({
+    required this.capabilities,
+    required this.brokerObserved,
+    required this.refreshing,
+    required this.message,
+    required this.onRefresh,
+  });
+
+  final List<HostCapabilityRecord> capabilities;
+  final bool brokerObserved;
+  final bool refreshing;
+  final String message;
+  final VoidCallback? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = capabilities
+        .where((item) => item.hostId.trim().isNotEmpty)
+        .toList(growable: false);
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '現在のBroker実行Host能力',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: onRefresh,
+                icon: refreshing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                label: Text(refreshing ? '更新中' : '能力を再取得'),
+              ),
+            ],
+          ),
+          Text(
+            brokerObserved
+                ? 'Broker応答のHost IDが一致した能力だけを表示します。remote登録Hostの能力やTrustを推測せず、能力状態からPermission／Approval／Authorityを生成しません。'
+                : '受理済みのBroker snapshotがないため、能力値は表示参考に限ります。実Hostの能力やremote接続の証拠として扱いません。',
+          ),
+          const SizedBox(height: 8),
+          if (current.isEmpty)
+            const Text('現在Host能力を取得できていません。Broker接続とModule構成を確認してください。')
+          else
+            for (final host in current)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${host.displayName} / ${host.hostId} / ${host.platform}'),
+                  Text('全体状態: ${_hostCapabilityStatusLabel(host.status)}'),
+                  for (final item in host.capabilities)
+                    ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        item.status == 'ready'
+                            ? Icons.check_circle_outline
+                            : Icons.info_outline,
+                      ),
+                      title: Text(item.capabilityId),
+                      subtitle: Text(
+                        '${_hostCapabilityStatusLabel(item.status)} / '
+                        '${_hostCapabilityEvidenceLabel(item.evidenceSource)}\n'
+                        '${item.reason}',
+                      ),
+                    ),
+                ],
+              ),
+          Text(message),
+        ],
+      ),
+    );
+  }
 }

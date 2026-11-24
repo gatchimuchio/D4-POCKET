@@ -79,9 +79,8 @@ class ShellCoreClient {
       final Map<String, Object?> hostCapability;
       if (kGuiShellModuleHostCapabilities) {
         final hostCapabilityResponse = await broker.request('ホスト能力');
-        hostCapability = _acceptedResponseBodyMap(
+        hostCapability = _validatedHostCapabilityResponse(
           hostCapabilityResponse,
-          'ホスト能力',
         );
       } else {
         hostCapability = const <String, Object?>{
@@ -689,6 +688,22 @@ class ShellCoreClient {
         .toList(growable: false);
   }
 
+  Future<HostCapabilityRecord> refreshCurrentHostCapability() async {
+    final transport = brokerTransport;
+    if (mode != 'broker' ||
+        transport == null ||
+        !kGuiShellModuleHostCapabilities) {
+      throw const BrokerClientException(
+        '現在Host能力は利用可能な製品Broker経路から取得できません',
+      );
+    }
+    final response = await transport.request('ホスト能力');
+    final capabilityBody = _validatedHostCapabilityResponse(response);
+    return HostCapabilityRecord.fromJson(
+      _hostCapabilitySnapshotJson(capabilityBody),
+    );
+  }
+
   Future<TrayStopResult> requestAllRuntimeStop() async {
     final transport = brokerTransport;
     if (transport == null) {
@@ -814,6 +829,79 @@ Map<String, Object?> _hostCapabilitySnapshotJson(
           },
     ],
   };
+}
+
+void _validateHostCapabilityBody(Map<String, Object?> body) {
+  const fields = {
+    '版',
+    'ホストID',
+    '表示名',
+    'プラットフォーム',
+    '状態',
+    '能力',
+  };
+  const platforms = {'windows', 'macos', 'linux', 'android', 'ios', 'unknown'};
+  const statuses = {'ready', 'degraded', 'unavailable', 'suspended', 'failed'};
+  const evidenceSources = {
+    'CONFIG',
+    'INTERNAL_STATE',
+    'LIVE_RUNTIME',
+    'EXTERNAL_EVIDENCE',
+    'FIXTURE',
+  };
+  if (body.length != fields.length ||
+      body.keys.any((key) => !fields.contains(key)) ||
+      body['版'] != 1 ||
+      body['ホストID'] is! String ||
+      (body['ホストID'] as String).isEmpty ||
+      body['表示名'] is! String ||
+      (body['表示名'] as String).isEmpty ||
+      !platforms.contains(body['プラットフォーム']) ||
+      !statuses.contains(body['状態'])) {
+    throw const BrokerClientException('現在Host能力のSchema適合を確認できません');
+  }
+  final rawCapabilities = body['能力'];
+  if (rawCapabilities is! List || rawCapabilities.isEmpty) {
+    throw const BrokerClientException('現在Host能力の能力配列が不正です');
+  }
+  const capabilityFields = {'能力ID', '状態', '証拠種別', '理由'};
+  for (final value in rawCapabilities) {
+    if (value is! Map) {
+      throw const BrokerClientException('現在Host能力にobject以外の項目があります');
+    }
+    final item = Map<String, Object?>.from(value);
+    if (item.length != capabilityFields.length ||
+        item.keys.any((key) => !capabilityFields.contains(key)) ||
+        item['能力ID'] is! String ||
+        (item['能力ID'] as String).isEmpty ||
+        !statuses.contains(item['状態']) ||
+        !evidenceSources.contains(item['証拠種別']) ||
+        item['理由'] is! String ||
+        (item['理由'] as String).isEmpty) {
+      throw const BrokerClientException('現在Host能力の項目Schemaが不正です');
+    }
+  }
+}
+
+Map<String, Object?> _validatedHostCapabilityResponse(
+  Map<String, Object?> response,
+) {
+  final auditId = response['audit_event_id'];
+  final body = response['body'];
+  if (response['operation'] != 'ホスト能力' ||
+      response['status'] != 'accepted' ||
+      response['evidence_source'] != 'LIVE_RUNTIME' ||
+      response['error'] != null ||
+      auditId is! String ||
+      !_isSafeAuditIdentifier(auditId) ||
+      body is! Map) {
+    throw const BrokerClientException(
+      '現在Host能力のBroker応答・Audit・証拠種別を確認できません',
+    );
+  }
+  final capabilityBody = Map<String, Object?>.from(body);
+  _validateHostCapabilityBody(capabilityBody);
+  return capabilityBody;
 }
 
 List<Map<String, Object?>> _hostRegistrySnapshotJson(

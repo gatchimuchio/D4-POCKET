@@ -4,6 +4,8 @@
 
 C18のHost操作面は、C17のHost registryをD4 Pocket Desktopへ接続する。`Host一覧`は通常認証済みIPCから取得し、Hostの表示名、Platform、接続状態、Trust、Runtime／Agentのboundedなsummaryだけを表示する。
 
+現行Hostの能力一覧は、起動時またはHost Centerの明示的な再取得操作でBrokerから受理した`ホスト能力`をHost IDで照合し、Host Centerへ投影する。再取得は認証済みIPCの読取要求であり、応答のoperation、accepted状態、`LIVE_RUNTIME`証拠、Audit参照、schemaを検証する。Broker観測Hostと一致しない登録Hostの能力は未観測のままにする。能力の状態・証拠種別・理由は利用可能性の表示であり、Permission、Approval、Authority、Trust、Credentialを生成しない。更新失敗時は最後に受理した値を明示して保持し、更新成功と表示しない。
+
 Host metadataの証拠種別は`INTERNAL_STATE`であり、未接続HostのRuntime／Agent一覧をliveであるかのように生成しない。登録時のRuntime／Agent件数はsummaryであって、個別一覧の観測証拠ではない。
 
 ## Host切替

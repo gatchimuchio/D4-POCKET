@@ -808,7 +808,14 @@ class _SetupDoctorTransport implements BrokerTransport {
         '表示名': '試験Host',
         'プラットフォーム': 'windows',
         '状態': 'ready',
-        '能力': <Map<String, Object?>>[],
+        '能力': <Map<String, Object?>>[
+          {
+            '能力ID': 'filesystem',
+            '状態': 'ready',
+            '証拠種別': 'LIVE_RUNTIME',
+            '理由': 'Brokerの永続保管先を現在の実行系から観測できる',
+          },
+        ],
       });
     }
     if (operation == 'Host一覧') {
