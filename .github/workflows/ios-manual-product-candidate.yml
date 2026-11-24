@@ -1,0 +1,92 @@
+name: iOS manual product build candidate
+
+'on':
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-product-candidate:
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - name: Checkout exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Record source and Apple build host
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/d4p-ios-evidence"
+          echo "D4P_EVIDENCE_DIR=$RUNNER_TEMP/d4p-ios-evidence" >> "$GITHUB_ENV"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          xcode_version="$(xcodebuild -version | awk '/^Xcode / {print $2; exit}')"
+          test -n "$xcode_version"
+          echo "D4P_XCODE_VERSION=$xcode_version" >> "$GITHUB_ENV"
+          {
+            printf 'source_commit=%s\n' "$(git rev-parse HEAD)"
+            printf 'runner_os=%s\n' "$(sw_vers -productVersion)"
+            printf 'architecture=%s\n' "$(uname -m)"
+            printf 'xcode_path=%s\n' "$(xcode-select -p)"
+            xcodebuild -version
+            df -k .
+          } | tee "$RUNNER_TEMP/d4p-ios-evidence/environment.txt"
+          test "$(uname -m)" = "arm64"
+
+      - name: Install pinned Flutter SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = "559ffa3f75e7402d65a8def9c28389a9b2e6fe42"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version --machine | tee "$D4P_EVIDENCE_DIR/flutter-version.json"
+
+      - name: Build Simulator and unsigned device candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd apps/mobile_flutter
+          flutter pub get --enforce-lockfile 2>&1 | tee "$D4P_EVIDENCE_DIR/mobile-pub-get.txt"
+          flutter build ios --simulator --debug --no-codesign --no-pub 2>&1 | tee "$D4P_EVIDENCE_DIR/ios-simulator-build.txt"
+          flutter build ios --release --no-codesign --no-pub 2>&1 | tee "$D4P_EVIDENCE_DIR/ios-device-build.txt"
+          cd ../..
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+          flutter_version="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["frameworkVersion"])' < "$D4P_EVIDENCE_DIR/flutter-version.json")"
+          python3 tooling/package_ios_product_candidate.py \
+            --simulator-app apps/mobile_flutter/build/ios/iphonesimulator/Runner.app \
+            --device-app apps/mobile_flutter/build/ios/iphoneos/Runner.app \
+            --output-dir "$RUNNER_TEMP/ios-product-candidate" \
+            --source-commit "$GITHUB_SHA" \
+            --flutter-version "$flutter_version" \
+            --xcode-version "$D4P_XCODE_VERSION" \
+            2>&1 | tee "$D4P_EVIDENCE_DIR/ios-candidate-package.txt"
+          python3 -m json.tool "$RUNNER_TEMP/ios-product-candidate/ios-product-candidate.json" > "$D4P_EVIDENCE_DIR/ios-candidate-record.pretty.json"
+          shasum -a 256 "$RUNNER_TEMP/ios-product-candidate"/* | tee "$D4P_EVIDENCE_DIR/ios-candidate-output-sha256.txt"
+
+      - name: Upload bounded build candidate and evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ios-product-candidate-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/d4p-ios-evidence/
+            ${{ runner.temp }}/ios-product-candidate/
+          retention-days: 1
+          if-no-files-found: warn
+
+      - name: Clean generated runner outputs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -x "$RUNNER_TEMP/flutter/bin/flutter" ]; then
+            cd apps/mobile_flutter
+            "$RUNNER_TEMP/flutter/bin/flutter" clean
+          fi
+          rm -rf -- "$RUNNER_TEMP/ios-product-candidate" "$RUNNER_TEMP/d4p-ios-evidence" "$RUNNER_TEMP/flutter"

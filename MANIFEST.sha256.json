@@ -88,6 +88,10 @@
       "sha256": "6023e9699146d399286ae82314ba09f3e3fe2152fcf87d12f0a8f6a799d574f9"
     },
     {
+      "path": ".github/workflows/ios-manual-product-candidate.yml",
+      "sha256": "637372594857b29eeb54b6e3c765646b0a7bdfc7609c582365be602f1f809b86"
+    },
+    {
       "path": ".github/workflows/linux-manual-export-build.yml",
       "sha256": "9821ddc08086b5e445d5a41408992de393e6069fc6761e29e234015222769537"
     },
