@@ -1883,13 +1883,15 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           final downloadJob = body['download_job'] is Map
               ? Map<String, Object?>.from(body['download_job']! as Map)
               : null;
-          final downloadAvailable = body['download実行'] == 'available';
+          // UpdateList derives this projection from Broker durable-store readiness.
+          final updateStoreReady = body['download実行'] == 'available';
           final rollbackState = body['rollback状態'] is Map
               ? Map<String, Object?>.from(body['rollback状態']! as Map)
               : null;
           final rollbackAvailable = body['rollback実行'] == 'available';
           final installedProduct = rollbackState?['現在版'] is Map;
-          final repairAvailable = body['製品起動項目修復操作'] == 'available';
+          final repairAvailable = updateStoreReady &&
+              body['製品起動項目修復操作'] == 'available';
           final uninstallAvailable = body['製品アンインストール操作'] == 'available';
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1968,7 +1970,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                     client,
                     listing,
                     update,
-                    downloadAvailable: downloadAvailable,
+                    updateStoreReady: updateStoreReady,
                     downloadJob: downloadJob,
                     rollbackAvailable: rollbackAvailable,
                     rollbackState: rollbackState,
@@ -1984,7 +1986,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     UpdateClient client,
     Future<Map<String, Object?>>? listing,
     Map<String, Object?> update, {
-    required bool downloadAvailable,
+    required bool updateStoreReady,
     required Map<String, Object?>? downloadJob,
     required bool rollbackAvailable,
     required Map<String, Object?>? rollbackState,
@@ -2013,7 +2015,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         jobState == 'downloading' || jobState == 'audit_failed';
     final sourceConfigured =
         update['取得元'] is Map && (update['取得元']! as Map)['状態'] == 'configured';
-    final canDownload = downloadAvailable &&
+    final canDownload = updateStoreReady &&
         update['署名状態'] == 'verified' &&
         sourceConfigured &&
         !_updateOperationInProgress &&
@@ -2027,7 +2029,8 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     final isRollbackTarget = rollbackVersion is Map &&
         rollbackVersion['更新ID'] == updateId &&
         rollbackVersion['候補hash'] == candidateHash;
-    final canRequestActivation = UpdateClient.canRequestActivation(
+    final canRequestActivation = updateStoreReady &&
+        UpdateClient.canRequestActivation(
       rollbackState: rollbackState,
       staged: stageState == 'version_staged',
       alreadyActive: isAlreadyActive,
@@ -2036,13 +2039,15 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
       packageSha256: packageSha256,
       packageSize: packageSize,
     );
-    final canApply = downloadedForUpdate &&
+    final canApply = updateStoreReady &&
+        downloadedForUpdate &&
         !_updateOperationInProgress &&
         update['署名状態'] == 'verified' &&
         !isAlreadyActive &&
         !isRollbackTarget &&
         stageState != 'version_staged';
-    final canRepair = UpdateClient.canRepairActiveVersion(
+    final canRepair = updateStoreReady &&
+        UpdateClient.canRepairActiveVersion(
       alreadyActive: isAlreadyActive,
       downloaded: downloadedForUpdate,
       operationInProgress: _updateOperationInProgress,
@@ -2051,7 +2056,8 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
       packageSize: packageSize,
     );
     final rollbackCurrent = rollbackState?['現在版'];
-    final canRollback = rollbackAvailable &&
+    final canRollback = updateStoreReady &&
+        rollbackAvailable &&
         rollbackState?['状態'] == 'available' &&
         !_updateOperationInProgress &&
         rollbackCurrent is Map &&

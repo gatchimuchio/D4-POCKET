@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：W-C10 永続Store利用不可時の操作表示（2026-11-25）
+
+基準main `0afb63bcd884d9192eb51eb4241acff811076721`。Broker UpdateListの`download実行`は`state_store.persistence_ready()`から投影され、Stage/Activation/Rollback/OS起動項目修復も永続Auditを確定できない場合はBrokerが`suspended`で拒否する。Settingsは候補・署名・rollback状態だけで一部操作を表示していたため、Broker永続Storeの現在可用性をStage/Activation/Repair/Rollbackと起動項目修復の表示条件へ結線した。Uninstallは既存の専用可用性条件を維持。Authority・拒否・AuditはBrokerの既存境界から変更していない。
+
+実装範囲はSettings Consumerの現在状態表示に限る。`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshot SHA-256 `ff47ad2ebcff304d9ef04931695b4a5902e1b9b36dbb0f0a8ffd97abb100b10a`でPASS（exit 0、workspace cleanup PASS）。`git diff --check`もPASS。Unit/E2E・品質QA・Installed Runtimeはこの施工単位で実施せず、W-C10全体や製品完成を主張しない。
+
 ### v11施工追補：W-C10 Rollback可用性のSettings表示結線（2026-11-25）
 
 基準main `8066511c433ed3ae6f0b0094f3b7a9a2406c085b`。Broker UpdateListが返す`rollback実行`の可用性をSettingsが消費していなかったため、Brokerが`suspended`またはunknownでもRollback操作を表示できる欠配線を修正した。現在の可用性が`available`で、さらにRollback状態・対象候補が一致するときだけ操作を表示する。Broker側の拒否・Owner確認・Auditは変更していない。
