@@ -124,7 +124,8 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
         ),
         _CurrentHostCapabilityPanel(
           capabilities: _hostCapabilities,
-          brokerObserved: snapshot.snapshotSource == 'broker',
+          brokerSnapshot: snapshot.snapshotSource == 'broker',
+          observedHostId: observedBrokerHostId,
           refreshing: _capabilityRefreshing,
           message: _capabilityMessage,
           onRefresh: observedBrokerHostId != null &&
@@ -703,23 +704,37 @@ String _hostCapabilityEvidenceLabel(String source) => switch (source) {
 class _CurrentHostCapabilityPanel extends StatelessWidget {
   const _CurrentHostCapabilityPanel({
     required this.capabilities,
-    required this.brokerObserved,
+    required this.brokerSnapshot,
+    required this.observedHostId,
     required this.refreshing,
     required this.message,
     required this.onRefresh,
   });
 
   final List<HostCapabilityRecord> capabilities;
-  final bool brokerObserved;
+  final bool brokerSnapshot;
+  final String? observedHostId;
   final bool refreshing;
   final String message;
   final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
-    final current = capabilities
-        .where((item) => item.hostId.trim().isNotEmpty)
-        .toList(growable: false);
+    final matching = observedHostId == null
+        ? const <HostCapabilityRecord>[]
+        : capabilities
+            .where((item) => item.hostId == observedHostId)
+            .toList(growable: false);
+    final current = matching.length == 1
+        ? matching
+        : const <HostCapabilityRecord>[];
+    final unbound = current.isEmpty
+        ? capabilities
+            .where((item) => item.hostId.trim().isNotEmpty)
+            .toList(growable: false)
+        : capabilities
+            .where((item) => item.hostId != observedHostId)
+            .toList(growable: false);
     return BorderedPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -728,7 +743,9 @@ class _CurrentHostCapabilityPanel extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '現在のBroker実行Host能力',
+                  observedHostId == null
+                      ? '現在Host未確定の能力記録'
+                      : '現在のBroker実行Host能力',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
@@ -746,13 +763,17 @@ class _CurrentHostCapabilityPanel extends StatelessWidget {
             ],
           ),
           Text(
-            brokerObserved
-                ? 'Broker応答のHost IDが一致した能力だけを表示します。remote登録Hostの能力やTrustを推測せず、能力状態からPermission／Approval／Authorityを生成しません。'
-                : '受理済みのBroker snapshotがないため、能力値は表示参考に限ります。実Hostの能力やremote接続の証拠として扱いません。',
+            observedHostId != null
+                ? '一意に観測した現在Broker Host ID=$observedHostId と一致する能力だけを現在値として表示します。能力状態からPermission／Approval／Authorityを生成しません。'
+                : brokerSnapshot
+                    ? 'Broker snapshotのHost IDを一意に確定できないため、能力記録は現在Hostへ結合せず参考表示に留めます。'
+                    : '現在のBroker snapshotがないため、能力記録は最後に受理した参考値です。実Hostの能力やremote接続の証拠として扱いません。',
           ),
           const SizedBox(height: 8),
           if (current.isEmpty)
-            const Text('現在Host能力を取得できていません。Broker接続とModule構成を確認してください。')
+            Text(observedHostId == null
+                ? '現在Host能力を一意に確認できていません。'
+                : '現在Host IDに一致する能力を取得できていません。')
           else
             for (final host in current)
               Column(
@@ -778,6 +799,18 @@ class _CurrentHostCapabilityPanel extends StatelessWidget {
                     ),
                 ],
               ),
+          if (unbound.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text('現在Host未照合の能力記録（参考）'),
+            for (final host in unbound)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${host.displayName} / ${host.hostId} / ${host.platform}'),
+                  Text('記録状態: ${_hostCapabilityStatusLabel(host.status)}'),
+                ],
+              ),
+          ],
           Text(message),
         ],
       ),

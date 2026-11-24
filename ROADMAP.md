@@ -16,6 +16,10 @@
 
 この変更はHost操作面の既存表示範囲に限り、Host接続・Trust・Permissionを生成しない。変更後の`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshotでPASS（exit 0、snapshot SHA-256 `411cd0e78ade8f7348c2140ce4e0b2cd7710f91a6b33f33f2192b833a4a29582`、snapshot cleanup PASS）。Unit/E2E・製品QA・Installed Runtimeは未実施。
 
+### v11施工追補：Host能力欄の現在Host照合（2026-11-24）
+
+基準main `4aba15a02fe103296f799687e52753abbfca429c`。Broker snapshotがHost IDを一意に確定できない場合に、能力行を現在Host能力として表示しないようHost能力欄を変更した。現在Host IDが一意に観測できた場合は一致する単一行だけを現在値として示し、その他の能力記録は現在Host未照合の参考値として区別する。更新失敗時に最後の受理値を残す既存動作は維持する。変更後の`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshotでPASS（exit 0、対象Source SHA-256 `78dc49948dbc4d76f7a6fe6c81287a3dd734c4c6c0e6fa365bdd58f71d378534`、snapshot cleanup PASS）。Unit/E2E・製品QA・Installed Runtimeは未実施。
+
 ### v11施工追補：W-J03 Source参照の現物束縛（2026-11-24）
 
 基準main `af3f21254e5967678421ee90a49ec9b0076a4428`。`tooling/current_governance_check.py`で実装152要求と54結線について、実装工程表と施工指示書のSource候補が一致し、候補がRepo内の実在fileを指すことを確認する構造を追加した。絶対path、path traversal、Repo外symlink、欠落file、directory参照は不成立として扱う。現行候補では152要求・54結線のSource参照がすべて一致し、参照先fileが存在する。
