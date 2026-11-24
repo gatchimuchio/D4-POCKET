@@ -89,7 +89,7 @@
     },
     {
       "path": ".github/workflows/ios-manual-product-candidate.yml",
-      "sha256": "637372594857b29eeb54b6e3c765646b0a7bdfc7609c582365be602f1f809b86"
+      "sha256": "f0199997461ca7fe6976c29249ed0e122603dfcc9afb15ea7ed0969ecef139a0"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",

@@ -57,7 +57,8 @@ jobs:
           git diff --exit-code
           git diff --cached --exit-code
           test -z "$(git status --porcelain --untracked-files=all)"
-          flutter_version="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["frameworkVersion"])' < "$D4P_EVIDENCE_DIR/flutter-version.json")"
+          flutter_version="$(git -C "$RUNNER_TEMP/flutter" describe --tags --exact-match)"
+          test "$flutter_version" = "3.44.0"
           python3 tooling/package_ios_product_candidate.py \
             --simulator-app apps/mobile_flutter/build/ios/iphonesimulator/Runner.app \
             --device-app apps/mobile_flutter/build/ios/iphoneos/Runner.app \
