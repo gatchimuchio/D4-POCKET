@@ -518,9 +518,7 @@ class _HostDetail extends StatelessWidget {
   Widget build(BuildContext context) {
     final brokerSnapshot = snapshot.snapshotSource == 'broker';
     final localObservation = brokerSnapshot &&
-        snapshot.hostCapabilities.any(
-          (item) => item.hostId == host.hostId,
-        );
+        _brokerObservedHostId(snapshot) == host.hostId;
     final hostLocation = !brokerSnapshot
         ? '未確認（Broker由来の実測証拠がありません）'
         : localObservation

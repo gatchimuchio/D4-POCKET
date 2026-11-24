@@ -10,6 +10,12 @@
 
 `python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshotでPASS（Flutter analyze exit 0、snapshot cleanup PASS）。Unit/E2E・製品QA・Installed Runtimeは未実施。
 
+### v11施工追補：Host Runtime／Agent投影の一意観測束縛（2026-11-24）
+
+基準main `0ec464a009cf57f8667f534ed81d7feb3c169a70`。Host詳細のRuntime／Agent一覧がBroker能力行を`any`一致で扱っていたため、複数行など現在Hostを一意に確定できないsnapshotでもローカル実測として表示される余地を閉じた。表示側も現在Broker Host IDを一件だけ確定する共通判定を使い、一意なHost ID一致がない場合は一覧を未観測とする。
+
+この変更はHost操作面の既存表示範囲に限り、Host接続・Trust・Permissionを生成しない。変更後の`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshotでPASS（exit 0、snapshot SHA-256 `411cd0e78ade8f7348c2140ce4e0b2cd7710f91a6b33f33f2192b833a4a29582`、snapshot cleanup PASS）。Unit/E2E・製品QA・Installed Runtimeは未実施。
+
 ### v11施工追補：W-J03 Source参照の現物束縛（2026-11-24）
 
 基準main `af3f21254e5967678421ee90a49ec9b0076a4428`。`tooling/current_governance_check.py`で実装152要求と54結線について、実装工程表と施工指示書のSource候補が一致し、候補がRepo内の実在fileを指すことを確認する構造を追加した。絶対path、path traversal、Repo外symlink、欠落file、directory参照は不成立として扱う。現行候補では152要求・54結線のSource参照がすべて一致し、参照先fileが存在する。
