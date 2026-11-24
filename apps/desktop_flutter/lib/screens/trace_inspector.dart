@@ -186,6 +186,7 @@ class _TraceInspectorState extends State<TraceInspector> {
           ),
         ),
         if (metrics.isNotEmpty) _metricPanel(metrics),
+        if (traces.isNotEmpty) _traceLineagePanel(traces),
         if (spans.isEmpty)
           EmptyStatePanel(
             title: 'Traceなし',
@@ -205,6 +206,51 @@ class _TraceInspectorState extends State<TraceInspector> {
           ),
       ],
     );
+  }
+
+  Widget _traceLineagePanel(List<Map<String, Object?>> traces) {
+    final traceIds = traces
+        .map((trace) => trace['TraceID'])
+        .whereType<String>()
+        .toSet();
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Task／Tool／Followup Trace相関（Broker内部観測）',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          for (final trace in traces)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                _traceLineageText(trace, traceIds),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          Text(
+            '同じTraceIDのSpanは同じ観測Traceに属します。親TraceIDが応答範囲外の場合、親の内容は取得・補完していません。これは相関表示であり、Auditや実行権限の根拠ではありません。',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _traceLineageText(
+    Map<String, Object?> trace,
+    Set<String> responseTraceIds,
+  ) {
+    final traceId = trace['TraceID']?.toString() ?? 'unknown';
+    final parentTraceId = trace['親TraceID'];
+    final parent = switch (parentTraceId) {
+      final String id when responseTraceIds.contains(id) => '$id（応答内）',
+      final String id => '$id（応答範囲外）',
+      _ => 'なし',
+    };
+    return '$traceId / Span: ${trace['件数'] ?? 'unknown'} / 親Trace: $parent';
   }
 
   Widget _metricPanel(List<Map<String, Object?>> metrics) => BorderedPanel(

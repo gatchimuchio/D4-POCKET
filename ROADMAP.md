@@ -10,6 +10,12 @@
 
 `python -X utf8 tooling/schema_check/check_schemas.py`はSchema 189件／正常例183件／負例250件でPASS、`python -B -X utf8 tooling/current_governance_check.py`はv11五文書整合でPASS。Rust `cargo check --locked --offline --features module_host_operations`と`cargo check --locked --offline --no-default-features`は両方PASS（変更対象外コードの警告9件／8件）。隔離source snapshot `d199ed55cf6752079b1227783c219ea5d20319044cd02f4980af0c05c1dee570`のWindows Desktop Flutter analyzeもPASS（exit 0、snapshot cleanup PASS）。実装施工範囲のためUnit/E2E・製品QA・Installed Runtimeは未実施。Host停止操作のSource／Contract／Consumer／Build結線を示し、remote Host停止や製品受入れを主張しない。
 
+### v11施工追補：W-C06 Trace親子関係のConsumer表示（2026-11-24）
+
+基準main `8d2ace2fb667516ef708b93282f4656a8a4341d2`。既存BrokerはTaskイベントとTaskに束縛されたMCP Tool監査イベントを同じTraceへ関連付け、検証済みMCP結果から作られるFollowup Taskを期限・一回消費付きで親Traceへ結ぶ。Observation ClientはSpanとTraceの対応を厳密検証し、Trace Inspectorは要求世代の古い応答を破棄する。画面にTraceごとの親TraceIDと応答範囲内／範囲外を追加表示し、範囲外の親内容を取得・推測しない。Observationは内部状態の相関表示に限り、Audit・Authorityへ昇格しない。
+
+整形後の`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshot SHA-256 `3dc627ed5cf982853045d213ac917d9d0fb210e66bd276ae31e22380294cbe64`でPASS（exit 0、snapshot cleanup PASS）。`git diff --check`もPASS。Unit/E2E・製品QA・Installed Runtimeはこの施工単位では実施していない。
+
 ### v11施工追補：Host初期表示のBroker観測束縛（2026-11-24）
 
 基準main `9c15fa793266d40eee92d2e65f43381958faf5cc`。Host一覧の先頭項目を無条件に現在の表示Hostとしていた初期化を改め、`snapshot_source=broker`の観測Host IDと登録一覧のHost IDが一致する場合だけ現在Hostとして表示する。不一致時は一覧の先頭を切替候補に残し、現在Host・Runtime／Agentのlive観測とは扱わない。Host操作面の切替・能力取得・権限境界は変更していない。
