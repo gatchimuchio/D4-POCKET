@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：W-C09 Palette／全体検索への現在StopReceipt投影（2026-11-25）
+
+基準main `a5960971eba538648b5ccb77ca752f1f2722f12a`。従来のコマンドPalette／全体検索は「Runtime停止要求とReceipt」の固定画面案内だけで、現在Receiptを結果候補として表示し、Problemsの表示対象へ結び付けていなかった。現在のBroker・Host／Task世代に束縛されたReceiptがありAudit IDを持つ場合だけ、停止状態・再承認状態・対象数・Audit IDのsummaryを検索候補へ追加する。選択後にBroker世代、Host／Task世代、Receipt object identity、Audit IDを再照合し、一致時だけAudit IDをProblemsの表示照合条件へ渡す。停止操作・Authority・Broker payloadは渡さない。照合対象が切り替わった場合は候補を破棄する。Problemsの不一致案内をNotification専用表現から一般のAudit ID照合へ合わせた。
+
+`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshotでPASS（exit 0、source SHA-256 `2b94da9f1a5d7a1e5a90efc1f38cf4d164c920ab1b106982827b7896c58209ba`、workspace cleanup PASS）。同じソース変更のWindows Flutter Release Runner buildも隔離snapshotでPASS（source SHA-256 `368443869bb9c49c2dd9fc3140221f674404953b4cab85bf15f9468af0053c54`、`gui_shell_desktop.exe` 164,352 bytes、SHA-256 `751a7e67db27352c12729f8a390c2e61a35f2c26da111933a8e1c16489b41b40`、workspace cleanup PASS）。`python -B -X utf8 tooling/current_governance_check.py`、`python -B -X utf8 tooling/manifest.py --check`、`git diff --check`もPASS。Unit/E2E・品質QA・Installed Runtime・Windows product packageはこの施工で実施していない。本追補はPalette／Search→Problemsの現在Receipt Consumer結線とFlutter Runner構築に限定し、W-C09全体や製品受入れ完了を主張しない。
+
 ### v11施工追補：W-C02 Workspace登録rootのInspector表示（2026-11-25）
 
 基準main `140bff4b9fa197ad8acb30206048a6591610cb49`。Owner起動設定とAgent CLIの両Workspace登録経路から、Registryへ実際のabsolute root pathを渡す。Workspace Registryは登録時と一覧投影時にcanonical pathおよびdirectory handleのdevice/file IDを照合し、削除・置換・不一致時はpathを表示せずnullとする。Rust BrokerのWorkspace一覧→Flutter Workspace Client→Workspace Inspectorを結線し、Flutterにfilesystem accessを追加していない。DeviceLink projectionはroot pathを検証後に落とし、Workspace ID／Runtime IDのみ投影する。IPC response schemaと既存fixtureを同期した。

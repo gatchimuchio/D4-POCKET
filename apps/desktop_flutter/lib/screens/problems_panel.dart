@@ -441,7 +441,7 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
         if (widget.stopReceiptAuditIdFilter != null && receipt == null)
           const BorderedPanel(
             child: Text(
-              '通知の関連監査IDと一致する停止Receiptを現在の表示状態から確認できません。別のReceiptを代用せず、停止実行済みとも扱いません。',
+              '指定した関連監査IDと一致する停止Receiptを現在の表示状態から確認できません。別のReceiptを代用せず、停止実行済みとも扱いません。',
             ),
           )
         else if (widget.stopReceiptContextMessage != null)

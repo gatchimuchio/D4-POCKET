@@ -262,7 +262,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   int _latestStopRequestHostContextGeneration = -1;
   int _latestStopRequestTaskContextGeneration = -1;
   String? _stopReceiptContextMessage;
-  String? _notificationStopReceiptAuditId;
+  String? _stopReceiptAuditIdFilter;
   String? _observationHostId;
   final ValueNotifier<int> _hostContextGeneration = ValueNotifier<int>(0);
   int _taskContextGeneration = 0;
@@ -388,7 +388,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     _latestStopRequestBrokerGeneration = -1;
     _latestStopRequestHostContextGeneration = -1;
     _latestStopRequestTaskContextGeneration = -1;
-    _notificationStopReceiptAuditId = null;
+    _stopReceiptAuditIdFilter = null;
   }
 
   Future<void> _initializeWindowsTray() async {
@@ -588,7 +588,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     }
     setState(() {
       _latestStopRequestReceipt = receipt;
-      if (receipt == null) _notificationStopReceiptAuditId = null;
+      if (receipt == null) _stopReceiptAuditIdFilter = null;
       _latestStopRequestTransport = receipt == null ? null : brokerTransport;
       _latestStopRequestBrokerGeneration =
           receipt == null ? -1 : brokerGeneration;
@@ -675,7 +675,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         connectResource:
             widget.runtimeResourceConnect ?? connectRuntimeResourceClient,
         stopReceipt: _currentStopRequestReceipt,
-        stopReceiptAuditIdFilter: _notificationStopReceiptAuditId,
+        stopReceiptAuditIdFilter: _stopReceiptAuditIdFilter,
         stopReceiptContextMessage: _stopReceiptContextMessage,
         hostContextGeneration: _hostContextGeneration.value,
         taskContextGeneration: _taskContextGeneration,
@@ -1106,7 +1106,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   void _openProductSetup() {
     setState(() {
       selectedIndex = 11;
-      _notificationStopReceiptAuditId = null;
+      _stopReceiptAuditIdFilter = null;
       _visitedPageIndexes.add(selectedIndex);
       navigationGroup = _ShellNavigationGroup.settings;
       _updateCenterFocusRequest++;
@@ -1127,7 +1127,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     setState(() {
       _pendingAiEditProposal = proposal;
       selectedIndex = 5;
-      _notificationStopReceiptAuditId = null;
+      _stopReceiptAuditIdFilter = null;
       _visitedPageIndexes.add(selectedIndex);
       if (!navigationGroup.includes(page.group)) {
         navigationGroup = page.group;
@@ -1157,7 +1157,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     setState(() {
       _pendingA2aArtifactHandoff = source;
       selectedIndex = page.index;
-      _notificationStopReceiptAuditId = null;
+      _stopReceiptAuditIdFilter = null;
       _visitedPageIndexes.add(selectedIndex);
       if (!navigationGroup.includes(page.group)) {
         navigationGroup = page.group;
@@ -1187,7 +1187,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       navigationGroup = group;
       if (!currentPageIsVisible) {
         selectedIndex = pageEntries.first.index;
-        _notificationStopReceiptAuditId = null;
+        _stopReceiptAuditIdFilter = null;
         _visitedPageIndexes.add(selectedIndex);
       }
     });
@@ -1204,7 +1204,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     final page = matches.first;
     setState(() {
       selectedIndex = index;
-      _notificationStopReceiptAuditId =
+      _stopReceiptAuditIdFilter =
           index == 9 ? stopReceiptAuditIdFilter : null;
       _visitedPageIndexes.add(index);
       if (!navigationGroup.includes(page.group)) {
@@ -1246,6 +1246,25 @@ class _ShellHomePageState extends State<ShellHomePage> {
 
     final availablePageIndices =
         _pageEntries().map((page) => page.index).toSet();
+    final receiptForSearch = _currentStopRequestReceipt;
+    final receiptHostContextGeneration = _hostContextGeneration.value;
+    final receiptTaskContextGeneration = _taskContextGeneration;
+    final currentReceiptNavigation =
+        receiptForSearch == null || receiptForSearch.auditId.trim().isEmpty
+            ? null
+            : GlobalSearchResult(
+                target: GlobalSearchTarget.navigation,
+                category: '現在の操作結果',
+                title: '現在のRuntime停止要求Receipt',
+                detail:
+                    '停止実行: ${receiptForSearch.stopPerformed ? '実行済み' : '未実行'} / '
+                    '承認: ${receiptForSearch.approvalState} / '
+                    '対象Runtime: ${receiptForSearch.targetCount} / '
+                    'Audit: ${receiptForSearch.auditId} / '
+                    '現在のHost／Task Contextに束縛',
+                recordId: 'problems.stop_receipt.current',
+                pageIndex: 9,
+              );
     const stopReceiptNavigation = GlobalSearchResult(
       target: GlobalSearchTarget.navigation,
       category: '画面案内',
@@ -1257,6 +1276,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
     final visibleEntries = <GlobalSearchResult>[
       if (availablePageIndices.contains(stopReceiptNavigation.pageIndex))
         stopReceiptNavigation,
+      if (currentReceiptNavigation != null &&
+          availablePageIndices.contains(currentReceiptNavigation.pageIndex))
+        currentReceiptNavigation,
       ...entries
           .where((entry) => availablePageIndices.contains(entry.pageIndex)),
     ]
@@ -1275,9 +1297,28 @@ class _ShellHomePageState extends State<ShellHomePage> {
       return;
     }
 
+    String? stopReceiptAuditIdFilter;
+    if (selected.recordId == 'problems.stop_receipt.current') {
+      final currentReceipt = _currentStopRequestReceipt;
+      if (receiptForSearch == null ||
+          currentReceipt == null ||
+          !identical(currentReceipt, receiptForSearch) ||
+          currentReceipt.auditId != receiptForSearch.auditId ||
+          receiptHostContextGeneration != _hostContextGeneration.value ||
+          receiptTaskContextGeneration != _taskContextGeneration) {
+        _showStopReceiptSearchInvalidated(context);
+        return;
+      }
+      stopReceiptAuditIdFilter = receiptForSearch.auditId;
+    }
+
     // Search and palette selections navigate only. They do not pass the
-    // indexed record or any authority to the destination.
-    _selectPage(selected.pageIndex);
+    // indexed record or any authority to the destination. A current receipt
+    // selection carries only its Audit ID as a display-match filter.
+    _selectPage(
+      selected.pageIndex,
+      stopReceiptAuditIdFilter: stopReceiptAuditIdFilter,
+    );
   }
 
   void _showCurrentSearchUnavailable(BuildContext context) {
@@ -1292,6 +1333,16 @@ class _ShellHomePageState extends State<ShellHomePage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Broker接続先が切り替わったため、古い検索結果を破棄しました。再度検索してください。'),
+      ),
+    );
+  }
+
+  void _showStopReceiptSearchInvalidated(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Host／Task Contextまたは停止要求Receiptが切り替わったため、検索候補を破棄しました。停止は実行していません。',
+        ),
       ),
     );
   }
