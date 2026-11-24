@@ -80,7 +80,7 @@
         "resource_id": { "type": "string", "pattern": "^resource-[a-f0-9]{1,247}$" },
         "name": { "type": "string", "minLength": 1, "maxLength": 256 },
         "uri_template_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-        "mime_type": { "const": "application/octet-stream" },
+        "mime_type": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[\\x20-\\x7E]+$" },
         "status": {
           "type": "object",
           "required": ["status", "reason"],

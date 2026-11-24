@@ -52,6 +52,10 @@
 
 基準main=`419d388a9588abf3de6996b9144b8bd7e50d0dc1`。Trace InspectorはObservation Clientから受け取る有界`Metric一覧`を画面へ表示していなかったため、値・単位・状態・種別・観測件数・証拠種別を追加表示した。値は引き続きBroker内部観測であり、Audit・Permission・Authorityへ昇格させない。隔離source snapshotでのWindows Desktop Flutter analyzeはPASS、snapshot cleanupもPASS。Unit/E2E・製品QAは未実施。これはW-C06のMetric Consumer欠配線を補う局所進捗であり、W-C06全体は未完のまま保持する。現Contractに明示HostID/TaskIDスコープがないため、別Hostを除外したことやcurrent Host/Task限定表示は主張しない。
 
+### v11施工進捗：MCP Resource MIME metadataのBroker→UI結線（2026-11-24）
+
+基準main=`0e1b05641caec48c46269072943b7ad6ae566c9a`。`resources/list`のResource MIME typeをBrokerで固定値へ置き換えず、ASCII printable・128 byte以下の検査後に既存receipt/schemaとFlutter Resource一覧へ渡す。`mimeType`省略時のみ`application/octet-stream`を使う。Resource URI実値と本文、Prompt本文、権限経路は変更しない。Rust isolated `cargo check --locked --offline`はexit 0（既存警告9件）、Windows Desktop Flutter analyzeはexit 0、隔離snapshot cleanup PASS。Unit/E2E・製品QAは未実施。
+
 ### 履歴：2026-11-23 v9 NLC08（非現行）
 
 当時の正本は[製品仕様書 v9](docs/QE_2026-11-23/01_D4Pocket_SPEC_v9_NLC08.jsonl)・[統合工程表 v9](docs/QE_2026-11-23/02_D4Pocket_PLAN_v9_NLC08.jsonl)・[施工指示書 v9](docs/QE_2026-11-23/03_D4Pocket_CODEX_v9_NLC08.jsonl)であり、採用範囲・原文固定は[v9 NLC08採用記録](docs/QE_2026-11-23/採用記録_NLC08.md)に従う。製品進捗は[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)を対象・時点・未閉包ごとに保持する。NLC08採用は製品状態を再評価せず、旧E/W/N状態を自動転記しない。工程の開始・退出・独立線継続は当時の工程表・施工指示書だけを適用し、旧台帳を番号順schedulerへ変換しない。NLC06で確立したDeveloper verificationと実製品Owner受入の分離を保持し、NLC08はWindows run #8で観測したsandbox setup前後のtest CODEX_HOME検査矛盾を限定是正する。Owner画面待ちで独立施工を止めず、実製品認可・該当受入・E5/E6条件はそれぞれの実受入まで未成立のまま保持する。

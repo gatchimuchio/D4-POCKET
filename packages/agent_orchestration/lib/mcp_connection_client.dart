@@ -22,11 +22,13 @@ class McpResourceSummary {
     required this.resourceId,
     required this.name,
     required this.uriTemplateHash,
+    this.mimeType = 'application/octet-stream',
   });
 
   final String resourceId;
   final String name;
   final String uriTemplateHash;
+  final String mimeType;
 }
 
 class McpPromptSummary {
@@ -1367,6 +1369,7 @@ class McpConnectionClient {
         final resourceId = resource['resource_id'];
         final name = resource['name'];
         final uriHash = resource['uri_template_hash'];
+        final mimeType = resource['mime_type'];
         if (resource.length != fields.length ||
             !resource.keys.toSet().containsAll(fields) ||
             resourceId is! String ||
@@ -1375,7 +1378,8 @@ class McpConnectionClient {
             !_safeMetadataName(name) ||
             uriHash is! String ||
             !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(uriHash) ||
-            resource['mime_type'] != 'application/octet-stream' ||
+            mimeType is! String ||
+            !_safeMimeType(mimeType) ||
             !_supportedMetadataStatus(resource['status'])) {
           throw const BrokerClientException('MCP Resource metadata値が不正です');
         }
@@ -1383,6 +1387,7 @@ class McpConnectionClient {
           resourceId: resourceId,
           name: name,
           uriTemplateHash: uriHash,
+          mimeType: mimeType,
         );
       }),
     );
@@ -1444,6 +1449,11 @@ class McpConnectionClient {
       utf8.encode(value).length <= 256 &&
       !_containsControl(value) &&
       !_containsBidiControl(value);
+
+  bool _safeMimeType(String value) =>
+      value.isNotEmpty &&
+      utf8.encode(value).length <= 128 &&
+      value.runes.every((rune) => rune >= 0x20 && rune <= 0x7e);
 
   Map<String, Object?> _objectField(Map<String, Object?> source, String key) {
     final value = source[key];

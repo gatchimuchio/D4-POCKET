@@ -16,6 +16,7 @@ pub const LEGACY_PROTOCOL_VERSION: &str = "2025-11-25";
 const MAX_WIRE_LINE_BYTES: usize = 256 * 1024;
 const MAX_CATALOG_ITEMS: usize = 256;
 const MAX_NAME_BYTES: usize = 256;
+const MAX_RESOURCE_MIME_TYPE_BYTES: usize = 128;
 const MAX_TOOL_SCHEMA_BYTES: usize = 128 * 1024;
 const MAX_TOOL_SCHEMA_NODES: usize = 4096;
 const MAX_TOOL_SCHEMA_DEPTH: usize = 64;
@@ -453,6 +454,7 @@ pub struct McpResource {
     pub name: String,
     pub resource_id: String,
     pub uri_hash: String,
+    pub mime_type: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -545,7 +547,7 @@ impl McpCatalog {
                     "resource_id": resource.resource_id,
                     "name": resource.name,
                     "uri_template_hash": resource.uri_hash,
-                    "mime_type": "application/octet-stream",
+                    "mime_type": resource.mime_type,
                     "status": {"status": "supported", "reason": "MCP resource metadataを検証済み"}
                 })
             })
@@ -1142,6 +1144,16 @@ pub fn parse_resources_response(message: &McpJsonRpcMessage) -> Result<Vec<McpRe
         reject_authority_fields(object)?;
         let name = required_safe_string(object, "name")?;
         let uri = required_safe_string(object, "uri")?;
+        let mime_type = match object.get("mimeType") {
+            None => "application/octet-stream",
+            Some(Value::String(value)) if safe_resource_mime_type(value) => value,
+            _ => {
+                return Err(McpError::new(
+                    "mcp_resource_mime_type_invalid",
+                    "MCP Resource MIME typeが不正",
+                ))
+            }
+        };
         if !names.insert(name.to_string()) {
             return Err(McpError::new(
                 "mcp_resource_duplicate",
@@ -1155,6 +1167,7 @@ pub fn parse_resources_response(message: &McpJsonRpcMessage) -> Result<Vec<McpRe
                 hex::encode(sha256_tagged(uri.as_bytes()).as_bytes())
             ),
             uri_hash: sha256_tagged(uri.as_bytes()),
+            mime_type: mime_type.to_string(),
         });
     }
     Ok(resources)
@@ -1361,6 +1374,11 @@ fn validate_credential_ref(value: &Value) -> Result<(), McpError> {
 
 fn safe_text(value: &str, max_bytes: usize) -> bool {
     !value.is_empty() && value.as_bytes().len() <= max_bytes && !value.chars().any(char::is_control)
+}
+
+fn safe_resource_mime_type(value: &str) -> bool {
+    safe_text(value, MAX_RESOURCE_MIME_TYPE_BYTES)
+        && value.as_bytes().iter().all(u8::is_ascii)
 }
 
 fn is_hash(value: &str) -> bool {

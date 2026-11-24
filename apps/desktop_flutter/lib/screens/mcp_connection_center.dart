@@ -454,7 +454,8 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                     ),
                     subtitle: Text(
                       '識別子: ${resource.resourceId}\n'
-                      'URIのhash: ${resource.uriTemplateHash}',
+                      'URIのhash: ${resource.uriTemplateHash}\n'
+                      'MIME type: ${resource.mimeType}',
                     ),
                   ),
               ],
