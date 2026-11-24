@@ -10,6 +10,10 @@
 
 TrayまたはProblemsでBrokerから受け取った全Runtime停止要求Receiptを、同じDesktop process内のProblemsへ共有する。保持は揮発メモリのみでBroker transport objectとgenerationへ束縛し、Broker切替・新規要求・応答不明で破棄する。Receiptは全Runtime対象と明示し、個別Host／Taskへ結合しない。再起動後の復元、現在Host／Task選択の束縛、製品経路の受入は未成立であり、W-C09全体の完成を主張しない。変更後の隔離Desktop Flutter analyzeはexit 0、source SHA-256 `e4ab074831db15211725f259c567e5c4d39ebd3415f128326d757e36e49efad1`、workspace cleanup PASS。`git diff --check`もPASS。Unit/E2E・品質QA・Installed Runtimeは未実施。
 
+### v11施工追補：W-C09 StopReceipt Runtime対象の投影（2026-11-25）
+
+Flutter Broker clientは`tray_stop_response.schema.json`に従いreceiptの固定field、停止未実行、Owner再承認、全Runtime target（上限256、ID一意、状態enum、未知field拒否）を検証し、typed targetとして保持する。Problemsは要求対象RuntimeのIDとBroker状態を折りたたみ表示し、全Runtime scopeと個別Host／Task非結合を明示する。変更後の隔離Desktop Flutter analyzeはexit 0、source SHA-256 `3c9e97799a6659bc130ef2dcfb3cb74c762df0f4fd6b4ec55fd3a4689ea86185`、workspace cleanup PASS。`git diff --check`もPASS。Host／Task固有Receipt、再起動後の復元、製品経路受入は未成立。Unit/E2E・品質QA・Installed Runtimeは未実施。
+
 ## 現行統合製品工程（2026-11-24 v11）
 
 現行正本は[要求仕様 v11](docs/V11_2026-11-24/01_D4Pocket_REQUIREMENTS_v11_JA.jsonl)・[設計仕様 v11](docs/V11_2026-11-24/02_D4Pocket_DESIGN_v11_JA.jsonl)・[実装開発工程 v11](docs/V11_2026-11-24/03_D4Pocket_IMPLEMENTATION_PLAN_v11_JA.jsonl)・[品質工程 v11](docs/V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl)・[実装開発実行指示 v11](docs/V11_2026-11-24/05_D4Pocket_IMPLEMENTATION_INSTRUCTIONS_v11_JA.jsonl)であり、採用範囲・原文固定は[v11採用記録](docs/V11_2026-11-24/採用記録.md)、常設施工方法は[AGENTS.md](AGENTS.md)に従う。v11は原要求188件（実装152・品質専用36）、本番結線54件、対象OS5種を保持し、実装・ビルドと独立品質業務を分離する。過去の進捗・検査・Release Blockerは対象SHAと時点に結合した履歴として保持し、v11採用だけで現在の実装完成・品質合格・公開を成立扱いしない。以下の過去記録は各見出しの対象版・時点に限る。

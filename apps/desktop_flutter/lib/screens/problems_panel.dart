@@ -397,9 +397,35 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
               'Recovery ID: ${receipt.recoveryId}',
             ],
           ),
+        if (receipt != null && receipt.targets.isEmpty)
+          const BorderedPanel(child: Text('Broker receiptの対象Runtimeはありません。')),
+        if (receipt != null && receipt.targets.isNotEmpty)
+          ExpansionTile(
+            title: Text('対象Runtimeの詳細 (${receipt.targetCount})'),
+            children: [
+              for (final target in receipt.targets)
+                ListTile(
+                  dense: true,
+                  title: Text(target.runtimeId),
+                  subtitle: Text(
+                    '現在状態: ${_runtimeStateLabel(target.runtimeState)} / '
+                    'Owner再承認: 必要 / 停止: 未実行',
+                  ),
+                ),
+            ],
+          ),
       ],
     );
   }
+
+  String _runtimeStateLabel(String state) => switch (state) {
+        'stopped' => '停止済み',
+        'ready' => '準備済み',
+        'paused' => '一時停止',
+        'quarantined' => '隔離',
+        'unknown' => '不明',
+        _ => '不明',
+      };
 
   String _statusLabel(String status) => switch (status) {
         'fail' => '失敗',

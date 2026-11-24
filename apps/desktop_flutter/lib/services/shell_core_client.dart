@@ -809,7 +809,7 @@ class ShellCoreClient {
         status: 'suspended',
         stopPerformed: false,
         approvalState: 'owner_reapproval_required',
-        targetCount: 0,
+        targets: [],
         auditId: '',
         recoveryId: 'recover-runtime-stop-request',
         message: 'Broker接続がないため全Runtime停止要求を停止しました。',
@@ -825,23 +825,87 @@ class ShellCoreClient {
       );
     }
     final body = _acceptedResponseBodyMap(response, '全Runtime停止要求');
-    final stopPerformed = body['停止実行済み'] == true;
-    if (stopPerformed || body['承認状態'] != 'owner_reapproval_required') {
+    const receiptKeys = {
+      '版',
+      '要求種別',
+      '対象',
+      '承認状態',
+      '停止実行済み',
+      '証拠種別',
+      '権限生成',
+      '復旧ID',
+    };
+    if (body.length != receiptKeys.length ||
+        !body.keys.every(receiptKeys.contains) ||
+        body['版'] != 1 ||
+        body['要求種別'] != '全Runtime停止要求' ||
+        body['停止実行済み'] != false ||
+        body['承認状態'] != 'owner_reapproval_required' ||
+        body['証拠種別'] != 'INTERNAL_STATE' ||
+        body['権限生成'] != 'なし' ||
+        body['復旧ID'] != 'recover-runtime-stop-request') {
       throw const BrokerClientException(
-        '全Runtime停止要求の応答が停止完了または承認境界を保持していません',
+        '全Runtime停止要求のreceipt形式または停止・再承認境界が不正です',
       );
     }
-    final targets = body['対象'];
-    if (targets is! List || targets.length > 256) {
+    final rawTargets = body['対象'];
+    if (rawTargets is! List || rawTargets.length > 256) {
       throw const BrokerClientException(
         '全Runtime停止要求の対象件数が上限を超えているか不正です',
+      );
+    }
+    const targetKeys = {
+      '実行系ID',
+      '状態',
+      '承認必要',
+      '停止実行済み',
+      '再承認状態',
+      '復旧ID',
+    };
+    final runtimeIdPattern = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$');
+    const runtimeStates = {
+      'stopped',
+      'ready',
+      'paused',
+      'quarantined',
+      'unknown',
+    };
+    final seenRuntimeIds = <String>{};
+    final targets = <TrayStopTarget>[];
+    for (final rawTarget in rawTargets) {
+      if (rawTarget is! Map ||
+          rawTarget.length != targetKeys.length ||
+          rawTarget.keys.any(
+            (key) => key is! String || !targetKeys.contains(key),
+          )) {
+        throw const BrokerClientException(
+          '全Runtime停止要求の対象receiptに未知fieldまたは不正な形式があります',
+        );
+      }
+      final runtimeId = rawTarget['実行系ID'];
+      final runtimeState = rawTarget['状態'];
+      if (runtimeId is! String ||
+          !runtimeIdPattern.hasMatch(runtimeId) ||
+          !seenRuntimeIds.add(runtimeId) ||
+          runtimeState is! String ||
+          !runtimeStates.contains(runtimeState) ||
+          rawTarget['承認必要'] != true ||
+          rawTarget['停止実行済み'] != false ||
+          rawTarget['再承認状態'] != 'owner_reapproval_required' ||
+          rawTarget['復旧ID'] != 'recover-runtime-stop-request') {
+        throw const BrokerClientException(
+          '全Runtime停止要求の対象receiptが承認・停止境界を保持していません',
+        );
+      }
+      targets.add(
+        TrayStopTarget(runtimeId: runtimeId, runtimeState: runtimeState),
       );
     }
     return TrayStopResult(
       status: response['status']?.toString() ?? 'unknown',
       stopPerformed: false,
       approvalState: body['承認状態']?.toString() ?? 'unknown',
-      targetCount: targets.length,
+      targets: List.unmodifiable(targets),
       auditId: response['audit_event_id']?.toString() ?? '',
       recoveryId: body['復旧ID']?.toString() ?? 'recover-runtime-stop-request',
       message: '全Runtime停止要求をBrokerへ渡しました。owner再承認後に個別lifecycleを評価します。',
@@ -876,7 +940,7 @@ class TrayStopResult {
     required this.status,
     required this.stopPerformed,
     required this.approvalState,
-    required this.targetCount,
+    required this.targets,
     required this.auditId,
     required this.recoveryId,
     required this.message,
@@ -885,10 +949,18 @@ class TrayStopResult {
   final String status;
   final bool stopPerformed;
   final String approvalState;
-  final int targetCount;
+  final List<TrayStopTarget> targets;
+  int get targetCount => targets.length;
   final String auditId;
   final String recoveryId;
   final String message;
+}
+
+class TrayStopTarget {
+  const TrayStopTarget({required this.runtimeId, required this.runtimeState});
+
+  final String runtimeId;
+  final String runtimeState;
 }
 
 Map<String, Object?> _acceptedResponseBodyMap(

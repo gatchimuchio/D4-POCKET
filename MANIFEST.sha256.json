@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "639b85053894a20c841c470edbac47b8db53262b3070874697e6af87c6ce7356"
+      "sha256": "8f2eb875045142422e6b3857a8b5e5b6a9533c387f4d04eedf4a3216c98f694c"
     },
     {
       "path": "SECURITY.md",
@@ -325,7 +325,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/problems_panel.dart",
-      "sha256": "5ea531a9bcc2d1347e4d4e58eeb3704e35d799197575822bce961d2befe3cb5f"
+      "sha256": "ac401b8a00ce53003aefcb623034292c49d84ec49dd61ee9570a0a70bba00b4a"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/provider_credential_metadata_panel.dart",
@@ -465,7 +465,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "988d3da86a8cbd3912773c8cbc414233d97d75e1a728a7c9a3bf08a901aee46f"
+      "sha256": "1bd4200b073df27f886cb47bfab491e3833debbc9ce0a02f424b1a27b47992bc"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
@@ -2005,7 +2005,7 @@
     },
     {
       "path": "docs/specs/desktop-tray-surface.md",
-      "sha256": "e2dc15b7b415adee74356cf6c52aef310f5630bf44a34845204c7ae361e7daff"
+      "sha256": "4e8814e1cbdb17203ccbd0d1d909375a6187f54bba6e247b134f9a7e0374f135"
     },
     {
       "path": "docs/specs/desktop-ux-integration.md",

@@ -15,6 +15,8 @@ Desktop Trayは、Windows／macOS／Linuxのネイティブ操作面からD4 Poc
 
 `stop_request`が示すのはBroker要求の入口だけである。`停止実行済み=false`、`承認状態=owner_reapproval_required`、`権限生成=なし`を維持し、Native側からprocessを停止しない。
 
+FlutterはBroker receiptの固定Schema、全Runtime targetのID／状態／再承認条件を検証し、ProblemsへRuntime別内訳を表示する。receiptの共有は同一Desktop process内の揮発状態で、Broker transportとgenerationに束縛する。Broker切替、新規要求、応答不明では破棄する。要求対象はBroker上の全Runtimeであり、個別Host／Taskへ結合しない。
+
 ## OS接続
 
 - WindowsはWin32 `Shell_NotifyIconW`と既存`gui_shell/tray` channelを使う。詳細は[Windows Tray責任正本](windows-tray-surface.md)。
