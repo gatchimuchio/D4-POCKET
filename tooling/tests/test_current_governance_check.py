@@ -63,11 +63,11 @@ class CurrentV11StructureTests(unittest.TestCase):
 
     def test_reject_duplicate_key(self):
         with self.assertRaises(Invalid):
-            read_nlc(b'{"識別":"x","識別":"y","種類":"要求"}\n')
+            read_nlc('{"識別":"x","識別":"y","種類":"要求"}\n'.encode("utf-8"))
 
     def test_reject_broken_internal_reference(self):
         with self.assertRaises(Invalid):
-            read_nlc(b'{"識別":"x","種類":"要求","意味参照":["missing"]}\n')
+            read_nlc('{"識別":"x","種類":"要求","意味参照":["missing"]}\n'.encode("utf-8"))
 
 
 class CurrentV11BindingTests(unittest.TestCase):

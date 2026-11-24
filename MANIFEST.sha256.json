@@ -197,7 +197,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "8349e0de77ba75bf3db1ac5447b6be491157d499ad1bf55ac0a0637b022669c3"
+      "sha256": "78e1bdce061ef7ff00e5bb8e6b833d068c02ef942e7aaa5dfae974ce15dc15ec"
     },
     {
       "path": "SECURITY.md",
@@ -233,7 +233,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "909661fb1e6c9f12ffce13f4427f70c9958ec036926aec2aa79dd858b9d0828a"
+      "sha256": "e0682e41d0eb71f5248e70803cca3b8bb4f8a63779f0b8cbf3d4be7193187a36"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -317,7 +317,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/problems_panel.dart",
-      "sha256": "e244c0f86b404905d1a7ae9f2ea6ced4556ec39d05498d3835b770563c75b02e"
+      "sha256": "c49e2a63c23f05ae2ef18428651a52b2538b43014d3a77fd28e5cdf8c38a0b3b"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/provider_credential_metadata_panel.dart",
@@ -6233,7 +6233,7 @@
     },
     {
       "path": "tooling/tests/test_current_governance_check.py",
-      "sha256": "0e45fc1265eece73266958412ef6837ebd4100dd6d28fafe18382438d679bca2"
+      "sha256": "7b0c72570036e8a620f99dc14deb02bad09dd13a081666beaaed39323bcb8d3e"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
