@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：W-C10 Broker更新状態の明示再読込（2026-11-25）
+
+基準main `8c8cd7779350b3b546e24d427ac45fed55edd747`。Settingsの更新センターは初回一覧と操作直後のBroker状態を表示していたが、バックグラウンドdownloadの進行／完了後にBroker一覧を読み直す通常操作がなく、配布元への候補再取得を使わずに現在状態を確認できなかった。読み取り専用の「Broker状態を再読込」を追加し、一覧取得中・操作中・画面非表示中は無効化した。既存の配布元候補取得は別操作として維持し、再読込では新たなネットワーク取得を行わない。
+
+`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze` PASS（exit 0、source SHA-256 `6347c4fe65ceb76801af942de1bc6c6d330716cc223efd9d59b339954d120b25`、隔離snapshot cleanup PASS）。Windows Flutter Release Runner build PASS（同一source SHA-256、`gui_shell_desktop.exe` 164,352 bytes、SHA-256 `98116c3f14fc1b2f6e23971820b4cae7d96b142a2f29f2bf6790cc9cc752b01c`、隔離snapshot cleanup PASS）。Unit/E2E・品質QA・Installed Runtimeは実施していない。本追補はW-C10更新状態の読取Consumerに限り、W-C10全体や製品受入れ完了を主張しない。
+
 ### v11施工追補：W-C09 Palette／全体検索への現在StopReceipt投影（2026-11-25）
 
 基準main `a5960971eba538648b5ccb77ca752f1f2722f12a`。従来のコマンドPalette／全体検索は「Runtime停止要求とReceipt」の固定画面案内だけで、現在Receiptを結果候補として表示し、Problemsの表示対象へ結び付けていなかった。現在のBroker・Host／Task世代に束縛されたReceiptがありAudit IDを持つ場合だけ、停止状態・再承認状態・対象数・Audit IDのsummaryを検索候補へ追加する。選択後にBroker世代、Host／Task世代、Receipt object identity、Audit IDを再照合し、一致時だけAudit IDをProblemsの表示照合条件へ渡す。停止操作・Authority・Broker payloadは渡さない。照合対象が切り替わった場合は候補を破棄する。Problemsの不一致案内をNotification専用表現から一般のAudit ID照合へ合わせた。

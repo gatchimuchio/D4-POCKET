@@ -1907,16 +1907,31 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                 Text('取得状態: ${UpdateClient.downloadJobLabel(downloadJob)}'),
               ],
               const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _checkingUpdateCatalog ||
-                        _updateOperationInProgress ||
-                        !updateStoreReady
-                    ? null
-                    : _fetchUpdateCatalog,
-                icon: const Icon(Icons.refresh),
-                label: Text(
-                  _checkingUpdateCatalog ? '候補取得中' : '配布元から候補取得',
-                ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _checkingUpdateCatalog ||
+                            _updateOperationInProgress ||
+                            !updateStoreReady
+                        ? null
+                        : _fetchUpdateCatalog,
+                    icon: const Icon(Icons.cloud_download_outlined),
+                    label: Text(
+                      _checkingUpdateCatalog ? '候補取得中' : '配布元から候補取得',
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: !widget.active ||
+                            snapshot.connectionState == ConnectionState.waiting ||
+                            _updateOperationInProgress
+                        ? null
+                        : _loadUpdates,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Broker状態を再読込'),
+                  ),
+                ],
               ),
               if (!updateStoreReady)
                 const Padding(
@@ -1964,13 +1979,6 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                 const LinearProgressIndicator()
               else if (snapshot.hasError) ...[
                 const Text('更新一覧を取得できません。Broker接続と更新状態を確認してください。'),
-                OutlinedButton.icon(
-                  onPressed: widget.active && !_updateOperationInProgress
-                      ? _loadUpdates
-                      : null,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('更新一覧を再取得'),
-                ),
               ]
               else if (updates.isEmpty)
                 const Text('署名検査済みの更新候補はありません。')
