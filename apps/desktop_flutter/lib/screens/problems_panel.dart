@@ -31,6 +31,10 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
   bool _isRefreshing = false;
   SetupDoctorReportRecord? _report;
   String? _refreshFailure;
+  int _stopRequestGeneration = 0;
+  bool _isSubmittingStopRequest = false;
+  TrayStopResult? _stopReceipt;
+  String? _stopRequestMessage;
 
   @override
   void initState() {
@@ -41,11 +45,21 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
   @override
   void didUpdateWidget(covariant ProblemsPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.client, widget.client)) {
+    final brokerChanged =
+        !identical(oldWidget.client, widget.client) ||
+        !identical(
+          oldWidget.client.brokerTransport,
+          widget.client.brokerTransport,
+        );
+    if (brokerChanged) {
       _requestGeneration++;
       _isRefreshing = false;
       _report = null;
       _refreshFailure = null;
+      _stopRequestGeneration++;
+      _isSubmittingStopRequest = false;
+      _stopReceipt = null;
+      _stopRequestMessage = 'Broker接続先が変わりました。前の接続の停止要求結果は破棄しました。';
       if (widget.active) _scheduleRefresh();
     } else if (oldWidget.active != widget.active) {
       if (widget.active) {
@@ -53,6 +67,53 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
       } else {
         _requestGeneration++;
         _isRefreshing = false;
+      }
+    }
+  }
+
+  bool _isCurrentStopRequest(
+    ShellCoreClient client,
+    Object? transport,
+    int generation,
+  ) =>
+      mounted &&
+      generation == _stopRequestGeneration &&
+      identical(client, widget.client) &&
+      identical(transport, widget.client.brokerTransport);
+
+  Future<void> _requestAllRuntimeStop() async {
+    final client = widget.client;
+    final transport = client.brokerTransport;
+    if (!widget.active ||
+        client.mode != 'broker' ||
+        transport == null ||
+        _isSubmittingStopRequest) {
+      return;
+    }
+
+    final generation = ++_stopRequestGeneration;
+    setState(() {
+      _isSubmittingStopRequest = true;
+      _stopReceipt = null;
+      _stopRequestMessage = '現在のBrokerへ停止要求を送信しています。停止自体は実行しません。';
+    });
+    try {
+      final receipt = await client.requestAllRuntimeStop();
+      if (!_isCurrentStopRequest(client, transport, generation)) return;
+      setState(() {
+        _stopReceipt = receipt;
+        _stopRequestMessage = '現在のBrokerから停止要求Receiptを受け取りました。';
+      });
+    } on Object {
+      if (!_isCurrentStopRequest(client, transport, generation)) return;
+      setState(() {
+        _stopReceipt = null;
+        _stopRequestMessage =
+            '停止要求の結果を確認できません。現在のBroker状態を確認してください。自動再送はしていません。';
+      });
+    } finally {
+      if (_isCurrentStopRequest(client, transport, generation)) {
+        setState(() => _isSubmittingStopRequest = false);
       }
     }
   }
@@ -132,6 +193,7 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
             connectResource: widget.connectResource,
             active: widget.active,
           ),
+        if (brokerMode) _stopRequestSection(),
         if (brokerMode)
           const SectionList(
             title: 'Broker診断の表示範囲',
@@ -269,6 +331,59 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
                   _problemRow(problem, recoveryById, authorityByRecoveryId),
               ],
             ),
+          ),
+      ],
+    );
+  }
+
+  Widget _stopRequestSection() {
+    final receipt = _stopReceipt;
+    final canRequest =
+        widget.active &&
+        widget.client.brokerTransport != null &&
+        !_isSubmittingStopRequest;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionList(
+          title: 'Runtime停止要求',
+          rows: [
+            '現在のBrokerに登録されたRuntime全体へ停止要求を送ります。',
+            'この要求はRuntimeを停止せず、個別のOwner再承認を必要とします。',
+          ],
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const ValueKey('problems-panel-stop-request'),
+            onPressed: canRequest
+                ? () => unawaited(_requestAllRuntimeStop())
+                : null,
+            icon: _isSubmittingStopRequest
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.stop_circle_outlined),
+            label: Text(
+              _isSubmittingStopRequest ? 'Broker応答を確認中…' : '全Runtime停止要求を送信',
+            ),
+          ),
+        ),
+        if (_stopRequestMessage != null)
+          BorderedPanel(child: Text(_stopRequestMessage!)),
+        if (receipt != null)
+          SectionList(
+            title: '現在のBroker停止要求Receipt',
+            rows: [
+              '応答状態: ${receipt.status}',
+              '対象Runtime数: ${receipt.targetCount}',
+              '停止実行済み: ${receipt.stopPerformed ? 'はい' : 'いいえ'}',
+              '承認状態: ${receipt.approvalState}',
+              'Audit ID: ${receipt.auditId.isEmpty ? '未取得' : receipt.auditId}',
+              'Recovery ID: ${receipt.recoveryId}',
+            ],
           ),
       ],
     );
