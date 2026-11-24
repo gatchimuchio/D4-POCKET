@@ -16,6 +16,9 @@ class ProblemsPanel extends StatefulWidget {
     this.connectResource = connectRuntimeResourceClient,
     this.stopReceipt,
     this.onStopReceiptChanged,
+    this.stopReceiptContextMessage,
+    this.hostContextGeneration = 0,
+    this.taskContextGeneration = 0,
     this.active = true,
   });
 
@@ -24,6 +27,9 @@ class ProblemsPanel extends StatefulWidget {
   final RuntimeResourceClientConnector connectResource;
   final TrayStopResult? stopReceipt;
   final ValueChanged<TrayStopResult?>? onStopReceiptChanged;
+  final String? stopReceiptContextMessage;
+  final int hostContextGeneration;
+  final int taskContextGeneration;
   final bool active;
 
   @override
@@ -55,6 +61,9 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
           oldWidget.client.brokerTransport,
           widget.client.brokerTransport,
         );
+    final displayContextChanged =
+        oldWidget.hostContextGeneration != widget.hostContextGeneration ||
+        oldWidget.taskContextGeneration != widget.taskContextGeneration;
     if (brokerChanged) {
       _requestGeneration++;
       _isRefreshing = false;
@@ -73,6 +82,18 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
         _isRefreshing = false;
       }
     }
+    if (!brokerChanged && displayContextChanged) {
+      _stopRequestGeneration++;
+      _isSubmittingStopRequest = false;
+      _stopReceipt = null;
+      _stopRequestMessage = widget.stopReceiptContextMessage ??
+          'Host／Taskの表示文脈が変わったため、前の停止要求Receiptを破棄しました。Runtime停止は実行していません。';
+    }
+    if (oldWidget.stopReceiptContextMessage !=
+            widget.stopReceiptContextMessage &&
+        widget.stopReceiptContextMessage != null) {
+      _stopRequestMessage = widget.stopReceiptContextMessage;
+    }
     if (oldWidget.stopReceipt != widget.stopReceipt &&
         widget.stopReceipt == null) {
       _stopReceipt = null;
@@ -83,15 +104,21 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
     ShellCoreClient client,
     Object? transport,
     int generation,
+    int hostContextGeneration,
+    int taskContextGeneration,
   ) =>
       mounted &&
       generation == _stopRequestGeneration &&
       identical(client, widget.client) &&
-      identical(transport, widget.client.brokerTransport);
+      identical(transport, widget.client.brokerTransport) &&
+      hostContextGeneration == widget.hostContextGeneration &&
+      taskContextGeneration == widget.taskContextGeneration;
 
   Future<void> _requestAllRuntimeStop() async {
     final client = widget.client;
     final transport = client.brokerTransport;
+    final hostContextGeneration = widget.hostContextGeneration;
+    final taskContextGeneration = widget.taskContextGeneration;
     if (!widget.active ||
         client.mode != 'broker' ||
         transport == null ||
@@ -108,14 +135,30 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
     widget.onStopReceiptChanged?.call(null);
     try {
       final receipt = await client.requestAllRuntimeStop();
-      if (!_isCurrentStopRequest(client, transport, generation)) return;
+      if (!_isCurrentStopRequest(
+        client,
+        transport,
+        generation,
+        hostContextGeneration,
+        taskContextGeneration,
+      )) {
+        return;
+      }
       setState(() {
         _stopReceipt = receipt;
         _stopRequestMessage = '現在のBrokerから停止要求Receiptを受け取りました。';
       });
       widget.onStopReceiptChanged?.call(receipt);
     } on Object {
-      if (!_isCurrentStopRequest(client, transport, generation)) return;
+      if (!_isCurrentStopRequest(
+        client,
+        transport,
+        generation,
+        hostContextGeneration,
+        taskContextGeneration,
+      )) {
+        return;
+      }
       setState(() {
         _stopReceipt = null;
         _stopRequestMessage =
@@ -123,7 +166,13 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
       });
       widget.onStopReceiptChanged?.call(null);
     } finally {
-      if (_isCurrentStopRequest(client, transport, generation)) {
+      if (_isCurrentStopRequest(
+        client,
+        transport,
+        generation,
+        hostContextGeneration,
+        taskContextGeneration,
+      )) {
         setState(() => _isSubmittingStopRequest = false);
       }
     }
@@ -361,6 +410,7 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
           rows: [
             '現在のBrokerに登録されたRuntime全体へ停止要求を送ります。',
             'この要求はRuntimeを停止せず、個別のOwner再承認を必要とします。',
+            'Receipt表示は要求時のHost／Task文脈に束縛され、文脈変更時に破棄します。',
           ],
         ),
         Align(
@@ -382,13 +432,16 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
             ),
           ),
         ),
-        if (_stopRequestMessage != null)
+        if (widget.stopReceiptContextMessage != null)
+          BorderedPanel(child: Text(widget.stopReceiptContextMessage!))
+        else if (_stopRequestMessage != null)
           BorderedPanel(child: Text(_stopRequestMessage!)),
         if (receipt != null)
           SectionList(
             title: '現在のBroker接続の停止要求Receipt',
             rows: [
-              '対象範囲: Brokerに登録された全Runtime（個別Host／Taskには結合しません）',
+              '停止対象: Brokerに登録された全Runtime（個別Host／Taskへの停止指令ではありません）',
+              '表示文脈: 要求時から同じHost／Task文脈。切替時はReceiptを破棄します。',
               '応答状態: ${receipt.status}',
               '対象Runtime数: ${receipt.targetCount}',
               '停止実行済み: ${receipt.stopPerformed ? 'はい' : 'いいえ'}',

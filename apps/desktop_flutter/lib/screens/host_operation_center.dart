@@ -52,7 +52,11 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
   }) {
     _hosts = List<HostRegistryRecord>.unmodifiable(hosts);
     if (_stoppedHostId != null) {
-      if (hosts.any((host) => host.hostId == _stoppedHostId)) {
+      final stoppedHostStillRegistered =
+          hosts.any((host) => host.hostId == _stoppedHostId);
+      final brokerStillObservesStoppedHost =
+          observedBrokerHostId == null || observedBrokerHostId == _stoppedHostId;
+      if (stoppedHostStillRegistered && brokerStillObservesStoppedHost) {
         _activeHostId = null;
         _candidateHostId = null;
         return;
@@ -83,22 +87,43 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
         ) ||
         oldWidget.client.mode != widget.client.mode;
     if (clientIdentityChanged) _stoppedHostId = null;
+    final observedBrokerHostId = _brokerObservedHostId(snapshot);
+    final stoppedHostStillRegistered = _stoppedHostId != null &&
+        snapshot.hosts.any((host) => host.hostId == _stoppedHostId);
+    final brokerStillObservesStoppedHost =
+        observedBrokerHostId == null || observedBrokerHostId == _stoppedHostId;
+    final expectedActiveHostId =
+            stoppedHostStillRegistered && brokerStillObservesStoppedHost
+        ? null
+        : observedBrokerHostId != null &&
+                snapshot.hosts.any((host) => host.hostId == observedBrokerHostId)
+            ? observedBrokerHostId
+            : null;
     if (!clientIdentityChanged &&
         identical(oldSnapshot.hosts, snapshot.hosts) &&
-        identical(oldSnapshot.hostCapabilities, snapshot.hostCapabilities)) {
+        identical(oldSnapshot.hostCapabilities, snapshot.hostCapabilities) &&
+        expectedActiveHostId == _activeHostId) {
       return;
     }
 
+    final previousActiveHostId = _activeHostId;
     _clientGeneration++;
     _setHosts(
       snapshot.hosts,
-      observedBrokerHostId: _brokerObservedHostId(snapshot),
+      observedBrokerHostId: observedBrokerHostId,
     );
     _setHostCapabilities(snapshot.hostCapabilities);
     _busy = false;
     _capabilityRefreshing = false;
     _message = _initialMessage;
     _capabilityMessage = 'Brokerの現在能力は読取表示です。remote Hostの能力は推測しません。';
+    if (!clientIdentityChanged && previousActiveHostId != _activeHostId) {
+      final generation = _clientGeneration;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || generation != _clientGeneration) return;
+        widget.onHostContextChanged?.call();
+      });
+    }
   }
 
   @override

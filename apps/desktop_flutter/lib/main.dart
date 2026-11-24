@@ -250,8 +250,14 @@ class _ShellHomePageState extends State<ShellHomePage> {
   TrayStopResult? _latestStopRequestReceipt;
   Object? _latestStopRequestTransport;
   int _latestStopRequestBrokerGeneration = -1;
+  int _latestStopRequestHostContextGeneration = -1;
+  int _latestStopRequestTaskContextGeneration = -1;
+  String? _stopReceiptContextMessage;
   final ValueNotifier<int> _hostContextGeneration = ValueNotifier<int>(0);
+  int _taskContextGeneration = 0;
+  final Map<String, ({String taskId, String status})> _taskContextBySession = {};
   AgentTaskExecutionCoordinator? _agentTaskExecutionCoordinator;
+  StreamSubscription<AgentTaskExecutionUpdate>? _taskContextUpdates;
 
   @override
   void initState() {
@@ -260,6 +266,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     if (transport != null) {
       _agentTaskExecutionCoordinator = AgentTaskExecutionCoordinator(transport);
     }
+    _bindTaskContextUpdates();
     _trayClient = WindowsTrayClient();
     unawaited(_initializeWindowsTray());
   }
@@ -273,15 +280,18 @@ class _ShellHomePageState extends State<ShellHomePage> {
     )) {
       _brokerTransportGeneration++;
       _trayProjectionGeneration++;
-      _latestStopRequestReceipt = null;
-      _latestStopRequestTransport = null;
-      _latestStopRequestBrokerGeneration = -1;
+      _clearStopRequestReceipt();
+      _stopReceiptContextMessage = null;
+      _hostContextGeneration.value++;
+      _taskContextGeneration++;
+      _taskContextBySession.clear();
       _pendingAiEditProposal = null;
       _pendingA2aArtifactHandoff = null;
       _agentTaskExecutionCoordinator?.dispose();
       final transport = widget.client.brokerTransport;
       _agentTaskExecutionCoordinator =
           transport == null ? null : AgentTaskExecutionCoordinator(transport);
+      _bindTaskContextUpdates();
       if (_trayClient.available) {
         if (_trayWindowVisible) {
           unawaited(_refreshWindowsTrayProjection());
@@ -295,10 +305,64 @@ class _ShellHomePageState extends State<ShellHomePage> {
   @override
   void dispose() {
     _trayRefreshTimer?.cancel();
+    final taskContextUpdates = _taskContextUpdates;
+    _taskContextUpdates = null;
+    if (taskContextUpdates != null) unawaited(taskContextUpdates.cancel());
     _agentTaskExecutionCoordinator?.dispose();
     _hostContextGeneration.dispose();
     unawaited(_trayClient.dispose());
     super.dispose();
+  }
+
+  void _bindTaskContextUpdates() {
+    final prior = _taskContextUpdates;
+    _taskContextUpdates = null;
+    if (prior != null) unawaited(prior.cancel());
+    final coordinator = _agentTaskExecutionCoordinator;
+    if (coordinator == null) return;
+    _taskContextUpdates = coordinator.updates.listen((update) {
+      if (!identical(coordinator, _agentTaskExecutionCoordinator)) return;
+      final task = update.task;
+      if (task == null) return;
+      final next = (taskId: task.taskId, status: task.status);
+      final previous = _taskContextBySession[task.sessionId];
+      if (previous == next) return;
+      if (previous == null && _taskContextBySession.length >= 256) {
+        _taskContextBySession.remove(_taskContextBySession.keys.first);
+      }
+      _taskContextBySession[task.sessionId] = next;
+      _taskContextGeneration++;
+      _invalidateStopReceiptForContextChange(
+        'Task状態が変わったため、古い停止要求Receiptを破棄しました。Runtime停止は実行していません。',
+      );
+    });
+  }
+
+  void _onHostContextChanged() {
+    _hostContextGeneration.value++;
+    _invalidateStopReceiptForContextChange(
+      'Host表示Contextが変わったため、古い停止要求Receiptを破棄しました。Runtime停止は実行していません。',
+    );
+  }
+
+  void _invalidateStopReceiptForContextChange(String message) {
+    final hadReceipt = _latestStopRequestReceipt != null;
+    if (!mounted) {
+      _clearStopRequestReceipt();
+      return;
+    }
+    setState(() {
+      _clearStopRequestReceipt();
+      if (hadReceipt) _stopReceiptContextMessage = message;
+    });
+  }
+
+  void _clearStopRequestReceipt() {
+    _latestStopRequestReceipt = null;
+    _latestStopRequestTransport = null;
+    _latestStopRequestBrokerGeneration = -1;
+    _latestStopRequestHostContextGeneration = -1;
+    _latestStopRequestTaskContextGeneration = -1;
   }
 
   Future<void> _initializeWindowsTray() async {
@@ -419,6 +483,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
     if (action != 'stop_request') return;
     final brokerTransport = widget.client.brokerTransport;
     final brokerGeneration = _brokerTransportGeneration;
+    final hostContextGeneration = _hostContextGeneration.value;
+    final taskContextGeneration = _taskContextGeneration;
     _recordStopRequestReceipt(null, brokerTransport, brokerGeneration);
     try {
       final result = await widget.client.requestAllRuntimeStop();
@@ -428,7 +494,18 @@ class _ShellHomePageState extends State<ShellHomePage> {
         _showStaleTrayStopResult();
         return;
       }
-      _recordStopRequestReceipt(result, brokerTransport, brokerGeneration);
+      if (hostContextGeneration != _hostContextGeneration.value ||
+          taskContextGeneration != _taskContextGeneration) {
+        _showStaleTrayStopResult();
+        return;
+      }
+      _recordStopRequestReceipt(
+        result,
+        brokerTransport,
+        brokerGeneration,
+        hostContextGeneration: hostContextGeneration,
+        taskContextGeneration: taskContextGeneration,
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 12),
@@ -449,6 +526,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
         _showStaleTrayStopResult();
         return;
       }
+      if (hostContextGeneration != _hostContextGeneration.value ||
+          taskContextGeneration != _taskContextGeneration) {
+        _showStaleTrayStopResult();
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('全Runtime停止要求の応答を確認できません。実行状態を再確認してください。'),
@@ -460,11 +542,22 @@ class _ShellHomePageState extends State<ShellHomePage> {
   void _recordStopRequestReceipt(
     TrayStopResult? receipt,
     Object? brokerTransport,
-    int brokerGeneration,
-  ) {
+    int brokerGeneration, {
+    int? hostContextGeneration,
+    int? taskContextGeneration,
+  }) {
     if (!mounted ||
         brokerGeneration != _brokerTransportGeneration ||
         !identical(widget.client.brokerTransport, brokerTransport)) {
+      return;
+    }
+    final expectedHostContextGeneration =
+        hostContextGeneration ?? _hostContextGeneration.value;
+    final expectedTaskContextGeneration =
+        taskContextGeneration ?? _taskContextGeneration;
+    if (receipt != null &&
+        (expectedHostContextGeneration != _hostContextGeneration.value ||
+            expectedTaskContextGeneration != _taskContextGeneration)) {
       return;
     }
     setState(() {
@@ -472,11 +565,22 @@ class _ShellHomePageState extends State<ShellHomePage> {
       _latestStopRequestTransport = receipt == null ? null : brokerTransport;
       _latestStopRequestBrokerGeneration =
           receipt == null ? -1 : brokerGeneration;
+      _latestStopRequestHostContextGeneration = receipt == null
+          ? -1
+          : expectedHostContextGeneration;
+      _latestStopRequestTaskContextGeneration = receipt == null
+          ? -1
+          : expectedTaskContextGeneration;
+      _stopReceiptContextMessage = null;
     });
   }
 
   TrayStopResult? get _currentStopRequestReceipt =>
       _latestStopRequestBrokerGeneration == _brokerTransportGeneration &&
+              _latestStopRequestHostContextGeneration ==
+                  _hostContextGeneration.value &&
+              _latestStopRequestTaskContextGeneration ==
+                  _taskContextGeneration &&
               identical(
                 _latestStopRequestTransport,
                 widget.client.brokerTransport,
@@ -488,7 +592,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-          'Broker接続先が切り替わったため、旧Brokerの停止要求結果を破棄しました。旧Brokerの状態を確認してください。',
+          'Broker接続先またはHost／Task Contextが変わったため、古い停止要求Receiptを破棄しました。Runtime停止は確認していません。',
         ),
       ),
     );
@@ -544,6 +648,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
         connectResource:
             widget.runtimeResourceConnect ?? connectRuntimeResourceClient,
         stopReceipt: _currentStopRequestReceipt,
+        stopReceiptContextMessage: _stopReceiptContextMessage,
+        hostContextGeneration: _hostContextGeneration.value,
+        taskContextGeneration: _taskContextGeneration,
         onStopReceiptChanged: (receipt) => _recordStopRequestReceipt(
           receipt,
           widget.client.brokerTransport,
@@ -610,7 +717,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       if (kGuiShellModuleHostOperations)
         HostOperationCenter(
           client: widget.client,
-          onHostContextChanged: () => _hostContextGeneration.value++,
+          onHostContextChanged: _onHostContextChanged,
         )
       else
         const SizedBox.shrink(),

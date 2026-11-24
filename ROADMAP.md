@@ -6,6 +6,12 @@
 
 実装限定確認：v11五文書整合PASS（344/320/311/401/488行、要求188・実装152・結線54・OS5）、Schema 189件／正常例183件／負例250件PASS、隔離Rust `cargo check --locked --offline` exit 0（warning 9件）、隔離Desktop Flutter analyze exit 0・source SHA-256 `3ce08f0728eeaba1f3a2826ec303b2dcec83d871fee5b238d5e8410e2c4b56a3`・workspace cleanup PASS。Unit/E2E・品質QA・Installed Runtimeは実施していない。本記録はW-C10のBroker導入状態とSettings結果表示の実装進捗であり、W-C10全体や製品受入れの完了を主張しない。
 
+### v11施工進捗：W-C09 StopReceiptのHost／Task表示文脈結線（2026-11-25）
+
+基準main `4dc0f69c8d6f47ea07040d38a91527710454d30a`。従来の同一Desktop内Receipt共有へHost／Task文脈世代を加えた。Host操作面でBroker観測Hostが切り替わった時、Host切替／表示停止時、またはAgentTaskExecutionCoordinatorがSessionごとの現Task ID／状態変更を通知した時に文脈世代を進め、保存Receiptを破棄する。表示停止済みHostが一覧に残っていてもBrokerが別Hostを観測した時はその新しいHostへ表示Contextを切り替える。Tray／Problemsの停止要求は送信時のBroker・Host・Task世代を捕捉し、応答時にどれかが変わっていればReceiptを表示・共有しない。Problemsも文脈世代が変わった時に保留中応答とローカルReceiptを無効化する。Task状態の保持はSessionあたり最新ID／状態の最大256件に制限する。
+
+UIは「停止対象=Brokerの全Runtime」と「Receipt表示=要求時の現在Host／Task文脈」を分けて表示する。Host／Task別の停止指令やAuthorityは生成しない。Broker receiptの停止未実行／Owner再承認、揮発共有、Window closeと停止完了の非同一性は維持する。`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshot SHA-256 `8cf097f8d906212e84e29b97edb8c1dbcae017ca15017a651f96c1f9d0ef0a44`でPASS（exit 0、snapshot cleanup PASS）。Unit/E2E・品質QA・Installed Runtimeは実施していない。これはW-C09のHost／Task文脈結線のSource／Consumer構築確認であり、W-C09全体のInstalled Product受入れやD4 Pocket全体の実装完了を主張しない。
+
 ### v11施工追補：W-C09 Notification CenterからProblemsへの停止要求案内（2026-11-25）
 
 基準main `e6eac58fc7f359985fea45305ea95b241a9153ef`。Rust Notification Centerが`全Runtime停止要求`のBroker Audit eventをRuntime通知へ投影し、Problemsへ画面遷移する経路を追加する。受理通知はRuntimeが停止していないこととOwner再承認が必要なことを固定summaryで示す。通知に要求payloadや対象内容を追加せず、遷移は画面移動のみ。
