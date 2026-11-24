@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9034237ec5b0560df8937222c6d6483406dea7eb49e7c3420ac51d8b858bbd29"
+      "sha256": "3a95ac9d000a2eb649461b4b78fd45d1abd822508fcad7ba5ec96e6d27ba8a07"
     },
     {
       "path": "SECURITY.md",
@@ -241,7 +241,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "e0682e41d0eb71f5248e70803cca3b8bb4f8a63779f0b8cbf3d4be7193187a36"
+      "sha256": "e7bac784de15a4aa626f6364819c95987631e171ce3ec8938fa36c593f784e78"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",

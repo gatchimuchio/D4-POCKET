@@ -422,7 +422,17 @@ class _ShellHomePageState extends State<ShellHomePage> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message)),
+        SnackBar(
+          duration: const Duration(seconds: 12),
+          content: Text(
+            '${result.message}\n'
+            '停止実行済み: ${result.stopPerformed ? 'はい' : 'いいえ'} / '
+            '承認状態: ${result.approvalState}\n'
+            '対象Runtime: ${result.targetCount} / '
+            'Audit: ${result.auditId.isEmpty ? '未取得' : result.auditId}\n'
+            'Recovery: ${result.recoveryId}',
+          ),
+        ),
       );
     } on Object {
       if (!mounted) return;

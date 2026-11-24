@@ -16,6 +16,16 @@
 
 整形後の`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshot SHA-256 `3dc627ed5cf982853045d213ac917d9d0fb210e66bd276ae31e22380294cbe64`でPASS（exit 0、snapshot cleanup PASS）。`git diff --check`もPASS。Unit/E2E・製品QA・Installed Runtimeはこの施工単位では実施していない。
 
+### v11施工追補：W-C09 Tray停止要求Receiptの画面表示（2026-11-24）
+
+基準main `2479eaf1ee0e8e3351fb49746b3adde9ce73101b`。TrayからBrokerへ全Runtime停止要求を送った後、従来は応答messageだけをSnackbarへ表示し、Receiptの`停止実行済み`、Owner再承認状態、対象Runtime数、Audit ID、Recovery IDを画面で確認できなかった。SnackbarへこれらのBroker応答項目を表示し、停止要求の受付と停止実行を区別する。Broker契約上、この操作は停止を実行せずOwner再承認を要求する。
+
+この変更はReceipt表示のConsumer部分に限る。Host/Task単位の現在性、Tray/Palette/Search/Problems全体への結線は未成立であり、W-C09全体の完成を主張しない。隔離source snapshotで`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`がPASS（exit 0、snapshot cleanup PASS）。Unit/E2E・製品QA・Installed Runtimeは未実施。
+
+### v11施工追補：W-C03の旧FileHash意味境界（2026-11-24）
+
+現行履歴Replayは元Task ID・終端Audit event hash・Runtime/Workspaceを検証し、新SessionとReplay Auditを作る。新Task開始時には別個の現在Workspace Permissionと一回Owner Approvalを要求し、旧Approvalを再利用しない。Replay Auditは元event hashを保持するが、v11の`W-C03`は追加で「旧FileHash」と記す一方、現行History Contract/Schemaはこの名称の値・生成元・意味・Consumer表示を定義していない。`event_hash`、`result_hash`、Workspaceファイルhashは同一視しない。従ってW-C03全体は未完了として保持し、この確認では意味を推測してContractを追加・変更しない。
+
 ### v11施工追補：Host初期表示のBroker観測束縛（2026-11-24）
 
 基準main `9c15fa793266d40eee92d2e65f43381958faf5cc`。Host一覧の先頭項目を無条件に現在の表示Hostとしていた初期化を改め、`snapshot_source=broker`の観測Host IDと登録一覧のHost IDが一致する場合だけ現在Hostとして表示する。不一致時は一覧の先頭を切替候補に残し、現在Host・Runtime／Agentのlive観測とは扱わない。Host操作面の切替・能力取得・権限境界は変更していない。
