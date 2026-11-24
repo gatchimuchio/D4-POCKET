@@ -1772,16 +1772,32 @@
       "sha256": "be140b09cebaec128cd1a4684f72f5d22afa9dc1fe39b5db81aefb5bbada96e9"
     },
     {
+      "path": "docs/QE_2026-11-23/01_D4Pocket_SPEC_v9_NLC08.jsonl",
+      "sha256": "e5ed0b21e38417f94221cf705ff99c4f3dd003c34e76da19d65ce695d99b0730"
+    },
+    {
       "path": "docs/QE_2026-11-23/02_D4Pocket_PLAN_v9_NLC07.jsonl",
       "sha256": "1c2ab16fa9a70728443a320efd71bce1c3dbae299ad07a28da204c0393d72b41"
+    },
+    {
+      "path": "docs/QE_2026-11-23/02_D4Pocket_PLAN_v9_NLC08.jsonl",
+      "sha256": "ecc18f5fe83bc0c3ca6d1669ecb5514145f5a858cda8dafce973ac5ad8738e47"
     },
     {
       "path": "docs/QE_2026-11-23/03_D4Pocket_CODEX_v9_NLC07.jsonl",
       "sha256": "0fdc00219aaaf8814a0690588b16f85b66e3d9f63305816f3a16412de603a391"
     },
     {
+      "path": "docs/QE_2026-11-23/03_D4Pocket_CODEX_v9_NLC08.jsonl",
+      "sha256": "03cbedcef707025a16869292d120f515ba3e6783b7027a158c12a92c207b305e"
+    },
+    {
       "path": "docs/QE_2026-11-23/採用記録_NLC07.md",
       "sha256": "eb33cf0a74b9dc5adb306a3bd4f03cf209327d2a04c044e8c31b019423f41aae"
+    },
+    {
+      "path": "docs/QE_2026-11-23/採用記録_NLC08.md",
+      "sha256": "5ef7c6b0d4ea8246c952030a647b3d6d657a9c8c839d4b33e947ecfff9947d08"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
