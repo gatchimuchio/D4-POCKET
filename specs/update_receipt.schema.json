@@ -19,6 +19,7 @@
     "署名者fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "rollback可能": { "type": "boolean" },
     "署名状態": { "enum": ["verified", "legacy_unbound", "verification_stale"] },
+    "導入状態": { "enum": ["version_staged", "not_staged", "unknown"] },
     "候補hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "延期期限": { "type": ["string", "null"] },
     "取得元": {

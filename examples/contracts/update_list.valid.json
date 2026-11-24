@@ -15,6 +15,7 @@
       "署名者fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "rollback可能": true,
       "署名状態": "verified",
+      "導入状態": "not_staged",
       "候補hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "延期期限": null,
       "取得元": {

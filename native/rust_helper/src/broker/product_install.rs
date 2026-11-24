@@ -186,6 +186,41 @@ pub(crate) fn open_existing_product_versions_directory(
     Ok((root_path.join(VERSIONS_DIRECTORY), versions))
 }
 
+/// 候補から再導出した固定version directoryだけをno-followで開く。
+/// 未導入またはstage未作成なら`None`、既存pathの異常はerrorにする。
+#[cfg(any(windows, target_os = "linux"))]
+pub(crate) fn open_existing_product_version_directory(
+    local_app_data: &Path,
+    app_id: &str,
+    product_version: &str,
+    package_sha256: &str,
+) -> Result<Option<(PathBuf, Dir)>, ProductInstallPlanError> {
+    let plan = plan_product_install(local_app_data, app_id, product_version, package_sha256)?;
+    let Some((_root_path, root)) =
+        open_existing_product_root_if_present(local_app_data, app_id)?
+    else {
+        return Ok(None);
+    };
+    let root_metadata = root
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_install_directory_invalid"))?;
+    let root_device = CapMetadataExt::dev(&root_metadata);
+    let Some(versions) =
+        open_existing_optional_child_directory(&root, VERSIONS_DIRECTORY, root_device)?
+    else {
+        return Ok(None);
+    };
+    let Some(stage_name) = plan.version_directory.file_name().and_then(|name| name.to_str())
+    else {
+        return Err(ProductInstallPlanError("product_install_version_invalid"));
+    };
+    let Some(stage) = open_existing_optional_child_directory(&versions, stage_name, root_device)?
+    else {
+        return Ok(None);
+    };
+    Ok(Some((plan.version_directory, stage)))
+}
+
 /// 固定導入root pathを導出する。directoryを作成せず、任意pathを受け取らない。
 pub(crate) fn product_install_root(
     local_app_data: &Path,

@@ -6,6 +6,31 @@ class UpdateClient {
 
   final BrokerTransport _transport;
 
+  static String stageState(Object? value) => switch (
+        value is Map ? value['導入状態'] : null
+      ) {
+        'version_staged' => 'version_staged',
+        'not_staged' => 'not_staged',
+        _ => 'unknown',
+      };
+
+  static Map<String, Object?>? findListedCandidate(
+    Map<String, Object?> listing, {
+    required String updateId,
+    required String candidateHash,
+  }) {
+    final updates = listing['更新一覧'];
+    if (updates is! List) return null;
+    for (final value in updates) {
+      if (value is Map &&
+          value['更新ID'] == updateId &&
+          value['候補hash'] == candidateHash) {
+        return Map<String, Object?>.from(value);
+      }
+    }
+    return null;
+  }
+
   static String signatureStatusLabel(Object? status) => switch (status) {
         'verified' => '現在のBroker trustで検証済み',
         'verification_stale' => '現在のBroker trustで未検証',

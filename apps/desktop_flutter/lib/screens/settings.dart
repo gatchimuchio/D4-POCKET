@@ -156,7 +156,6 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
       : defaultTargetPlatform == TargetPlatform.macOS
           ? 'macos'
           : 'windows';
-  final Set<String> _stagedUpdateCandidates = <String>{};
   final TextEditingController _searchController = TextEditingController();
   bool _modifiedOnly = false;
   bool _authorityOnly = false;
@@ -1994,6 +1993,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         ? '$packageSize bytes'
         : 'byte長不明';
     final jobState = downloadJob?['状態'];
+    final stageState = UpdateClient.stageState(update);
     final downloadedForUpdate = UpdateClient.matchesDownloadedCandidate(
       downloadJob,
       updateId: updateId,
@@ -2020,7 +2020,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
         rollbackVersion['候補hash'] == candidateHash;
     final canRequestActivation = UpdateClient.canRequestActivation(
       rollbackState: rollbackState,
-      staged: _stagedUpdateCandidates.contains('$updateId|$candidateHash'),
+      staged: stageState == 'version_staged',
       alreadyActive: isAlreadyActive,
       rollbackTarget: isRollbackTarget,
       signatureStatus: update['署名状態'],
@@ -2029,8 +2029,10 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     );
     final canApply = downloadedForUpdate &&
         !_updateOperationInProgress &&
+        update['署名状態'] == 'verified' &&
         !isAlreadyActive &&
-        !isRollbackTarget;
+        !isRollbackTarget &&
+        stageState != 'version_staged';
     final canRepair = UpdateClient.canRepairActiveVersion(
       alreadyActive: isAlreadyActive,
       downloaded: downloadedForUpdate,
@@ -2059,7 +2061,8 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
       title: Text('${update['提供版'] ?? ''} ($updateId)'),
       subtitle: Text(
         'channel=${update['channel']} / 署名=$signatureStatus / rollback=${update['rollback可能']}\n'
-        '$packageSizeSummary / $packageHashSummary / ${UpdateClient.packageSourceLabel(update['取得元'])}',
+        '$packageSizeSummary / $packageHashSummary / ${UpdateClient.packageSourceLabel(update['取得元'])}\n'
+        '導入状態=${switch (stageState) { 'version_staged' => 'Broker完了記録あり（有効化前に再検証）', 'not_staged' => '未展開', _ => '不明（Brokerが再検証）' }}',
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
       ),
@@ -2076,6 +2079,15 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                         candidateHash: candidateHash,
                       ),
                       'download jobを開始しました。取得状態は一覧を更新して確認できます。',
+                      brokerStateConfirms: (latest) {
+                        final job = latest['download_job'];
+                        return job is Map &&
+                            job['更新ID'] == updateId &&
+                            job['候補hash'] == candidateHash &&
+                            job['package_sha256'] == packageSha256 &&
+                            const {'downloading', 'downloaded'}
+                                .contains(job['状態']);
+                      },
                     )
                 : null,
             child: Text(downloadedForUpdate ? '取得済み' : 'download'),
@@ -2090,20 +2102,39 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                           updateId: updateId,
                           candidateHash: candidateHash,
                         );
-                        if (mounted &&
-                            identical(client, _updateClient) &&
-                            body['導入状態'] == 'version_staged') {
-                          setState(() => _stagedUpdateCandidates
-                              .add('$updateId|$candidateHash'));
+                        if (body['導入状態'] != 'version_staged' ||
+                            body['更新ID'] != updateId ||
+                            body['候補hash'] != candidateHash ||
+                            body['証拠種別'] != 'INTERNAL_STATE') {
+                          throw const BrokerClientException(
+                            'Brokerの展開完了状態を確認できません',
+                          );
                         }
                         return body;
                       },
                       isAlreadyActive
                           ? '現在の有効版を署名済みpackageと照合しました。不足fileだけを復元し、不一致fileは上書きせず拒否します。有効版recordとprocessは変更していません。'
                           : '署名済みpackageを未起動versionとして固定導入先へ展開しました。OS起動項目切替・process起動・rollbackは別操作です。',
+                      brokerStateConfirms: (latest) =>
+                          UpdateClient.stageState(
+                            UpdateClient.findListedCandidate(
+                              latest,
+                              updateId: updateId,
+                              candidateHash: candidateHash,
+                            ),
+                          ) ==
+                          'version_staged',
                     )
                 : null,
-            child: Text(isAlreadyActive ? '有効版を修復' : '未起動版へ展開'),
+            child: Text(
+              isAlreadyActive
+                  ? '有効版を修復'
+                  : stageState == 'version_staged'
+                      ? '展開済み'
+                      : stageState == 'unknown'
+                          ? '展開を確認・再開'
+                          : '未起動版へ展開',
+            ),
           ),
           TextButton(
             onPressed: canRequestActivation && !_updateOperationInProgress
@@ -2115,6 +2146,12 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                         candidateHash: candidateHash,
                       ),
                       '$activationSuccess 検証済みdownload package cacheだけを除去し、stageと旧versionは保持しています。processはこの場で起動していません。',
+                      brokerStateConfirms: (latest) =>
+                          _brokerCurrentVersionMatches(
+                        latest,
+                        updateId: updateId,
+                        candidateHash: candidateHash,
+                      ),
                     )
                 : null,
             child: Text(activationLabel),
@@ -2122,19 +2159,29 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           TextButton(
             onPressed: _updateOperationInProgress
                 ? null
-                : () => _runUpdateRequest(
+                : () async {
+                    final deferredUntil = DateTime.now()
+                        .toUtc()
+                        .add(const Duration(days: 1))
+                        .toIso8601String();
+                    await _runUpdateRequest(
                       client,
                       listing,
                       () => client.defer(
                         updateId: updateId,
                         candidateHash: candidateHash,
-                        deferredUntil: DateTime.now()
-                            .toUtc()
-                            .add(const Duration(days: 1))
-                            .toIso8601String(),
+                        deferredUntil: deferredUntil,
                       ),
                       '更新を延期しました。',
-                    ),
+                      brokerStateConfirms: (latest) =>
+                          UpdateClient.findListedCandidate(
+                            latest,
+                            updateId: updateId,
+                            candidateHash: candidateHash,
+                          )?['延期期限'] ==
+                          deferredUntil,
+                    );
+                  },
             child: const Text('延期'),
           ),
           if (canRollback)
@@ -2147,6 +2194,11 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                   candidateHash: candidateHash,
                 ),
                 '直前に有効化した版へ戻しました。有効版切替は次回の固定root起動時に反映されます。process起動・file削除はしていません。',
+                brokerStateConfirms: (latest) =>
+                    _brokerCurrentVersionMatchesDescriptor(
+                  latest,
+                  rollbackVersion,
+                ),
               ),
               child: const Text('直前版へ戻す'),
             ),
@@ -2207,17 +2259,41 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     UpdateClient client,
     Future<Map<String, Object?>>? listing,
     Future<Map<String, Object?>> Function() request,
-    String success,
-  ) async {
+    String success, {
+    required bool Function(Map<String, Object?>) brokerStateConfirms,
+  }) async {
     if (!_canUseUpdateList(client, listing)) return;
     setState(() => _updateOperationInProgress = true);
     _updateMutationInProgress = true;
+    var operationAccepted = false;
+    var stateRefreshed = false;
     var initialInstallAccepted = false;
     var handoffToInstalledVersion = false;
     try {
       final body = await request();
+      operationAccepted = true;
       if (!mounted || !identical(client, _updateClient)) return;
-      if (UpdateClient.shouldLaunchInstalledVersionAfterExit(body)) {
+
+      final current = await client.list();
+      if (!mounted || !identical(client, _updateClient)) return;
+      stateRefreshed = true;
+      setState(() => _updatesFuture = Future<Map<String, Object?>>.value(current));
+
+      final executionState = body['実行状態']?.toString();
+      final operationState = body['状態']?.toString();
+      final activationState = body['有効化']?.toString();
+      final suspended = executionState == 'suspended' ||
+          operationState == 'suspended' ||
+          body['導入状態'] == 'suspended' ||
+          (activationState == 'suspended' &&
+              body['導入状態'] != 'version_staged');
+      if (suspended) {
+        _setUpdateMessage('Brokerは操作を保留しました。成功とは扱わず、現在状態を表示しています。');
+      } else if (!brokerStateConfirms(current)) {
+        _setUpdateMessage(
+          '要求応答は受領しましたが、Brokerの現在状態から結果を確認できません。成功とは扱っていません。',
+        );
+      } else if (UpdateClient.shouldLaunchInstalledVersionAfterExit(body)) {
         initialInstallAccepted = true;
         handoffToInstalledVersion =
             await _completeInitialInstallHandoff(client);
@@ -2228,28 +2304,55 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           );
         }
       } else {
-        final state = body['実行状態']?.toString();
         if (body['download package cleanup'] == 'pending') {
           _setUpdateMessage(
             '$success package cache清掃は保留中です。stageと有効版recordは維持しています。',
           );
         } else {
-          _setUpdateMessage(
-            state == 'suspended' ? '$success Brokerは実行を保留しました。' : success,
-          );
+          _setUpdateMessage(success);
         }
       }
     } on Object {
-      _setUpdateMessage(initialInstallAccepted
-          ? 'インストール済み版は登録されましたが、切替のための画面終了に失敗しました。固定起動項目から起動してください。'
-          : '更新操作に失敗しました。状態を更新して確認してください。');
+      _setUpdateMessage(
+        initialInstallAccepted
+            ? 'インストール済み版は登録されましたが、切替のための画面終了に失敗しました。固定起動項目から起動してください。'
+            : operationAccepted
+                ? '要求応答は受領しましたが、Brokerの現在状態を取得できません。成功とは扱っていません。'
+                : '更新操作に失敗しました。状態を更新して確認してください。',
+      );
     } finally {
       _updateMutationInProgress = false;
       if (mounted && !handoffToInstalledVersion) {
         setState(() => _updateOperationInProgress = false);
       }
     }
-    if (!handoffToInstalledVersion) _loadUpdates();
+    if (!handoffToInstalledVersion && !stateRefreshed) _loadUpdates();
+  }
+
+  bool _brokerCurrentVersionMatches(
+    Map<String, Object?> listing, {
+    required String updateId,
+    required String candidateHash,
+  }) {
+    final rollback = listing['rollback状態'];
+    final current = rollback is Map ? rollback['現在版'] : null;
+    return current is Map &&
+        current['更新ID'] == updateId &&
+        current['候補hash'] == candidateHash;
+  }
+
+  bool _brokerCurrentVersionMatchesDescriptor(
+    Map<String, Object?> listing,
+    Object? descriptor,
+  ) {
+    if (descriptor is! Map) return false;
+    final rollback = listing['rollback状態'];
+    final current = rollback is Map ? rollback['現在版'] : null;
+    return current is Map &&
+        current['更新ID'] == descriptor['更新ID'] &&
+        current['候補hash'] == descriptor['候補hash'] &&
+        current['提供版'] == descriptor['提供版'] &&
+        current['package_sha256'] == descriptor['package_sha256'];
   }
 
   Future<bool> _completeInitialInstallHandoff(UpdateClient client) async {

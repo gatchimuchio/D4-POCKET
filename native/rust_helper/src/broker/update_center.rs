@@ -2235,13 +2235,22 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
             hash,
         );
     }
+    let rollback = rollback_state_projection(broker);
     let trust = broker.update_trust.as_ref();
     let updates: Vec<Value> = broker
         .updates
         .values()
-        .map(|value| project_update_record(value, trust))
+        .map(|value| {
+            let mut projected = project_update_record(value, trust);
+            if let Some(object) = projected.as_object_mut() {
+                object.insert(
+                    "導入状態".into(),
+                    Value::String(project_stage_state(broker, value, &rollback).into()),
+                );
+            }
+            projected
+        })
         .collect();
-    let rollback = rollback_state_projection(broker);
     let rollback_available = rollback["状態"] == "available";
     accepted(
         broker,
@@ -2379,6 +2388,102 @@ fn project_update_record(value: &Value, trust: Option<&UpdateTrust>) -> Value {
         );
     }
     projected
+}
+
+fn project_stage_state(broker: &Broker, value: &Value, rollback: &Value) -> &'static str {
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        let _ = (broker, value, rollback);
+        return "unknown";
+    }
+
+    #[cfg(any(windows, target_os = "linux"))]
+    {
+        let Ok(record) = serde_json::from_value::<UpdateRecord>(value.clone()) else {
+            return "unknown";
+        };
+        if record.candidate.version != CANDIDATE_VERSION
+            || record.signature_status != "verified"
+            || !current_candidate_verification(broker.update_trust.as_ref(), &record)
+        {
+            return "unknown";
+        }
+        let Some((app_id, _audit_store_id)) = broker.desktop_product_identity.as_ref() else {
+            return "unknown";
+        };
+        let Some(package_sha256) = record.candidate.package_sha256.as_deref() else {
+            return "unknown";
+        };
+        if record.candidate.package_size_bytes.is_none() {
+            return "unknown";
+        }
+        if [rollback.get("現在版"), rollback.get("対象版")]
+            .into_iter()
+            .flatten()
+            .any(|descriptor| rollback_descriptor_matches_record(descriptor, &record))
+        {
+            return "version_staged";
+        }
+
+        #[cfg(test)]
+        let local_app_data = broker
+            .desktop_product_install_local_app_data
+            .clone()
+            .or_else(|| super::product_install::current_user_local_app_data().ok());
+        #[cfg(not(test))]
+        let local_app_data = super::product_install::current_user_local_app_data().ok();
+        let Some(local_app_data) = local_app_data else {
+            return "unknown";
+        };
+        let staged = match super::product_install::open_existing_product_version_directory(
+            &local_app_data,
+            app_id,
+            &record.candidate.offered_version,
+            package_sha256,
+        ) {
+            Ok(Some((_, stage))) => {
+                drop(stage);
+                true
+            }
+            Ok(None) => return "not_staged",
+            Err(_) => return "unknown",
+        };
+        if staged && completed_stage_audit_matches(broker, &record) {
+            "version_staged"
+        } else {
+            "unknown"
+        }
+    }
+}
+
+#[cfg(any(windows, target_os = "linux"))]
+fn rollback_descriptor_matches_record(descriptor: &Value, record: &UpdateRecord) -> bool {
+    descriptor.get("更新ID").and_then(Value::as_str)
+        == Some(record.candidate.update_id.as_str())
+        && descriptor.get("候補hash").and_then(Value::as_str)
+            == Some(record.candidate_hash.as_str())
+        && descriptor.get("提供版").and_then(Value::as_str)
+            == Some(record.candidate.offered_version.as_str())
+        && descriptor.get("package_sha256").and_then(Value::as_str)
+            == record.candidate.package_sha256.as_deref()
+}
+
+#[cfg(any(windows, target_os = "linux"))]
+fn completed_stage_audit_matches(broker: &Broker, record: &UpdateRecord) -> bool {
+    let package_sha256 = record.candidate.package_sha256.as_deref().unwrap_or_default();
+    let markers = [
+        format!("update_id={}", record.candidate.update_id),
+        format!("candidate_hash={}", record.candidate_hash),
+        format!("product_version={}", record.candidate.offered_version),
+        format!("package_sha256={package_sha256}"),
+    ];
+    broker.audit_events().iter().any(|event| {
+        event.operation == OP_APPLY
+            && event.decision == "completed"
+            && markers.iter().all(|marker| {
+                event.reason.split_whitespace().any(|field| field == marker)
+            })
+    })
 }
 
 fn project_package_source(
@@ -3835,7 +3940,7 @@ fn apply_verified_package(
             &format!("{request_id}:complete"),
             OP_APPLY,
             "completed",
-            &format!("Capability=product.install.version_stage Permission=署名済みApp identityとcontent-addressed version directory一回限定 Approval=Rust Desktop native Owner確認 AuditEvent=完全展開・package／file digest一致を記録 RecoveryAction=既存stageはpackage prefix hashと全entryを再照合してのみ再開し、不一致・余分なentryを変更しない。versionは起動・有効化しない。resumed={resumed} file_count={} total_bytes={} package_sha256={}", info.file_count, info.total_file_bytes, package_sha256),
+            &format!("Capability=product.install.version_stage Permission=署名済みApp identityとcontent-addressed version directory一回限定 Approval=Rust Desktop native Owner確認 AuditEvent=完全展開・package／file digest一致を記録 RecoveryAction=既存stageはpackage prefix hashと全entryを再照合してのみ再開し、不一致・余分なentryを変更しない。versionは起動・有効化しない。resumed={resumed} update_id={} candidate_hash={} product_version={} file_count={} total_bytes={} package_sha256={}", request.update_id, request.candidate_hash, record.candidate.offered_version, info.file_count, info.total_file_bytes, package_sha256),
             EVIDENCE_SOURCE_INTERNAL_STATE,
             payload_hash,
         );

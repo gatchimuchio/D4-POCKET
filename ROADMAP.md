@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工進捗：W-C10 Broker導入状態の再読込結線（2026-11-25）
+
+基準main `19ea9ac6aac431fb2cb11fb9a4aa109bc89ff768`。Update Centerの候補一覧へ、現在trustで検証された候補・active descriptor・固定version directory・展開完了Auditに基づく`導入状態`を追加した。stage directoryがない場合は`not_staged`、認証・path・状態が確定できない場合は`unknown`とし、画面内揮発状態を除去した。Settingsは操作後にBroker一覧を再取得し、対象候補の状態が一致した場合だけ成功を表示する。stage完了表示は有効化前の再検証を明記し、有効化時の既存package/stage検証を維持する。
+
+実装限定確認：v11五文書整合PASS（344/320/311/401/488行、要求188・実装152・結線54・OS5）、Schema 189件／正常例183件／負例250件PASS、隔離Rust `cargo check --locked --offline` exit 0（warning 9件）、隔離Desktop Flutter analyze exit 0・source SHA-256 `3ce08f0728eeaba1f3a2826ec303b2dcec83d871fee5b238d5e8410e2c4b56a3`・workspace cleanup PASS。Unit/E2E・品質QA・Installed Runtimeは実施していない。本記録はW-C10のBroker導入状態とSettings結果表示の実装進捗であり、W-C10全体や製品受入れの完了を主張しない。
+
 ### v11施工追補：W-C09 Notification CenterからProblemsへの停止要求案内（2026-11-25）
 
 基準main `e6eac58fc7f359985fea45305ea95b241a9153ef`。Rust Notification Centerが`全Runtime停止要求`のBroker Audit eventをRuntime通知へ投影し、Problemsへ画面遷移する経路を追加する。受理通知はRuntimeが停止していないこととOwner再承認が必要なことを固定summaryで示す。通知に要求payloadや対象内容を追加せず、遷移は画面移動のみ。

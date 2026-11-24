@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "8f2eb875045142422e6b3857a8b5e5b6a9533c387f4d04eedf4a3216c98f694c"
+      "sha256": "92913d334e1f4d26bbb7b855adf28feeb3eed6202caf1664c62253952e489640"
     },
     {
       "path": "SECURITY.md",
@@ -345,7 +345,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "1c3196c60b5e7f59b08a01950b05df5c257a9c65174330ae72f0e4c45cf013d3"
+      "sha256": "afaa4dd59bbc0ddbbb737669b6c0038a7c3b194a921efa554fbbe0603db01e00"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -469,7 +469,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
-      "sha256": "8c6f7f31e8a68cc657b6628b196217bd8cc0e0a8bf452d54ef24e1a5954c22b3"
+      "sha256": "829a15f5ed2461e9ac5f48e1b7c1ec061e1bdcd35310771a5905199b4d43e25e"
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
@@ -2185,7 +2185,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "1e526d7eb31947614dcf863df49b99e52da73219fe33c8c71278071221277910"
+      "sha256": "6de98204c30be069cfcb64e4b86134f94f71c3321de02e53e1fb1edafdab1803"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
@@ -4049,7 +4049,7 @@
     },
     {
       "path": "examples/contracts/update_list.valid.json",
-      "sha256": "5adc7162a92c307e726b5b98ebea2fda0fdf0c46082960bfec3fb3593dba9d2d"
+      "sha256": "59c52f933c73920fafd55878717765521a8521111dd90b1dae520395acf49074"
     },
     {
       "path": "examples/contracts/update_receipt.valid.json",
@@ -4413,7 +4413,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "3e935f6d398c9628aea2889ad1e0aef6c2ac01ad7a866394c9e25422d15458e1"
+      "sha256": "c9bb74dbb765f5413f9c25c0c58ac88e380b8b735e99f51ec9850208a6d71ce4"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -4449,7 +4449,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "603e911b2314867eb738b86d493e356d1a328a7d6558bbcc6df40009b79cd75c"
+      "sha256": "d59e303bb1cb8a08bea5727c747b6e485eb892eadb32c79a3fe35fea6a37ef47"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -5929,7 +5929,7 @@
     },
     {
       "path": "specs/update_receipt.schema.json",
-      "sha256": "f16f39fd0e258760b8100e3407f519f46c16823bc475e11c66bc36c452f10af1"
+      "sha256": "673212d2c4125749e01d334bc05308e0ae45fbe880fa25d94e829bbf39b562ba"
     },
     {
       "path": "specs/update_trust.schema.json",
