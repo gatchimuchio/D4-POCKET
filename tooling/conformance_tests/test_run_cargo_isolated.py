@@ -60,6 +60,7 @@ class IsolatedCargoRunnerTests(unittest.TestCase):
                         "CARGO_TARGET_DIR": "unsafe-existing-target",
                         "CARGO_BUILD_TARGET_DIR": "unsafe-config-target",
                         "CARGO_BUILD_BUILD_DIR": str(repository / "intermediate"),
+                        "CARGO_HOME": str(repository / ".cargo"),
                         **dict.fromkeys(("TEMP", "TMP", "TMPDIR"), str(repository)),
                     },
                 ),
@@ -74,6 +75,9 @@ class IsolatedCargoRunnerTests(unittest.TestCase):
             )
             self.assertEqual(observed["cwd"], repository.resolve())
             self.assertFalse(observed["check"])
+            self.assertEqual(
+                observed["env"]["CARGO_HOME"], str(observed["target"] / "cargo-home")
+            )
             self.assertEqual(observed["env"]["CARGO_TARGET_DIR"], str(observed["target"]))
             self.assertEqual(
                 observed["env"]["CARGO_BUILD_TARGET_DIR"], str(observed["target"])
@@ -81,7 +85,83 @@ class IsolatedCargoRunnerTests(unittest.TestCase):
             for name in ("TEMP", "TMP", "TMPDIR"):
                 self.assertEqual(observed["env"][name], str(observed["temporary_io"]))
             self.assertFalse(observed["target"].exists())
+            self.assertFalse((repository / ".cargo").exists())
             self.assertFalse((repository / "intermediate").exists())
+
+    def test_isolates_cargo_home_inside_onedrive(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-cargo-test-") as temporary:
+            base = Path(temporary)
+            repository = base / "repository"
+            temp_parent = base / "temp"
+            onedrive = base / "OneDrive"
+            repository.mkdir()
+            temp_parent.mkdir()
+            onedrive.mkdir()
+            configured_cargo_home = onedrive / "Cargo"
+            observed: dict[str, object] = {}
+
+            def fake_run(_command, *, cwd, env, check):
+                observed.update(cwd=cwd, env=env, check=check)
+                cache = Path(env["CARGO_HOME"])
+                self.assertTrue(cache.is_relative_to(Path(env["CARGO_TARGET_DIR"])))
+                (cache / "registry-marker").write_text("isolated", encoding="utf-8")
+                return SimpleNamespace(returncode=0)
+
+            with (
+                patch(
+                    "tooling.run_cargo_isolated.safe_flutter_temp_parent",
+                    return_value=temp_parent,
+                ),
+                patch.dict(
+                    os.environ,
+                    {"CARGO_HOME": str(configured_cargo_home), "OneDrive": str(onedrive)},
+                ),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                self.assertEqual(run_cargo(["check"], root=repository, runner=fake_run), 0)
+
+            self.assertEqual(observed["cwd"], repository.resolve())
+            self.assertFalse(observed["check"])
+            self.assertFalse(configured_cargo_home.exists())
+            self.assertFalse(Path(observed["env"]["CARGO_TARGET_DIR"]).exists())
+
+    def test_preserves_shared_cargo_home_outside_source_and_onedrive(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-cargo-test-") as temporary:
+            base = Path(temporary)
+            repository = base / "repository"
+            temp_parent = base / "temp"
+            shared_cargo_home = base / "shared-cargo-home"
+            repository.mkdir()
+            temp_parent.mkdir()
+            shared_cargo_home.mkdir()
+            marker = shared_cargo_home / "existing-cache-marker"
+            marker.write_text("keep", encoding="utf-8")
+            observed: dict[str, object] = {}
+
+            def fake_run(_command, *, cwd, env, check):
+                observed.update(cwd=cwd, env=env, check=check)
+                (Path(env["CARGO_HOME"]) / "new-cache-marker").write_text(
+                    "shared", encoding="utf-8"
+                )
+                return SimpleNamespace(returncode=0)
+
+            with (
+                patch(
+                    "tooling.run_cargo_isolated.safe_flutter_temp_parent",
+                    return_value=temp_parent,
+                ),
+                patch.dict(os.environ, {"CARGO_HOME": str(shared_cargo_home), "OneDrive": ""}),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                self.assertEqual(run_cargo(["check"], root=repository, runner=fake_run), 0)
+
+            self.assertEqual(Path(observed["env"]["CARGO_HOME"]), shared_cargo_home)
+            self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
+            self.assertEqual(
+                (shared_cargo_home / "new-cache-marker").read_text(encoding="utf-8"),
+                "shared",
+            )
+            self.assertFalse(Path(observed["env"]["CARGO_TARGET_DIR"]).exists())
 
     def test_rejects_target_directory_override_without_running_cargo(self) -> None:
         commands = [

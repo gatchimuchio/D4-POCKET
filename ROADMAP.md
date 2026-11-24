@@ -22,6 +22,10 @@
 
 現ソースの構築確認はRust `cargo check --locked --offline`、Schema検査（187件／正常例181件／負例248件）、Windows Desktop Flutter analyzeがPASS。Unit/E2E・製品QA・Installed Runtimeはこの施工単位で未実施で、これらのPASSを主張しない。Rollback操作は成功直後の結果画面から起動し、アプリ再起動後に過去の適用一覧から対象を再発見するConsumerは未接続である。これは現状記録であり、v11の要求・安全下限・品質工程を変更するものではない。
 
+### v11施工追補：隔離Cargo実行時のCargo cache境界（2026-11-24）
+
+基準main=`3395d0bcfc8a54b5a6f82256e0c1f0fcbc6c18aa`。Rust隔離実行器はCargo targetと一時領域を隔離していたが、`CARGO_HOME`がsourceまたはOneDrive内にある場合のcache書込みが共有されていた。Flutter検証と同じcache配置判定を共有し、source/OneDrive内の`CARGO_HOME`を隔離一時領域へ向け、source外の共有cacheは維持するよう接続した。対象の5件のrunner conformance test、Python構文検査、manifest検査、現行ガバナンス検査はPASS。全conformance skeletonは実行したが、Owner operation set、Linux Export workflow assertion、AGENTS検査入口の9件でFAILしたため、全体PASSとは扱わない。Rust cargo build、製品QA、Installed Runtimeは未実施。この記録はB5施工の範囲に限り、品質工程の判定を代替しない。
+
 ### 履歴：2026-11-23 v9 NLC08（非現行）
 
 当時の正本は[製品仕様書 v9](docs/QE_2026-11-23/01_D4Pocket_SPEC_v9_NLC08.jsonl)・[統合工程表 v9](docs/QE_2026-11-23/02_D4Pocket_PLAN_v9_NLC08.jsonl)・[施工指示書 v9](docs/QE_2026-11-23/03_D4Pocket_CODEX_v9_NLC08.jsonl)であり、採用範囲・原文固定は[v9 NLC08採用記録](docs/QE_2026-11-23/採用記録_NLC08.md)に従う。製品進捗は[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)を対象・時点・未閉包ごとに保持する。NLC08採用は製品状態を再評価せず、旧E/W/N状態を自動転記しない。工程の開始・退出・独立線継続は当時の工程表・施工指示書だけを適用し、旧台帳を番号順schedulerへ変換しない。NLC06で確立したDeveloper verificationと実製品Owner受入の分離を保持し、NLC08はWindows run #8で観測したsandbox setup前後のtest CODEX_HOME検査矛盾を限定是正する。Owner画面待ちで独立施工を止めず、実製品認可・該当受入・E5/E6条件はそれぞれの実受入まで未成立のまま保持する。

@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 
 from tooling.flutter_workspace import (
     FlutterWorkspaceError,
+    cargo_home_path,
     cargo_output_environment,
     safe_flutter_temp_parent,
 )
@@ -70,12 +71,15 @@ def run_cargo(
             target_path = Path(target_directory).resolve(strict=True)
             temporary_io = target_path / "io-temp"
             temporary_io.mkdir()
+            cargo_home, cargo_home_mode = cargo_home_path(repository, target_path)
             environment = os.environ.copy()
+            environment["CARGO_HOME"] = str(cargo_home)
             environment.update(cargo_output_environment(target_path))
             for variable in ("TEMP", "TMP", "TMPDIR"):
                 environment[variable] = str(temporary_io)
             print(
-                "Cargoの成果物・中間生成物・一時ファイルをRepository／OneDrive外へ隔離します。",
+                "Cargoの成果物・中間生成物・一時ファイルをRepository／OneDrive外へ隔離します。"
+                f"CARGO_HOME={cargo_home_mode}。",
                 file=sys.stderr,
             )
             result = invoke(

@@ -262,7 +262,7 @@ def _pub_cache_path(source_root: Path, temporary_root: Path) -> tuple[Path, str]
     return cache, "shared_outside_source_and_OneDrive"
 
 
-def _cargo_home_path(source_root: Path, temporary_root: Path) -> tuple[Path, str]:
+def cargo_home_path(source_root: Path, temporary_root: Path) -> tuple[Path, str]:
     configured = os.environ.get("CARGO_HOME")
     cargo_home = (
         Path(configured).expanduser().resolve(strict=False)
@@ -376,7 +376,7 @@ class IsolatedFlutterWorkspace:
             environment["XDG_CONFIG_HOME"] = str(app_data)
 
         cache, cache_mode = _pub_cache_path(self.source_root, self.temporary_root)
-        cargo_home, cargo_home_mode = _cargo_home_path(self.source_root, self.temporary_root)
+        cargo_home, cargo_home_mode = cargo_home_path(self.source_root, self.temporary_root)
         environment["PUB_CACHE"] = str(cache)
         environment["CARGO_HOME"] = str(cargo_home)
         environment.update(
