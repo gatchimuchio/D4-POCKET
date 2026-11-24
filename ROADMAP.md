@@ -1,8 +1,12 @@
 # GUI Shell ロードマップ
 
-## 現行統合製品工程（2026-11-23 v9 NLC08）
+## 現行統合製品工程（2026-11-24 v11）
 
-現行正本は[製品仕様書 v9](docs/QE_2026-11-23/01_D4Pocket_SPEC_v9_NLC08.jsonl)・[統合工程表 v9](docs/QE_2026-11-23/02_D4Pocket_PLAN_v9_NLC08.jsonl)・[施工指示書 v9](docs/QE_2026-11-23/03_D4Pocket_CODEX_v9_NLC08.jsonl)とし、採用範囲・原文固定は[v9 NLC08採用記録](docs/QE_2026-11-23/採用記録_NLC08.md)に従う。製品進捗は[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)を対象・時点・未閉包ごとに保持する。NLC08採用は製品状態を再評価せず、旧E/W/N状態を自動転記しない。工程の開始・退出・独立線継続は現行工程表・施工指示書だけを適用し、旧台帳を番号順schedulerへ変換しない。NLC06で確立したDeveloper verificationと実製品Owner受入の分離を保持し、NLC08はWindows run #8で観測したsandbox setup前後のtest CODEX_HOME検査矛盾を限定是正する。Owner画面待ちで独立施工を止めず、実製品認可・該当受入・E5/E6条件はそれぞれの実受入まで未成立のまま保持する。
+現行正本は[要求仕様 v11](docs/V11_2026-11-24/01_D4Pocket_REQUIREMENTS_v11_JA.jsonl)・[設計仕様 v11](docs/V11_2026-11-24/02_D4Pocket_DESIGN_v11_JA.jsonl)・[実装開発工程 v11](docs/V11_2026-11-24/03_D4Pocket_IMPLEMENTATION_PLAN_v11_JA.jsonl)・[品質工程 v11](docs/V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl)・[実装開発実行指示 v11](docs/V11_2026-11-24/05_D4Pocket_IMPLEMENTATION_INSTRUCTIONS_v11_JA.jsonl)であり、採用範囲・原文固定は[v11採用記録](docs/V11_2026-11-24/採用記録.md)、常設施工方法は[AGENTS.md](AGENTS.md)に従う。v11は原要求188件（実装152・品質専用36）、本番結線54件、対象OS5種を保持し、実装・ビルドと独立品質業務を分離する。過去の進捗・検査・Release Blockerは対象SHAと時点に結合した履歴として保持し、v11採用だけで現在の実装完成・品質合格・公開を成立扱いしない。以下の過去記録は各見出しの対象版・時点に限る。
+
+### 履歴：2026-11-23 v9 NLC08（非現行）
+
+当時の正本は[製品仕様書 v9](docs/QE_2026-11-23/01_D4Pocket_SPEC_v9_NLC08.jsonl)・[統合工程表 v9](docs/QE_2026-11-23/02_D4Pocket_PLAN_v9_NLC08.jsonl)・[施工指示書 v9](docs/QE_2026-11-23/03_D4Pocket_CODEX_v9_NLC08.jsonl)であり、採用範囲・原文固定は[v9 NLC08採用記録](docs/QE_2026-11-23/採用記録_NLC08.md)に従う。製品進捗は[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)を対象・時点・未閉包ごとに保持する。NLC08採用は製品状態を再評価せず、旧E/W/N状態を自動転記しない。工程の開始・退出・独立線継続は当時の工程表・施工指示書だけを適用し、旧台帳を番号順schedulerへ変換しない。NLC06で確立したDeveloper verificationと実製品Owner受入の分離を保持し、NLC08はWindows run #8で観測したsandbox setup前後のtest CODEX_HOME検査矛盾を限定是正する。Owner画面待ちで独立施工を止めず、実製品認可・該当受入・E5/E6条件はそれぞれの実受入まで未成立のまま保持する。
 ### 履歴：2026-11-16 v8・2026-11-19 v8R2（非現行）
 
 次の段落の「現行」「現状」は当時を指す。状態・結果本文は変更せず、現在の適用先は上記v9三点とする。
