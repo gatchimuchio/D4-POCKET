@@ -15,6 +15,7 @@ class ProblemsPanel extends StatefulWidget {
     this.resourceClient,
     this.connectResource = connectRuntimeResourceClient,
     this.stopReceipt,
+    this.stopReceiptAuditIdFilter,
     this.onStopReceiptChanged,
     this.stopReceiptContextMessage,
     this.hostContextGeneration = 0,
@@ -26,6 +27,7 @@ class ProblemsPanel extends StatefulWidget {
   final RuntimeResourceClient? resourceClient;
   final RuntimeResourceClientConnector connectResource;
   final TrayStopResult? stopReceipt;
+  final String? stopReceiptAuditIdFilter;
   final ValueChanged<TrayStopResult?>? onStopReceiptChanged;
   final String? stopReceiptContextMessage;
   final int hostContextGeneration;
@@ -397,7 +399,11 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
   }
 
   Widget _stopRequestSection() {
-    final receipt = widget.stopReceipt ?? _stopReceipt;
+    final candidate = widget.stopReceipt ?? _stopReceipt;
+    final receipt = widget.stopReceiptAuditIdFilter == null ||
+            candidate?.auditId == widget.stopReceiptAuditIdFilter
+        ? candidate
+        : null;
     final canRequest =
         widget.active &&
         widget.client.brokerTransport != null &&
@@ -432,7 +438,13 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
             ),
           ),
         ),
-        if (widget.stopReceiptContextMessage != null)
+        if (widget.stopReceiptAuditIdFilter != null && receipt == null)
+          const BorderedPanel(
+            child: Text(
+              '通知の関連監査IDと一致する停止Receiptを現在の表示状態から確認できません。別のReceiptを代用せず、停止実行済みとも扱いません。',
+            ),
+          )
+        else if (widget.stopReceiptContextMessage != null)
           BorderedPanel(child: Text(widget.stopReceiptContextMessage!))
         else if (_stopRequestMessage != null)
           BorderedPanel(child: Text(_stopRequestMessage!)),

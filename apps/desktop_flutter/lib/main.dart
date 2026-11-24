@@ -253,6 +253,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   int _latestStopRequestHostContextGeneration = -1;
   int _latestStopRequestTaskContextGeneration = -1;
   String? _stopReceiptContextMessage;
+  String? _notificationStopReceiptAuditId;
   final ValueNotifier<int> _hostContextGeneration = ValueNotifier<int>(0);
   int _taskContextGeneration = 0;
   final Map<String, ({String taskId, String status})> _taskContextBySession = {};
@@ -363,6 +364,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     _latestStopRequestBrokerGeneration = -1;
     _latestStopRequestHostContextGeneration = -1;
     _latestStopRequestTaskContextGeneration = -1;
+    _notificationStopReceiptAuditId = null;
   }
 
   Future<void> _initializeWindowsTray() async {
@@ -562,6 +564,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     }
     setState(() {
       _latestStopRequestReceipt = receipt;
+      if (receipt == null) _notificationStopReceiptAuditId = null;
       _latestStopRequestTransport = receipt == null ? null : brokerTransport;
       _latestStopRequestBrokerGeneration =
           receipt == null ? -1 : brokerGeneration;
@@ -648,6 +651,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         connectResource:
             widget.runtimeResourceConnect ?? connectRuntimeResourceClient,
         stopReceipt: _currentStopRequestReceipt,
+        stopReceiptAuditIdFilter: _notificationStopReceiptAuditId,
         stopReceiptContextMessage: _stopReceiptContextMessage,
         hostContextGeneration: _hostContextGeneration.value,
         taskContextGeneration: _taskContextGeneration,
@@ -1041,7 +1045,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     ];
   }
 
-  void _navigateFromNotification(String target) {
+  void _navigateFromNotification(String target, String relatedAuditId) {
     final index = switch (target) {
       'approval' => 6,
       'permission' => 4,
@@ -1056,12 +1060,17 @@ class _ShellHomePageState extends State<ShellHomePage> {
       _ => 0,
     };
     if (!mounted) return;
-    _selectPage(index);
+    _selectPage(
+      index,
+      stopReceiptAuditIdFilter:
+          index == 9 && relatedAuditId.isNotEmpty ? relatedAuditId : null,
+    );
   }
 
   void _openProductSetup() {
     setState(() {
       selectedIndex = 11;
+      _notificationStopReceiptAuditId = null;
       _visitedPageIndexes.add(selectedIndex);
       navigationGroup = _ShellNavigationGroup.settings;
       _updateCenterFocusRequest++;
@@ -1082,6 +1091,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     setState(() {
       _pendingAiEditProposal = proposal;
       selectedIndex = 5;
+      _notificationStopReceiptAuditId = null;
       _visitedPageIndexes.add(selectedIndex);
       if (!navigationGroup.includes(page.group)) {
         navigationGroup = page.group;
@@ -1111,6 +1121,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     setState(() {
       _pendingA2aArtifactHandoff = source;
       selectedIndex = page.index;
+      _notificationStopReceiptAuditId = null;
       _visitedPageIndexes.add(selectedIndex);
       if (!navigationGroup.includes(page.group)) {
         navigationGroup = page.group;
@@ -1140,12 +1151,13 @@ class _ShellHomePageState extends State<ShellHomePage> {
       navigationGroup = group;
       if (!currentPageIsVisible) {
         selectedIndex = pageEntries.first.index;
+        _notificationStopReceiptAuditId = null;
         _visitedPageIndexes.add(selectedIndex);
       }
     });
   }
 
-  void _selectPage(int index) {
+  void _selectPage(int index, {String? stopReceiptAuditIdFilter}) {
     final matches = _pageEntries().where((entry) => entry.index == index);
     if (matches.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1156,6 +1168,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
     final page = matches.first;
     setState(() {
       selectedIndex = index;
+      _notificationStopReceiptAuditId =
+          index == 9 ? stopReceiptAuditIdFilter : null;
       _visitedPageIndexes.add(index);
       if (!navigationGroup.includes(page.group)) {
         navigationGroup = page.group;

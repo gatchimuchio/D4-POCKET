@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：W-C09通知からStopReceiptへの監査結合（2026-11-25）
+
+基準main `f79f35fc7fb5fd3e1c2b953a7d6d8051638a3c44`。Brokerで検証済みの通知`関連監査ID`をProblemsへの画面遷移時に表示限定の照合条件として渡す。Problemsは同じAudit IDの現在Receiptだけを表示し、一致Receiptがなければ別Receiptで代用せず、停止実行済みとも扱わない。照合条件は新しい停止要求、Broker／Host／Task文脈変更、別画面への明示遷移で破棄する。通知クリックは引き続き画面遷移だけで、Broker要求・停止・権限を発生させない。
+
+`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshot SHA-256 `e1fea39977b58c6db9169ede21b0d5fc9fee5ec0c5c0f5e4cccc56d6af2245f3`でPASS（exit 0、snapshot cleanup PASS）。Unit/E2E・品質QA・Installed Runtimeは未実施。本追補はW-C09通知→Problemsの現在表示におけるSource/Consumer結線を示し、W-C09全体や製品受入れ完了は主張しない。
+
 ### v11施工追補：W-C10 Brokerアンインストール可用性のOS判定（2026-11-25）
 
 基準main `5d692fc5f2c55e0aed6900d9fb8eb82be94abb37`。Brokerの導入済み製品アンインストール可用性がLinux以外を一律`available`としていたため、macOSで実行できないBroker要求を利用可能と誤表示し得た。判定をWindows=既存経路、Linux=現在の終了handoff、その他OS=停止へ分け、macOSのBroker応答が実装済み経路に一致するよう修正した。macOSの別経路である`.pkg` Uninstaller生成は維持し、この修正をmacOS package導入・実行の検証へ読み替えない。

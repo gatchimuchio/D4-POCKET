@@ -4,7 +4,10 @@ import '../services/notification_client.dart';
 import '../services/shell_core_client.dart';
 import 'shared.dart';
 
-typedef NotificationNavigation = void Function(String target);
+typedef NotificationNavigation = void Function(
+  String target,
+  String relatedAuditId,
+);
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({
@@ -193,6 +196,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final severity = item['severity']?.toString() ?? 'unknown';
     final target = item['遷移先']?.toString() ?? 'dashboard';
     final id = item['通知ID']?.toString() ?? '';
+    final relatedAuditId = item['関連監査ID']?.toString() ?? '';
     final notificationHash = item['通知hash']?.toString() ?? '';
     final unread = item['状態'] == 'unread';
     return Padding(
@@ -228,7 +232,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 OutlinedButton(
                   onPressed: widget.onNavigate == null
                       ? null
-                      : () => widget.onNavigate!(target),
+                      : () => widget.onNavigate!(target, relatedAuditId),
                   child: const Text('開く'),
                 ),
                 if (unread)
