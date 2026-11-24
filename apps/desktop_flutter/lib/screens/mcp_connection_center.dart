@@ -381,8 +381,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               subtitle: Text(
                 'サーバーID: ${connection.serverId}\n'
                 '通信方式: ${connection.transport} ・ '
-                '実行状態: ${connection.executionState} ・ '
-                'ツール ${connection.toolCount} / リソース ${connection.resourceCount} / プロンプト ${connection.promptCount}',
+                '接続: ${connection.connectionState} ・ 実行状態: ${connection.executionState}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               isThreeLine: true,
               trailing: disconnecting
@@ -401,6 +402,33 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                       icon: const Icon(Icons.link_off),
                       label: const Text('切断'),
                     ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Version（Server申告／未提供時はProtocol）: ${connection.reportedVersion}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  Text(
+                    'Trust: ${connection.trustState} ・ '
+                    'ツール ${connection.toolCount} / '
+                    'リソース ${connection.resourceCount} / '
+                    'プロンプト ${connection.promptCount}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  SelectableText(
+                    'Server metadata hash: ${connection.metadataHash}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  Text(
+                    '外部Server metadataは未検証です。Trust・Permission・Authorityを生成しません。',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
             ExpansionTile(
               title: Text('Tool一覧：${connection.tools.length}件'),
@@ -854,6 +882,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                   ? McpConnectionSummary(
                       serverId: item.serverId,
                       displayName: item.displayName,
+                      reportedVersion: item.reportedVersion,
+                      metadataHash: item.metadataHash,
+                      trustState: item.trustState,
                       transport: item.transport,
                       tools: item.tools,
                       resources: item.resources,
@@ -874,6 +905,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                     ? McpConnectionSummary(
                         serverId: item.serverId,
                         displayName: item.displayName,
+                        reportedVersion: item.reportedVersion,
+                        metadataHash: item.metadataHash,
+                        trustState: item.trustState,
                         transport: item.transport,
                         tools: item.tools,
                         resources: item.resources,

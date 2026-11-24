@@ -73,6 +73,9 @@ class McpConnectionSummary {
   const McpConnectionSummary({
     required this.serverId,
     required this.displayName,
+    required this.reportedVersion,
+    required this.metadataHash,
+    required this.trustState,
     required this.transport,
     required this.tools,
     required this.resources,
@@ -83,6 +86,9 @@ class McpConnectionSummary {
 
   final String serverId;
   final String displayName;
+  final String reportedVersion;
+  final String metadataHash;
+  final String trustState;
   final String transport;
   final List<McpToolSummary> tools;
   final List<McpResourceSummary> resources;
@@ -1272,6 +1278,7 @@ class McpConnectionClient {
     }
     final server = _objectField(receipt, 'Server');
     final transport = _objectField(receipt, 'Transport');
+    final trust = _objectField(receipt, 'Trust');
     final tools = _arrayField(receipt, 'Tool');
     final resources = _arrayField(receipt, 'Resource');
     final prompts = _arrayField(receipt, 'Prompt');
@@ -1280,14 +1287,41 @@ class McpConnectionClient {
     }
     final serverId = server['server_id'];
     final displayName = server['表示名'];
+    final reportedVersion = server['version'];
+    final metadataHash = server['metadata_hash'];
     final transportKind = transport['kind'];
+    final trustState = trust['state'];
+    final trustReason = trust['reason'];
+    const serverFields = {
+      'server_id',
+      '表示名',
+      'origin',
+      'version',
+      'metadata_hash',
+      'status',
+    };
+    const trustFields = {'state', 'evidence_source', 'reason'};
     if (serverId is! String ||
         !_validIdentifier(serverId) ||
         displayName is! String ||
         displayName.length > 512 ||
         _containsControl(displayName) ||
         _containsBidiControl(displayName) ||
-        transportKind != 'stdio') {
+        server.length != serverFields.length ||
+        !server.keys.toSet().containsAll(serverFields) ||
+        server['origin'] != 'live_runtime' ||
+        reportedVersion is! String ||
+        !_safeMetadataName(reportedVersion) ||
+        metadataHash is! String ||
+        !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(metadataHash) ||
+        server['status'] != 'discovered' ||
+        transportKind != 'stdio' ||
+        trust.length != trustFields.length ||
+        !trust.keys.toSet().containsAll(trustFields) ||
+        trustState != 'unverified' ||
+        trust['evidence_source'] != 'LIVE_RUNTIME' ||
+        trustReason is! String ||
+        !_safeMetadataName(trustReason)) {
       throw const BrokerClientException('MCP接続metadataの表示項目が不正です');
     }
     final toolSummaries = _toolSummaries(tools);
@@ -1296,6 +1330,9 @@ class McpConnectionClient {
     return McpConnectionSummary(
       serverId: serverId,
       displayName: displayName,
+      reportedVersion: reportedVersion,
+      metadataHash: metadataHash,
+      trustState: trustState as String,
       transport: transportKind as String,
       tools: toolSummaries,
       resources: resourceSummaries,
