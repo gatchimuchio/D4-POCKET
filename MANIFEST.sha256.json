@@ -125,7 +125,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "78dac90037e391433b3429f61fcdea2ba829f6782212fc428e78ac2e2bbd48b7"
+      "sha256": "4b878e7673c6b371d9093ad7c0fde34fc865070374ec8f8f1d0d809ffcf3d234"
     },
     {
       "path": "AUDIT.md",
@@ -185,11 +185,11 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "ee08ea28fb79f5b44ebfe771436c012e08e76076270fc2c9cc2bf02d657aa818"
+      "sha256": "33150e21a311941d10b97201ac3a50ee8de0cd28ec64fe3f2b7e8a957b667ec6"
     },
     {
       "path": "README.md",
-      "sha256": "fc61d8bcafdfbf8172afe49f44047bba8944f7b84f0daa1862c8db788295baef"
+      "sha256": "1a6c4faff78e8631a6f0e8904f9c1b6c85c1f65f538a3714c50c3cfe37401c45"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -1461,7 +1461,7 @@
     },
     {
       "path": "docs/OPERATING_MODEL.md",
-      "sha256": "798c8b1097666de849b9ef38a12e53bcd246dcada7ea2df46e9b3814fc66c32d"
+      "sha256": "e43ecbc31aa651d5c339743eac42ea4b47ce619d87103336a08d7cebd9bd999a"
     },
     {
       "path": "docs/PHASE_STRATEGY.md",

@@ -33,6 +33,7 @@ python tooling/conformance_tests/run_conformance_skeleton.py
 ```bash
 python -X utf8 tooling/run_cargo_isolated.py check --locked --offline --manifest-path native/rust_helper/Cargo.toml
 python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-platform windows
+python -X utf8 tooling/validate_all.py --flutter-step mobile_flutter_analyze
 ```
 
 Cargoの既定`target`はsourceの隣へ生成されます。OneDrive等の同期対象sourceでは生成先を安全な一時領域へ分離するため、この入口を使用してください。Cargoの終了値をそのまま返し、一時targetの回収に失敗した場合も成功扱いしません。隔離対象はCargo `target`であり、任意のbuild scriptや共有package cacheの書込みをsandboxするものではありません。

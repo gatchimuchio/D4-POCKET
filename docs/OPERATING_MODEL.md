@@ -156,8 +156,9 @@ python3 tooling/conformance_tests/run_conformance_skeleton.py
 条件付き check:
 
 ~~~bash
-python -X utf8 tooling/run_cargo_isolated.py +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+python -X utf8 tooling/run_cargo_isolated.py check --locked --offline --manifest-path native/rust_helper/Cargo.toml
 python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-platform windows
+python -X utf8 tooling/validate_all.py --flutter-step mobile_flutter_analyze
 ~~~
 
 Rust例はCargo生成物をRepository／OneDrive外の検証済み一時targetへ置く。Flutter例はOneDrive外の一時source snapshotで対象stepだけを実行する。target OS・stepに応じた正確な選択肢はroot `AGENTS.md`と`tooling/validate_all.py --help`を確認する。任意の直接Flutter起動や別processの全書込みを隔離する仕組みではない。

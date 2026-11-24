@@ -82,8 +82,9 @@ python tooling/conformance_tests/run_conformance_skeleton.py
 必要に応じてRust・Flutterの製品実装を別途検査します。
 
 ```bash
-python -X utf8 tooling/run_cargo_isolated.py test --locked --offline --manifest-path native/rust_helper/Cargo.toml
+python -X utf8 tooling/run_cargo_isolated.py check --locked --offline --manifest-path native/rust_helper/Cargo.toml
 python tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-platform windows
+python tooling/validate_all.py --flutter-step mobile_flutter_analyze
 ```
 
 `run_cargo_isolated.py`はCargoの最終成果物と中間生成物、子プロセスの`TEMP`／`TMP`／`TMPDIR`をRepository／OneDrive外の一時領域へ設定し、終了時に回収します。明示的な`--target-dir`とCargo `--config`は拒否します。`build.rs`などが明示する別パスやCargoの依存キャッシュには、各ツールの既存設定が適用されます。[Cargoの生成物の配置](https://doc.rust-lang.org/cargo/reference/build-cache.html)
