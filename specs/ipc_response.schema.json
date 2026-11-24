@@ -200,5 +200,75 @@
     "shutdown_requested": {
       "type": "boolean"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation": { "const": "作業領域一覧" }
+        },
+        "required": ["operation"]
+      },
+      "then": {
+        "properties": {
+          "body": {
+            "type": "object",
+            "required": ["作業領域"],
+            "additionalProperties": false,
+            "properties": {
+              "作業領域": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "作業領域ID",
+                    "実行系ID",
+                    "登録hash",
+                    "workspace_root",
+                    "承認状態",
+                    "有効期限",
+                    "表示範囲",
+                    "approval_id"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "作業領域ID": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                    },
+                    "実行系ID": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                    },
+                    "登録hash": {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    "workspace_root": {
+                      "type": ["string", "null"],
+                      "minLength": 1,
+                      "maxLength": 4096,
+                      "anyOf": [
+                        { "type": "null" },
+                        { "type": "string", "pattern": "^/" },
+                        { "type": "string", "pattern": "^[A-Za-z]:[/\\\\]" },
+                        { "type": "string", "pattern": "^\\\\\\\\" }
+                      ]
+                    },
+                    "承認状態": { "enum": ["approved", "denied"] },
+                    "有効期限": { "type": ["integer", "null"], "minimum": 1 },
+                    "表示範囲": {
+                      "enum": ["none", "hash_only", "summary", "redacted", "full"]
+                    },
+                    "approval_id": { "type": ["string", "null"], "minLength": 1 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

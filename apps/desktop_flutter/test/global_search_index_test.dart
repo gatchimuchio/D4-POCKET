@@ -192,6 +192,7 @@ WorkspaceRegistration _workspace(
     '有効期限': approved ? expiredAt : null,
     '表示範囲': approved ? 'summary' : 'none',
     'approval_id': approved ? 'approval-$id' : null,
+    'workspace_root': r'C:\work\fixture',
   });
 }
 
@@ -233,6 +234,7 @@ class _SearchTransport implements BrokerTransport {
             '有効期限': 1900000000,
             '表示範囲': 'summary',
             'approval_id': 'approval-current',
+            'workspace_root': null,
           },
         ],
       });

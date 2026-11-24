@@ -1726,14 +1726,17 @@ impl Broker {
         {
             return Err("Agent CLIの作業rootとOwner確認済みWorkspaceが一致しない");
         }
+        let display_root_path = std::fs::canonicalize(Path::new(&request.workspace_root))
+            .map_err(|_| "Workspaceの表示root pathを確認できない")?;
         self.実行系登録(&request.runtime_id, adapter)
             .map_err(|_| "Agent CLI実行系登録と監査に失敗")?;
-        if let Err(error) = self.作業領域登録範囲付き(
+        if let Err(error) = self.作業領域登録範囲付きpath(
             &request.runtime_id,
             &request.workspace_id,
             root,
             &request.secret_paths,
             Some(ancestry),
+            Some(display_root_path),
         ) {
             self.rollback_agent_cli_registration(&request.runtime_id);
             return Err(error);
@@ -3381,6 +3384,9 @@ impl Broker {
             }
             let (root, filesystem, ancestry) =
                 super::workspace_root::open_registered_root_with_ancestry(config, protected)?;
+            let registered_root_path =
+                std::fs::canonicalize(Path::new(&config.root_path))
+                    .map_err(|_| "Workspaceの表示root pathを確認できない")?;
             self.append_audit(
                 "作業領域起動",
                 "作業領域登録",
@@ -3390,12 +3396,13 @@ impl Broker {
                 &sha256_tagged(format!("{hash}:{filesystem}").as_bytes()),
             )
             .map_err(|_| "root検査の監査失敗")?;
-            self.作業領域登録範囲付き(
+            self.作業領域登録範囲付きpath(
                 &config.runtime_id,
                 &config.workspace_id,
                 root,
                 &config.secret_paths,
                 Some(ancestry),
+                Some(registered_root_path),
             )?;
             self.recover_agent_task_scratch(config, protected)?;
             Ok(())
@@ -3503,6 +3510,18 @@ impl Broker {
         secrets: &[String],
         ancestry: Option<Vec<super::workspace_root::DirectoryIdentity>>,
     ) -> Result<(), &'static str> {
+        self.作業領域登録範囲付きpath(runtime, id, root, secrets, ancestry, None)
+    }
+
+    fn 作業領域登録範囲付きpath(
+        &mut self,
+        runtime: &str,
+        id: &str,
+        root: cap_std::fs::Dir,
+        secrets: &[String],
+        ancestry: Option<Vec<super::workspace_root::DirectoryIdentity>>,
+        registered_root_path: Option<std::path::PathBuf>,
+    ) -> Result<(), &'static str> {
         if !self.state_store.persistence_ready() {
             return Err("作業領域登録には永続監査が必要");
         }
@@ -3515,22 +3534,33 @@ impl Broker {
         }
         let mut registry = std::mem::take(&mut self.作業領域);
         let mut audit_failed = false;
-        let result =
-            registry.register(runtime, id, root, secrets, ancestry, &mut |reason, hash| {
-                self.append_audit(
-                    "作業領域登録",
-                    "作業領域登録",
-                    "recorded",
-                    reason,
-                    EVIDENCE_SOURCE_INTERNAL_STATE,
-                    hash,
-                )
-                .map(|_| ())
-                .map_err(|_| {
-                    audit_failed = true;
-                    "監査失敗"
-                })
-            });
+        let mut record = |reason: &str, hash: &str| {
+            self.append_audit(
+                "作業領域登録",
+                "作業領域登録",
+                "recorded",
+                reason,
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                hash,
+            )
+            .map(|_| ())
+            .map_err(|_| {
+                audit_failed = true;
+                "監査失敗"
+            })
+        };
+        let result = match registered_root_path {
+            Some(path) => registry.register_with_display_root(
+                runtime,
+                id,
+                root,
+                secrets,
+                ancestry,
+                Some(path),
+                &mut record,
+            ),
+            None => registry.register(runtime, id, root, secrets, ancestry, &mut record),
+        };
         if !audit_failed {
             self.作業領域 = registry;
         }
@@ -4557,6 +4587,7 @@ impl Broker {
             "有効期限",
             "表示範囲",
             "approval_id",
+            "workspace_root",
         ];
         let valid_id = |value: &str| {
             let bytes = value.as_bytes();
@@ -4589,6 +4620,14 @@ impl Broker {
                 .ok_or("Runtime ID不正")?;
             if seen.iter().any(|known| known == id) {
                 return Err("Workspace ID重複");
+            }
+            match fields.get("workspace_root") {
+                Some(Value::Null) => {}
+                Some(Value::String(path))
+                    if Path::new(path).is_absolute()
+                        && path.len() <= 4096
+                        && !path.chars().any(char::is_control) => {}
+                _ => return Err("Workspace root path不正"),
             }
             seen.push(id.to_owned());
             projected.push(serde_json::json!({"作業領域ID": id, "実行系ID": runtime}));

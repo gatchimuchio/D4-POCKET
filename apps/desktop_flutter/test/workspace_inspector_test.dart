@@ -43,6 +43,7 @@ class TestBroker implements BrokerTransport {
         '有効期限': approval == null ? null : expires,
         '表示範囲': approval == null ? 'none' : visibility,
         'approval_id': approval,
+        'workspace_root': r'C:\workspaces\workspace-a',
       };
   @override
   Future<Map<String, Object?>> request(String operation,

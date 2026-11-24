@@ -4779,6 +4779,7 @@ void main() {
                 '有効期限': null,
                 '表示範囲': 'none',
                 'approval_id': null,
+                'workspace_root': null,
               },
               {
                 '作業領域ID': targetWorkspaceId,
@@ -4788,6 +4789,7 @@ void main() {
                 '有効期限': null,
                 '表示範囲': 'none',
                 'approval_id': null,
+                'workspace_root': null,
               },
             ],
           },

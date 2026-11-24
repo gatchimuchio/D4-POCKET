@@ -41,6 +41,7 @@ impl std::fmt::Debug for WorkspaceRegistry {
 
 struct RegisteredWorkspace {
     runtime: String,
+    registered_root_path: Option<std::path::PathBuf>,
     root_device: u64,
     root_file_id: u64,
     root_ancestry: Vec<super::workspace_root::DirectoryIdentity>,
@@ -53,6 +54,24 @@ struct RegisteredWorkspace {
 }
 
 impl RegisteredWorkspace {
+    fn current_root_path(&self) -> Option<String> {
+        let registered = self.registered_root_path.as_ref()?;
+        let current = std::fs::canonicalize(registered).ok()?;
+        if &current != registered {
+            return None;
+        }
+        let directory =
+            cap_std::fs::Dir::open_ambient_dir(&current, cap_std::ambient_authority()).ok()?;
+        let metadata = directory.dir_metadata().ok()?;
+        if !metadata.is_dir()
+            || cap_fs_ext::MetadataExt::dev(&metadata) != self.root_device
+            || cap_fs_ext::MetadataExt::ino(&metadata) != self.root_file_id
+        {
+            return None;
+        }
+        current.to_str().map(str::to_owned)
+    }
+
     fn compare_whole(
         &self,
         baseline: &Baseline,
@@ -352,6 +371,19 @@ impl WorkspaceRegistry {
         ancestry: Option<Vec<super::workspace_root::DirectoryIdentity>>,
         audit: &mut Audit<'_>,
     ) -> Result<(), &'static str> {
+        self.register_with_display_root(runtime, id, root, secrets, ancestry, None, audit)
+    }
+
+    pub(crate) fn register_with_display_root(
+        &mut self,
+        runtime: &str,
+        id: &str,
+        root: Dir,
+        secrets: &[String],
+        ancestry: Option<Vec<super::workspace_root::DirectoryIdentity>>,
+        registered_root_path: Option<std::path::PathBuf>,
+        audit: &mut Audit<'_>,
+    ) -> Result<(), &'static str> {
         if !identifier(id)
             || !identifier(runtime)
             || self.entries.contains_key(id)
@@ -367,6 +399,35 @@ impl WorkspaceRegistry {
         if root_file_id == 0 {
             return Err("root file IDが未観測のため作業領域登録を拒否");
         }
+        let registered_root_path = registered_root_path
+            .map(|path| {
+                if !path.is_absolute() {
+                    return Err("表示root pathが絶対pathではない");
+                }
+                let canonical =
+                    std::fs::canonicalize(&path).map_err(|_| "表示root pathを現在確認できない")?;
+                if canonical != path {
+                    return Err("表示root pathが正規pathではない");
+                }
+                let directory =
+                    cap_std::fs::Dir::open_ambient_dir(&canonical, cap_std::ambient_authority())
+                        .map_err(|_| "表示root pathのmetadataを確認できない")?;
+                let metadata = directory
+                    .dir_metadata()
+                    .map_err(|_| "表示root pathのmetadataを確認できない")?;
+                if !metadata.is_dir()
+                    || cap_fs_ext::MetadataExt::dev(&metadata) != root_device
+                    || cap_fs_ext::MetadataExt::ino(&metadata) != root_file_id
+                {
+                    return Err("表示root pathと登録handleの実体が一致しない");
+                }
+                let text = canonical.to_str().ok_or("表示root pathの文字列が不正")?;
+                if text.is_empty() || text.len() > 4096 || text.chars().any(char::is_control) {
+                    return Err("表示root pathの文字列が不正");
+                }
+                Ok(canonical)
+            })
+            .transpose()?;
         let root_identity = super::workspace_root::DirectoryIdentity {
             device: root_device,
             file_id: root_file_id,
@@ -429,6 +490,7 @@ impl WorkspaceRegistry {
             id.into(),
             RegisteredWorkspace {
                 runtime: runtime.into(),
+                registered_root_path,
                 root_device,
                 root_file_id,
                 root_ancestry,
@@ -482,6 +544,7 @@ impl WorkspaceRegistry {
             return Ok(json!({"作業領域":self.entries.iter().map(|(id,e)| {
                 let grant = e.grant.as_ref().filter(|g| now < g.expires);
                 json!({"作業領域ID":id,"実行系ID":e.runtime,"登録hash":e.registration_hash,
+                    "workspace_root":e.current_root_path(),
                     "承認状態":if grant.is_some(){"approved"}else{"denied"},"有効期限":grant.map(|g|g.expires),
                     "表示範囲":grant.map(|g|g.visibility.as_str()).unwrap_or("none"),"approval_id":grant.map(|g|g.id.as_str())})
             }).collect::<Vec<_>>()}));

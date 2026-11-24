@@ -14,6 +14,7 @@ const workspaceEditRollbackCandidatesOperation = 'GUI Shell編集Rollback候補�
 final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
 final _id = RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$');
 final _auditEventId = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$');
+final _windowsAbsoluteRoot = RegExp(r'^[A-Za-z]:[\\/]');
 const _unavailableAuditEventId = 'broker-audit-unavailable';
 const _workspaceFailureCodes = {
   '作業領域拒否',
@@ -48,6 +49,20 @@ String _string(Object? value) {
     _invalid();
   }
   return value;
+}
+
+bool _validWorkspaceRoot(Object? value) {
+  if (value == null) return true;
+  if (value is! String ||
+      value.isEmpty ||
+      utf8.encode(value).length > 4096 ||
+      value.runes.any(
+          (rune) => rune <= 0x1f || (rune >= 0x7f && rune <= 0x9f))) {
+    return false;
+  }
+  return value.startsWith('/') ||
+      _windowsAbsoluteRoot.hasMatch(value) ||
+      value.startsWith(r'\\');
 }
 
 /// Broker拒否から、秘密を含み得る自由記述messageを除いて画面へ渡す情報。
@@ -152,23 +167,34 @@ WorkspaceClientFailure? _workspaceFailure(
 
 class WorkspaceRegistration {
   WorkspaceRegistration._(this.id, this.runtime, this.hash, this.visibility,
-      this.approval, this.expires);
+      this.approval, this.expires, this.rootPath);
   final String id, runtime, hash, visibility;
   final String? approval;
   final int? expires;
+  final String? rootPath;
 
   factory WorkspaceRegistration.parse(Object? value) {
     final data = _map(value);
-    _keys(data,
-        ['作業領域ID', '実行系ID', '登録hash', '承認状態', '有効期限', '表示範囲', 'approval_id']);
+    _keys(data, [
+      '作業領域ID',
+      '実行系ID',
+      '登録hash',
+      '承認状態',
+      '有効期限',
+      '表示範囲',
+      'approval_id',
+      'workspace_root',
+    ]);
     final id = _string(data['作業領域ID']);
     final runtime = _string(data['実行系ID']);
     final hash = _string(data['登録hash']);
     final visibility = _string(data['表示範囲']);
+    final rootPath = data['workspace_root'];
     if (!_id.hasMatch(id) ||
         !_id.hasMatch(runtime) ||
         !_hash.hasMatch(hash) ||
-        !_visibilities.contains(visibility)) {
+        !_visibilities.contains(visibility) ||
+        !_validWorkspaceRoot(rootPath)) {
       _invalid();
     }
     final approval = data['approval_id'];
@@ -181,7 +207,14 @@ class WorkspaceRegistration {
         _invalid();
       }
       return WorkspaceRegistration._(
-          id, runtime, hash, visibility, approval, expires);
+          id,
+          runtime,
+          hash,
+          visibility,
+          approval,
+          expires,
+          rootPath as String?,
+      );
     }
     if (data['承認状態'] != 'denied' ||
         approval != null ||
@@ -189,7 +222,15 @@ class WorkspaceRegistration {
         visibility != 'none') {
       _invalid();
     }
-    return WorkspaceRegistration._(id, runtime, hash, visibility, null, null);
+    return WorkspaceRegistration._(
+      id,
+      runtime,
+      hash,
+      visibility,
+      null,
+      null,
+      rootPath as String?,
+    );
   }
 
   bool current(DateTime now) =>
@@ -200,7 +241,8 @@ class WorkspaceRegistration {
       hash == other.hash &&
       approval == other.approval &&
       expires == other.expires &&
-      visibility == other.visibility;
+      visibility == other.visibility &&
+      rootPath == other.rootPath;
 }
 
 class WorkspaceView {

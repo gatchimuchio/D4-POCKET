@@ -617,6 +617,10 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       if (selectedRegistration != null) ...[
         Text(
             '選択Workspace: ${selectedRegistration.id}・登録hash ${selectedRegistration.hash}'),
+        SelectableText(
+          'Brokerが現在の登録rootと照合したpath: '
+          '${selectedRegistration.rootPath ?? '現在のpathと登録rootを照合できません'}',
+        ),
         DropdownButton<String>(
           value: _requestedVisibility,
           items: const [
