@@ -12,6 +12,7 @@ name: Apple platform 手動補助build
           - ios_product_ui
           - ios_product_candidate
           - macos_product
+          - macos_build_only
           - macos_export
           - macos_owner
           - macos_adapter_lifecycle
@@ -450,7 +451,7 @@ jobs:
           retention-days: 3
           if-no-files-found: error
   macos-product:
-    if: ${{ inputs.target == 'macos_product' || inputs.target == 'macos_owner' || inputs.target == 'macos_adapter_lifecycle' || inputs.target == 'macos_agent_registration' || inputs.target == 'macos_workspace_selection' || inputs.target == 'macos_agent_cli_selection' || inputs.target == 'macos_workspace_inspector' }}
+    if: ${{ inputs.target == 'macos_product' || inputs.target == 'macos_build_only' || inputs.target == 'macos_owner' || inputs.target == 'macos_adapter_lifecycle' || inputs.target == 'macos_agent_registration' || inputs.target == 'macos_workspace_selection' || inputs.target == 'macos_agent_cli_selection' || inputs.target == 'macos_workspace_inspector' }}
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -468,32 +469,39 @@ jobs:
           test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
           rustup toolchain install 1.95.0 --profile minimal
-      - name: 通常Broker接続のRust試験とbuild
+      - name: 通常Brokerのbuildと対象Rust試験
         shell: bash
         run: |
           set -euo pipefail
-          filter='macos_desktop_worker::tests::'
-          if [ '${{ inputs.target }}' = 'macos_owner' ]; then
-            filter='macos_desktop_worker::tests::owner_adapter_roundtrip'
-            cargo +1.95.0 test --locked --manifest-path native/macos_owner/Cargo.toml 2>&1 | tee evidence/macos-owner-native.txt
-          elif [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ]; then
-            filter='macos_desktop_worker::tests::owner_adapter_lifecycle'
-          elif [ '${{ inputs.target }}' = 'macos_agent_registration' ]; then
-            filter='macos_desktop_worker::tests::owner_agent_registration_'
-          elif [ '${{ inputs.target }}' = 'macos_workspace_selection' ]; then
-            filter='macos_workspace_selection::tests::'
-            cargo +1.95.0 test --locked --manifest-path native/macos_owner/Cargo.toml --lib workspace_transport::tests:: 2>&1 | tee evidence/workspace-native-boundary-test.txt
-          elif [ '${{ inputs.target }}' = 'macos_agent_cli_selection' ]; then
-            filter='macos_workspace_selection::tests::cli_selection_'
-            cargo +1.95.0 test --locked --manifest-path native/macos_owner/Cargo.toml --lib workspace_transport::tests::cli_public_selection_ 2>&1 | tee evidence/cli-native-boundary-test.txt
-          elif [ '${{ inputs.target }}' = 'macos_workspace_inspector' ]; then
-            filter='macos_workspace_inspector_broker入口'
+          if [ '${{ inputs.target }}' != 'macos_build_only' ]; then
+            filter='macos_desktop_worker::tests::'
+            if [ '${{ inputs.target }}' = 'macos_owner' ]; then
+              filter='macos_desktop_worker::tests::owner_adapter_roundtrip'
+              cargo +1.95.0 test --locked --manifest-path native/macos_owner/Cargo.toml 2>&1 | tee evidence/macos-owner-native.txt
+            elif [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ]; then
+              filter='macos_desktop_worker::tests::owner_adapter_lifecycle'
+            elif [ '${{ inputs.target }}' = 'macos_agent_registration' ]; then
+              filter='macos_desktop_worker::tests::owner_agent_registration_'
+            elif [ '${{ inputs.target }}' = 'macos_workspace_selection' ]; then
+              filter='macos_workspace_selection::tests::'
+              cargo +1.95.0 test --locked --manifest-path native/macos_owner/Cargo.toml --lib workspace_transport::tests:: 2>&1 | tee evidence/workspace-native-boundary-test.txt
+            elif [ '${{ inputs.target }}' = 'macos_agent_cli_selection' ]; then
+              filter='macos_workspace_selection::tests::cli_selection_'
+              cargo +1.95.0 test --locked --manifest-path native/macos_owner/Cargo.toml --lib workspace_transport::tests::cli_public_selection_ 2>&1 | tee evidence/cli-native-boundary-test.txt
+            elif [ '${{ inputs.target }}' = 'macos_workspace_inspector' ]; then
+              filter='macos_workspace_inspector_broker入口'
+            fi
+            if [ '${{ inputs.target }}' != 'macos_workspace_inspector' ] || [ '${{ inputs.inspector_product_only }}' != 'true' ]; then
+              cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib "$filter" -- --test-threads=1 2>&1 | tee evidence/macos-rust-test.txt
+            fi
           fi
-          if [ '${{ inputs.target }}' != 'macos_workspace_inspector' ] || [ '${{ inputs.inspector_product_only }}' != 'true' ]; then
-            cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib "$filter" -- --test-threads=1 2>&1 | tee evidence/macos-rust-test.txt
+          if [ '${{ inputs.target }}' = 'macos_build_only' ]; then
+            cargo +1.95.0 build --locked --release --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker 2>&1 | tee evidence/macos-rust-build.txt
+            cargo +1.95.0 build --locked --release --manifest-path native/macos_owner/Cargo.toml --lib 2>&1 | tee evidence/macos-rust-ui-build.txt
+          else
+            cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker 2>&1 | tee evidence/macos-rust-build.txt
+            cargo +1.95.0 build --locked --manifest-path native/macos_owner/Cargo.toml --lib 2>&1 | tee evidence/macos-rust-ui-build.txt
           fi
-          cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker 2>&1 | tee evidence/macos-rust-build.txt
-          cargo +1.95.0 build --locked --manifest-path native/macos_owner/Cargo.toml --lib 2>&1 | tee evidence/macos-rust-ui-build.txt
       - name: 固定版実Codexとsandbox内の合成Workspaceを準備
         if: inputs.target == 'macos_agent_registration' || inputs.target == 'macos_workspace_selection' || inputs.target == 'macos_agent_cli_selection' || inputs.target == 'macos_workspace_inspector'
         shell: bash
@@ -555,8 +563,77 @@ jobs:
             flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'CLI実行file OS選択は登録とは別の限定native待機を使う' 2>&1 | tee ../../evidence/cli-timeout-test.txt
             flutter test --no-pub test/widget_test.dart --plain-name 'macOS CLI実行fileのOS選択は入力だけへ投影し登録を開始しない' 2>&1 | tee ../../evidence/cli-projection-test.txt
           fi
-          flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-build.txt
+          if [ '${{ inputs.target }}' = 'macos_build_only' ]; then
+            flutter build macos --release --no-pub --no-codesign 2>&1 | tee ../../evidence/macos-build.txt
+          else
+            flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-build.txt
+          fi
+      - name: macOS Release bundleを記録
+        if: inputs.target == 'macos_build_only'
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$(find apps/desktop_flutter/build/macos/Build/Products/Release -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$app" && test -d "$app" && test ! -L "$app"
+          broker="$app/Contents/MacOS/gui_shell_macos_broker"
+          test -f "$broker" && test ! -L "$broker" && test -x "$broker"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$RUNNER_TEMP/d4-pocket-macos-release.zip"
+          python3 - "$app" "$RUNNER_TEMP/d4-pocket-macos-release.zip" evidence/macos-build.json <<'PY'
+          import hashlib, json, os, plistlib, sys
+          from pathlib import Path
+          app, archive, report = map(Path, sys.argv[1:])
+          root_real = app.resolve(strict=True)
+          entries = []
+          for path in sorted(app.rglob('*')):
+              if path.is_symlink():
+                  target = os.readlink(path)
+                  try:
+                      (path.parent / target).resolve(strict=False).relative_to(root_real)
+                  except ValueError:
+                      raise SystemExit(f"bundle外を指すsymlinkを拒否: {path.relative_to(app)}")
+                  raw = target.encode('utf-8')
+                  entries.append({"path": path.relative_to(app).as_posix(), "type": "symlink", "target": target, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
+              elif path.is_file():
+                  raw = path.read_bytes()
+                  entries.append({"path": path.relative_to(app).as_posix(), "type": "file", "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
+          plist = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
+          executable = plist.get('CFBundleExecutable')
+          main_binary = app / 'Contents/MacOS' / executable
+          broker = app / 'Contents/MacOS/gui_shell_macos_broker'
+          if not executable or not main_binary.is_file() or not broker.is_file():
+              raise SystemExit('Release bundleの実行ファイルまたはBrokerが不在')
+          tree = hashlib.sha256()
+          for entry in entries:
+              tree.update(entry['path'].encode('utf-8') + b'\0' + entry['type'].encode('ascii') + b'\0' + bytes.fromhex(entry['sha256']))
+          report.write_text(json.dumps({
+              "source_commit": __import__('subprocess').check_output(['git','rev-parse','HEAD'], text=True).strip(),
+              "bundle_id": plist.get('CFBundleIdentifier'),
+              "bundle_executable": executable,
+              "file_count": len(entries),
+              "payload_bytes": sum(e['bytes'] for e in entries),
+              "tree_sha256": tree.hexdigest(),
+              "app_executable_sha256": hashlib.sha256(main_binary.read_bytes()).hexdigest(),
+              "broker_sha256": hashlib.sha256(broker.read_bytes()).hexdigest(),
+              "archive_bytes": archive.stat().st_size,
+              "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+              "publisher_identity_signed": False,
+              "distribution_ready": False,
+              "installed_product_verified": False,
+              "files": entries
+          }, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps({"bundle_id": plist.get('CFBundleIdentifier'), "file_count": len(entries), "payload_bytes": sum(e['bytes'] for e in entries), "tree_sha256": tree.hexdigest(), "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest()}, ensure_ascii=False))
+          PY
+      - name: macOS Release bundleをartifact保存
+        if: success() && inputs.target == 'macos_build_only'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: d4-pocket-macos-release-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/d4-pocket-macos-release.zip
+            evidence/macos-build.json
+          retention-days: 3
       - name: 製品bootstrapとBroker終了
+        if: inputs.target != 'macos_build_only'
         shell: bash
         run: |
           set -euo pipefail
