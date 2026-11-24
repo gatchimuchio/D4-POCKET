@@ -34,6 +34,28 @@
         "approval_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"}
       }
     },
+    "editApplyRequest": {
+      "type": "object",
+      "required": ["version", "target_audit_id", "target_request"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {"const": 1},
+        "target_audit_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+        "target_request": {"$ref": "#/$defs/editApplyTargetRequest"}
+      }
+    },
+    "rollbackCandidatesRequest": {
+      "type": "object",
+      "required": ["version", "workspace_id", "registration_hash", "approval_id"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {"const": 1},
+        "workspace_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+        "registration_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "approval_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+        "cursor": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
     "editApplyBinding": {
       "type": "object",
       "required": [
@@ -72,6 +94,15 @@
             "target_request": {"$ref": "#/$defs/editApplyTargetRequest"}
           }
         }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["operation", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {"const": "GUI Shell編集Rollback候補一覧"},
+        "payload": {"$ref": "#/$defs/rollbackCandidatesRequest"}
       }
     },
     {

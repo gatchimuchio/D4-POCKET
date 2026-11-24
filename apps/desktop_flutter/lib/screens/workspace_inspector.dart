@@ -315,6 +315,8 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       WorkspaceView? prepareTargetFor,
       WorkspaceView? applyTarget,
       WorkspaceView? rollbackTarget,
+      bool rollbackCandidates = false,
+      String? rollbackCursor,
       String? baselineHash}) async {
     if (!_isActive) return;
     _cancelViewMaintenance();
@@ -327,7 +329,9 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       _selected = registration.id;
       _message = rollbackTarget != null
           ? 'Owner確認とRollbackの結果を待っています。'
-          : applyTarget == null
+          : rollbackCandidates
+              ? 'Brokerが現在の許可でRollback候補を確認中です。'
+              : applyTarget == null
               ? '承認済み範囲を取得中'
               : 'Owner確認と適用の結果を待っています。';
     });
@@ -335,6 +339,9 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       final WorkspaceView view;
       if (rollbackTarget != null) {
         view = await widget.client.rollbackAppliedEdit(rollbackTarget);
+      } else if (rollbackCandidates) {
+        view = await widget.client.rollbackCandidates(registration,
+            cursor: rollbackCursor);
       } else if (applyTarget != null) {
         view = await widget.client.applyReviewedEdit(applyTarget);
       } else if (prepareTargetFor != null) {
@@ -356,7 +363,9 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         _viewLimit = _elapsed.elapsedMilliseconds + 300000;
         _message = rollbackTarget != null
             ? '別のOwner確認で適用済み差分を巻き戻しました。'
-            : applyTarget == null
+            : rollbackCandidates
+                ? '適用完了AuditとJournalを照合した候補を表示しています。'
+                : applyTarget == null
                 ? '取得時点の表示です。承認状態を定期確認しています。'
                 : '審査済みの差分を適用しました。';
       });
@@ -653,6 +662,13 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
                   : () => _captureWholeBaseline(selectedRegistration),
               child: const Text('native Owner確認で比較baselineを保存'),
             ),
+            OutlinedButton(
+              onPressed: _busy || !_isActive
+                  ? null
+                  : () => _read(selectedRegistration, '', false,
+                      rollbackCandidates: true),
+              child: const Text('適用済み編集のRollback候補を確認'),
+            ),
           ],
         ],
       ],
@@ -811,6 +827,48 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         if (view.operation == workspaceEditRollbackOperation) ...[
           Text('Rollback済み ${projection!['changed_files']}件'),
           Text('復旧記録 ${projection['transaction_id']}'),
+        ],
+        if (view.operation == workspaceEditRollbackCandidatesOperation) ...[
+          Text('表示候補 ${view.rollbackCandidates?.length ?? 0}件・候補にできないJournal ${projection!['unavailable_count']}件'),
+          if ((view.rollbackCandidates ?? const []).isEmpty &&
+              projection['unavailable_count'] == 0)
+            const Text('このページにRollback可能な適用記録はありません。'),
+          for (final candidate in view.rollbackCandidates ?? const [])
+            ListTile(
+              title: Text('Transaction ${candidate.transactionId.substring(0, 12)}'),
+              subtitle: Text(
+                  '${candidate.changedFiles}件・${candidate.status}・${candidate.availability}・Audit ${candidate.appliedAuditId}'),
+              trailing: candidate.availability == 'conflict'
+                  ? const Icon(Icons.block)
+                  : const Icon(Icons.restore),
+              onTap: _busy ||
+                      !_isActive ||
+                      candidate.availability == 'conflict' ||
+                      !view.registration.current(DateTime.now()) ||
+                      view.registration.visibility != 'full'
+                  ? null
+                  : () => _read(
+                        view.registration,
+                        '',
+                        false,
+                        rollbackTarget: widget.client.rollbackTargetForCandidate(
+                            view.registration, candidate),
+                      ),
+            ),
+          if (projection['next_cursor'] is String)
+            OutlinedButton(
+              onPressed: _busy || !_isActive
+                  ? null
+                  : () => _read(
+                        view.registration,
+                        '',
+                        false,
+                        rollbackCandidates: true,
+                        rollbackCursor: projection['next_cursor'] as String,
+                      ),
+              child: const Text('次の候補ページ'),
+            ),
+          const Text('候補表示は読取専用です。Rollbackには最新のPermissionと別のNative Owner確認が必要です。'),
         ],
         if (view.registration.visibility == 'full' &&
             (view.operation == '作業領域差分' ||

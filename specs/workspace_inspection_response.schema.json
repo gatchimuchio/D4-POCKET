@@ -32,6 +32,56 @@
       "additionalProperties": false,
       "properties": {
         "version": {"const": 1},
+        "operation": {"const": "GUI Shell編集Rollback候補一覧"},
+        "要求hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "作業領域ID": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+        "実行系ID": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+        "登録hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "approval_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+        "有効期限": {"type": "integer", "minimum": 1},
+        "表示範囲": {"const": "full"},
+        "projection": {
+          "type": "object",
+          "required": ["candidates", "unavailable_count", "next_cursor"],
+          "additionalProperties": false,
+          "properties": {
+            "candidates": {
+              "type": "array",
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "required": [
+                  "transaction_id", "applied_request_hash", "applied_audit_id",
+                  "applied_request", "diff_hash", "changed_files", "status", "availability"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "transaction_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                  "applied_request_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+                  "applied_audit_id": {"type": "string", "pattern": "^broker-audit-[1-9][0-9]*$"},
+                  "applied_request": {"$ref": "workspace_inspection_request.schema.json#/$defs/editApplyRequest"},
+                  "diff_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+                  "changed_files": {"type": "integer", "minimum": 1, "maximum": 32},
+                  "status": {"enum": ["applied", "reverting", "recovery_required"]},
+                  "availability": {"enum": ["available", "conflict", "resume"]}
+                }
+              }
+            },
+            "unavailable_count": {"type": "integer", "minimum": 0, "maximum": 4},
+            "next_cursor": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"}
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "version", "operation", "要求hash", "作業領域ID", "実行系ID",
+        "登録hash", "approval_id", "有効期限", "表示範囲", "projection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {"const": 1},
         "operation": {"const": "GUI Shell編集適用先照合"},
         "要求hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "作業領域ID": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},

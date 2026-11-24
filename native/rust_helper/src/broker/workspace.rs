@@ -13,11 +13,13 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use super::ai_edit_center::{
-    ApplyRequest, ApplyTargetRequest, ReviewRequest, RollbackRequest, APPLY_TARGET_OPERATION,
-    REVIEW_OPERATION, ROLLBACK_OPERATION,
+    ApplyRequest, ApplyTargetRequest, ReviewRequest, RollbackCandidatesRequest, RollbackRequest,
+    APPLY_TARGET_OPERATION, REVIEW_OPERATION, ROLLBACK_CANDIDATES_OPERATION, ROLLBACK_OPERATION,
 };
+use super::audit::BrokerAuditLog;
 
 type Audit<'a> = dyn FnMut(&str, &str) -> Result<(), &'static str> + 'a;
+const ROLLBACK_CANDIDATE_PAGE_SIZE: usize = 4;
 
 #[derive(Default)]
 pub(crate) struct WorkspaceRegistry {
@@ -965,6 +967,7 @@ impl WorkspaceRegistry {
         request: super::ai_edit_center::ApplyRequest,
         target_request: super::ai_edit_center::ApplyTargetRequest,
         binding: super::ai_edit_center::ApplyBinding,
+        applied_request: &Value,
         checked_target_hash: &str,
         plan_hash: &str,
         now: i64,
@@ -1096,11 +1099,12 @@ impl WorkspaceRegistry {
             target: &target.reader,
             vault: &vault,
         };
-        match transaction.apply(
+        match transaction.apply_with_request(
             transaction_id,
             plan_hash,
             &binding.files,
             &source.reader,
+            Some(applied_request),
             current,
         )? {
             EditStatus::Applied => (),
@@ -1118,6 +1122,228 @@ impl WorkspaceRegistry {
             let _result = transaction.rollback(transaction_id, plan_hash, || true);
         }
         terminal.map(|event_id| (body, event_id))
+    }
+
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    pub(super) fn list_rollback_candidates(
+        &mut self,
+        payload: &Value,
+        now: i64,
+        store: &super::store::BrokerPersistentStore,
+        audit_log: &BrokerAuditLog,
+        audit: &mut Audit<'_>,
+    ) -> Result<Value, &'static str> {
+        use super::ai_edit_center::find_applied_receipt;
+        use super::ai_edit_transaction::{EditStatus, EditTransaction};
+        use cap_fs_ext::DirExt;
+
+        let request = RollbackCandidatesRequest::parse(payload)?;
+        if self.last_now.is_some_and(|last| now < last) {
+            for entry in self.entries.values_mut() {
+                entry.grant = None;
+                entry.baseline = None;
+            }
+            return Err("時計後退を検出したためWorkspace Permissionを失効");
+        }
+        self.last_now = Some(now);
+        for entry in self.entries.values_mut() {
+            if entry
+                .grant
+                .as_ref()
+                .is_some_and(|grant| now >= grant.expires || Instant::now() >= grant.deadline)
+            {
+                entry.grant = None;
+            }
+        }
+        let entry = self
+            .entries
+            .get(&request.workspace_id)
+            .ok_or("Rollback候補のWorkspaceが未登録")?;
+        let root = entry
+            .reader
+            .edit_root_identity()
+            .map_err(|_| "Rollback候補のWorkspace rootを確認できない")?;
+        if entry.registration_hash != request.registration_hash
+            || root != (entry.root_device, entry.root_file_id)
+        {
+            return Err("Rollback候補の現在登録またはroot実体が一致しない");
+        }
+        let grant = entry
+            .grant
+            .as_ref()
+            .filter(|grant| {
+                grant.id == request.approval_id
+                    && grant.visibility == "full"
+                    && now < grant.expires
+                    && Instant::now() < grant.deadline
+            })
+            .ok_or("Rollback候補一覧には現在のfull Workspace Permissionが必要")?;
+        let current = || now < grant.expires && Instant::now() < grant.deadline;
+        if !current() {
+            return Err("Rollback候補の読取開始前にPermissionが失効");
+        }
+        let permission_binding = json!({
+            "workspace_id": request.workspace_id,
+            "registration_hash": request.registration_hash,
+            "approval_id": grant.id,
+            "capability_id": "workspace.inspect",
+            "visibility": grant.visibility,
+            "request": payload
+        });
+        audit(
+            "現在のfull Workspace PermissionとRollback候補要求を照合",
+            &digest(&permission_binding),
+        )?;
+
+        let (ids, next_cursor) = store
+            .workspace_edit_record_page(request.cursor.as_deref(), ROLLBACK_CANDIDATE_PAGE_SIZE)?;
+        let (store_root, _, store_ancestry) =
+            super::workspace_root::open_isolated_root_with_ancestry(store.root(), &[])?;
+        let store_identity = store_ancestry
+            .last()
+            .ok_or("Rollback候補の保管rootを確認できない")?;
+        let target_identity = super::workspace_root::DirectoryIdentity {
+            device: entry.root_device,
+            file_id: entry.root_file_id,
+        };
+        if store_identity.device != entry.root_device
+            || store_ancestry.contains(&target_identity)
+            || entry.root_ancestry.contains(store_identity)
+        {
+            return Err("Rollback候補のJournal保管先とWorkspaceが分離されていない");
+        }
+
+        let mut candidates = Vec::new();
+        let mut unavailable_count = 0usize;
+        for id in ids {
+            if !current() {
+                return Err("Rollback候補の確認中にWorkspace Permissionが失効");
+            }
+            let Some(journal) = EditTransaction::inspect_stored_record(store, &id)? else {
+                continue;
+            };
+            if journal.target != root {
+                continue;
+            }
+            if !matches!(
+                journal.status,
+                EditStatus::Applied | EditStatus::Reverting | EditStatus::RecoveryRequired
+            ) {
+                continue;
+            }
+            let Some(applied_request) = journal.apply_request.as_ref() else {
+                unavailable_count += 1;
+                continue;
+            };
+            let (_apply, target_request, binding) = ApplyRequest::parse(applied_request)?;
+            let request_hash = super::protocol::canonical_payload_hash(Some(applied_request));
+            if request_hash != journal.plan_hash
+                || target_request.workspace_id != request.workspace_id
+            {
+                return Err("Rollback候補Journalと元適用要求が一致しない");
+            }
+            let expected_id = digest(&json!({
+                "review_audit_id": target_request.review_audit_id,
+                "target_device": root.0,
+                "target_file_id": root.1
+            }));
+            if expected_id.strip_prefix("sha256:") != Some(id.as_str()) {
+                return Err("Rollback候補のTransaction IDが現在rootと一致しない");
+            }
+            if journal.files.len() != binding.files.len()
+                || journal
+                    .files
+                    .iter()
+                    .zip(&binding.files)
+                    .any(|(record, request)| {
+                        record.path != request.path
+                            || record.before_hash != request.before_hash
+                            || record.after_hash != request.after_hash
+                    })
+            {
+                return Err("Rollback候補Journalと適用file一覧が一致しない");
+            }
+            let receipt = match find_applied_receipt(
+                audit_log,
+                &request_hash,
+                &target_request.workspace_id,
+                &target_request.review_audit_id,
+                &binding.diff_hash,
+                &id,
+                binding.files.len(),
+            ) {
+                Ok(receipt) => receipt,
+                Err("同じ編集適用に複数のAudit receiptがある") => {
+                    return Err("Rollback候補に重複した適用Audit receiptがある");
+                }
+                Err(_) => {
+                    unavailable_count += 1;
+                    continue;
+                }
+            };
+            let vault_name = format!("edit-files-{id}");
+            let vault = WorkspaceReader::from_registered_dir(
+                store_root
+                    .open_dir_nofollow(&vault_name)
+                    .map_err(|_| "Rollback候補の保護退避先を開けない")?,
+                &[],
+            )
+            .map_err(|_| "Rollback候補の保護退避先実体が不正")?;
+            let transaction = EditTransaction {
+                store,
+                target: &entry.reader,
+                vault: &vault,
+            };
+            let matches = transaction.candidate_matches(&journal, &binding.files)?;
+            let availability = match journal.status {
+                EditStatus::Applied if matches => "available",
+                EditStatus::Applied => "conflict",
+                EditStatus::Reverting | EditStatus::RecoveryRequired => "resume",
+                EditStatus::Applying | EditStatus::Reverted => continue,
+            };
+            candidates.push(json!({
+                "transaction_id": id,
+                "applied_request_hash": request_hash,
+                "applied_audit_id": receipt.event_id,
+                "applied_request": applied_request,
+                "diff_hash": binding.diff_hash,
+                "changed_files": binding.files.len(),
+                "status": match journal.status {
+                    EditStatus::Applied => "applied",
+                    EditStatus::Reverting => "reverting",
+                    EditStatus::RecoveryRequired => "recovery_required",
+                    EditStatus::Applying | EditStatus::Reverted => continue,
+                },
+                "availability": availability
+            }));
+            if !current() {
+                return Err("Rollback候補の確認完了前にWorkspace Permissionが失効");
+            }
+        }
+        let body = json!({
+            "version": 1,
+            "operation": ROLLBACK_CANDIDATES_OPERATION,
+            "要求hash": digest(payload),
+            "作業領域ID": request.workspace_id,
+            "実行系ID": entry.runtime,
+            "登録hash": entry.registration_hash,
+            "approval_id": grant.id,
+            "有効期限": grant.expires,
+            "表示範囲": grant.visibility,
+            "projection": {
+                "candidates": candidates,
+                "unavailable_count": unavailable_count,
+                "next_cursor": next_cursor
+            }
+        });
+        audit(
+            "Broker確認済みRollback候補のbounded projectionを確定",
+            &digest(&body),
+        )?;
+        if !current() {
+            return Err("Rollback候補projectionの確定前にWorkspace Permissionが失効");
+        }
+        Ok(body)
     }
 
     #[cfg(any(windows, target_os = "linux", target_os = "macos"))]

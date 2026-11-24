@@ -14,6 +14,7 @@ pub(super) const REVIEW_OPERATION: &str = "GUI Shell編集提案審査";
 pub(super) const APPLY_TARGET_OPERATION: &str = "GUI Shell編集適用先照合";
 pub(super) const APPLY_OPERATION: &str = "GUI Shell編集適用";
 pub(super) const ROLLBACK_OPERATION: &str = "GUI Shell編集Rollback";
+pub(super) const ROLLBACK_CANDIDATES_OPERATION: &str = "GUI Shell編集Rollback候補一覧";
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -206,6 +207,43 @@ pub(super) struct RollbackRequest {
     pub(super) approval_id: String,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RollbackCandidatesRequest {
+    version: u64,
+    pub(super) workspace_id: String,
+    pub(super) registration_hash: String,
+    pub(super) approval_id: String,
+    #[serde(default, deserialize_with = "deserialize_cursor")]
+    pub(super) cursor: Option<String>,
+}
+
+fn deserialize_cursor<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    String::deserialize(deserializer).map(Some)
+}
+
+impl RollbackCandidatesRequest {
+    pub(super) fn parse(payload: &Value) -> Result<Self, &'static str> {
+        let request: Self =
+            serde_json::from_value(payload.clone()).map_err(|_| "Rollback候補一覧の入力が不正")?;
+        if request.version != VERSION
+            || !super::workspace::identifier(&request.workspace_id)
+            || !valid_hash(&request.registration_hash)
+            || !valid_identifier(&request.approval_id)
+            || request
+                .cursor
+                .as_deref()
+                .is_some_and(|cursor| !valid_transaction_id(cursor))
+        {
+            return Err("Rollback候補一覧の版、Workspace、Permissionまたはcursorが不正");
+        }
+        Ok(request)
+    }
+}
+
 impl RollbackRequest {
     pub(super) fn parse(payload: &Value) -> Result<Self, &'static str> {
         let request: Self =
@@ -237,17 +275,14 @@ impl RollbackRequest {
     pub(super) fn verify_applied_receipt(&self, broker: &Broker) -> Result<(), &'static str> {
         let (target, binding) = self.applied_context()?;
         let event = current_host_receipt(broker, &self.applied_audit_id)?;
-        let expected = json!({
-            "version": 1,
-            "operation": APPLY_OPERATION,
-            "request_hash": self.applied_request_hash,
-            "workspace_id": target.workspace_id,
-            "review_audit_id": target.review_audit_id,
-            "diff_hash": binding.diff_hash,
-            "transaction_id": self.transaction_id,
-            "changed_files": binding.files.len(),
-            "status": "applied"
-        });
+        let expected = applied_receipt_body(
+            &self.applied_request_hash,
+            &target.workspace_id,
+            &target.review_audit_id,
+            &binding.diff_hash,
+            &self.transaction_id,
+            binding.files.len(),
+        );
         if event.operation != APPLY_OPERATION
             || event.decision != "accepted"
             || event.evidence_source != super::protocol::EVIDENCE_SOURCE_LIVE_RUNTIME
@@ -357,13 +392,82 @@ pub(super) fn current_host_receipt(
         .verified_audit_log()
         .map_err(|_| "編集の永続監査を検証できない")?
         .ok_or("編集の永続監査がない")?;
-    log.events()
+    current_host_receipt_in_log(&log, audit_id)
+}
+
+pub(super) fn current_host_receipt_in_log(
+    log: &super::audit::BrokerAuditLog,
+    audit_id: &str,
+) -> Result<super::audit::BrokerAuditEvent, &'static str> {
+    current_host_events(log)
         .iter()
-        .rev()
-        .take_while(|event| !(event.operation == "Host切替" && event.decision == "accepted"))
         .find(|event| event.event_id == audit_id)
         .cloned()
         .ok_or("現在Hostに一致する編集監査がない")
+}
+
+pub(super) fn find_applied_receipt(
+    log: &super::audit::BrokerAuditLog,
+    request_hash: &str,
+    workspace_id: &str,
+    review_audit_id: &str,
+    diff_hash: &str,
+    transaction_id: &str,
+    changed_files: usize,
+) -> Result<super::audit::BrokerAuditEvent, &'static str> {
+    let expected_hash = super::protocol::canonical_payload_hash(Some(&applied_receipt_body(
+        request_hash,
+        workspace_id,
+        review_audit_id,
+        diff_hash,
+        transaction_id,
+        changed_files,
+    )));
+    let matches = current_host_events(log)
+        .iter()
+        .filter(|event| {
+            event.operation == APPLY_OPERATION
+                && event.decision == "accepted"
+                && event.evidence_source == super::protocol::EVIDENCE_SOURCE_LIVE_RUNTIME
+                && event.reason == "編集適用と復旧記録の耐久確定"
+                && event.payload_hash == expected_hash
+        })
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [event] => Ok((*event).clone()),
+        [] => Err("現在Hostに適用完了Audit receiptがない"),
+        _ => Err("同じ編集適用に複数のAudit receiptがある"),
+    }
+}
+
+fn current_host_events(log: &super::audit::BrokerAuditLog) -> &[super::audit::BrokerAuditEvent] {
+    let start = log
+        .events()
+        .iter()
+        .rposition(|event| event.operation == "Host切替" && event.decision == "accepted")
+        .map_or(0, |index| index + 1);
+    &log.events()[start..]
+}
+
+fn applied_receipt_body(
+    request_hash: &str,
+    workspace_id: &str,
+    review_audit_id: &str,
+    diff_hash: &str,
+    transaction_id: &str,
+    changed_files: usize,
+) -> Value {
+    json!({
+        "version": 1,
+        "operation": APPLY_OPERATION,
+        "request_hash": request_hash,
+        "workspace_id": workspace_id,
+        "review_audit_id": review_audit_id,
+        "diff_hash": diff_hash,
+        "transaction_id": transaction_id,
+        "changed_files": changed_files,
+        "status": "applied"
+    })
 }
 
 fn valid_hash(hash: &str) -> bool {

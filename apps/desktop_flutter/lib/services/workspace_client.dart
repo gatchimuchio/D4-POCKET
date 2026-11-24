@@ -10,6 +10,7 @@ const workspaceEditReviewOperation = 'GUI Shell編集提案審査';
 const workspaceEditApplyTargetOperation = 'GUI Shell編集適用先照合';
 const workspaceEditApplyOperation = 'GUI Shell編集適用';
 const workspaceEditRollbackOperation = 'GUI Shell編集Rollback';
+const workspaceEditRollbackCandidatesOperation = 'GUI Shell編集Rollback候補一覧';
 final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
 final _id = RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$');
 final _auditEventId = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$');
@@ -206,7 +207,7 @@ class WorkspaceView {
   WorkspaceView(this.registration, this.operation, this.path, this.projection,
       this.auditId,
       [this.baselineHash, this.sourceRegistration, this.editTargetRequest,
-      this.appliedRequest]);
+      this.appliedRequest, this.rollbackCandidates]);
   final WorkspaceRegistration registration;
   final String operation, path, auditId;
   final String? baselineHash;
@@ -214,6 +215,29 @@ class WorkspaceView {
   final Map<String, Object?>? projection;
   final Map<String, Object?>? editTargetRequest;
   final Map<String, Object?>? appliedRequest;
+  final List<WorkspaceRollbackCandidate>? rollbackCandidates;
+}
+
+class WorkspaceRollbackCandidate {
+  const WorkspaceRollbackCandidate({
+    required this.transactionId,
+    required this.appliedRequestHash,
+    required this.appliedAuditId,
+    required this.appliedRequest,
+    required this.diffHash,
+    required this.changedFiles,
+    required this.status,
+    required this.availability,
+  });
+
+  final String transactionId;
+  final String appliedRequestHash;
+  final String appliedAuditId;
+  final Map<String, Object?> appliedRequest;
+  final String diffHash;
+  final int changedFiles;
+  final String status;
+  final String availability;
 }
 
 /// Brokerのprojectionだけを消費する。owner資格と権限付与を保持しない。
@@ -682,6 +706,184 @@ class WorkspaceClient {
       _invalid();
     }
     return WorkspaceView(matches.single, operation, '', result, auditId);
+  }
+
+  Future<WorkspaceView> rollbackCandidates(WorkspaceRegistration selected,
+      {String? cursor}) async {
+    const operation = workspaceEditRollbackCandidatesOperation;
+    if (!selected.current(DateTime.now()) ||
+        selected.visibility != 'full' ||
+        selected.approval == null ||
+        (cursor != null && !RegExp(r'^[a-f0-9]{64}$').hasMatch(cursor))) {
+      _invalid();
+    }
+    final payload = <String, Object?>{
+      'version': 1,
+      'workspace_id': selected.id,
+      'registration_hash': selected.hash,
+      'approval_id': selected.approval,
+      if (cursor != null) 'cursor': cursor,
+    };
+    final response = await _request(operation, payload);
+    final body = _map(response['body']);
+    _keys(body, [
+      'version', 'operation', '要求hash', '作業領域ID', '実行系ID', '登録hash',
+      'approval_id', '有効期限', '表示範囲', 'projection',
+    ]);
+    final auditId = _string(response['audit_event_id']);
+    final projection = _map(body['projection']);
+    _keys(projection, ['candidates', 'unavailable_count', 'next_cursor']);
+    final rawCandidates = projection['candidates'];
+    final unavailableCount = projection['unavailable_count'];
+    final nextCursor = projection['next_cursor'];
+    if (response['evidence_source'] != 'LIVE_RUNTIME' ||
+        !_auditEventId.hasMatch(auditId) ||
+        auditId == _unavailableAuditEventId ||
+        body['version'] != 1 ||
+        body['operation'] != operation ||
+        body['要求hash'] != brokerPayloadHash(payload) ||
+        body['作業領域ID'] != selected.id ||
+        body['実行系ID'] != selected.runtime ||
+        body['登録hash'] != selected.hash ||
+        body['approval_id'] != selected.approval ||
+        body['有効期限'] != selected.expires ||
+        body['表示範囲'] != 'full' ||
+        rawCandidates is! List ||
+        rawCandidates.length > 4 ||
+        unavailableCount is! int ||
+        unavailableCount < 0 ||
+        unavailableCount > 4 ||
+        (nextCursor != null &&
+            (nextCursor is! String ||
+                !RegExp(r'^[a-f0-9]{64}$').hasMatch(nextCursor)))) {
+      _invalid();
+    }
+    final candidates = <WorkspaceRollbackCandidate>[];
+    for (final raw in rawCandidates) {
+      final item = _map(raw);
+      _keys(item, [
+        'transaction_id', 'applied_request_hash', 'applied_audit_id',
+        'applied_request', 'diff_hash', 'changed_files', 'status', 'availability',
+      ]);
+      final transactionId = _string(item['transaction_id']);
+      final requestHash = _string(item['applied_request_hash']);
+      final receiptId = _string(item['applied_audit_id']);
+      final appliedRequest = _validateAppliedRequest(item['applied_request']);
+      final diffHash = _string(item['diff_hash']);
+      final changedFiles = item['changed_files'];
+      final status = _string(item['status']);
+      final availability = _string(item['availability']);
+      final targetRequest = _map(appliedRequest['target_request']);
+      final binding = _map(targetRequest['review_binding']);
+      final files = binding['files'];
+      if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(transactionId) ||
+          !_hash.hasMatch(requestHash) ||
+          !_auditEventId.hasMatch(receiptId) ||
+          receiptId == _unavailableAuditEventId ||
+          brokerPayloadHash(appliedRequest) != requestHash ||
+          !_hash.hasMatch(diffHash) ||
+          changedFiles is! int ||
+          changedFiles < 1 ||
+          changedFiles > 32 ||
+          files is! List ||
+          files.length != changedFiles ||
+          binding['diff_hash'] != diffHash ||
+          targetRequest['workspace_id'] != selected.id ||
+          !const {'applied', 'reverting', 'recovery_required'}.contains(status) ||
+          (status == 'applied' &&
+              !const {'available', 'conflict'}.contains(availability)) ||
+          (status != 'applied' && availability != 'resume')) {
+        _invalid();
+      }
+      candidates.add(WorkspaceRollbackCandidate(
+        transactionId: transactionId,
+        appliedRequestHash: requestHash,
+        appliedAuditId: receiptId,
+        appliedRequest: Map<String, Object?>.unmodifiable(appliedRequest),
+        diffHash: diffHash,
+        changedFiles: changedFiles,
+        status: status,
+        availability: availability,
+      ));
+    }
+    return WorkspaceView(selected, operation, '',
+        Map<String, Object?>.unmodifiable(projection), auditId, null, null, null,
+        null, List<WorkspaceRollbackCandidate>.unmodifiable(candidates));
+  }
+
+  WorkspaceView rollbackTargetForCandidate(
+      WorkspaceRegistration selected, WorkspaceRollbackCandidate candidate) {
+    final appliedProjection = <String, Object?>{
+      'version': 1,
+      'operation': workspaceEditApplyOperation,
+      'request_hash': candidate.appliedRequestHash,
+      'workspace_id': selected.id,
+      'review_audit_id':
+          _map(candidate.appliedRequest['target_request'])['review_audit_id'],
+      'diff_hash': candidate.diffHash,
+      'transaction_id': candidate.transactionId,
+      'changed_files': candidate.changedFiles,
+      'status': 'applied',
+    };
+    return WorkspaceView(
+      selected,
+      workspaceEditApplyOperation,
+      '',
+      appliedProjection,
+      candidate.appliedAuditId,
+      null,
+      null,
+      null,
+      candidate.appliedRequest,
+    );
+  }
+
+  Map<String, Object?> _validateAppliedRequest(Object? value) {
+    final request = _map(value);
+    _keys(request, ['version', 'target_audit_id', 'target_request']);
+    final target = _map(request['target_request']);
+    _keys(target, [
+      'version', 'review_audit_id', 'review_binding', 'workspace_id',
+      'registration_hash', 'approval_id',
+    ]);
+    final binding = _map(target['review_binding']);
+    _keys(binding, [
+      'proposal_id', 'diff_hash', 'workspace_id', 'registration_hash',
+      'approval_id', 'expires_at', 'baseline_hash', 'files',
+    ]);
+    final files = binding['files'];
+    if (request['version'] != 1 ||
+        target['version'] != 1 ||
+        !_auditEventId.hasMatch(_string(request['target_audit_id'])) ||
+        !_auditEventId.hasMatch(_string(target['review_audit_id'])) ||
+        !_id.hasMatch(_string(target['workspace_id'])) ||
+        !_hash.hasMatch(_string(target['registration_hash'])) ||
+        !_id.hasMatch(_string(target['approval_id'])) ||
+        !_id.hasMatch(_string(binding['proposal_id'])) ||
+        !_hash.hasMatch(_string(binding['diff_hash'])) ||
+        !_id.hasMatch(_string(binding['workspace_id'])) ||
+        !_hash.hasMatch(_string(binding['registration_hash'])) ||
+        !_id.hasMatch(_string(binding['approval_id'])) ||
+        binding['expires_at'] is! int ||
+        !_hash.hasMatch(_string(binding['baseline_hash'])) ||
+        files is! List ||
+        files.isEmpty ||
+        files.length > 32) {
+      _invalid();
+    }
+    for (final rawFile in files) {
+      final file = _map(rawFile);
+      _keys(file, ['path', 'before_hash', 'after_hash']);
+      final path = _string(file['path']);
+      for (final key in ['before_hash', 'after_hash']) {
+        final hash = file[key];
+        if (hash != null && (hash is! String || !_hash.hasMatch(hash))) {
+          _invalid();
+        }
+      }
+      if (path.isEmpty || utf8.encode(path).length > 200) _invalid();
+    }
+    return Map<String, Object?>.unmodifiable(request);
   }
 
   Future<WorkspaceView> read(WorkspaceRegistration selected, String path,

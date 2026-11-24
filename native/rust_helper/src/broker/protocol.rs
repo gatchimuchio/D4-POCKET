@@ -655,6 +655,8 @@ pub enum BrokerOperation {
     GuiShell編集適用,
     #[serde(rename = "GUI Shell編集Rollback")]
     GuiShell編集Rollback,
+    #[serde(rename = "GUI Shell編集Rollback候補一覧")]
+    GuiShell編集Rollback候補一覧,
     #[serde(rename = "GUI Shell書出し")]
     GuiShell書出し,
     #[serde(rename = "更新一覧")]
@@ -849,6 +851,9 @@ impl BrokerOperation {
             }
             BrokerOperation::GuiShell編集適用 => super::ai_edit_center::APPLY_OPERATION,
             BrokerOperation::GuiShell編集Rollback => super::ai_edit_center::ROLLBACK_OPERATION,
+            BrokerOperation::GuiShell編集Rollback候補一覧 => {
+                super::ai_edit_center::ROLLBACK_CANDIDATES_OPERATION
+            }
             BrokerOperation::GuiShell書出し => "GUI Shell書出し",
             BrokerOperation::更新一覧 => "更新一覧",
             BrokerOperation::更新候補取得 => "更新候補取得",
@@ -2609,6 +2614,7 @@ impl Broker {
             | BrokerOperation::作業領域比較範囲
             | BrokerOperation::作業領域全体基準点保存
             | BrokerOperation::作業領域変更一覧
+            | BrokerOperation::GuiShell編集Rollback候補一覧
             | BrokerOperation::GuiShell編集提案審査
             | BrokerOperation::GuiShell編集適用先照合
             | BrokerOperation::作業領域復旧プレビュー) => self.作業領域要求処理(
@@ -3585,6 +3591,7 @@ impl Broker {
                 request,
                 target,
                 binding,
+                payload,
                 &verified,
                 hash,
                 now,
@@ -3813,7 +3820,29 @@ impl Broker {
         let mut registry = std::mem::take(&mut self.作業領域);
         let mut audit_failed = false;
         let now = self.current_epoch_seconds();
-        let result = registry.operate(operation, payload, owner, now, &mut |reason, digest| {
+        let candidate_context = if operation == super::ai_edit_center::ROLLBACK_CANDIDATES_OPERATION
+        {
+            (|| {
+                let store = self
+                    .state_store
+                    .persistent_store
+                    .clone()
+                    .ok_or("Rollback候補には永続保管先が必要")?;
+                let log = self
+                    .state_store
+                    .verified_audit_log()
+                    .map_err(|_| "Rollback候補の永続Auditを検証できない")?
+                    .ok_or("Rollback候補には永続Auditが必要")?;
+                if log != self.audit_log {
+                    return Err("Rollback候補のBroker Auditと永続Auditが一致しない");
+                }
+                Ok((store, log))
+            })()
+            .map(Some)
+        } else {
+            Ok(None)
+        };
+        let mut record_audit = |reason: &str, digest: &str| {
             self.append_audit(
                 id,
                 operation,
@@ -3827,7 +3856,14 @@ impl Broker {
                 audit_failed = true;
                 "監査失敗"
             })
-        });
+        };
+        let result = match candidate_context {
+            Err(reason) => Err(reason),
+            Ok(Some((store, log))) => {
+                registry.list_rollback_candidates(payload, now, &store, &log, &mut record_audit)
+            }
+            Ok(None) => registry.operate(operation, payload, owner, now, &mut record_audit),
+        };
         if audit_failed {
             return self.audit_store_failed_response(
                 id,
@@ -3849,6 +3885,7 @@ impl Broker {
                             | "作業領域復旧プレビュー"
                             | "作業領域差分"
                             | "作業領域変更一覧"
+                            | super::ai_edit_center::ROLLBACK_CANDIDATES_OPERATION
                             | REVIEW_OPERATION
                             | APPLY_TARGET_OPERATION
                     ) && matches!(body["表示範囲"].as_str(), Some("full" | "hash_only"))
@@ -3893,6 +3930,7 @@ impl Broker {
                                 | "作業領域差分"
                                 | "作業領域変更一覧"
                                 | "作業領域比較範囲"
+                                | super::ai_edit_center::ROLLBACK_CANDIDATES_OPERATION
                                 | REVIEW_OPERATION
                                 | APPLY_TARGET_OPERATION
                         ) && !self

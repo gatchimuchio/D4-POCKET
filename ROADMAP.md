@@ -4,6 +4,12 @@
 
 現行正本は[要求仕様 v11](docs/V11_2026-11-24/01_D4Pocket_REQUIREMENTS_v11_JA.jsonl)・[設計仕様 v11](docs/V11_2026-11-24/02_D4Pocket_DESIGN_v11_JA.jsonl)・[実装開発工程 v11](docs/V11_2026-11-24/03_D4Pocket_IMPLEMENTATION_PLAN_v11_JA.jsonl)・[品質工程 v11](docs/V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl)・[実装開発実行指示 v11](docs/V11_2026-11-24/05_D4Pocket_IMPLEMENTATION_INSTRUCTIONS_v11_JA.jsonl)であり、採用範囲・原文固定は[v11採用記録](docs/V11_2026-11-24/採用記録.md)、常設施工方法は[AGENTS.md](AGENTS.md)に従う。v11は原要求188件（実装152・品質専用36）、本番結線54件、対象OS5種を保持し、実装・ビルドと独立品質業務を分離する。過去の進捗・検査・Release Blockerは対象SHAと時点に結合した履歴として保持し、v11採用だけで現在の実装完成・品質合格・公開を成立扱いしない。以下の過去記録は各見出しの対象版・時点に限る。
 
+### v11施工追補：AI Edit Rollback候補の再発見接続（2026-11-24）
+
+施工開始main `3cfc6edd8c408765275d9519a2efbaa88f8194b2`を基準に、成功した適用のHMAC Journalへ元Apply要求を保存し、Workspace Inspectorから`GUI Shell編集Rollback候補一覧`をBroker経由で取得するConsumerを接続した。候補は現在Hostの完全一致Apply Audit receipt、現在Workspace root／full Permission、Journalと退避先、適用file bindingを照合する。Appliedの競合候補は無効化し、`Reverting`／`RecoveryRequired`は新しい現在Permission・別Native確認のもとで既存Rollback経路へ渡す。旧Journal形式version 1や現Hostの完了Apply Audit receiptを特定できないJournalは、そのページの`unavailable_count`で明示し、候補として再構成しない。候補一覧は最大4件／ページ、Journal directory走査は最大65,536 entry。
+
+この追補は実装・結線と限定構築確認の記録であり、Unit/E2E・製品QA・Installed RuntimeのPASSを主張しない。適用本文やCredentialを候補一覧へ返さない。適用とRollbackの現在Permission／Native確認は変更していない。
+
 ### v11施工追補：AI Edit明示Rollbackの接続（2026-11-24）
 
 基準main=`2f8b2b3ddaaceb1bcb6b224e50e3982464b53908`。`GUI Shell編集Rollback`をRust Broker、Windows/macOS/LinuxのNative確認受口、IPC Schema、Flutter Workspace Inspectorへ接続した。明示Rollbackは元Apply AuditとHash、現Workspace登録・full Permission、Agent Task非実行、同一volumeのHMAC Journal、file版を照合し、適用時と別のNative Owner確認を要求する。中断後は新しい確認・PermissionのもとでJournalの`Reverting`／`RecoveryRequired`から差分を再照合して続行する。

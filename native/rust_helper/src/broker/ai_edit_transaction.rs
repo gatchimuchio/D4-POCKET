@@ -23,6 +23,8 @@ struct EditRecord {
     vault: (u64, u64),
     files: Vec<EditEntry>,
     status: EditStatus,
+    #[serde(default)]
+    apply_request: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -33,6 +35,22 @@ struct EditEntry {
     after: Option<EditFileVersion>,
 }
 
+pub(super) struct EditCandidateRecord {
+    record: EditRecord,
+    pub(super) plan_hash: String,
+    pub(super) target: (u64, u64),
+    pub(super) vault: (u64, u64),
+    pub(super) apply_request: Option<serde_json::Value>,
+    pub(super) status: EditStatus,
+    pub(super) files: Vec<EditCandidateFile>,
+}
+
+pub(super) struct EditCandidateFile {
+    pub(super) path: String,
+    pub(super) before_hash: Option<String>,
+    pub(super) after_hash: Option<String>,
+}
+
 /// Brokerが現在認可した操作と、隔離済みの同一volume退避先を渡す。
 pub(super) struct EditTransaction<'a> {
     pub(super) store: &'a BrokerPersistentStore,
@@ -41,6 +59,7 @@ pub(super) struct EditTransaction<'a> {
 }
 
 impl EditTransaction<'_> {
+    #[cfg(test)]
     pub(super) fn apply(
         &self,
         id: &str,
@@ -49,11 +68,28 @@ impl EditTransaction<'_> {
         source: &WorkspaceReader,
         current: impl Fn() -> bool,
     ) -> Result<EditStatus, &'static str> {
+        self.apply_with_request(id, plan_hash, files, source, None, current)
+    }
+
+    pub(super) fn apply_with_request(
+        &self,
+        id: &str,
+        plan_hash: &str,
+        files: &[ApplyFile],
+        source: &WorkspaceReader,
+        apply_request: Option<&serde_json::Value>,
+        current: impl Fn() -> bool,
+    ) -> Result<EditStatus, &'static str> {
         if self.store.read_workspace_edit_record(id)?.is_some() {
             return Err("編集復旧記録が存在するため同じ適用を再実行できない");
         }
         if !valid_hash(plan_hash) || files.is_empty() || files.len() > 32 || !current() {
             return Err("編集適用の審査結合、対象件数または承認期限が不正");
+        }
+        if apply_request.is_some_and(|request| {
+            super::protocol::canonical_payload_hash(Some(request)) != plan_hash
+        }) {
+            return Err("編集Journalへ保存する元要求hashが不一致");
         }
         let (target, vault) = self.roots()?;
         if source
@@ -117,12 +153,13 @@ impl EditTransaction<'_> {
             return Err("編集適用の着手前に承認期限を超過");
         }
         let mut record = EditRecord {
-            version: 1,
+            version: if apply_request.is_some() { 2 } else { 1 },
             plan_hash: plan_hash.into(),
             target,
             vault,
             files: entries,
             status: EditStatus::Applying,
+            apply_request: apply_request.cloned(),
         };
         self.save(id, &record, true)?;
         let ran = record
@@ -195,7 +232,8 @@ impl EditTransaction<'_> {
             .ok_or("編集復旧記録が存在しない")?;
         let record: EditRecord =
             serde_json::from_value(value).map_err(|_| "編集復旧記録の形式が不正")?;
-        if record.version != 1
+        if !matches!(record.version, 1 | 2)
+            || (record.version == 2 && record.apply_request.is_none())
             || !valid_hash(&record.plan_hash)
             || self.roots()? != (record.target, record.vault)
         {
@@ -242,11 +280,39 @@ impl EditTransaction<'_> {
     }
 
     fn verify_applied(&self, record: &EditRecord) -> Result<(), &'static str> {
+        let mut target_budget = MAX_COMPARISON_BYTES;
+        let mut vault_budget = MAX_COMPARISON_BYTES;
         for (index, entry) in record.files.iter().enumerate() {
-            if version_at(self.target, &entry.path)? != entry.after
-                || version_at(self.vault, &old_slot(index))? != entry.before
-                || version_at(self.vault, &new_slot(index))?.is_some()
-                || version_at(self.vault, &reverted_slot(index))?.is_some()
+            let (target_version, target_bytes) = self
+                .target
+                .edit_file_version(&entry.path, target_budget)
+                .map_err(|_| "適用後の対象版を確認できない")?
+                .map_or((None, 0), |(version, bytes)| (Some(version), bytes));
+            target_budget = target_budget
+                .checked_sub(target_bytes)
+                .ok_or("適用後の対象版が検証上限を超過")?;
+            let (old_version, old_bytes) = self
+                .vault
+                .edit_file_version(&old_slot(index), vault_budget)
+                .map_err(|_| "適用前の退避版を確認できない")?
+                .map_or((None, 0), |(version, bytes)| (Some(version), bytes));
+            vault_budget = vault_budget
+                .checked_sub(old_bytes)
+                .ok_or("適用前の退避版が検証上限を超過")?;
+            let new_present = self
+                .vault
+                .edit_file_version(&new_slot(index), 0)
+                .map_err(|_| "未設置の変更後退避版を確認できない")?
+                .is_some();
+            let reverted_present = self
+                .vault
+                .edit_file_version(&reverted_slot(index), 0)
+                .map_err(|_| "未使用のRollback退避版を確認できない")?
+                .is_some();
+            if target_version != entry.after
+                || old_version != entry.before
+                || new_present
+                || reverted_present
             {
                 return Err("適用後の対象版または退避版が変更された");
             }
@@ -355,13 +421,94 @@ impl EditTransaction<'_> {
             .ok_or("編集復旧記録が存在しない")?;
         let record: EditRecord =
             serde_json::from_value(value).map_err(|_| "編集復旧記録の形式が不正")?;
-        if record.version != 1
+        if !matches!(record.version, 1 | 2)
+            || (record.version == 2 && record.apply_request.is_none())
             || record.plan_hash != plan_hash
             || self.roots()? != (record.target, record.vault)
         {
             return Err("編集復旧記録の審査結合、適用先または退避先が不一致");
         }
         Ok(record)
+    }
+
+    pub(super) fn inspect_stored_record(
+        store: &BrokerPersistentStore,
+        id: &str,
+    ) -> Result<Option<EditCandidateRecord>, &'static str> {
+        let Some(value) = store.read_workspace_edit_record(id)? else {
+            return Ok(None);
+        };
+        let record: EditRecord =
+            serde_json::from_value(value).map_err(|_| "編集復旧記録の形式が不正")?;
+        if !matches!(record.version, 1 | 2)
+            || (record.version == 2 && record.apply_request.is_none())
+            || !valid_hash(&record.plan_hash)
+            || record.target.1 == 0
+            || record.vault.1 == 0
+            || record.target == record.vault
+            || record.target.0 != record.vault.0
+            || record.files.is_empty()
+            || record.files.len() > 32
+        {
+            return Err("編集復旧記録の識別、rootまたは対象数が不正");
+        }
+        let mut seen = BTreeSet::new();
+        let mut files = Vec::with_capacity(record.files.len());
+        for entry in &record.files {
+            if entry.path.is_empty()
+                || entry.path.len() > 200
+                || !seen.insert(entry.path.to_lowercase())
+                || entry.before == entry.after
+                || entry
+                    .before
+                    .iter()
+                    .chain(entry.after.iter())
+                    .any(|version| !valid_hash(&version.hash) || version.file_id == 0)
+            {
+                return Err("編集復旧記録のfile bindingが不正");
+            }
+            files.push(EditCandidateFile {
+                path: entry.path.clone(),
+                before_hash: entry.before.as_ref().map(|version| version.hash.clone()),
+                after_hash: entry.after.as_ref().map(|version| version.hash.clone()),
+            });
+        }
+        Ok(Some(EditCandidateRecord {
+            plan_hash: record.plan_hash.clone(),
+            target: record.target,
+            vault: record.vault,
+            apply_request: record.apply_request.clone(),
+            status: record.status,
+            files,
+            record,
+        }))
+    }
+
+    pub(super) fn candidate_matches(
+        &self,
+        candidate: &EditCandidateRecord,
+        files: &[ApplyFile],
+    ) -> Result<bool, &'static str> {
+        if self.roots()? != (candidate.target, candidate.vault)
+            || files.len() != candidate.record.files.len()
+            || files
+                .iter()
+                .zip(&candidate.record.files)
+                .any(|(request, entry)| {
+                    request.path != entry.path
+                        || request.before_hash.as_deref()
+                            != entry.before.as_ref().map(|version| version.hash.as_str())
+                        || request.after_hash.as_deref()
+                            != entry.after.as_ref().map(|version| version.hash.as_str())
+                })
+        {
+            return Err("編集Journalと元適用要求のfile bindingが不一致");
+        }
+        match candidate.status {
+            EditStatus::Applied => Ok(self.verify_applied(&candidate.record).is_ok()),
+            EditStatus::Reverting | EditStatus::RecoveryRequired => Ok(true),
+            EditStatus::Applying | EditStatus::Reverted => Ok(false),
+        }
     }
 
     fn save(&self, id: &str, record: &EditRecord, initialize: bool) -> Result<(), &'static str> {

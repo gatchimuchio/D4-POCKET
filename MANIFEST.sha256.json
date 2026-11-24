@@ -197,7 +197,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "96505f685cee559fbc7e2e7eb9687966afd0ab1e14c12fdcae77faddc86e2bf4"
+      "sha256": "8349e0de77ba75bf3db1ac5447b6be491157d499ad1bf55ac0a0637b022669c3"
     },
     {
       "path": "SECURITY.md",
@@ -361,7 +361,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/workspace_inspector.dart",
-      "sha256": "5ae82444dedaabcb17f9bb9b58b02d34151f2ec87d51e7d2dc9a53bd891d3979"
+      "sha256": "614af2868cedd4878351e13a7116c59f06be14f52721108f90776f961a1a2b3c"
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart",
@@ -469,7 +469,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
-      "sha256": "604111c25d8075d340f8830eccb830567b8d08e0a08696833bfbc3691ab4e320"
+      "sha256": "bd4d5dbb6ec8e236cf53b5e4d211b4775b4f49acd86342afa0bfc205f5bddf52"
     },
     {
       "path": "apps/desktop_flutter/linux/.gitignore",
@@ -2033,7 +2033,7 @@
     },
     {
       "path": "docs/specs/gui-shell-ai-edit.md",
-      "sha256": "ae8578bf1ce6b98801b27ce2b2526f329d228f84ed4df91490f0dac067b3cd67"
+      "sha256": "3c93c01e96586790a69ac813dae2476f7424b677313ec4e493f2b91e5d62fd70"
     },
     {
       "path": "docs/specs/gui-shell-compose.md",
@@ -4265,11 +4265,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/ai_edit_center.rs",
-      "sha256": "de069828a3e2ee64f107fe43dc991292750115d22788c3a36daced344a4ba895"
+      "sha256": "616cf1131c1a441b6f57f93569b70f3e84de1608a1264a51cd2429978bfaea3e"
     },
     {
       "path": "native/rust_helper/src/broker/ai_edit_transaction.rs",
-      "sha256": "ec1235f8ccb1b53f02c825f0626f501a104c1ce08037d866cd4ea3714a79eef2"
+      "sha256": "bef860fcf61eedf1882dabf710da8f169a07aff3da0bb080c774947407de7d25"
     },
     {
       "path": "native/rust_helper/src/broker/audit.rs",
@@ -4397,7 +4397,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "7fb8bb692352c88c338683cce87494db59de64e20b1b43037362df19acb18f84"
+      "sha256": "40ae59aeb3107fafa46557c10e89e8c23d68620bbc776e466e5142296389614e"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -4421,7 +4421,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
-      "sha256": "0474ad319ab0f30338382fffad2950ce890f99af68ac8e8a54c506e1921adc1c"
+      "sha256": "67147f4b9a6385d680ea8c4df894f55ba2f2a7368011d9ade43acd7a2259aed3"
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
@@ -4437,7 +4437,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "a7f1697c06a0481ac3fdca9c8221daaf6c2d96c9c7448b46f78266fb9439569b"
+      "sha256": "09424d97eaa812f7f8bbc0e682a14fb8abbce4594fb622bb6cd63351d635080d"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -5573,11 +5573,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "768f4e71d0004649fc80560b5cd2b9297e9e71ea643c47eb6518f6e064a2a782"
+      "sha256": "65b3090ae214aef6faca9c8c4847ac0ae1365c16532b1ca1648754d6480ce2ee"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "24f2296349a27c033ce178af3b198ee5f463ca786bab7e3f5a873c79bd87a09c"
+      "sha256": "0ce9eb5d0a596e4c289fbb25cf744b95d6b230dccee605e76f34b5c4c0cf1f3e"
     },
     {
       "path": "specs/linux_workspace_selection.schema.json",
@@ -5913,11 +5913,11 @@
     },
     {
       "path": "specs/workspace_inspection_request.schema.json",
-      "sha256": "3e632cba0181550a0bd8ee879c3eb9a75ecc95482c262ea55af04bf8586583e8"
+      "sha256": "1410d80b38cb6c52c0afa574ef3c197ccc97146b80d22b422e33343e7347a8c7"
     },
     {
       "path": "specs/workspace_inspection_response.schema.json",
-      "sha256": "391bb3b240b78289124afd3737be31390e5d5dc8e85b27b50021e1dc266de473"
+      "sha256": "e994088d1fc93ab05a730bb77ca4d53c6494ed19298ffb3f30bc49cbb7357c2e"
     },
     {
       "path": "specs/workspace_startup.schema.json",

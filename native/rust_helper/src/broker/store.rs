@@ -19,6 +19,8 @@ const MAX_ADAPTER_STATE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_AGENT_TASK_SCRATCH_STATE_BYTES: usize = 512 * 1024;
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 const MAX_WORKSPACE_EDIT_RECORD_BYTES: usize = 96 * 1024;
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+const MAX_WORKSPACE_EDIT_DIRECTORY_ENTRIES: usize = 65_536;
 #[cfg(feature = "module_setup_doctor")]
 const MAX_SETUP_DOCTOR_REPORT_BYTES: usize = 64 * 1024;
 const MAX_FIRST_RUN_CONFIGURATION_BYTES: usize = 16 * 1024;
@@ -627,6 +629,65 @@ impl BrokerPersistentStore {
             return Err("編集復旧記録の認証に失敗");
         }
         Ok(Some(signed.state))
+    }
+
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    pub(super) fn workspace_edit_record_page(
+        &self,
+        after: Option<&str>,
+        page_size: usize,
+    ) -> Result<(Vec<String>, Option<String>), &'static str> {
+        if page_size == 0
+            || page_size > 16
+            || after.is_some_and(|id| {
+                id.len() != 64
+                    || !id
+                        .bytes()
+                        .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+            })
+        {
+            return Err("編集復旧記録のページ指定が不正");
+        }
+        let root =
+            fs::symlink_metadata(&self.root).map_err(|_| "編集復旧記録の保管rootを確認できない")?;
+        if !root.is_dir() || root.file_type().is_symlink() || is_reparse_point(&root) {
+            return Err("編集復旧記録の保管rootが通常directoryではない");
+        }
+        let entries = fs::read_dir(&self.root).map_err(|_| "編集復旧記録一覧を取得できない")?;
+        let mut ids = Vec::new();
+        let mut count = 0usize;
+        for entry in entries {
+            count = count.checked_add(1).ok_or("編集復旧記録一覧の件数が不正")?;
+            if count > MAX_WORKSPACE_EDIT_DIRECTORY_ENTRIES {
+                return Err("編集復旧記録一覧が走査上限を超過");
+            }
+            let entry = entry.map_err(|_| "編集復旧記録一覧のentryを確認できない")?;
+            let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            let Some(id) = name
+                .strip_prefix("workspace-edit-")
+                .and_then(|name| name.strip_suffix(".json"))
+            else {
+                continue;
+            };
+            if id.len() == 64
+                && id
+                    .bytes()
+                    .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+            {
+                ids.push(id.to_owned());
+            }
+        }
+        ids.sort_unstable();
+        ids.dedup();
+        if let Some(after) = after {
+            ids.retain(|id| id.as_str() > after);
+        }
+        let has_more = ids.len() > page_size;
+        ids.truncate(page_size);
+        let next = has_more.then(|| ids.last().cloned()).flatten();
+        Ok((ids, next))
     }
 
     #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
