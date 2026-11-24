@@ -1,5 +1,8 @@
 # D4 Pocket — クイックスタート
 
+> **現行採用（2026-11-24、v11）**: [要求仕様](docs/V11_2026-11-24/01_D4Pocket_REQUIREMENTS_v11_JA.jsonl) / [設計仕様](docs/V11_2026-11-24/02_D4Pocket_DESIGN_v11_JA.jsonl) / [実装開発工程](docs/V11_2026-11-24/03_D4Pocket_IMPLEMENTATION_PLAN_v11_JA.jsonl) / [品質工程](docs/V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl) / [実行指示](docs/V11_2026-11-24/05_D4Pocket_IMPLEMENTATION_INSTRUCTIONS_v11_JA.jsonl)。実装と品質は独立した仕事。本人追加GOは実装/品質完了の条件ではない。未委任の署名・外部公開は別作用、製品使用時のNative Owner/認証Brokerの本人認可は保持。本書の以下の日付付き旧記述は当時の記録として保持し、現行正本の効力を上書きしない。
+
+
 D4 Pocketは開発中の汎用AI Runtime／Agent操作基盤です。以下は**ソースコードから実装・契約を検証するための手順**であり、正式出荷製品のインストール案内ではありません。
 
 - プロジェクト概要・技術的特徴：[README.md](README.md)

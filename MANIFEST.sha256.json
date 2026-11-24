@@ -1,7 +1,7 @@
 {
   "version": 1,
   "hash": "sha256",
-  "self_reference_policy": "MANIFEST.sha256.json\u306f\u81ea\u8eab\u306efile\u4e00\u89a7\u304b\u3089\u9664\u5916\u3059\u308b\u3002",
+  "self_reference_policy": "MANIFEST.sha256.jsonは自身のfile一覧から除外する。",
   "coverage": {
     "glob_patterns": [
       "native/windows_protection/Cargo.toml",
@@ -125,7 +125,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "91b8dd89f3df5f8d11fb0eddcff2032dee077ade731369fc8d38b1ea8426d04c"
+      "sha256": "78dac90037e391433b3429f61fcdea2ba829f6782212fc428e78ac2e2bbd48b7"
     },
     {
       "path": "AUDIT.md",
@@ -141,11 +141,11 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "2eed328443f0bc14358da580666370419767829de75b34f96c5cb061c31c0a8b"
+      "sha256": "a73c3aeb94a16168ca06dbdc785cb8dfda87172b4f295dc47544d2dddf0b19fe"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
-      "sha256": "975ff78313aeb585279963ae126188f6b9f1346ff4ea2b473e9c11531523922b"
+      "sha256": "83a4beca874f9eaa78dd59142658963f816b3ee343b0560fb42a9d629ac5e355"
     },
     {
       "path": "CONFIG.md",
@@ -161,7 +161,7 @@
     },
     {
       "path": "INSTALLER_STATUS.md",
-      "sha256": "77784d18662caa1662b3ee462f36fd485f37b7af8c0029f0a2900eadc3920b07"
+      "sha256": "86c1c15dfe0cdc8c040d0c3db593d8f19e3a5f4f69d19fee3f966fbe8e469d1e"
     },
     {
       "path": "LICENSE",
@@ -177,7 +177,7 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "6f996b33bf0037bc791c94ce2a4d0abe0affc10bc9895b0f7fbf6690783d16ae"
+      "sha256": "b9bc966e673885868dd165eb20bd541ce163eef6884e2ebc96c67a3998b312ae"
     },
     {
       "path": "NOTICE",
@@ -185,15 +185,15 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "67b2c3afea63242f4f96805e16751d5222d7cdf4bbd9b72e0ebe5dc5a906f6ff"
+      "sha256": "4df89719a75f40a3ba676b5b5a15844eb85b1d319a7835176f6b7a116c43d3a5"
     },
     {
       "path": "README.md",
-      "sha256": "f2cda56ad2fda674fe1a411b7e6794d0ff2017243fbd10d5dcf7f3c3e5a09b1b"
+      "sha256": "efa038d12c67a7a4550f2fabcc07a8b545bed4127c7d36606439eeccdb01420b"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "008c7e0592bd39c57ba30555896b21760f52bf0aef079572f938d7924fb04b4b"
+      "sha256": "6ed6776c27b365f561ec9b1671f2c397134ff4d1e9b50f642980edbe636100cb"
     },
     {
       "path": "ROADMAP.md",
@@ -205,7 +205,7 @@
     },
     {
       "path": "SECURITY_REVIEW.md",
-      "sha256": "413c03786dc441941f8a08f916ae46d464496323a9d696ad871bb8eb3bad308e"
+      "sha256": "b6b9b66ee4fe4553988126cb40121f9d3c6cb7fe457a42ae1de230c104add8e4"
     },
     {
       "path": "TROUBLESHOOTING.md",
@@ -1449,7 +1449,7 @@
     },
     {
       "path": "docs/LANGUAGE_POLICY.md",
-      "sha256": "ab654904fe4af1d88e4ed9cf66b49eae06cfcd410620e9a1622b60eab77524cc"
+      "sha256": "844dde9b4a43b8bd5017fa82d6b6eac0cab1f178a84a5308a72e0723b9b0df12"
     },
     {
       "path": "docs/MUTATION_VERIFICATION.md",
@@ -1469,154 +1469,154 @@
     },
     {
       "path": "docs/PRODUCT_COMPLETION_PLAN.md",
-      "sha256": "7279e4f19804d24d614b467c03fa5ef4bbfc9184185893da51da6aedf7609338"
+      "sha256": "93df3c1353fbd1619c6acd5192bc01f922eb8b03b81be64ac5c65f18ad5725c1"
     },
     {
-      "path": "docs/QE_2026-10-22/D4Pocket_01_QE\u7d71\u5408\u5b9f\u88c5\u4ed5\u69d8\u66f8_20261022.md",
+      "path": "docs/QE_2026-10-22/D4Pocket_01_QE統合実装仕様書_20261022.md",
       "sha256": "f06cf46d2f89bc13e55ce4fe8a9eac6e80d326da3faba9e77a373ce6fa2c4f7b"
     },
     {
-      "path": "docs/QE_2026-10-22/D4Pocket_02_QE\u7d71\u5408\u5de5\u7a0b\u8868_20261022.md",
+      "path": "docs/QE_2026-10-22/D4Pocket_02_QE統合工程表_20261022.md",
       "sha256": "36aeba6c0694b8dc14a391166fc3f4c9f4ecff5c21f0715575df452077ba7dbc"
     },
     {
-      "path": "docs/QE_2026-10-22/D4Pocket_03_Codex_QE\u65bd\u5de5\u6307\u793a\u66f8_20261022.md",
+      "path": "docs/QE_2026-10-22/D4Pocket_03_Codex_QE施工指示書_20261022.md",
       "sha256": "7c40ff4fb0644e087e6c3bae731ffcde5f8c8eeb3cc63f6c093cf1d585583e20"
     },
     {
-      "path": "docs/QE_2026-10-22/F03_\u5b9f\u7e3e\u6587\u66f8\u5bfe\u5fdc.md",
+      "path": "docs/QE_2026-10-22/F03_実績文書対応.md",
       "sha256": "c05e55641d0563f6b7177bcf3e77d76191dcb68c4232b8bff4b3e41406e84066"
     },
     {
-      "path": "docs/QE_2026-10-22/F04_\u5206\u985e\u30fb\u662f\u6b63\u53f0\u5e33_20261030.md",
+      "path": "docs/QE_2026-10-22/F04_分類・是正台帳_20261030.md",
       "sha256": "b6b7b221c577df19da274d74e967ae1e7410aafa3883d895cfdaa0b1bf07389f"
     },
     {
-      "path": "docs/QE_2026-10-22/F04_\u5206\u985e\u30fb\u662f\u6b63\u53f0\u5e33_20261030.txt",
+      "path": "docs/QE_2026-10-22/F04_分類・是正台帳_20261030.txt",
       "sha256": "9165d6fc902fae4d7f937032b48f20f3ae35d37d45043fbef2300ee74df1b8e2"
     },
     {
-      "path": "docs/QE_2026-10-22/F04_\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb\u539f\u6587_20261030.json.txt",
+      "path": "docs/QE_2026-10-22/F04_日本語基底監査原文_20261030.json.txt",
       "sha256": "4fa48d57ac2ec0fe26b51b581a0de1df2d032e1169fa5f089bf9e9675bf05959"
     },
     {
-      "path": "docs/QE_2026-10-22/F05_remote_codex_branch\u68da\u5378\u3057_20261030.md",
+      "path": "docs/QE_2026-10-22/F05_remote_codex_branch棚卸し_20261030.md",
       "sha256": "b4eeac82122bb6b0ceca5bf772eafb79d0c1434e50afd7b4211633d02f19913c"
     },
     {
-      "path": "docs/QE_2026-10-22/F06_\u6b63\u672c\u7d22\u5f15\u91cd\u8907\u53c2\u7167_20261030.md",
+      "path": "docs/QE_2026-10-22/F06_正本索引重複参照_20261030.md",
       "sha256": "d1631489f5107558be258d34afe33af111a272a1fe25d08771dd31ed37cabdb2"
     },
     {
-      "path": "docs/QE_2026-10-22/F07_rev5\u539f\u672c\u8981\u6c42\u7167\u5408_20261030.md",
+      "path": "docs/QE_2026-10-22/F07_rev5原本要求照合_20261030.md",
       "sha256": "70b26d130cd8bfcdbbb8fa7fe547868496177e6fe0f06b45a7f11bc532299076"
     },
     {
-      "path": "docs/QE_2026-10-22/\u63a1\u7528\u8a18\u9332.md",
+      "path": "docs/QE_2026-10-22/採用記録.md",
       "sha256": "0f9b3f146d13d9ddda79a686ca037a814a92bf8ba2a8e6398239962c78994bdf"
     },
     {
-      "path": "docs/QE_2026-11-05/01_D4Pocket_\u7d71\u5408\u88fd\u54c1\u5b9f\u88c5\u4ed5\u69d8\u66f8_20261105.md",
+      "path": "docs/QE_2026-11-05/01_D4Pocket_統合製品実装仕様書_20261105.md",
       "sha256": "310f3aca23da4cc4685fb53c9679e2881149776be2496074d396b3cec88232be"
     },
     {
-      "path": "docs/QE_2026-11-05/02_D4Pocket_\u7d71\u5408\u958b\u767a\u5de5\u7a0b\u8868_20261105.md",
+      "path": "docs/QE_2026-11-05/02_D4Pocket_統合開発工程表_20261105.md",
       "sha256": "4c8ab701175ceac634720fcf64f909ab4e2392867845575d09ea87d4356406a0"
     },
     {
-      "path": "docs/QE_2026-11-05/03_D4Pocket_Codex\u65bd\u5de5\u6307\u793a\u66f8_20261105.md",
+      "path": "docs/QE_2026-11-05/03_D4Pocket_Codex施工指示書_20261105.md",
       "sha256": "a3422ea4a0ca547fa9d0cd280750f7a8c6f67ed8a40615c2135afbf46136d60e"
     },
     {
-      "path": "docs/QE_2026-11-05/W00_\u8981\u4ef6consumer\u7167\u5408_20261105.md",
+      "path": "docs/QE_2026-11-05/W00_要件consumer照合_20261105.md",
       "sha256": "f9a68f8cf2cfb47a257d8289d6cc9e33fcf8b4cb4638f4dadb1ff41836b4815f"
     },
     {
-      "path": "docs/QE_2026-11-05/W01_G1_\u901a\u5e38ReleaseAgentTask\u8a3c\u62e0_20261107.md",
+      "path": "docs/QE_2026-11-05/W01_G1_通常ReleaseAgentTask証拠_20261107.md",
       "sha256": "4db82e0389b6c320aa5107eb42e2f8aeb00b3a9a7fcc505d23d39e8776e67b0b"
     },
     {
-      "path": "docs/QE_2026-11-05/W02_\u4f5c\u696d\u8a18\u9332_20261107.md",
+      "path": "docs/QE_2026-11-05/W02_作業記録_20261107.md",
       "sha256": "e6b5176ea0867b094d1ebc69245a121b1a7f5fd28d2ccb72939b9340d99ad68c"
     },
     {
-      "path": "docs/QE_2026-11-05/\u63a1\u7528\u8a18\u9332.md",
+      "path": "docs/QE_2026-11-05/採用記録.md",
       "sha256": "36e7c37a228c735f713e9996645d8a86ef6772b17bab0d6453b8c335b1bf3bf6"
     },
     {
-      "path": "docs/QE_2026-11-05/\u9032\u6357.md",
+      "path": "docs/QE_2026-11-05/進捗.md",
       "sha256": "5c1cdb6993c3d99da87b5b2aad12aa55cf617f5eae898ebf32e903f15aeb76df"
     },
     {
-      "path": "docs/QE_2026-11-08/01_D4Pocket_\u7d71\u5408\u88fd\u54c1\u5b9f\u88c5\u4ed5\u69d8\u66f8_20261108.md",
+      "path": "docs/QE_2026-11-08/01_D4Pocket_統合製品実装仕様書_20261108.md",
       "sha256": "138f2183fc09ee0eccf576846a7bd2aae822f238abae6008ee382ff5aae1c7cc"
     },
     {
-      "path": "docs/QE_2026-11-08/02_D4Pocket_\u7d71\u5408\u958b\u767a\u5de5\u7a0b\u8868_20261108.md",
+      "path": "docs/QE_2026-11-08/02_D4Pocket_統合開発工程表_20261108.md",
       "sha256": "aa9e1c7e75cad5e165655bc42d89a4470b892047bd15d1b620f7c7a0af3a95f5"
     },
     {
-      "path": "docs/QE_2026-11-08/03_D4Pocket_Codex\u65bd\u5de5\u6307\u793a\u66f8_20261108.md",
+      "path": "docs/QE_2026-11-08/03_D4Pocket_Codex施工指示書_20261108.md",
       "sha256": "e6730e5e8d027229ea2b9c331ed74eb30f62a086aa5f5a62702039cb18bbc548"
     },
     {
-      "path": "docs/QE_2026-11-08/W02-B01_\u767b\u9332\u5f8cUI\u505c\u6b62\u89b3\u6e2c_20261108.md",
+      "path": "docs/QE_2026-11-08/W02-B01_登録後UI停止観測_20261108.md",
       "sha256": "3016db30fc87926085ac3edda6dd7096823055b23f9866782842674424126a26"
     },
     {
-      "path": "docs/QE_2026-11-08/\u63a1\u7528\u8a18\u9332.md",
+      "path": "docs/QE_2026-11-08/採用記録.md",
       "sha256": "0940beeb1dfeb7d43d293a8fec7161fe497750c93a9991fe59307847896e5ae2"
     },
     {
-      "path": "docs/QE_2026-11-08/\u9032\u6357.md",
+      "path": "docs/QE_2026-11-08/進捗.md",
       "sha256": "e66aeb11cec3d3e099f9e98ddee1670ceaba0dddd0e1a497b6c5c7f65db48a8e"
     },
     {
-      "path": "docs/QE_2026-11-09/01_D4Pocket_\u7d71\u5408\u88fd\u54c1\u5b9f\u88c5\u4ed5\u69d8\u66f8_v3_20261109.md",
+      "path": "docs/QE_2026-11-09/01_D4Pocket_統合製品実装仕様書_v3_20261109.md",
       "sha256": "f059751239c2e8cbc2319c21457cf66aca1a960b38e818b4814313ebdc2b75b6"
     },
     {
-      "path": "docs/QE_2026-11-09/02_D4Pocket_\u7d71\u5408\u958b\u767a\u5de5\u7a0b\u8868_v3_20261109.md",
+      "path": "docs/QE_2026-11-09/02_D4Pocket_統合開発工程表_v3_20261109.md",
       "sha256": "745bbfd3ba1801d17398df71e43fbd3aa2c1b9b498453e02d98ad4d4f7d5af94"
     },
     {
-      "path": "docs/QE_2026-11-09/03_D4Pocket_Codex\u65bd\u5de5\u6307\u793a\u66f8_v3_20261109.md",
+      "path": "docs/QE_2026-11-09/03_D4Pocket_Codex施工指示書_v3_20261109.md",
       "sha256": "9f99895d79b580c3657f2d45b2369d790c685399fd03be3e8957198cd102a70d"
     },
     {
-      "path": "docs/QE_2026-11-09/\u63a1\u7528\u8a18\u9332.md",
+      "path": "docs/QE_2026-11-09/採用記録.md",
       "sha256": "b35d4dc7fee34e82fb71f11d3e230b2d8929061d749bd75abf1f9e8aab8f7cc1"
     },
     {
-      "path": "docs/QE_2026-11-09/\u9032\u6357.md",
+      "path": "docs/QE_2026-11-09/進捗.md",
       "sha256": "0cdff6ca8462da5ecd9cb8014527664cbea352004480056bf8b77bfb333dddce"
     },
     {
-      "path": "docs/QE_2026-11-13/01_D4Pocket_\u7d71\u5408\u88fd\u54c1\u5b9f\u88c5\u4ed5\u69d8\u66f8_v4.md",
+      "path": "docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md",
       "sha256": "8ceedf21f881a783e35ee8642673faaeef949465343df65e63dc21b04ee5a3ef"
     },
     {
-      "path": "docs/QE_2026-11-13/02_D4Pocket_\u7d71\u5408\u958b\u767a\u5de5\u7a0b\u8868_v4.md",
+      "path": "docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md",
       "sha256": "54f1b3e207ec884cbaa67233aef22d0cada2dd0d28fb66e23da91ffbc5c7f721"
     },
     {
-      "path": "docs/QE_2026-11-13/03_D4Pocket_Codex\u65bd\u5de5\u6307\u793a\u66f8_v4.md",
+      "path": "docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md",
       "sha256": "334a79cbc8f7b17d81d27c040c451586c70ad1d355e9b45d6de758dd1aa4f55f"
     },
     {
-      "path": "docs/QE_2026-11-13/E0_\u8981\u6c42consumer\u53f0\u5e33.md",
+      "path": "docs/QE_2026-11-13/E0_要求consumer台帳.md",
       "sha256": "720aa307447446c32599d6a789193bd50950babff2eaf90f05935d817e07e453"
     },
     {
-      "path": "docs/QE_2026-11-13/\u5dee\u5206\u79fb\u884c\u53f0\u5e33.md",
+      "path": "docs/QE_2026-11-13/差分移行台帳.md",
       "sha256": "1d040c9ff17fc47f88dc5da550bdad20a5c976f8c76a7463ae0b3cb09ad7e250"
     },
     {
-      "path": "docs/QE_2026-11-13/\u63a1\u7528\u8a18\u9332.md",
+      "path": "docs/QE_2026-11-13/採用記録.md",
       "sha256": "7a72d078d3d239d66e30332256a35a8019b731005424c75e59fc31beaa60c116"
     },
     {
-      "path": "docs/QE_2026-11-13/\u9032\u6357.md",
+      "path": "docs/QE_2026-11-13/進捗.md",
       "sha256": "7997296eb047406b8de1711f8adca4284748b695596e496a6725936ec8fa8669"
     },
     {
@@ -1632,11 +1632,11 @@
       "sha256": "c663589224ebf1611f95d710812f973b70ca7d2aaa88f58d587bf9908c80ae1c"
     },
     {
-      "path": "docs/QE_2026-11-14/\u63a1\u7528\u8a18\u9332.md",
+      "path": "docs/QE_2026-11-14/採用記録.md",
       "sha256": "963cb8eed54929142aec894629d9e310b084cccda3c4768d4dc726217d8bbd9f"
     },
     {
-      "path": "docs/QE_2026-11-14/\u9032\u6357.md",
+      "path": "docs/QE_2026-11-14/進捗.md",
       "sha256": "579f1fdff093e05ec0e2fd3b5704e949090ad5bede10433da5a7ea02eb7ba917"
     },
     {
@@ -1656,12 +1656,12 @@
       "sha256": "df6fd5f708a67d2aa677ec8bbc4960cb23d6df26f0c15caada74cbd9bce31f27"
     },
     {
-      "path": "docs/QE_2026-11-16/\u63a1\u7528\u8a18\u9332.md",
+      "path": "docs/QE_2026-11-16/採用記録.md",
       "sha256": "61301f37de1136dc5ce664cb3d49fe320a028eeac2097618511a7e7dd84e32b7"
     },
     {
-      "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "aaa1848b15f3b0cea366662a0c158130dc25bfc81302d4daad53ed6a88e8c9e5"
+      "path": "docs/QE_2026-11-16/進捗.md",
+      "sha256": "40b76b91ec0d9a8c75da3cbc1a70d5ae6fccbea29f09ba81f9992b5bc4bab1d6"
     },
     {
       "path": "docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl",
@@ -1716,11 +1716,11 @@
       "sha256": "ec91048e623e3bdd40e0206e2620576613a5bcd58263071445cc21c8bdec442e"
     },
     {
-      "path": "docs/QE_2026-11-21/\u63a1\u7528\u8a18\u9332.md",
+      "path": "docs/QE_2026-11-21/採用記録.md",
       "sha256": "ca07760f4141700892cb0129d7d12467e15731be1d6fd738fecd3b562a37799b"
     },
     {
-      "path": "docs/QE_2026-11-21/\u9032\u6357.md",
+      "path": "docs/QE_2026-11-21/進捗.md",
       "sha256": "544e9dbf8685e70eef50d750045d6b46a154f36364b79b48fc31ad4c1cda5eeb"
     },
     {
@@ -1760,11 +1760,11 @@
       "sha256": "fcf9060536c777f07b38d79c6c3207b38edf02c2240709aabba5f93232885fbc"
     },
     {
-      "path": "docs/QE_2026-11-22/\u63a1\u7528\u8a18\u9332.md",
+      "path": "docs/QE_2026-11-22/採用記録.md",
       "sha256": "acd2fa0ceef3dc7ac65643d7d3f38fef3944d2defb5d0b9bba9f5d4e6f2a80e8"
     },
     {
-      "path": "docs/QE_2026-11-22/\u63a1\u7528\u8a18\u9332_NLC06.md",
+      "path": "docs/QE_2026-11-22/採用記録_NLC06.md",
       "sha256": "eb629cb28fd0977bc6f00454f2fad0f6e4eb01fb5778e412f8fa171324348994"
     },
     {
@@ -1780,7 +1780,7 @@
       "sha256": "0fdc00219aaaf8814a0690588b16f85b66e3d9f63305816f3a16412de603a391"
     },
     {
-      "path": "docs/QE_2026-11-23/\u63a1\u7528\u8a18\u9332_NLC07.md",
+      "path": "docs/QE_2026-11-23/採用記録_NLC07.md",
       "sha256": "eb33cf0a74b9dc5adb306a3bd4f03cf209327d2a04c044e8c31b019423f41aae"
     },
     {
@@ -1810,6 +1810,30 @@
     {
       "path": "docs/STRATEGY.md",
       "sha256": "b829f3bcbda40f0e392ef12b4e9c6489a1e401dd7ec10300afa33da1bf2c6433"
+    },
+    {
+      "path": "docs/V11_2026-11-24/01_D4Pocket_REQUIREMENTS_v11_JA.jsonl",
+      "sha256": "dc0d6b4f2373a1e5d49858ed7633839e538177771b21edbff4235633d7cb472d"
+    },
+    {
+      "path": "docs/V11_2026-11-24/02_D4Pocket_DESIGN_v11_JA.jsonl",
+      "sha256": "2f3d858b6e0350cd0852060f49b37068cdb891f3c6e653ea8ca1157c88ea49df"
+    },
+    {
+      "path": "docs/V11_2026-11-24/03_D4Pocket_IMPLEMENTATION_PLAN_v11_JA.jsonl",
+      "sha256": "e56ddf19731869dcf63c19e30e3b979eedae22c5c3bde66192f7cecd3bc4878a"
+    },
+    {
+      "path": "docs/V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl",
+      "sha256": "3c9b8b6cd9d1e076275a315412d646be51b438ebe3f74596413ff1aa225c195a"
+    },
+    {
+      "path": "docs/V11_2026-11-24/05_D4Pocket_IMPLEMENTATION_INSTRUCTIONS_v11_JA.jsonl",
+      "sha256": "4e6c5bbafa4a258b25a8f0476d88f60b52e873460e3b210a20d023b717d17b8b"
+    },
+    {
+      "path": "docs/V11_2026-11-24/採用記録.md",
+      "sha256": "d3f9ea830a398b1b6f73ccbc44fec7e1ab1f857acfd23bbaf4446bb4e5a5b1ad"
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
@@ -2168,75 +2192,75 @@
       "sha256": "b800c3990332eecbb39356f0de08ce2dde6510b7473764596b7b0582db80efeb"
     },
     {
-      "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u53d7\u9818\u8a18\u9332.json",
+      "path": "docs/総合機能拡張_rev1/受領記録.json",
       "sha256": "a0040c830f78f1ca76569f4c5552b4726ee7fa0b98f0029f19e40fea1bf3509c"
     },
     {
-      "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
+      "path": "docs/総合機能拡張_rev1/実装仕様書.md",
       "sha256": "328149770ee17c84799fb464fa18d2a6180df9df26b0dc928e5fe9c822ffb8be"
     },
     {
-      "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u5b9f\u88c5\u6307\u793a\u66f8.md",
+      "path": "docs/総合機能拡張_rev1/実装指示書.md",
       "sha256": "bcd18701afaf6ee43163bbcb2c362112eeb25de88da42e691ab16605c47e1906"
     },
     {
-      "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u5de5\u7a0b\u8868.md",
+      "path": "docs/総合機能拡張_rev1/工程表.md",
       "sha256": "c7619c0a26f25664de25eb89f5e713b702553c36508113973c4132ea61749e7a"
     },
     {
-      "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
+      "path": "docs/総合機能拡張_rev1/進捗.md",
       "sha256": "7276272fdaca8e35a0ca0b57562ba61a1ed2c19fe7075ea691aff72144bbadfb"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u4e0d\u8db3\u8a3c\u62e0\u4e00\u89a7.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/B0_不足証拠一覧.md",
       "sha256": "c4586ea9b9600ea727922d897ca8dc0be4261fa87dd212817c676ebe3df6992a"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u539f\u56e0\u5bfe\u5fdc\u53f0\u5e33.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/B0_原因対応台帳.md",
       "sha256": "29859975b32121fe6d04f6cfea1c186f7fec3bec512391ba55fd976a55e57cae"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u53c2\u7167\u539f\u672c\u4e00\u89a7.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/B0_参照原本一覧.md",
       "sha256": "3a1e2ab905e422c4703e56701234c99665f4fb0f6da3434cf3f021cb13c7c1a9"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u91cd\u8907\u5883\u754c\u56f3.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/B0_重複境界図.md",
       "sha256": "12644359edbf9002d99a57f223558e71e9b50db6af327c4779a80bfa972e65bc"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B1_\u8a2d\u8a08QC.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/B1_設計QC.md",
       "sha256": "4b82eda79dd7bd8a12f865c15869617d6ed19561274ee95695035356f0b5ac4a"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B2_\u5b9f\u884cQC.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/B2_実行QC.md",
       "sha256": "c0453309f1e631b1bc2c60014d02cc885c81c3081ea812e7fdfaa8121216973c"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B3_\u5168\u539f\u56e0\u6a5f\u69cb\u5bfe\u5fdc.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md",
       "sha256": "0fdb32ccc04d59d05e533cc6a15df09ca26a207ba97486691ccbedc3d85d3c55"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B4_\u88fd\u54c1\u63a5\u7d9a\u8a2d\u8a08.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/B4_製品接続設計.md",
       "sha256": "19d06c8d1dfb35e015c6985ff7fa5165818be0b8ff6d32d9419183d0d6464384"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md",
       "sha256": "1c405ceebe84697ff704bfc5582ac65ed0a486e927404360f4ef61cda77900f4"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/実装仕様書.md",
       "sha256": "a354e8493ee3a86dd480fcef256fd9bdb569631b5735b3155fac41ea77e38473"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u6307\u793a\u66f8.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/実装指示書.md",
       "sha256": "e33c7ce0cfb92b4032e24fae74a8fb2a8798f9154e75f1c0564f379a0e585507"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5de5\u7a0b\u8868.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/工程表.md",
       "sha256": "f57eab65a759e55015f1091aebcfcae954fbd8628b80f58c6ae68badfd4345e8"
     },
     {
-      "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
+      "path": "docs/緩衝基盤_rev5補遺_QC/採用記録.md",
       "sha256": "a4a5f6acf7f4b7fea143e3eb9421b1a8daf72f82479d80fbcc253dad30e6551d"
     },
     {
@@ -5117,7 +5141,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "9ce6006fecda5d425ad4e60195577d4135e58955884407d2c7c7f7d0e223cc42"
+      "sha256": "d4b873a3fcdd4fb72e8d1b0bbabeefb54fa6a2c20075a3bb9ba8874c9b2a29ab"
     },
     {
       "path": "requirements-dev.txt",
@@ -5961,7 +5985,7 @@
     },
     {
       "path": "tooling/current_governance_check.py",
-      "sha256": "7908e60d15898c67a1da617b24cd83c1c8dc2574ce532124731a7f93fe16d92b"
+      "sha256": "518f0d59a54f8c44fe1b98bbeeabf680f55a4bdd15bc6d9d86626ca5fd9e8877"
     },
     {
       "path": "tooling/device_link_live_check.py",
@@ -6050,6 +6074,10 @@
     {
       "path": "tooling/mobile_product_candidate_metadata.py",
       "sha256": "847186c1519322b6de5500b28bd8cceff545e2cf8657c7b2440d3f71f2fdf24a"
+    },
+    {
+      "path": "tooling/nlc08_governance_check_legacy.py",
+      "sha256": "8457b32ae090419469bec0a765bd6ce1cbac42e225e4bf26ddc008fa31f85a21"
     },
     {
       "path": "tooling/package_android_product_candidate.py",
@@ -6189,7 +6217,7 @@
     },
     {
       "path": "tooling/tests/test_current_governance_check.py",
-      "sha256": "6d4844f619ab5a3124e5ca3734f0d5c16a0bd46ecaf3bda34b849c9c7d4c86b0"
+      "sha256": "0e45fc1265eece73266958412ef6837ebd4100dd6d28fafe18382438d679bca2"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -6246,6 +6274,10 @@
     {
       "path": "tooling/tests/test_module_feature_selection.py",
       "sha256": "79271b6dbd91c629ec95d51f5e465dc2ff329bc54e13ebac708754a1448a332f"
+    },
+    {
+      "path": "tooling/tests/test_nlc08_governance_legacy.py",
+      "sha256": "3a753b32fff54ea704664b27a49352260c921e87ef2e432e6a97558fdc1c9c16"
     },
     {
       "path": "tooling/tests/test_release_gate_owner_go.py",
@@ -6308,20 +6340,20 @@
       "sha256": "34145af6b2e92b8886501ae2bd1126b97ccb0b2faf2bab234ef6f8d7336a64be"
     },
     {
-      "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",
+      "path": "tooling/日本語基底監査.py",
       "sha256": "1d4c1ee5517c1ca09c96286174eae92ce5c919a6f978514f4f9ed2d29150f8da"
     },
     {
-      "path": "\u898f\u5b9a/00_\u65e5\u672c\u8a9e\u57fa\u5e95\u898f\u5b9a.md",
+      "path": "規定/00_日本語基底規定.md",
       "sha256": "c6e9e1a3c881a76342e0749277030f4e14034526c7d3c335ca8d396c05f71ea1"
     },
     {
-      "path": "\u898f\u5b9a/\u65e5\u672c\u8a9e\u57fa\u5e95\u4f8b\u5916.json",
+      "path": "規定/日本語基底例外.json",
       "sha256": "06e4432c37cf8019bf621aa9afb60450d209ee0642f315820890bea4f3228d4b"
     },
     {
-      "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "7e2de0342ca06ea25045420fd0c8cc674041457a5e548f78bb90cbe12b4487a4"
+      "path": "規定/正本索引.json",
+      "sha256": "521f0912eb690cccdf3a0e65d28176f86855a224880476639dd2f0823639e3c0"
     }
   ]
 }

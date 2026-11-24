@@ -7,9 +7,9 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 名前のとおり目指すのは、異なる能力やRuntimeを必要に応じて取り出し、安全に組み合わせられる**エージェントのための四次元ポケット**。特定のLLMやBLUE-TANUKI専用のフロントエンドではありません。
 
-[現行仕様 v9](docs/QE_2026-11-23/01_D4Pocket_SPEC_v9_NLC08.jsonl) · [現行工程 v9](docs/QE_2026-11-23/02_D4Pocket_PLAN_v9_NLC08.jsonl) · [現行施工指示 v9](docs/QE_2026-11-23/03_D4Pocket_CODEX_v9_NLC08.jsonl) · [v9 NLC08採用記録](docs/QE_2026-11-23/採用記録_NLC08.md) · [v8継続施工証拠](docs/QE_2026-11-16/進捗.md) · [v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
+[現行要求仕様 v11](docs/V11_2026-11-24/01_D4Pocket_REQUIREMENTS_v11_JA.jsonl) · [現行設計仕様 v11](docs/V11_2026-11-24/02_D4Pocket_DESIGN_v11_JA.jsonl) · [現行実装工程 v11](docs/V11_2026-11-24/03_D4Pocket_IMPLEMENTATION_PLAN_v11_JA.jsonl) · [現行品質工程 v11](docs/V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl) · [現行実装実行指示 v11](docs/V11_2026-11-24/05_D4Pocket_IMPLEMENTATION_INSTRUCTIONS_v11_JA.jsonl) · [採用記録](docs/V11_2026-11-24/採用記録.md) · [作業要領](AGENTS.md) · [旧v9 NLC08履歴](docs/QE_2026-11-23/採用記録_NLC08.md)
 
-> **開発中 — 製品リリース未宣言。** 現行正本は[2026-11-23採用のv9 NLC08三点セット](docs/QE_2026-11-23/採用記録_NLC08.md)です。NLC08はrun #8の開発test初期化検査矛盾だけを是正し、製品進捗の再判定ではなく、実装・QA・出荷状態を再評価していません。v8継続施工証拠に記録されたE0=`CLOSED`、E1=`IN_PROGRESS`、E2/E3=`OPEN`、E4/E5=`NOT_RUN`、E6=`NOT_STARTED`と、E1のA〜J本番Source初回一巡・五OSのinstalled製品QA未完を、その対象・時点のまま保持します。v5のN/W受入証拠も未閉包確認に継続使用し、NLC08の実証へ自動転記しません。Windows、macOS、Linux、Android、iOSはすべて必須対象です。NLC04採用前のRelease Registry snapshotは18件中16件未解決、`release_ready=false`であり、文書採用だけで変更しません。以下の2026-11-10時点の表も限定証拠の履歴です。
+> **開発中・製品リリース未宣言。** 2026-11-24採用v11では要求・設計・実装開発工程・実装実行指示と、独立の品質工程を分離。実装完成=必須Source/54結線/五OSビルドが実体化した状態。品質検査・品質保証・本人再GO・未委任公開を実装工程の完了条件にしない。現在の実装/QA/Release完成は本採用だけで成立しない。製品使用中の認証Broker/本人Permission・Approvalは維持。旧v8/v9の進捗と16件の未解決Release Blockerは当時の事実として保持し、現行完成へ転記しない。下表は2026-11-10時点の限定履歴。
 
 ## D4 Pocketが変えようとしていること
 

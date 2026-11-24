@@ -1,7 +1,7 @@
 {
   "version": 1,
   "release_ready": false,
-  "release_ready_reason": "完成製品のreleaseには2026-11-21採用v9三点の全必須Acceptanceと対象platformの同一候補証拠、監査署名、正式配布条件、owner GOが必要。正本は規定/正本索引.jsonの現行施工採用欄へ結合する。旧版の工程名・限定証拠・文書更新だけではrelease readinessを満たさない。",
+  "release_ready_reason": "現行採用は2026-11-24 v11五文書（要求/設計/実装開発/品質独立/実装指示）。実装完了と品質検査は別工程で、本人の再GOは両者の成立条件ではない。release_readyは外部公開・正式配布等の独立条件を扱い、公開が未委任なら自動実行しない。18件の既存Blockerと16未解決/2解決は現時点の履歴/配布条件として保持し、文書採用で解決済みへ変えない。",
   "blockers": [
     {
       "name": "windows_evidence_provenance_isolation",
@@ -11,7 +11,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "platform_evidence",
-      "release_tracks": ["windows_v1"],
+      "release_tracks": [
+        "windows_v1"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
       "reason": "分離したWindowsソース・成果物・証拠の由来が、リリース前に機械検証へ合格する必要があります。",
@@ -25,7 +27,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "platform_evidence",
-      "release_tracks": ["windows_v1"],
+      "release_tracks": [
+        "windows_v1"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
       "reason": "2026-09-29のcollector v15 DiagnosticOnly runでは、起動器経由・No-Python起動、122 nodeのControl View、必須4 surface、trayの通常終了、起動／終了Audit、初回設定生成とaccepted Audit hash一致を実測した。Setup Doctor reportはpass。surface validatorは合格したが、run statusはdiagnostic_onlyでstage作業者と同じWindows profileのため、strict first-run validatorはこの2条件でrelease_blockerを返した。別profileのformal evidenceは未成立。",
@@ -39,7 +43,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "platform_evidence",
-      "release_tracks": ["windows_v1"],
+      "release_tracks": [
+        "windows_v1"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
       "reason": "Flutter 3.44.0 Releaseのcollector v15診断専用実行でControl View 122要素、必須4画面領域、tray通常終了、Setup Doctor製品報告の成功を観測した。Setup Doctor画面そのものの操作者向け可読性、別profileでの正式証拠、strict validator合格は未成立です。",
@@ -53,7 +59,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "platform_evidence",
-      "release_tracks": ["windows_v1"],
+      "release_tracks": [
+        "windows_v1"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
       "reason": "現行main commit f740fff64248d1a16b900fafa790a65f245e9150を対象にしたWindows Actions #29で、clean source由来standalone Release helperのBroker起動・認証IPC・通常資格でのTask grant拒否・restart replay拒否・fresh health・強制停止後fail-closed・session資格file cleanupをLIVE_RUNTIMEで確認した。ただし正式Windows installed evidence bundleへの取込み、final packageとのartifact同一性、installed product起動経路を示していないため、release gateは未成立。",
@@ -164,7 +172,10 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "production_secret",
-      "release_tracks": ["windows_v1", "mobile"],
+      "release_tracks": [
+        "windows_v1",
+        "mobile"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "reason": "オフラインEd25519署名checkpointの実検証経路は実装したが、owner公開鍵固定・実署名・独立した最新継続性記録は未取得。",
@@ -177,7 +188,10 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "owner_decision",
-      "release_tracks": ["windows_v1", "mobile"],
+      "release_tracks": [
+        "windows_v1",
+        "mobile"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "reason": "所有者の明示GOが記録されていません。",
@@ -190,7 +204,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "technical_blocker",
-      "release_tracks": ["non_windows"],
+      "release_tracks": [
+        "non_windows"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "latest_evidence": {
@@ -234,7 +250,9 @@
         "status": "pending_standard_os_evidence",
         "history_preserved": true
       },
-      "release_tracks": ["mobile"],
+      "release_tracks": [
+        "mobile"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "reason": "Android実機検証は2026-09-11のowner指示で凍結中。iOSを含む実機のinstall・起動・結合・対話・安全保管・lifecycleの実測は未取得。",
@@ -247,7 +265,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "distribution_identity",
-      "release_tracks": ["mobile"],
+      "release_tracks": [
+        "mobile"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "reason": "Mobileの正式配布識別子・署名・配布経路が未確定。",
@@ -260,7 +280,9 @@
       "active": false,
       "classification": "release_blocker",
       "cause_category": "platform_evidence",
-      "release_tracks": ["windows_v1"],
+      "release_tracks": [
+        "windows_v1"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "reason": "2026-09-11にWindows開発appの13画面表示、実MINIDORA二系統の承認待ち・応答・個別中止・新規session・片側失敗の隔離を実測した。Linux起動証拠と合わせた開発回帰の範囲。詳細はdocs/REV2_PROGRESS.md。",
@@ -413,14 +435,29 @@
           "purpose": "development_progression_not_final_product_acceptance",
           "active_phase": "R2",
           "ledger_path": "docs/REV4_ACCEPTANCE_LEDGER.md",
-          "condition_order": ["R2-A", "R2-B", "R2-C", "R2-D", "R2-E", "R2-F", "R2-G", "R2-H"],
+          "condition_order": [
+            "R2-A",
+            "R2-B",
+            "R2-C",
+            "R2-D",
+            "R2-E",
+            "R2-F",
+            "R2-G",
+            "R2-H"
+          ],
           "active_condition": "R2-B",
           "active_condition_status": "IMPLEMENTING",
           "closed_condition_retest": "forbidden_without_specific_regression_evidence",
           "deferred_final_assurance": {
             "formal_evidence_phase": "R13",
             "integrated_final_qa_phase": "R14",
-            "scope": ["全数回帰", "長時間稼働", "fault injection", "performance", "最終統合状態のFormal Evidence"]
+            "scope": [
+              "全数回帰",
+              "長時間稼働",
+              "fault injection",
+              "performance",
+              "最終統合状態のFormal Evidence"
+            ]
           },
           "safety_contracts_unchanged": true
         },
@@ -435,14 +472,28 @@
           "R2-A": {
             "date": "2026-10-05",
             "status": "CLOSED",
-            "evidence_sources": ["LIVE_RUNTIME", "CONFIG", "FIXTURE", "INTERNAL_STATE"],
+            "evidence_sources": [
+              "LIVE_RUNTIME",
+              "CONFIG",
+              "FIXTURE",
+              "INTERNAL_STATE"
+            ],
             "installed_run_id": "d4p-r2-A-cd4f2ab-run2",
             "cancel": {
               "task_id": "e3a093e56923d91b8f2053336df094cd",
-              "permission_audit_ids": ["broker-audit-139", "broker-audit-140"],
-              "owner_approval_audit_ids": ["broker-audit-142", "broker-audit-143"],
+              "permission_audit_ids": [
+                "broker-audit-139",
+                "broker-audit-140"
+              ],
+              "owner_approval_audit_ids": [
+                "broker-audit-142",
+                "broker-audit-143"
+              ],
               "task_start_audit_id": "broker-audit-146",
-              "cancel_audit_ids": ["broker-audit-148", "broker-audit-149"],
+              "cancel_audit_ids": [
+                "broker-audit-148",
+                "broker-audit-149"
+              ],
               "terminal_audit_id": "broker-audit-151",
               "terminal_status": "cancelled",
               "recovery_action": "Workspace差分を確認",
@@ -452,8 +503,14 @@
             "deadline": {
               "session_id": "253b9133001ba0189eac12c210debc4b",
               "task_id": "38285d80bf8d4aa0d088fb93b81211c5",
-              "permission_audit_ids": ["broker-audit-167", "broker-audit-168"],
-              "owner_approval_audit_ids": ["broker-audit-169", "broker-audit-170"],
+              "permission_audit_ids": [
+                "broker-audit-167",
+                "broker-audit-168"
+              ],
+              "owner_approval_audit_ids": [
+                "broker-audit-169",
+                "broker-audit-170"
+              ],
               "task_start_audit_id": "broker-audit-173",
               "terminal_audit_id": "broker-audit-182",
               "terminal_status": "failed",
@@ -483,7 +540,10 @@
           "runtime provenanceとinstalled artifact identityを現行Release evidenceへ結合"
         ],
         "scope_frozen": true,
-        "after_r2": ["R3 Multi-Agent Compare", "R4 Handoff"],
+        "after_r2": [
+          "R3 Multi-Agent Compare",
+          "R4 Handoff"
+        ],
         "promotion_rule": "closed_conditions_reuse_existing_evidenceとremaining_conditionsをすべて適切な証拠でPASSしたらsupportedへ昇格する。PASS後に仮説的riskでunsupportedを維持しない。"
       },
       "r2_windows_rust_manual_validation_run37": {
@@ -596,7 +656,11 @@
         "task_id": "7ec80a7ebc87995f3f2d4c68ee44c4ec",
         "task_start_audit_id": "broker-audit-70",
         "task_recovery_audit_id": "broker-audit-78",
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "result": "broker_restart_recovery_audit_passed_process_group_cleanup_unverified",
         "artifact_identity": {
           "manifest_sha256": "sha256:de67d49d7d3e90b6044f57fba5433c93ef3df2091bbf2dda80228d967f253de9",
@@ -698,7 +762,10 @@
       },
       "installed_task_cancellation_probe_120s_registration_hang_2026_10_05": {
         "date": "2026-10-05",
-        "evidence_sources": ["LIVE_RUNTIME", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "FIXTURE"
+        ],
         "current_repository_head": "7126ae0d9a3df3d0b0dd5d0b5efc1e4132169e33",
         "installed_artifact_source_commit": "f888c7e0d4abb499c9524849c2605570748a0146",
         "source_worktree_clean": false,
@@ -726,7 +793,12 @@
           "runtime_id": "codex-local",
           "workspace_id": "workspace-local",
           "codex_cli": "codex-cli 0.160.0; --version and exec --help interface probes succeeded",
-          "audit_refs": ["broker-audit-32", "broker-audit-33", "broker-audit-34", "broker-audit-35"],
+          "audit_refs": [
+            "broker-audit-32",
+            "broker-audit-33",
+            "broker-audit-34",
+            "broker-audit-35"
+          ],
           "permission_or_task_approval_created": false,
           "task_started": false
         },
@@ -987,7 +1059,11 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "technical_blocker",
-      "release_tracks": ["windows_v1", "mobile", "non_windows"],
+      "release_tracks": [
+        "windows_v1",
+        "mobile",
+        "non_windows"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
       "broker_codex_task_fixture_probe": {
@@ -1176,7 +1252,10 @@
         "date": "2026-10-01",
         "source_base_commit": "0f807201ec011acab1c8f73cd78d7345db10b1b5",
         "source_tree_clean": false,
-        "evidence_sources": ["LIVE_RUNTIME", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "FIXTURE"
+        ],
         "validation": "Local Windows focused native Owner registration test: 1 passed; current-source Release Broker production negative-gate E2E: 1 passed; Rust all-target check passed; serial all-target tests: 13 targets, 444 passed, 0 failed, 7 ignored; Schema 152, examples 152, negative fixtures 195; Conformance 231 checks; Desktop Flutter analyze and focused registration Widget test passed in a short-path source copy. Windows manual Actions #32 and Desktop Flutter manual Actions #10 both passed on the exact committed source; evidence and scope are recorded below.",
         "hosted_actions": {
           "source_commit": "fc8144c743c980b004637952f31734e4ca9910da",
@@ -1192,7 +1271,15 @@
             "duration_seconds": 964,
             "runner": "windows-2025",
             "toolchain": "Rust/Cargo 1.95.0",
-            "checks": ["rustfmt", "cargo check --all-targets", "serial cargo test --all-targets", "Release Broker helper build", "authenticated loopback IPC negative-gate smoke", "runner cleanup", "post-test clean tree"]
+            "checks": [
+              "rustfmt",
+              "cargo check --all-targets",
+              "serial cargo test --all-targets",
+              "Release Broker helper build",
+              "authenticated loopback IPC negative-gate smoke",
+              "runner cleanup",
+              "post-test clean tree"
+            ]
           },
           "desktop_flutter": {
             "run_id": 36835318511,
@@ -1201,7 +1288,13 @@
             "duration_seconds": 483,
             "runner": "windows-2025",
             "flutter_version": "3.44.0",
-            "checks": ["Rust helper build", "Desktop flutter analyze", "all Desktop Flutter tests", "Mobile flutter analyze", "post-test clean tree"]
+            "checks": [
+              "Rust helper build",
+              "Desktop flutter analyze",
+              "all Desktop Flutter tests",
+              "Mobile flutter analyze",
+              "post-test clean tree"
+            ]
           },
           "artifacts_uploaded": false,
           "pull_request_created": false
@@ -1296,7 +1389,10 @@
         "source_commit": "59b32108dc0003a6834d4be9059970c9f95b898c",
         "production_source_unchanged": true,
         "cli_version": "codex-cli 0.160.0",
-        "evidence_sources": ["LIVE_RUNTIME", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "FIXTURE"
+        ],
         "validation": "cargo +1.95.0 build --locked --offline --manifest-path native/rust_helper/Cargo.toml --release --bin gui_shell_rust_helper succeeded with existing MINIDORA dead-code warnings. Focused ignored production Broker E2E windows::production_agent_task_gate_fails_closed_over_authenticated_ipc passed 1/1 after two sequential Release Broker processes used the same synthetic store. cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1 passed 449, failed 0, ignored 7. Schema check passed: 152 schemas, 152 examples, 196 negative fixtures. Conformance passed: 231 checks. rustfmt --check and git diff --check passed. python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows passed all 10 development checks; strict Japanese audit 1134 files/0 findings; Manifest 1131 files; release_ready remained false. Release helper SHA-256: D616F45F1B288983B1756F666FE61F5406382B29A87A24424451BF58CFA801E.",
         "observations": {
           "broker_restart": "The standalone Release Broker was shut down normally and restarted against the same isolated synthetic store. Restart created a different authenticated session ID and secret. A pre-restart request was rejected with no body; a fresh request was accepted.",
@@ -1431,7 +1527,11 @@
         "date": "2026-10-02",
         "source_commit": "c0b15ae82a46a298e42bc2aaf54615d4c32682dd",
         "source_worktree_clean": true,
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "installed_manifest": {
           "run_id": "r2-owner-e2e-c0b15ae-20261002a",
           "broker_mediated": true,
@@ -1458,7 +1558,10 @@
         "status": "blocked_before_owner_registration",
         "source_commit": "7dbeba1361d852180dd12c4165fffcab6e355da9",
         "clean_source_archive_matches_commit": true,
-        "evidence_sources": ["LIVE_RUNTIME", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "FIXTURE"
+        ],
         "run_id": "r2-synthetic-task-e2e-7dbeba1-run4",
         "toolchain": {
           "flutter": "3.44.0",
@@ -1508,7 +1611,10 @@
         "date": "2026-10-02",
         "status": "failed_after_task_started",
         "source_commit": "7dbeba1361d852180dd12c4165fffcab6e355da9",
-        "evidence_sources": ["LIVE_RUNTIME", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "FIXTURE"
+        ],
         "run_id": "r2-synthetic-task-e2e-7dbeba1-run7",
         "toolchain": {
           "flutter": "3.44.0",
@@ -1569,7 +1675,11 @@
         "status": "positive_task_completed_with_release_blockers",
         "source_commit": "19bab4e05b152b99ac1a01308f6be17f7d7721b0",
         "source_worktree_clean": true,
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "run_id": "d4p-r2-19bab4e-run23",
         "toolchain": {
           "codex_cli": "0.159.2",
@@ -1590,7 +1700,11 @@
         },
         "observations": {
           "production_path": "Staged Flutter UI -> Windows Runner PID-bound named-pipe relay -> production Rust Broker -> real Codex CLI/MxC -> loopback fake Responses API.",
-          "owner_decisions": ["Runtime/Workspace registration", "one-use agent_task.execute Workspace Permission", "separate one-use Task Approval"],
+          "owner_decisions": [
+            "Runtime/Workspace registration",
+            "one-use agent_task.execute Workspace Permission",
+            "separate one-use Task Approval"
+          ],
           "session_id": "566fb8538a6ac3afa6fe026fa831d83e",
           "permission_audit_ref": "broker-audit-83",
           "approval_audit_ref": "broker-audit-85",
@@ -1667,7 +1781,11 @@
         "source_worktree_clean": true,
         "test_harness_source_commit": "9c1f8a777728efc2ab02c8ae4e4e8addd10a0282",
         "test_harness_worktree_clean": false,
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "run_id": "d4p-r2-run27-9c1f8a",
         "toolchain": {
           "rust": "1.95.0",
@@ -1689,7 +1807,11 @@
         },
         "observations": {
           "production_path": "Staged Flutter UI -> PID-bound named-pipe relay -> production Rust Broker -> real Codex CLI/MxC -> loopback fake Responses API.",
-          "owner_decisions": ["Runtime/Workspace registration", "one-use agent_task.execute Workspace Permission", "separate one-use Task Approval"],
+          "owner_decisions": [
+            "Runtime/Workspace registration",
+            "one-use agent_task.execute Workspace Permission",
+            "separate one-use Task Approval"
+          ],
           "session_id": "15e47a5f7d02173b29210ece3c914c99",
           "permission_audit_ref": "broker-audit-56",
           "approval_audit_ref": "broker-audit-58",
@@ -1760,7 +1882,11 @@
         "status": "cancelled_after_task_started",
         "source_commit": "9159b88f73e1036381493a957545535afd48c5cc",
         "source_worktree_clean": true,
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "run_id": "d4p-r2-run31-9159b88",
         "installed_manifest": {
           "stage_run_id": "d4p-r2-run30-9159b88",
@@ -1769,7 +1895,10 @@
           "launcher_sha256": "sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671",
           "fake_responses_api_sha256": "sha256:b2924713cf72cecc8ab5eb2d555c534a53af8650026492320f19f08b55b2cdc2"
         },
-        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "owner_decisions": [
+          "one-use Workspace Permission",
+          "separate one-use Task Approval"
+        ],
         "task_attempts": [
           {
             "task_id": "1e908929679bf19963495eebf5feb172",
@@ -1847,8 +1976,14 @@
           },
           "cleanup": {
             "fake_api_listener_absent": true,
-            "frontend_pids_remaining": [3932, 20140],
-            "launcher_pids_remaining": [16816, 15584],
+            "frontend_pids_remaining": [
+              3932,
+              20140
+            ],
+            "launcher_pids_remaining": [
+              16816,
+              15584
+            ],
             "windows_hidden_in_notification_area": true,
             "desktop_exit_audit_ref": null,
             "cleanup_complete": false
@@ -1857,8 +1992,14 @@
         "post_owner_reported_exit_check": {
           "observed_at_utc": "2026-10-03T09:01:50Z",
           "owner_reported_exit": true,
-          "frontend_pids_still_alive": [3932, 20140],
-          "launcher_pids_still_alive": [16816, 15584],
+          "frontend_pids_still_alive": [
+            3932,
+            20140
+          ],
+          "launcher_pids_still_alive": [
+            16816,
+            15584
+          ],
           "main_window_handles": 0,
           "audit_event_count": 158,
           "audit_last_event_id": "broker-audit-158",
@@ -1880,7 +2021,11 @@
         "test_harness_source_commit": "209751720b973ce52ebf1dbb60137485bc9f56f8",
         "test_harness_worktree_clean": true,
         "fake_api_artifact_hash_captured": false,
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "run_id": "d4p-r2-run32-2097517",
         "installed_manifest": {
           "stage_run_id": "d4p-r2-run30-9159b88",
@@ -1888,7 +2033,10 @@
           "broker_sha256": "sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d",
           "launcher_sha256": "sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671"
         },
-        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "owner_decisions": [
+          "one-use Workspace Permission",
+          "separate one-use Task Approval"
+        ],
         "task_attempts": [
           {
             "task_id": "bc442f051d8ac54a7568bd45b7b04e59",
@@ -1941,7 +2089,11 @@
         "test_harness_source_commit": "209751720b973ce52ebf1dbb60137485bc9f56f8",
         "test_harness_worktree_clean": true,
         "fake_api_artifact_hash_captured": false,
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "run_id": "d4p-r2-run33-2097517",
         "installed_manifest": {
           "stage_run_id": "d4p-r2-run30-9159b88",
@@ -1949,7 +2101,10 @@
           "broker_sha256": "sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d",
           "launcher_sha256": "sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671"
         },
-        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "owner_decisions": [
+          "one-use Workspace Permission",
+          "separate one-use Task Approval"
+        ],
         "task_attempt": {
           "task_id": "367b5900ae9281c701f8999b634fb2a2",
           "status": "failed",
@@ -2000,7 +2155,11 @@
         "test_harness_source_commit": "209751720b973ce52ebf1dbb60137485bc9f56f8",
         "test_harness_worktree_clean": true,
         "fake_api_artifact_hash_captured": false,
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "run_id": "d4p-r2-run34-2097517",
         "installed_manifest": {
           "stage_run_id": "d4p-r2-run30-9159b88",
@@ -2008,7 +2167,10 @@
           "broker_sha256": "sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d",
           "launcher_sha256": "sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671"
         },
-        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "owner_decisions": [
+          "one-use Workspace Permission",
+          "separate one-use Task Approval"
+        ],
         "task_attempt": {
           "task_id": "1ebd3e158075f9e8f70b670185ae8718",
           "status": "failed",
@@ -2081,7 +2243,11 @@
         "test_harness_source_commit": "0acda4705c432c298269ace5b23abfa35960213d",
         "test_harness_worktree_clean": true,
         "fake_api_artifact_hash_captured": true,
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "run_id": "d4p-r2-run35-0acda47",
         "installed_manifest": {
           "stage_run_id": "d4p-r2-run30-9159b88",
@@ -2111,18 +2277,33 @@
           "version_captured": false,
           "real_cli_mxc_tool_child_observed": true
         },
-        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "owner_decisions": [
+          "one-use Workspace Permission",
+          "separate one-use Task Approval"
+        ],
         "task_attempt": {
           "task_id": "933db3b53d0641ab8b842a1a8d640856",
           "status": "completed",
-          "permission_audit_refs": ["broker-audit-60", "broker-audit-61"],
-          "approval_audit_refs": ["broker-audit-63", "broker-audit-64"],
-          "start_audit_refs": ["broker-audit-66", "broker-audit-67"],
+          "permission_audit_refs": [
+            "broker-audit-60",
+            "broker-audit-61"
+          ],
+          "approval_audit_refs": [
+            "broker-audit-63",
+            "broker-audit-64"
+          ],
+          "start_audit_refs": [
+            "broker-audit-66",
+            "broker-audit-67"
+          ],
           "state_query_audit_ref": "broker-audit-75",
           "result_hash": "sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab",
           "completion_event_ref": "broker-audit-70",
           "completion_event_note": "The event reason records Agent Task completion and its result hash, while the outer operation field is AgentTask取消 because the state pump ran during a cancel request. A later state query returned completed. The event is preserved without relabeling its operation.",
-          "cancel_audit_refs": ["broker-audit-69", "broker-audit-70"],
+          "cancel_audit_refs": [
+            "broker-audit-69",
+            "broker-audit-70"
+          ],
           "duplicate_cancel_rejected_ref": "broker-audit-71",
           "instruction_hash": "sha256:925fe4108448289885e4d5b48452c6cd9986f8102d3d501272954c109cc8a165"
         },
@@ -2188,7 +2369,11 @@
         "test_harness_source_commit": "6e31a1c0b6b8d22481bab6bd61d93a77edbfc660",
         "test_harness_worktree_clean": true,
         "fake_api_artifact_hash_captured": true,
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "run_id": "d4p-r2-run36-6e31a1c",
         "installed_manifest": {
           "build_feature": "r2-e2e",
@@ -2204,14 +2389,26 @@
           "real_model_used": false,
           "mxc_tool_child_observed": true
         },
-        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "owner_decisions": [
+          "one-use Workspace Permission",
+          "separate one-use Task Approval"
+        ],
         "task_attempt": {
           "task_id": "0e548cb404c14d12c057a4a80e9ced98",
           "session_id": "c8b0cd0031dc7d08db72f426d5074542",
           "status": "failed",
-          "permission_audit_refs": ["broker-audit-73", "broker-audit-74"],
-          "approval_audit_refs": ["broker-audit-75", "broker-audit-76"],
-          "start_audit_refs": ["broker-audit-79", "broker-audit-80"],
+          "permission_audit_refs": [
+            "broker-audit-73",
+            "broker-audit-74"
+          ],
+          "approval_audit_refs": [
+            "broker-audit-75",
+            "broker-audit-76"
+          ],
+          "start_audit_refs": [
+            "broker-audit-79",
+            "broker-audit-80"
+          ],
           "terminal_state_audit_ref": "broker-audit-94",
           "terminal_reason": "Agent Task失敗・取消（RecoveryAction=Workspace差分を確認）"
         },
@@ -2284,7 +2481,11 @@
         "test_harness_source_commit": "3688fa0fc0a50d3f06df40d003b8115c194846e1",
         "test_harness_worktree_clean": true,
         "fake_api_artifact_hash_captured": true,
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "run_id": "d4p-r2-run37-3688fa0",
         "installed_manifest": {
           "build_feature": "r2-e2e",
@@ -2317,14 +2518,26 @@
           "real_model_used": false,
           "mxc_tool_child_observed": true
         },
-        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "owner_decisions": [
+          "one-use Workspace Permission",
+          "separate one-use Task Approval"
+        ],
         "task_attempt": {
           "task_id": "7d3b5a7c71758370f35192231f7211e8",
           "session_id": "7eaa7c009934aed6cff2e0452b2fb597",
           "status": "completed",
-          "permission_audit_refs": ["broker-audit-50", "broker-audit-51"],
-          "approval_audit_refs": ["broker-audit-53", "broker-audit-54"],
-          "start_audit_refs": ["broker-audit-58", "broker-audit-59"],
+          "permission_audit_refs": [
+            "broker-audit-50",
+            "broker-audit-51"
+          ],
+          "approval_audit_refs": [
+            "broker-audit-53",
+            "broker-audit-54"
+          ],
+          "start_audit_refs": [
+            "broker-audit-58",
+            "broker-audit-59"
+          ],
           "state_query_and_completion_audit_ref": "broker-audit-65",
           "completion_reason_classification": "Agent Task完了（結果本文非保存・hashのみ）",
           "result_hash": "sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab",
@@ -2399,7 +2612,11 @@
         "source_commit": "ffd2e02729f5726a7ea631b0623420f8737ed442",
         "source_worktree_clean": true,
         "run_id": "d4p-r2-run38-ffd2e02",
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "build": {
           "feature": "r2-e2e",
           "flutter": "3.44.0 Release",
@@ -2518,7 +2735,11 @@
         "source_commit": "38624dda3fe80d2ec955728ee3cb98d13db7b0c8",
         "source_worktree_clean": true,
         "run_id": "d4p-r2-run43-38624dd",
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "build": {
           "feature": "r2-e2e",
           "flutter": "3.44.0 Release",
@@ -2548,9 +2769,18 @@
           "task_id": "4e5d884a4d0798e9d67fc1a0b80a6c26",
           "status": "completed",
           "result_hash": "sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab",
-          "workspace_permission_audit_refs": ["broker-audit-52", "broker-audit-53"],
-          "task_approval_audit_refs": ["broker-audit-54", "broker-audit-55"],
-          "task_start_audit_refs": ["broker-audit-57", "broker-audit-58"],
+          "workspace_permission_audit_refs": [
+            "broker-audit-52",
+            "broker-audit-53"
+          ],
+          "task_approval_audit_refs": [
+            "broker-audit-54",
+            "broker-audit-55"
+          ],
+          "task_start_audit_refs": [
+            "broker-audit-57",
+            "broker-audit-58"
+          ],
           "task_completion_audit_ref": "broker-audit-61",
           "instruction_body_present_in_audit": false,
           "result_and_diff_ui": "The UI showed completed state and result hash; result body and diff were not projected."
@@ -2626,7 +2856,11 @@
         "source_commit": "7340e27566b11f5fa729fbf4212ff82d5380f595",
         "source_worktree_clean": true,
         "run_id": "d4p-r2-run44-7340e275",
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "build": {
           "staged_product_run_id": "d4p-r2-run44-7340e275",
           "feature": "r2-e2e",
@@ -2673,7 +2907,11 @@
         "source_worktree_clean": true,
         "run_id": "d4p-r2-run45-7340e275",
         "staged_product_run_id": "d4p-r2-run44-7340e275",
-        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "INTERNAL_STATE",
+          "FIXTURE"
+        ],
         "build": {
           "feature": "r2-e2e",
           "flutter": "3.44.0 Release; staged application files hash-identical to the clean-source run43 build",
@@ -2710,9 +2948,18 @@
           "instruction_hash": "sha256:992f746b8277bdb5927909bfa14b2e17fc285b0703450551cc3b1ad2d0925233",
           "status": "completed",
           "result_hash": "sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab",
-          "workspace_permission_audit_refs": ["broker-audit-135", "broker-audit-136"],
-          "task_approval_audit_refs": ["broker-audit-138", "broker-audit-139"],
-          "task_start_audit_refs": ["broker-audit-143", "broker-audit-144"],
+          "workspace_permission_audit_refs": [
+            "broker-audit-135",
+            "broker-audit-136"
+          ],
+          "task_approval_audit_refs": [
+            "broker-audit-138",
+            "broker-audit-139"
+          ],
+          "task_start_audit_refs": [
+            "broker-audit-143",
+            "broker-audit-144"
+          ],
           "task_status_audit_ref": "broker-audit-147",
           "instruction_body_present_in_audit": false,
           "result_and_diff_ui": "The UI displayed completed and the result hash; result body and diff were not projected."
@@ -3119,8 +3366,14 @@
         "evidence_source": "LIVE_RUNTIME for the real Codex CLI/MxC child; FIXTURE for the in-process Broker consumer, Owner decisions, Audit callback, Workspace, CODEX_HOME, and loopback Responses API",
         "validation": "Focused ignored Windows Rust integration test passed 1/1. The fixed fake Responses API drove one normal completion and one Broker cancellation; each observed both the synthetic TEMP marker and the reported TEMP directory as absent after child termination.",
         "observations": {
-          "normal_completion": {"marker_after_exit": "NotFound", "temp_directory_after_exit": "NotFound"},
-          "broker_cancellation": {"marker_after_exit": "NotFound", "temp_directory_after_exit": "NotFound"},
+          "normal_completion": {
+            "marker_after_exit": "NotFound",
+            "temp_directory_after_exit": "NotFound"
+          },
+          "broker_cancellation": {
+            "marker_after_exit": "NotFound",
+            "temp_directory_after_exit": "NotFound"
+          },
           "temp_equals_tmp": true,
           "temp_equals_broker_workspace_scratch": false,
           "path_or_entry_names_recorded": false
@@ -3190,7 +3443,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "technical_blocker",
-      "release_tracks": ["windows_v1"],
+      "release_tracks": [
+        "windows_v1"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
       "current_rev5_status": "2026-10-06 rev5 P11: Settingsからnative Owner確認・既存Brokerへ入り、durable intent Audit、一回ticket、終了後固定root finalizerによるproduct root／一致shortcut削除と保持dataを実装。欠損した固定root Bootstrapper／固定Start Menu shortcutだけを補う限定Repairに加え、有効versionの欠損payload fileだけを同一trust済みpackageから補う限定Repairを既存Broker applyへ接続した。既存内容のbyte mismatchは拒否し、active record／process／別versionを変更しない。後者はCargo／Flutter fixture証拠のみ。正式Installer、installed product全体を通すInstall／Uninstaller／Repair LIVE_RUNTIME、破損payload byte・active record復旧、crash／電源断 Recoveryは未成立。",
@@ -3198,7 +3453,10 @@
       "required_action": "試験用識別子によるInstaller／Uninstaller、installed productからの固定root通常起動とStart Menu shortcut連結、同一volume更新、正式導入製品の強制終了／電源断後の再起動復旧、旧版復帰を契約・negative試験・隔離Windows実測へ接続する。実配布元からの取得／改変検出／修復と、導入から次回起動／rollbackまでの製品経路をsource／artifact identityへ結合して検証する。正式発行者・署名識別情報はWindows技術完了後の別blockerで扱う。",
       "broker_signed_version_staging_consumer": {
         "date": "2026-10-06",
-        "evidence_sources": ["FIXTURE", "LIVE_RUNTIME"],
+        "evidence_sources": [
+          "FIXTURE",
+          "LIVE_RUNTIME"
+        ],
         "validation": {
           "focused_broker_consumer": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib native_owner_apply_stages_exact_signed_package_without_activation_or_overwrite -- --test-threads=1: 1 passed。",
           "fixed_versions_capability": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::product_install::tests -- --test-threads=1: 4 passed。",
@@ -3301,7 +3559,10 @@
         "evidence_source": "FIXTURE",
         "validation": "Rust全target 12 targetで411 passed／0 failed／3 ignored、cargo check --all-targets成功、Schema 149／正常example 149／negative fixture 192、Conformance 228 checks成功。",
         "observations": {
-          "signed_fields": ["package_sha256", "package_size_bytes"],
+          "signed_fields": [
+            "package_sha256",
+            "package_size_bytes"
+          ],
           "digest_change": "署名後にpackage SHA-256だけを差し替える候補を拒否した。",
           "size_change": "署名後にpackage byte長だけを差し替える候補を拒否した。",
           "legacy_record": "版1はlegacy_unboundとして保持・表示し、新規候補受理と適用要求を拒否した。"
@@ -3398,7 +3659,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "distribution_identity",
-      "release_tracks": ["windows_v1"],
+      "release_tracks": [
+        "windows_v1"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "reason": "正式Publisher、Windows package／app identity、production code-signing identityはOwnerの確定が必要な配布条件であり、現時点では未固定。これはR0–R14のTechnical Completeを止める条件ではない。",
@@ -3411,7 +3674,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "technical_blocker",
-      "release_tracks": ["windows_v1"],
+      "release_tracks": [
+        "windows_v1"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
       "reason": "Flutter BrokerClientのendpoint file・session secret・TCP SocketはRust起動器owned PID-bound named-pipe relayへ移譲され、component試験に加えてdirty worktreeの分離scratch起動でhealth往復とLIVE_RUNTIME永続Auditを確認した。Flutter child環境は起動器で消去し、OS実行allowlistとpipe接続先札だけを渡す境界をRust子process試験とConformanceで検査する。ShellCoreClient.local()のsnapshot file/environment読込、内部Semantics registry出力、およびSetup DoctorのFlutter直接file export/config/audit probeは撤去した。初回設定の固定store create-only生成・read-only IPC取得もBrokerへ接続されRust library testに含む。一方、clean committed productのformal smoke、全negative/failure経路、正常終了、変更後sourceのfirst-run／Setup Doctor product evidenceは未成立。",
@@ -3424,7 +3689,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "technical_blocker",
-      "release_tracks": ["windows_v1"],
+      "release_tracks": [
+        "windows_v1"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
       "reason": "Rust起動器の製品別runtime root、Broker create-only Manifest／Receipt／Audit結合、Schema検証済みManifest由来App／Audit IDをcompile-timeへ渡すWindows開発bundle生成は実装済み。過去の手動run #6／#7はknown-pattern credential scanで停止し、run #8はfixture bundleのscan 0件で成功したが一般的な秘密不存在は証明しない。今回、実Win32 No／Yes確認dialogをfixture-backed Broker Receipt／Manifest生成へ接続し、run #30はcommit 3d312b27d2a4b53575de5561790ecc7fc8f2439cでRust全target検査・Release Broker build・standalone Broker smokeを含む9 stepすべてpassした。同じclean commitからBroker test経路が生成したReceipt／Manifestを使い、14-file unsigned development bundleをWindows上で生成し、hash一致とknown-pattern scan 0 findingsを確認した。現行docs/specs/windows-desktop-launcher.mdはpath／authority選択のためのruntime Manifest再読込を認めず、compile-time IDを使う。この契約は維持する。今回の証拠はWin32 dialogのLIVE_RUNTIME、synthetic Broker／WorkspaceのFIXTURE、bundle buildのINTERNAL_STATE、Actions結果のEXTERNAL_EVIDENCEに限られ、別profile installed product、production Owner authority、実Audit store分離・完了Audit、非継承Receipt、実製品起動・署名・Installerは未成立。",
@@ -3494,7 +3761,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "technical_blocker",
-      "release_tracks": ["windows_v1"],
+      "release_tracks": [
+        "windows_v1"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
       "reason": "同一source commit・Flutter toolchain・Windows Release条件のall-enabled baseline／選択UI比較では、6つの選択外Dart surface library nodeがFlutter AOT report上で不在、選択した2 nodeは存在し、artifact差は224 KiBである。新しい開発Export toolは選択Module defineをFlutter／Rust portable bundleへ接続しartifact hashを記録するが、Manifestの選択記録やUI AOT node差、bundle生成はbinary pruningの証拠ではない。最終製品の意味上の除去、安全Core保持、Rust／third-party除去、別Runtime／物理Audit store、cold startupと実行時resourceは未検証。",
@@ -3507,7 +3776,9 @@
       "active": false,
       "classification": "release_blocker",
       "cause_category": "platform_evidence",
-      "release_tracks": ["windows_v1"],
+      "release_tracks": [
+        "windows_v1"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "current_validation": {
@@ -3528,7 +3799,9 @@
       "active": true,
       "classification": "release_blocker",
       "cause_category": "technical_blocker",
-      "release_tracks": ["mobile"],
+      "release_tracks": [
+        "mobile"
+      ],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "reason": "旧Dart経路は廃止済み。Android Kotlin／iOS SwiftのOS側処理と端末内local_recovery_audit契約・読取画面を追加した。iOS native sourceは手動Actions run #22（commit b6dbf10）でFlutter analyze、Flutter test 21件、iPhone 16 Pro／iOS 18.5 Simulator build、native XCTest 8件（8 passed／0 failed）がPASSした。XCTestはproduction identityを使わずad-hoc署名identity '-'を使用した。前段run #19／#20のSwift compile failure、#21のCODE_SIGNING_ALLOWED=NOによるerrSecMissingEntitlement failureは履歴として保持し、#22で修正済み。現行Android／共有UI source 117 fileを照合したfresh Temp copyでcleanup除外なしのclean・unit test・APK buildが成功し、JUnit 8件が通過した。元OneDrive workspaceのignored build outputには削除deny ACLが継承されるhost-local limitationが残り、ACLは変更していない。2026-10-07の手動Actions run 37580429609（commit 0ca5dfa84dc1ca68ca8f01bae8ca456e1a9a12ba）では、Android API 35 Emulatorの製品UIからnative招待・Keystore・TLSを経た実Rust Brokerへの結合、Runtime表示、HOME復帰、切断・失効、誤pin拒否がPASSした。これはAndroid基本経路のLIVE_RUNTIME証拠であり、物理端末のKeychain／Keystore・TLS・全lifecycleやiOS native実Broker接続を証明しない。端末内記録の証拠種別はINTERNAL_STATEであり、Desktop Brokerの監査記録・失効・本人性を証明しない。旧Dart経路や前回版Androidの成功は今回の境界証拠ではない。2026-09-27、登録Workspace選択をnative Device Linkの空payload要求・ID／Runtime ID限定応答としてRust／Flutter／Android native testへ追加し、ASCII検証copyでAndroid unit testと3面のFlutter analyzeを確認した。Flutter analyzeのOneDrive日本語path上のLSP失敗はhost-local検証制約である。",
