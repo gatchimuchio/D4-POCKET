@@ -832,6 +832,20 @@ fn product_uninstall_available(broker: &Broker) -> bool {
     }
 }
 
+fn product_repair_available(broker: &Broker) -> bool {
+    if !broker.desktop_install_path_verified || broker.desktop_product_identity.is_none() {
+        return false;
+    }
+    #[cfg(any(windows, target_os = "linux"))]
+    {
+        true
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        false
+    }
+}
+
 fn request_product_uninstall(
     broker: &mut Broker,
     payload: &Value,
@@ -2276,6 +2290,7 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
             "適用実行": "suspended",
             "rollback実行": if rollback_available { "available" } else { "suspended" },
             "rollback状態": rollback,
+            "製品起動項目修復操作": if product_repair_available(broker) { "available" } else { "suspended" },
             "製品アンインストール操作": if product_uninstall_available(broker) { "available" } else { "suspended" },
             "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
         }),
@@ -7559,7 +7574,7 @@ mod tests {
     }
 
     #[test]
-    fn update_list_checks_uninstall_availability_independently_of_rollback_metadata() {
+    fn update_list_checks_launch_repair_and_uninstall_availability_independently_of_rollback_metadata() {
         let mut portable_broker = Broker::new("session-1");
         let portable_list = call(
             &mut portable_broker,
@@ -7571,9 +7586,29 @@ mod tests {
             portable_list.body.as_ref().unwrap()["製品アンインストール操作"],
             "suspended"
         );
+        assert_eq!(
+            portable_list.body.as_ref().unwrap()["製品起動項目修復操作"],
+            "suspended"
+        );
+
+        let mut path_only_broker = Broker::new("session-1");
+        path_only_broker.desktop_install_path_verified = true;
+        let path_only_list = call(
+            &mut path_only_broker,
+            BrokerOperation::更新一覧,
+            json!({"版": 1}),
+        );
+        assert_eq!(path_only_list.status, BrokerStatus::Accepted);
+        assert_eq!(
+            path_only_list.body.unwrap()["製品起動項目修復操作"],
+            "suspended"
+        );
 
         let mut installed_broker = Broker::new("session-1");
         installed_broker.desktop_install_path_verified = true;
+        installed_broker
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
         let installed_list = call(
             &mut installed_broker,
             BrokerOperation::更新一覧,
@@ -7581,12 +7616,18 @@ mod tests {
         );
         let body = installed_list.body.expect("更新一覧");
         assert_eq!(installed_list.status, BrokerStatus::Accepted);
-        let expected = if cfg!(target_os = "linux") {
-            "suspended"
-        } else {
+        let expected = if cfg!(windows) {
             "available"
+        } else {
+            "suspended"
         };
         assert_eq!(body["製品アンインストール操作"], expected);
+        let expected_repair = if cfg!(any(windows, target_os = "linux")) {
+            "available"
+        } else {
+            "suspended"
+        };
+        assert_eq!(body["製品起動項目修復操作"], expected_repair);
         assert_eq!(body["rollback状態"]["状態"], "unknown");
         assert!(body["rollback状態"]["現在版"].is_null());
     }

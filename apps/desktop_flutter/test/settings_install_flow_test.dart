@@ -87,11 +87,11 @@ void main() {
     await tester.pump();
     expect(first.operations, contains('更新有効版切替要求'));
 
-    activationGate.complete();
-    await tester.pump();
     await tester.pumpWidget(screen(second));
     await tester.pumpAndSettle();
     expect(unknownOutcomeCount, 1);
+    activationGate.complete();
+    await tester.pump();
 
     await tester.pump(const Duration(milliseconds: 601));
     await tester.pumpAndSettle();
@@ -144,9 +144,6 @@ void main() {
     await tester.ensureVisible(installButton);
     await tester.tap(installButton);
     await tester.pump();
-    expect(tester.widget<TextButton>(installButton).onPressed, isNull);
-    await tester.tap(installButton, warnIfMissed: false);
-    await tester.pump();
     expect(
       transport.operations.where((operation) => operation == '更新有効版切替要求'),
       hasLength(1),
@@ -165,7 +162,9 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(tester.widget<TextButton>(installButton).onPressed, isNotNull);
+    final activeRepairButton =
+        find.widgetWithText(TextButton, '有効版を修復');
+    expect(tester.widget<TextButton>(activeRepairButton).onPressed, isNotNull);
     expect(find.textContaining('更新操作失敗'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -329,6 +328,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Brokerが起動項目修復を停止している環境では修復要求を表示しない', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final transport = _InstallFlowTransport(
+      installed: true,
+      repairAvailable: false,
+    );
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SettingsScreen(client: ShellCoreClient.mock(transport: transport)),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('起動項目を修復'), findsNothing);
+    expect(
+      find.text('Brokerはこの環境で起動項目修復を停止しています。修復要求は表示しません。'),
+      findsOneWidget,
+    );
+    expect(transport.operations, isNot(contains('製品起動項目修復要求')));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('一覧の再取得中と取得失敗時は旧導入操作を表示せず、Broker一覧だけを再試行できる', (tester) async {
     tester.view.physicalSize = const Size(1200, 1000);
     tester.view.devicePixelRatio = 1;
@@ -435,14 +462,18 @@ class _InstallFlowTransport implements BrokerTransport {
     this.repairGate,
     this.operationGates = const <String, Completer<void>>{},
     this.rollbackCurrentVersionAvailable = true,
+    bool? repairAvailable,
     bool? uninstallAvailable,
-  }) : uninstallAvailable = uninstallAvailable ?? installed;
+  }) : repairAvailable = repairAvailable ?? installed,
+       uninstallAvailable = uninstallAvailable ?? installed;
 
-  final bool installed;
+  bool installed;
   final Completer<void>? repairGate;
   final Map<String, Completer<void>> operationGates;
   final bool rollbackCurrentVersionAvailable;
+  bool repairAvailable;
   bool uninstallAvailable;
+  String _stageState = 'not_staged';
 
   static const _packageHash =
       'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -470,6 +501,7 @@ class _InstallFlowTransport implements BrokerTransport {
               '提供版': '1.2.3',
               'channel': 'stable',
               '署名状態': 'verified',
+              '導入状態': _stageState,
               'rollback可能': false,
               'package_sha256': _packageHash,
               'package_size_bytes': 4096,
@@ -490,6 +522,7 @@ class _InstallFlowTransport implements BrokerTransport {
           },
           '適用実行': 'available',
           'rollback実行': 'suspended',
+          '製品起動項目修復操作': repairAvailable ? 'available' : 'suspended',
           '製品アンインストール操作': uninstallAvailable ? 'available' : 'suspended',
           'rollback状態': {
             '状態': installed && !rollbackCurrentVersionAvailable
@@ -509,10 +542,13 @@ class _InstallFlowTransport implements BrokerTransport {
       };
     }
     if (operation == '更新適用要求') {
+      _stageState = 'version_staged';
       return {
         'status': 'accepted',
         'body': {
           '版': 1,
+          '更新ID': _updateId,
+          '候補hash': _candidateHash,
           '導入状態': 'version_staged',
           '有効化': 'suspended',
           '証拠種別': 'INTERNAL_STATE',
@@ -520,6 +556,7 @@ class _InstallFlowTransport implements BrokerTransport {
       };
     }
     if (operation == '更新有効版切替要求') {
+      installed = true;
       return {
         'status': 'accepted',
         'body': {

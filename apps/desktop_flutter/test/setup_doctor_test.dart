@@ -240,6 +240,36 @@ void main() {
     expect(requests.last['payload'], const <String, Object?>{'version': 1});
   });
 
+  testWidgets('Setup Doctorは起動項目修復可用性をBroker状態から表示し、不明値はunknownに閉じる', (tester) async {
+    final transport = _SetupDoctorTransport()
+      ..updateListResponses.add(_updateListResponse('available'));
+    final client = await ShellCoreClient.product(transport: transport);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: SetupDoctor(client: client))),
+    );
+    await tester.tap(find.byKey(const ValueKey('setup-doctor-refresh')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('製品起動項目修復操作: Brokerで利用可能'),
+      findsOneWidget,
+    );
+
+    transport.updateListResponses.add(_updateListResponse('suspended'));
+    await tester.tap(find.byKey(const ValueKey('setup-doctor-refresh')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('製品起動項目修復操作: Brokerで停止中'),
+      findsOneWidget,
+    );
+
+    transport.updateListResponses.add(_updateListResponse('unknown'));
+    await tester.tap(find.byKey(const ValueKey('setup-doctor-refresh')));
+    await tester.pumpAndSettle();
+    expect(find.text('製品起動項目修復操作: unknown'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Setup Doctor再取得失敗時は前回結果を捨てunknownに閉じる', (tester) async {
     final transport = _SetupDoctorTransport();
     final client = await ShellCoreClient.product(transport: transport);
@@ -735,6 +765,7 @@ class _SetupDoctorTransport implements BrokerTransport {
   final requests = <Map<String, Object?>>[];
   final agentEntries = <Map<String, Object?>>[];
   final credentialEntries = <Map<String, Object?>>[];
+  final updateListResponses = <Map<String, Object?>>[];
   int _reportCount = 0;
   Map<String, Object?>? nextReportResponse;
   Map<String, Object?>? nextAuditResponse;
@@ -750,6 +781,12 @@ class _SetupDoctorTransport implements BrokerTransport {
       'operation': operation,
       if (payload != null) 'payload': Map<String, Object?>.from(payload),
     });
+    if (operation == '更新一覧') {
+      if (updateListResponses.isEmpty) {
+        throw const BrokerClientException('No update-list fixture response');
+      }
+      return updateListResponses.removeAt(0);
+    }
     if (operation == '監査一覧取得') {
       if (auditResponses.isNotEmpty) return auditResponses.removeAt(0);
       final next = nextAuditResponse;
@@ -867,6 +904,33 @@ class _SetupDoctorTransport implements BrokerTransport {
     throw BrokerClientException('Unexpected fixture operation: $operation');
   }
 }
+
+Map<String, Object?> _updateListResponse(String repairAvailability) => {
+      'request_id': 'test-update-list',
+      'operation': '更新一覧',
+      'status': 'accepted',
+      'evidence_source': 'INTERNAL_STATE',
+      'audit_event_id': 'audit-update-list',
+      'error': null,
+      'body': {
+        '版': 1,
+        '更新一覧': <Object?>[],
+        '件数': 0,
+        '署名信頼設定': 'unconfigured',
+        'download実行': 'suspended',
+        'download_job': null,
+        '適用実行': 'suspended',
+        'rollback実行': 'suspended',
+        'rollback状態': {
+          '状態': 'unavailable',
+          '現在版': null,
+          '対象版': null,
+        },
+        '製品起動項目修復操作': repairAvailability,
+        '製品アンインストール操作': 'suspended',
+        '証拠種別': 'INTERNAL_STATE',
+      },
+    };
 
 Map<String, Object?> _agentAdapterFixture({required String method}) => {
       'adapter_id': 'fixture-adapter',

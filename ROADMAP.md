@@ -1,5 +1,13 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：W-C10起動項目修復可用性のBroker→UI結線（2026-11-25）
+
+基準main `b1277fe5cc2022e655681fbc1250514afbd0e7d5`。UpdateListへ`製品起動項目修復操作`を追加し、Brokerが導入先と製品identityを確認した上で、修復経路のあるWindows/Linuxだけ`available`を返し、それ以外を`suspended`とする。SettingsはBrokerが停止・不明とした修復要求を表示せず、Setup Doctorは可用性を`available`／`suspended`／`unknown`として表示する。このprojectionは権限を生成せず、実要求のRust native Owner確認・現状態再照合・Auditを維持する。
+
+施工中に見つかったSettings再読込の`setState` callbackがFutureを返す欠陥を修正した。これによりBroker現在状態の再読込がFlutter例外で中断され、正しいstage結果を成功表示できなかった経路が閉じた。初回Install fixtureは、Broker有効版反映後に操作表示が切り替わる現在状態へ同期した。
+
+実装限定確認：UpdateList Schema 189件／正常例183件／負例250件PASS。隔離Rustの対象Broker test 1 passed／680 filtered、隔離FlutterのSettings install flow・Setup Doctor対象31 test PASS（snapshot `a213966a08685bb024d8a951a576b598af5229b646392b1f2127af798ba27c9b`、cleanup PASS）、Desktop Flutter analyze PASS（source snapshot `13ce47ca68690d20c6d28e7dd97402c784f2ead992a48cc932fc42b46ada9d73`）、五文書整合PASS（344/320/311/401/488行、要求188・実装152／品質36・結線54・品質71・OS5）。通常Release・macOS/Linux installed product・製品Runtime・全W-C10成立・品質QAはこの施工で判定していない。W-C10の局所Source／Contract／Consumer接続を前進させた記録であり、W-C10全体や製品受入れ完了を主張しない。
+
 ### v11施工追補：W-C09通知からStopReceiptへの監査結合（2026-11-25）
 
 基準main `f79f35fc7fb5fd3e1c2b953a7d6d8051638a3c44`。Brokerで検証済みの通知`関連監査ID`をProblemsへの画面遷移時に表示限定の照合条件として渡す。Problemsは同じAudit IDの現在Receiptだけを表示し、一致Receiptがなければ別Receiptで代用せず、停止実行済みとも扱わない。照合条件は新しい停止要求、Broker／Host／Task文脈変更、別画面への明示遷移で破棄する。通知クリックは引き続き画面遷移だけで、Broker要求・停止・権限を発生させない。

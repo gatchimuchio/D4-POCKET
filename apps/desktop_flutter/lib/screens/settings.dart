@@ -1888,6 +1888,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
               ? Map<String, Object?>.from(body['rollback状態']! as Map)
               : null;
           final installedProduct = rollbackState?['現在版'] is Map;
+          final repairAvailable = body['製品起動項目修復操作'] == 'available';
           final uninstallAvailable = body['製品アンインストール操作'] == 'available';
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1911,7 +1912,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                   _checkingUpdateCatalog ? '候補取得中' : '配布元から候補取得',
                 ),
               ),
-              if (installedProduct) ...[
+              if (installedProduct && repairAvailable) ...[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: _updateOperationInProgress
@@ -1922,6 +1923,11 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                 ),
                 const Text(
                   '現行版が検証できる場合に、欠損した固定root起動器とOS起動項目だけを復元します。破損した版本体や有効版記録は上書きしません。',
+                ),
+              ] else if (installedProduct) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Brokerはこの環境で起動項目修復を停止しています。修復要求は表示しません。',
                 ),
               ],
               if (uninstallAvailable) ...[
@@ -2277,7 +2283,9 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
       final current = await client.list();
       if (!mounted || !identical(client, _updateClient)) return;
       stateRefreshed = true;
-      setState(() => _updatesFuture = Future<Map<String, Object?>>.value(current));
+      setState(() {
+        _updatesFuture = Future<Map<String, Object?>>.value(current);
+      });
 
       final executionState = body['実行状態']?.toString();
       final operationState = body['状態']?.toString();

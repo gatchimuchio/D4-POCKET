@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "b5b3cb66bc382d0eb958593d80f8945e3174d9624a3cec0033e9831a46d9a5d7"
+      "sha256": "d7969e6e934cea5dd3ddb1e1dd076e8e4abde9b398d7b315ed7fc6ef0c38a32e"
     },
     {
       "path": "SECURITY.md",
@@ -345,11 +345,11 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "afaa4dd59bbc0ddbbb737669b6c0038a7c3b194a921efa554fbbe0603db01e00"
+      "sha256": "13936ecc1928a5b6e435e1247149a451008b12e9cf4ae47178922cc92e6da2dd"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
-      "sha256": "261f138099b75e67da450583dd740f59409bfcb393d7116d95ad16709820924d"
+      "sha256": "bb0013658142b91bc00450973fd3048be9b917bbcef9029e304cbd9065df809d"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/shared.dart",
@@ -849,11 +849,11 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
-      "sha256": "1be4fe4b088b89034867b22ae97dbeaf9b74deb7b69f010299586f204ea86375"
+      "sha256": "cb424355a8eef872a31d7993d97ce5d54a442a4a3643dddd073e39aa83233e29"
     },
     {
       "path": "apps/desktop_flutter/test/setup_doctor_test.dart",
-      "sha256": "c1cefcf3d37e94885feb87bab27e04c08cf074bb41dd1a5781a19498226c75e4"
+      "sha256": "37b8d7fc1c382243f0068b1f75c8424014610df01623f689f50710cc31baa8fe"
     },
     {
       "path": "apps/desktop_flutter/test/shell_core_unavailable_test.dart",
@@ -2185,7 +2185,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "6de98204c30be069cfcb64e4b86134f94f71c3321de02e53e1fb1edafdab1803"
+      "sha256": "2548be471d11d0577c8954a1d33d5f4453a2159fe8bbb7b15bf415fb71fbd8f0"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
@@ -3681,7 +3681,7 @@
     },
     {
       "path": "examples/contracts/invalid/update_list.invalid.json",
-      "sha256": "f90351a792c76483f385ba3a932683c95a0b17ca1de1ae5b9777d94054a84887"
+      "sha256": "fcac3367d82c01b16f2c21685bdf846cbd86472269ec4c57490fa94330da998b"
     },
     {
       "path": "examples/contracts/invalid/update_receipt.invalid.json",
@@ -4049,7 +4049,7 @@
     },
     {
       "path": "examples/contracts/update_list.valid.json",
-      "sha256": "59c52f933c73920fafd55878717765521a8521111dd90b1dae520395acf49074"
+      "sha256": "cb24446fcbf246aa7c489d9aac16f651856a02a0963efcd88c28c2fc7240e0c5"
     },
     {
       "path": "examples/contracts/update_receipt.valid.json",
@@ -4449,7 +4449,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "3b6d2bf628b2b2dd52ea71ce4da90a4f370dcc63b0237c65e58b004a5e671b5c"
+      "sha256": "4df43978bb48c4255c031e5957fafe03584df3b87a13e37bea6ed8059103800c"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -5925,7 +5925,7 @@
     },
     {
       "path": "specs/update_list.schema.json",
-      "sha256": "7e206830d3aa058430468ee178d2c43e661eef5fd015bb68ce84337b9e508045"
+      "sha256": "e67de2618039027d0cf021009aeca5ee4b1a47b5e15638d946959c8d0be61b0c"
     },
     {
       "path": "specs/update_receipt.schema.json",

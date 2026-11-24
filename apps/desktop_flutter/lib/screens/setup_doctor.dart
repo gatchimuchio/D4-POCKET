@@ -309,6 +309,12 @@ List<String> _productInstallStateRows(
     rows.add('直前版: unknown');
   }
 
+  rows.add(switch (report['製品起動項目修復操作']) {
+    'available' => '製品起動項目修復操作: Brokerで利用可能',
+    'suspended' => '製品起動項目修復操作: Brokerで停止中',
+    _ => '製品起動項目修復操作: unknown',
+  });
+
   rows.add(switch (report['製品アンインストール操作']) {
     'available' => '製品アンインストール操作: Brokerで利用可能',
     'suspended' => '製品アンインストール操作: Brokerで停止中',
