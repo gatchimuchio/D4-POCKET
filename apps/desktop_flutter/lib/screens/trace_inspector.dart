@@ -133,6 +133,7 @@ class _TraceInspectorState extends State<TraceInspector> {
   Widget _tracePanel(Map<String, Object?> body) {
     final spans = _maps(body['Span一覧']);
     final traces = _maps(body['Trace一覧']);
+    final metrics = _maps(body['Metric一覧']);
     final traceIds = traces
         .map((trace) => trace['TraceID']?.toString())
         .whereType<String>()
@@ -148,6 +149,7 @@ class _TraceInspectorState extends State<TraceInspector> {
             children: [
               Text('Trace: ${traceIds.length}'),
               Text('Span: ${spans.length}'),
+              Text('Metric: ${metrics.length}'),
               if (traceIds.isNotEmpty)
                 DropdownButton<String?>(
                   value: _selectedTraceId,
@@ -183,6 +185,7 @@ class _TraceInspectorState extends State<TraceInspector> {
             ],
           ),
         ),
+        if (metrics.isNotEmpty) _metricPanel(metrics),
         if (spans.isEmpty)
           EmptyStatePanel(
             title: 'Traceなし',
@@ -203,6 +206,36 @@ class _TraceInspectorState extends State<TraceInspector> {
       ],
     );
   }
+
+  Widget _metricPanel(List<Map<String, Object?>> metrics) => BorderedPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '表示範囲のMetric（Broker内部観測）',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            for (final metric in metrics)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${metric['名称'] ?? metric['MetricID'] ?? 'Metric'}: ${metric['値'] ?? 'unknown'} ${metric['単位'] ?? ''} (${metric['状態'] ?? 'unknown'})',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    Text(
+                      '種別: ${metric['種別'] ?? 'unknown'} / 観測件数: ${metric['観測件数'] ?? 'unknown'} / Source: ${metric['証拠種別'] ?? 'unknown'}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
 
   Widget _waterfallPanel(
     List<Map<String, Object?>> spans, {
