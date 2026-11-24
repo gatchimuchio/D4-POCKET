@@ -1047,8 +1047,20 @@ class _ShellHomePageState extends State<ShellHomePage> {
 
     final availablePageIndices =
         _pageEntries().map((page) => page.index).toSet();
-    final visibleEntries = entries
-        .where((entry) => availablePageIndices.contains(entry.pageIndex))
+    const stopReceiptNavigation = GlobalSearchResult(
+      target: GlobalSearchTarget.navigation,
+      category: '画面案内',
+      title: 'Runtime停止要求とReceipt',
+      detail: '問題一覧で現在のBrokerへ要求。選択時は画面移動だけで、停止は実行しません。',
+      recordId: 'problems.stop_receipt',
+      pageIndex: 9,
+    );
+    final visibleEntries = <GlobalSearchResult>[
+      if (availablePageIndices.contains(stopReceiptNavigation.pageIndex))
+        stopReceiptNavigation,
+      ...entries
+          .where((entry) => availablePageIndices.contains(entry.pageIndex)),
+    ]
         .toList(growable: false);
     final selected = await showDialog<GlobalSearchResult>(
       context: context,
@@ -1350,7 +1362,7 @@ class _CurrentBrokerSearchDialogState
                   prefixIcon: const Icon(Icons.manage_search),
                   labelText: widget.label,
                   helperText:
-                      'Brokerの現在Host・Workspaceと有効なWorkspace読取だけを検索します。選択時は画面移動のみです。',
+                      'Brokerの現在Host・Workspace、有効なWorkspace読取と画面案内を検索します。選択時は画面移動のみです。',
                 ),
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) {
@@ -1372,7 +1384,7 @@ class _CurrentBrokerSearchDialogState
                             title: Text(result.title),
                             subtitle: Text(
                               '${result.category} / ${result.detail} / '
-                              '証拠: ${result.evidenceSource}',
+                              '出所: ${result.sourceLabel}',
                             ),
                             onTap: () => Navigator.of(context).pop(result),
                           );

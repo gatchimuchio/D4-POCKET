@@ -28,6 +28,12 @@
 
 これはProblems Consumerの局所結線であり、Host/Task単位の現在性、Tray/Palette/Search/Notificationsとの全経路結線は未成立のまま保持する。W-C09全体の完成は主張しない。`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshot SHA-256 `4cacec4166276bf43b97d48fc378822f22f4ef2f6f1f87ae5d80b8a34454f444`でPASS（exit 0、snapshot cleanup PASS）。同コマンドの並行実行初回はMANIFEST更新中のsource変化でNOT_RUNとなり、更新終了後の単独再実行でPASSした。Unit/E2E・製品QA・Installed Runtimeは本施工では実施しない。
 
+### v11施工追補：W-C09 Palette/SearchからProblemsへ遷移（2026-11-24）
+
+基準main `3b91359d992b5fc222033431e1c267d7a09f236d`。Command PaletteとGlobal Searchへ固定の「Runtime停止要求とReceipt」画面案内を加え、Problemsへ遷移できるようにした。検索結果選択は引き続き画面移動だけで、Host/Workspace/Task/Permission/Approval/Receiptを遷移先へ渡さない。Problems画面での操作時にその時点のBroker接続を使う。初回analyzeで既存`evidenceSource`参照を壊すAPI変更が検出されたためgetterを保持して修正し、最終analyzeは隔離source snapshot SHA-256 `9036e4775f1f07767d176fae8c38b3e3ec991b19efa9569a81ad5dfcc22af78f`でPASS（exit 0、snapshot cleanup PASS）。
+
+これはPalette/Searchの画面遷移Consumerだけを接続したもの。Notification Centerからの停止Receipt投影とHost/Task全体の現在性は未成立のままであり、W-C09全体の完成は主張しない。Unit/E2E・製品QA・Installed Runtimeは本施工では実施しない。
+
 ### v11施工追補：W-C03の旧FileHash意味境界（2026-11-24）
 
 現行履歴Replayは元Task ID・終端Audit event hash・Runtime/Workspaceを検証し、新SessionとReplay Auditを作る。新Task開始時には別個の現在Workspace Permissionと一回Owner Approvalを要求し、旧Approvalを再利用しない。Replay Auditは元event hashを保持するが、v11の`W-C03`は追加で「旧FileHash」と記す一方、現行History Contract/Schemaはこの名称の値・生成元・意味・Consumer表示を定義していない。`event_hash`、`result_hash`、Workspaceファイルhashは同一視しない。従ってW-C03全体は未完了として保持し、この確認では意味を推測してContractを追加・変更しない。

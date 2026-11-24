@@ -3,7 +3,7 @@ import 'broker_client.dart';
 import 'host_registration_client.dart';
 import 'workspace_client.dart';
 
-enum GlobalSearchTarget { host, workspace, grantedAction }
+enum GlobalSearchTarget { host, workspace, grantedAction, navigation }
 
 class GlobalSearchResult {
   const GlobalSearchResult({
@@ -22,6 +22,9 @@ class GlobalSearchResult {
   final String recordId;
   final int pageIndex;
   String get evidenceSource => 'INTERNAL_STATE';
+  String get sourceLabel => target == GlobalSearchTarget.navigation
+      ? '固定画面案内'
+      : evidenceSource;
 
   bool matches(String query) {
     final normalized = query.trim().toLowerCase();
