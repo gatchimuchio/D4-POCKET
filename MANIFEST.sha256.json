@@ -112,6 +112,10 @@
       "sha256": "ed82c97a6ee613e8994d3ca3b9713ca25ec34526a6bc1fe0ee05c23fff54c2a3"
     },
     {
+      "path": ".github/workflows/windows-manual-product-build-candidate.yml",
+      "sha256": "1d991256a9e7fd43bef28ee8983354d7c1359c105ae25e1d456421c74d4c944b"
+    },
+    {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
       "sha256": "6a7ef1c10d2b07b2e11a9456733ab6f6a4efc6a3f99b96a431f563e85fdb0fca"
     },

@@ -1,0 +1,160 @@
+name: Windows manual product build candidate
+
+'on':
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-product-build-candidate:
+    runs-on: windows-2025
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record source and Windows build host
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF -ne 'refs/heads/main') { throw "Windows product build must use main: $env:GITHUB_REF" }
+          $head = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $head -ne $env:GITHUB_SHA) { throw "checkout HEAD differs from GITHUB_SHA: $head" }
+          $remoteMain = (git rev-parse refs/remotes/origin/main).Trim()
+          if ($LASTEXITCODE -ne 0 -or $remoteMain -ne $head) { throw "origin/main differs from build source: $remoteMain" }
+          $changes = @(git status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0 -or $changes.Count -gt 0) { throw 'Windows product build source must be clean' }
+          $evidence = Join-Path $env:RUNNER_TEMP 'd4p-windows-build-evidence'
+          New-Item -ItemType Directory -Path $evidence | Out-Null
+          "D4P_WINDOWS_EVIDENCE=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          @(
+            "source_commit=$head"
+            "source_ref=$env:GITHUB_REF"
+            "remote_main=$remoteMain"
+            "runner_os=$env:RUNNER_OS"
+            "runner_image=$env:ImageOS/$env:ImageVersion"
+            "architecture=$env:PROCESSOR_ARCHITECTURE"
+            "windows_version=$([Environment]::OSVersion.Version)"
+          ) | Out-File -FilePath (Join-Path $evidence 'environment.txt') -Encoding utf8
+
+      - name: Install pinned Rust and Flutter toolchains
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          rustup toolchain install 1.95.0 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $rustc = (rustc +1.95.0 --version).Trim()
+          $cargo = (cargo +1.95.0 --version).Trim()
+          if (-not $rustc.StartsWith('rustc 1.95.0 ') -or -not $cargo.StartsWith('cargo 1.95.0 ')) {
+            throw "Unexpected Rust toolchain: $rustc / $cargo"
+          }
+          $flutterRoot = Join-Path $env:RUNNER_TEMP 'd4p-flutter-sdk'
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git $flutterRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $flutterCommit = (git -C $flutterRoot rev-parse HEAD).Trim()
+          if ($flutterCommit -ne '559ffa3f75e7402d65a8def9c28389a9b2e6fe42') { throw "Flutter commit mismatch: $flutterCommit" }
+          "$flutterRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          @("rustc=$rustc", "cargo=$cargo", "flutter_commit=$flutterCommit") |
+            Out-File -FilePath (Join-Path $env:D4P_WINDOWS_EVIDENCE 'toolchains.txt') -Encoding utf8
+          & "$flutterRoot\bin\flutter.bat" --version --machine |
+            Out-File -FilePath (Join-Path $env:D4P_WINDOWS_EVIDENCE 'flutter-version.json') -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build Windows Rust Broker and Launcher
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cargoTarget = Join-Path $env:RUNNER_TEMP 'd4p-windows-cargo-target'
+          $candidate = Join-Path $env:RUNNER_TEMP 'd4p-windows-build-candidate'
+          New-Item -ItemType Directory -Path $candidate | Out-Null
+          $env:CARGO_TARGET_DIR = $cargoTarget
+          cargo +1.95.0 build --locked --release --manifest-path native/rust_helper/Cargo.toml `
+            --bin gui_shell_rust_helper --bin gui_shell_desktop_launcher
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $rustOutput = Join-Path $candidate 'rust-binaries'
+          New-Item -ItemType Directory -Path $rustOutput | Out-Null
+          foreach ($name in @('gui_shell_rust_helper.exe', 'gui_shell_desktop_launcher.exe')) {
+            $source = Join-Path $cargoTarget "release\$name"
+            if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Rust build output missing: $name" }
+            Copy-Item -LiteralPath $source -Destination $rustOutput
+          }
+          "D4P_WINDOWS_CANDIDATE=$candidate" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "D4P_WINDOWS_CARGO_TARGET=$cargoTarget" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build Windows Flutter Release app
+        working-directory: apps/desktop_flutter
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          flutter pub get --enforce-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          flutter build windows --release --no-pub
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $release = Join-Path $PWD 'build\windows\x64\runner\Release'
+          $exe = Join-Path $release 'gui_shell_desktop.exe'
+          $flutterDll = Join-Path $release 'flutter_windows.dll'
+          $dataDir = Join-Path $release 'data'
+          foreach ($required in @($exe, $flutterDll, $dataDir)) {
+            if (-not (Test-Path -LiteralPath $required)) { throw "Flutter Windows Release output missing: $required" }
+          }
+          $flutterOutput = Join-Path $env:D4P_WINDOWS_CANDIDATE 'flutter-windows-release'
+          New-Item -ItemType Directory -Path $flutterOutput | Out-Null
+          Get-ChildItem -LiteralPath $release | ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination $flutterOutput -Recurse
+          }
+          $repoRoot = (Resolve-Path (Join-Path $PWD '..\..')).Path
+          Set-Location $repoRoot
+          $changes = @(git status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0 -or $changes.Count -gt 0) {
+            $changes | Write-Output
+            throw 'Windows build modified tracked or unexpected source files'
+          }
+          @(
+            'artifact_kind=Windows source build outputs'
+            'installer=false'
+            'export_bundle=false'
+            'signed=false'
+            'installed_product_verified=false'
+          ) | Out-File -FilePath (Join-Path $env:D4P_WINDOWS_CANDIDATE 'BUILD_SCOPE.txt') -Encoding utf8
+          $files = Get-ChildItem -LiteralPath $env:D4P_WINDOWS_CANDIDATE -File -Recurse | Sort-Object FullName
+          $hashes = foreach ($file in $files) {
+            $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $relative = $file.FullName.Substring($env:D4P_WINDOWS_CANDIDATE.Length + 1)
+            "$hash  $relative"
+          }
+          $hashes | Out-File -FilePath (Join-Path $env:D4P_WINDOWS_EVIDENCE 'candidate-sha256.txt') -Encoding utf8
+
+      - name: Upload bounded Windows build candidate and evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: windows-product-build-candidate-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/d4p-windows-build-candidate/
+            ${{ runner.temp }}/d4p-windows-build-evidence/
+          retention-days: 1
+          if-no-files-found: warn
+
+      - name: Clean generated runner outputs
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $flutter = Join-Path $env:RUNNER_TEMP 'd4p-flutter-sdk\bin\flutter.bat'
+          if (Test-Path -LiteralPath $flutter -PathType Leaf) {
+            Push-Location apps/desktop_flutter
+            try {
+              & $flutter clean
+              if ($LASTEXITCODE -ne 0) { throw 'Flutter generated-output cleanup failed' }
+            } finally { Pop-Location }
+          }
+          $runnerRoot = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\') + '\'
+          foreach ($name in @('d4p-windows-build-candidate','d4p-windows-build-evidence','d4p-windows-cargo-target','d4p-flutter-sdk')) {
+            $target = [IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP $name))
+            if (-not $target.StartsWith($runnerRoot, [StringComparison]::OrdinalIgnoreCase)) { throw "Cleanup path escaped RUNNER_TEMP: $target" }
+            if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
+          }
