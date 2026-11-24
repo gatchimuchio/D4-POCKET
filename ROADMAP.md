@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：W-C10 Rollback可用性のSettings表示結線（2026-11-25）
+
+基準main `8066511c433ed3ae6f0b0094f3b7a9a2406c085b`。Broker UpdateListが返す`rollback実行`の可用性をSettingsが消費していなかったため、Brokerが`suspended`またはunknownでもRollback操作を表示できる欠配線を修正した。現在の可用性が`available`で、さらにRollback状態・対象候補が一致するときだけ操作を表示する。Broker側の拒否・Owner確認・Auditは変更していない。
+
+`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshot SHA-256 `027a181a6dc5bc14f29527b7d56986361a972ed19af6e33925ff02f897857693`でPASS（exit 0、workspace cleanup PASS）。Unit/E2E・品質QA・Installed Runtimeは実施していない。本変更はW-C10のSettings Consumer接続に限り、W-C10全体や製品受入れ完了を主張しない。
+
 ### v11施工追補：W-C10起動項目修復可用性のBroker→UI結線（2026-11-25）
 
 基準main `b1277fe5cc2022e655681fbc1250514afbd0e7d5`。UpdateListへ`製品起動項目修復操作`を追加し、Brokerが導入先と製品identityを確認した上で、修復経路のあるWindows/Linuxだけ`available`を返し、それ以外を`suspended`とする。SettingsはBrokerが停止・不明とした修復要求を表示せず、Setup Doctorは可用性を`available`／`suspended`／`unknown`として表示する。このprojectionは権限を生成せず、実要求のRust native Owner確認・現状態再照合・Auditを維持する。

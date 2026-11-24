@@ -1887,6 +1887,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           final rollbackState = body['rollback状態'] is Map
               ? Map<String, Object?>.from(body['rollback状態']! as Map)
               : null;
+          final rollbackAvailable = body['rollback実行'] == 'available';
           final installedProduct = rollbackState?['現在版'] is Map;
           final repairAvailable = body['製品起動項目修復操作'] == 'available';
           final uninstallAvailable = body['製品アンインストール操作'] == 'available';
@@ -1969,6 +1970,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                     update,
                     downloadAvailable: downloadAvailable,
                     downloadJob: downloadJob,
+                    rollbackAvailable: rollbackAvailable,
                     rollbackState: rollbackState,
                   ),
             ],
@@ -1984,6 +1986,7 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
     Map<String, Object?> update, {
     required bool downloadAvailable,
     required Map<String, Object?>? downloadJob,
+    required bool rollbackAvailable,
     required Map<String, Object?>? rollbackState,
   }) {
     final updateId = update['更新ID']?.toString() ?? '';
@@ -2048,7 +2051,8 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
       packageSize: packageSize,
     );
     final rollbackCurrent = rollbackState?['現在版'];
-    final canRollback = rollbackState?['状態'] == 'available' &&
+    final canRollback = rollbackAvailable &&
+        rollbackState?['状態'] == 'available' &&
         !_updateOperationInProgress &&
         rollbackCurrent is Map &&
         rollbackCurrent['更新ID'] == updateId &&
