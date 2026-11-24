@@ -77,6 +77,21 @@ class CurrentV11BindingTests(unittest.TestCase):
         cls.paths = ["README.md", "AGENTS.md", INDEX_PATH,
                      cls.original["現行施工採用"]["採用記録"],
                      *(entry["path"] for entry in cls.original["現行施工採用"]["五文書"])]
+        source_paths = set()
+        source_documents = (
+            (2, ("施工要求/", "施工結線/"), ("主要Source", "候補Source")),
+            (4, ("要求施工/", "施工結線詳細/"),
+             ("既存Source候補", "施工Source候補")),
+        )
+        for document_index, prefixes, fields in source_documents:
+            document = cls.original["現行施工採用"]["五文書"][document_index]
+            raw = (ROOT / document["path"]).read_bytes().decode("utf-8")
+            for line in raw.splitlines():
+                item = json.loads(line)
+                if any(item.get("識別", "").startswith(prefix) for prefix in prefixes):
+                    for field in fields:
+                        source_paths.update(item.get(field, []))
+        cls.paths.extend(sorted(source_paths))
         cls.bytes = {p: (ROOT / p).read_bytes() for p in cls.paths}
 
     def setUp(self):

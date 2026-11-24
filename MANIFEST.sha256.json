@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "420ac55ed2402270eddc431d1c1a4597dc3c9c42bc6c8b9dc0b7fae679edd36b"
+      "sha256": "daeacc33ac1771722bf318b8d6ba3d303b4b6b520b9e6d88fa5d9fde548f0602"
     },
     {
       "path": "SECURITY.md",
@@ -6009,7 +6009,7 @@
     },
     {
       "path": "tooling/current_governance_check.py",
-      "sha256": "518f0d59a54f8c44fe1b98bbeeabf680f55a4bdd15bc6d9d86626ca5fd9e8877"
+      "sha256": "a2c17e2b1b515d0dc13420982fdbc505273a6185651fca26ebcc91ffb0b1d25d"
     },
     {
       "path": "tooling/device_link_live_check.py",
@@ -6241,7 +6241,7 @@
     },
     {
       "path": "tooling/tests/test_current_governance_check.py",
-      "sha256": "7b0c72570036e8a620f99dc14deb02bad09dd13a081666beaaed39323bcb8d3e"
+      "sha256": "a96046276779495b0b2a380fed7e1e612d97f125d71fc138e836d6a04eed815a"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",

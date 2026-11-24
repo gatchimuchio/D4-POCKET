@@ -4,6 +4,12 @@
 
 現行正本は[要求仕様 v11](docs/V11_2026-11-24/01_D4Pocket_REQUIREMENTS_v11_JA.jsonl)・[設計仕様 v11](docs/V11_2026-11-24/02_D4Pocket_DESIGN_v11_JA.jsonl)・[実装開発工程 v11](docs/V11_2026-11-24/03_D4Pocket_IMPLEMENTATION_PLAN_v11_JA.jsonl)・[品質工程 v11](docs/V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl)・[実装開発実行指示 v11](docs/V11_2026-11-24/05_D4Pocket_IMPLEMENTATION_INSTRUCTIONS_v11_JA.jsonl)であり、採用範囲・原文固定は[v11採用記録](docs/V11_2026-11-24/採用記録.md)、常設施工方法は[AGENTS.md](AGENTS.md)に従う。v11は原要求188件（実装152・品質専用36）、本番結線54件、対象OS5種を保持し、実装・ビルドと独立品質業務を分離する。過去の進捗・検査・Release Blockerは対象SHAと時点に結合した履歴として保持し、v11採用だけで現在の実装完成・品質合格・公開を成立扱いしない。以下の過去記録は各見出しの対象版・時点に限る。
 
+### v11施工追補：W-J03 Source参照の現物束縛（2026-11-24）
+
+基準main `af3f21254e5967678421ee90a49ec9b0076a4428`。`tooling/current_governance_check.py`で実装152要求と54結線について、実装工程表と施工指示書のSource候補が一致し、候補がRepo内の実在fileを指すことを確認する構造を追加した。絶対path、path traversal、Repo外symlink、欠落file、directory参照は不成立として扱う。現行候補では152要求・54結線のSource参照がすべて一致し、参照先fileが存在する。
+
+これは要求/結線からSource候補への参照と実在だけを示す。機能のProducer/Consumer接続、実Effect、Build組込み、品質合格は判定しない。`python -B -X utf8 tooling/current_governance_check.py`と`git diff --check`がPASS。v11実装施工指示に従い、製品試験・QAは実行していない。
+
 ### v11施工追補：Runtime資源のProblems UI接続（2026-11-24）
 
 基準main `6a2220ef457b186adae1c3986a329ee61ad54fc3`で、Problems画面に既存のBroker Runtime一覧とRuntime Resource Clientを接続した。利用者が登録Runtimeを更新・選択し、一回観測を要求した場合だけ、Broker応答の時刻・PID binding・登録／観測Audit IDとCPU、RAM、I/O、遅延、失敗件数を表示する。未計測値は`unknown`のまま理由と証拠種別を表示する。画面離脱・Broker接続変更・Runtime変更では旧応答を破棄し、常時pollingを行わない。

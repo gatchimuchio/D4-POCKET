@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 INDEX_PATH = "規定/正本索引.json"
@@ -125,6 +125,63 @@ def validate_population(docs: dict[str, dict[str, dict]]) -> None:
             and len(ids_with_prefix(quality, "品質阻害/")) == 18, "歴史阻害18不一致")
 
 
+def validate_source_references(root: Path, docs: dict[str, dict[str, dict]]) -> None:
+    """工程表と施工指示のSource候補を照合し、Repo内の実在fileへ束縛する。"""
+    plan = docs["実装開発工程"]
+    instructions = docs["実装開発実行指示"]
+    construction_ids = {
+        ident.removeprefix("要求施工/")
+        for ident in ids_with_prefix(instructions, "要求施工/")
+    }
+    wire_ids = {
+        ident.removeprefix("施工結線詳細/")
+        for ident in ids_with_prefix(instructions, "施工結線詳細/")
+    }
+    expected_wire_ids = {f"W-{family}{index:02}"
+                         for family, count in WIRE_COUNTS.items()
+                         for index in range(1, count + 1)}
+    require(len(construction_ids) == 152, "Source対応: 実装要求152件が不一致")
+    require(wire_ids == expected_wire_ids, "Source対応: 必須結線54件が不一致")
+
+    repository = Path(root).resolve(strict=True)
+    pairs = (
+        (construction_ids, "施工要求/", "主要Source", "要求施工/", "既存Source候補"),
+        (wire_ids, "施工結線/結線/", "候補Source", "施工結線詳細/", "施工Source候補"),
+    )
+    for identifiers, plan_prefix, plan_field, instruction_prefix, instruction_field in pairs:
+        for suffix in identifiers:
+            plan_key = f"{plan_prefix}{suffix}"
+            instruction_key = f"{instruction_prefix}{suffix}"
+            planned = plan.get(plan_key, {}).get(plan_field)
+            instructed = instructions.get(instruction_key, {}).get(instruction_field)
+            require(type(planned) is list and bool(planned),
+                    f"Source対応: {plan_key} の{plan_field}が空")
+            require(type(instructed) is list and bool(instructed),
+                    f"Source対応: {instruction_key} の{instruction_field}が空")
+            require(set(planned) == set(instructed),
+                    f"Source対応: {plan_key} と {instruction_key} が不一致")
+            for source in planned:
+                require(type(source) is str and bool(source),
+                        f"Source対応: {plan_key} に不正path")
+                relative = PurePosixPath(source)
+                require(
+                    not relative.is_absolute()
+                    and relative.as_posix() == source
+                    and "\\" not in source
+                    and ":" not in source
+                    and all(part not in ("", ".", "..") for part in source.split("/")),
+                    f"Source対応: Repo相対pathではない {source}",
+                )
+                candidate = repository.joinpath(*relative.parts)
+                try:
+                    resolved = candidate.resolve(strict=True)
+                except (OSError, RuntimeError) as error:
+                    raise Invalid(f"Source対応: 候補が存在しない {source}: {error}") from error
+                require(resolved.is_relative_to(repository),
+                        f"Source対応: Repo外を指すpath {source}")
+                require(resolved.is_file(), f"Source対応: fileではない {source}")
+
+
 def governance_errors(root: Path = ROOT) -> list[str]:
     """現行v11だけを判定。v9履歴検査はnlc08_governance_check_legacyへ分離。"""
     try:
@@ -168,6 +225,7 @@ def governance_errors(root: Path = ROOT) -> list[str]:
                     and entry["SHA256"] in adopted, f"{role}: 索引/AGENTS/README/採用記録断絶")
             docs[role] = records
         validate_population(docs)
+        validate_source_references(root, docs)
         require("品質" in adoption.get("完成規則", "")
                 and "実装" in adoption.get("完成規則", ""),
                 "実装と品質の完成状態が混線")
