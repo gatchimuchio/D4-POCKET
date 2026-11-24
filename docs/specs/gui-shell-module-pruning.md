@@ -72,7 +72,8 @@ Windows Export build receipt v2は選択Manifestで同じFlutter Release build�
 ## 未成立範囲
 
 - 開発者専用の`Manifest`選択をFlutter画面のコンパイル時定義へ反映する経路と、`commit` `f0e9a40bd279b25c36fcefd6a65a50a3c1a80c9c`に結び付くWindows向けAOT画面生成および各ファイルの`hash`証拠は成立した。詳細は`docs/REV2_PROGRESS.md`に記録し、独立製品やOwner操作を主張しない。
-- Flutter以外のRust／第三者Module除去は未接続であり、安全基盤を別Moduleへ分割した主張をしない。
+- Rustの任意Broker ModuleはCargoの`module_*` featureと`#[cfg]`でcompile-time選択され、Windows／Linux／macOSのExport Builderは解決済みModulePlanに対応するfeatureをBroker buildへ渡す。これはSource／Builderの接続状態であり、生成Binaryから選択外nodeが実際に消えたことの証拠ではない。安全基盤を独立除去可能なModuleへ分割したとも主張しない。
+- Cargo依存とResourcesはModule単位の実際のbuild graphに基づいて扱う。共有依存を選択Moduleだけの依存と誤認して除去しない。特に`regex`はEvaluation LabだけでなくJSON Schema処理からも参照されるため、Evaluation Lab選択外でもCargo依存として残る。
 - 現行Desktop Export UIは通常Broker要求を送り、Export内容からRust/Desktop Native Owner確認へ接続する。FlutterへOwner資格は渡さず、Brokerは`DesktopNativeConfirmation`だけを受理する。これはSource上の接続状態を示し、各OSのinstalled製品上での実操作・受入れを証明しない（操作契約は[Export契約](gui-shell-export.md)を参照）。
 - 実行済み同一commit／toolchain比較の記録は`docs/REV2_PROGRESS.md`の最新Phase 33追補を参照する。AOT report上のCatalog surface node有無とartifact差分は限定された開発証拠であり、最終製品の除去・挙動を主張しない。cold startup、実行時resource比較、独立製品の実起動は未成立。
 - Installer、署名、実起動、配布は別工程として扱う。
