@@ -2,9 +2,9 @@
 
 ### v11施工追補：W-C10 永続Store利用不可時の操作表示（2026-11-25）
 
-基準main `0afb63bcd884d9192eb51eb4241acff811076721`。Broker UpdateListの`download実行`は`state_store.persistence_ready()`から投影され、Stage/Activation/Rollback/OS起動項目修復も永続Auditを確定できない場合はBrokerが`suspended`で拒否する。Settingsは候補・署名・rollback状態だけで一部操作を表示していたため、Broker永続Storeの現在可用性をStage/Activation/Repair/Rollbackと起動項目修復の表示条件へ結線した。Uninstallは既存の専用可用性条件を維持。Authority・拒否・AuditはBrokerの既存境界から変更していない。
+基準main `0afb63bcd884d9192eb51eb4241acff811076721`。Broker UpdateListの`download実行`は`state_store.persistence_ready()`から投影され、Stage/Activation/Rollback/OS起動項目修復/Uninstallも永続Auditを確定できない場合はBrokerが拒否する。Settingsは候補・署名・rollback状態だけで一部操作を表示していたため、Broker永続Storeの現在可用性をStage/Activation/Repair/Rollback/起動項目修復/Uninstallの表示条件へ結線した。Uninstallの導入先可用性判定は維持。Authority・拒否・AuditはBrokerの既存境界から変更していない。
 
-実装範囲はSettings Consumerの現在状態表示に限る。`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshot SHA-256 `ff47ad2ebcff304d9ef04931695b4a5902e1b9b36dbb0f0a8ffd97abb100b10a`でPASS（exit 0、workspace cleanup PASS）。`git diff --check`もPASS。Unit/E2E・品質QA・Installed Runtimeはこの施工単位で実施せず、W-C10全体や製品完成を主張しない。
+実装範囲はSettings Consumerの現在状態表示に限る。`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshot SHA-256 `966c6d7742799d5e3f8a92c349b8e4ee478b5a61af7f4cebe4de2b34d3cde3f`でPASS（exit 0、workspace cleanup PASS）。初回実行はManifest再生成との同時実行によりsnapshot作成時にNOT_RUNとなり、Manifest確定後の単独再実行でPASSした。`git diff --check`とManifest照合もPASS。Unit/E2E・品質QA・Installed Runtimeはこの施工単位で実施せず、W-C10全体や製品完成を主張しない。
 
 ### v11施工追補：W-C10 Rollback可用性のSettings表示結線（2026-11-25）
 

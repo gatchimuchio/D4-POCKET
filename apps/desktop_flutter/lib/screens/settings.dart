@@ -1892,7 +1892,8 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
           final installedProduct = rollbackState?['現在版'] is Map;
           final repairAvailable = updateStoreReady &&
               body['製品起動項目修復操作'] == 'available';
-          final uninstallAvailable = body['製品アンインストール操作'] == 'available';
+          final uninstallAvailable = updateStoreReady &&
+              body['製品アンインストール操作'] == 'available';
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
