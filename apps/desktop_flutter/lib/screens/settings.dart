@@ -1908,7 +1908,9 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
               ],
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: _checkingUpdateCatalog || _updateOperationInProgress
+                onPressed: _checkingUpdateCatalog ||
+                        _updateOperationInProgress ||
+                        !updateStoreReady
                     ? null
                     : _fetchUpdateCatalog,
                 icon: const Icon(Icons.refresh),
@@ -1916,6 +1918,13 @@ class _SettingsScreenState extends State<_SettingsScreenStateful> {
                   _checkingUpdateCatalog ? '候補取得中' : '配布元から候補取得',
                 ),
               ),
+              if (!updateStoreReady)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Brokerの永続Storeが利用できないため、更新候補の取得を停止しています。',
+                  ),
+                ),
               if (installedProduct && repairAvailable) ...[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(

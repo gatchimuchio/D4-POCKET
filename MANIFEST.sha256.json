@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "39dbca614781b21f7db073ec343191cc98e2443d5b783efa6ca9f76e98f70617"
+      "sha256": "8777f3e538426f230c493bdb45a09cd63a4924e150d1cc37129da859024bf5fb"
     },
     {
       "path": "SECURITY.md",
@@ -345,7 +345,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "5fbdb2e8fa8fc0ff7abf9b96c4a2809d92e7442fe24fd49a9a4bbc298191a48d"
+      "sha256": "f93ae76a1b14411d3f2f1b0de6cda4d36fbf67515dd58ede9cbf42cf8dad6b1b"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -2185,7 +2185,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "17fbc0bcea1fa6b248360fd7dcb44005d638aebc1815e78229b9fe355dd9e1bb"
+      "sha256": "5b6d2d81e32e273584d40564c19b48c092e0c88ad183ed67ff828d3bb14488a9"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",

@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：W-C10 候補取得の永続Store表示結線（2026-11-25）
+
+基準main `048926667e85ec328f23366fc85194afd2b637cf`。Broker認証IPC入口には、永続Storeが必須なのに利用不能な場合、操作実行前に要求を拒否する既存ガードがある。Settingsの候補取得ボタンだけがUpdateListの`download実行`可用性を消費せず、Brokerが停止している状態でも操作可能に見えていた。Broker権限処理は変更せず、既存投影が`available`でない場合は候補取得を無効化し、永続Store停止を画面に表示する。
+
+この変更はSettingsの可用性表示と更新センター契約の記録に限定する。Desktop Flutter analyzeとManifest／統治整合確認を構築確認として実施し、Unit/E2E・品質QA・Installed Runtimeは実施しない。W-C10全体や製品受入れ完了を主張しない。
+
 ### v11施工追補：W-C10 永続Store利用不可時の操作表示（2026-11-25）
 
 基準main `0afb63bcd884d9192eb51eb4241acff811076721`。Broker UpdateListの`download実行`は`state_store.persistence_ready()`から投影され、Stage/Activation/Rollback/OS起動項目修復/Uninstallも永続Auditを確定できない場合はBrokerが拒否する。Settingsは候補・署名・rollback状態だけで一部操作を表示していたため、Broker永続Storeの現在可用性をStage/Activation/Repair/Rollback/起動項目修復/Uninstallの表示条件へ結線した。Uninstallの導入先可用性判定は維持。Authority・拒否・AuditはBrokerの既存境界から変更していない。
