@@ -90,7 +90,7 @@ python tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-
 
 `--flutter-step`は指定したFlutter analyze／test／buildだけをOneDrive外の一時source snapshotで実行します。Owner用起動scriptも`tooling/launch_owner_desktop_isolated.py`を介し、Rust helper build、Flutter run、一時session fileを隔離snapshot内で扱います。snapshot内のCargoには同じ最終成果物・中間生成物の配置規則を適用します。任意に直接実行する`flutter run`等はこの隔離経路を通りません。snapshotは生成物を隔離する開発用機構で、Rust BrokerのAuthorityを代替しません。Broker永続storeは既存の開発データ互換性のため従来locationを維持します。
 
-現行の適用文書と証拠の責任分離は[v9 NLC08採用記録](docs/QE_2026-11-23/採用記録_NLC08.md)、既記録の環境差と未解決検査は[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)・[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)を参照してください。旧証拠の対象・時点を保持し、候補再評価を代替しません。ソースからの開発・検証を始める手順は[開発クイックスタート](QUICKSTART.md)にあります。
+現行の適用文書と責任分離は[v11採用記録](docs/V11_2026-11-24/採用記録.md)と[AGENTS.md](AGENTS.md)、既記録の環境差と未解決検査は[v8継続施工証拠](docs/QE_2026-11-16/進捗.md)・[v5継続N/W受入証拠](docs/QE_2026-11-14/進捗.md)を参照してください。旧証拠の対象・時点を保持し、現行状態の再評価を代替しません。ソースからの開発を始める手順は[開発クイックスタート](QUICKSTART.md)にあります。
 
 ## リポジトリを読む
 

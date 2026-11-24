@@ -9,6 +9,7 @@ const _visibilities = {'none', 'hash_only', 'summary', 'redacted', 'full'};
 const workspaceEditReviewOperation = 'GUI Shell編集提案審査';
 const workspaceEditApplyTargetOperation = 'GUI Shell編集適用先照合';
 const workspaceEditApplyOperation = 'GUI Shell編集適用';
+const workspaceEditRollbackOperation = 'GUI Shell編集Rollback';
 final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
 final _id = RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$');
 final _auditEventId = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$');
@@ -23,6 +24,9 @@ const _workspaceFailureCodes = {
   'ai_edit_review_provenance_invalid',
   'ai_edit_apply_binding_invalid',
   'ai_edit_apply_rejected',
+  'ai_edit_rollback_unsupported',
+  'ai_edit_rollback_binding_invalid',
+  'ai_edit_rollback_rejected',
 };
 Never _invalid() => throw const BrokerClientException('作業領域の応答を確認できません');
 Map<String, Object?> _map(Object? value) {
@@ -201,13 +205,15 @@ class WorkspaceRegistration {
 class WorkspaceView {
   WorkspaceView(this.registration, this.operation, this.path, this.projection,
       this.auditId,
-      [this.baselineHash, this.sourceRegistration, this.editTargetRequest]);
+      [this.baselineHash, this.sourceRegistration, this.editTargetRequest,
+      this.appliedRequest]);
   final WorkspaceRegistration registration;
   final String operation, path, auditId;
   final String? baselineHash;
   final WorkspaceRegistration? sourceRegistration;
   final Map<String, Object?>? projection;
   final Map<String, Object?>? editTargetRequest;
+  final Map<String, Object?>? appliedRequest;
 }
 
 /// Brokerのprojectionだけを消費する。owner資格と権限付与を保持しない。
@@ -600,7 +606,82 @@ class WorkspaceClient {
         body['status'] != 'applied') {
       _invalid();
     }
-    return WorkspaceView(prepared.registration, operation, '', body, auditId);
+    return WorkspaceView(
+      prepared.registration,
+      operation,
+      '',
+      body,
+      auditId,
+      null,
+      prepared.sourceRegistration,
+      prepared.editTargetRequest,
+      Map<String, Object?>.unmodifiable(payload),
+    );
+  }
+
+  Future<WorkspaceView> rollbackAppliedEdit(WorkspaceView applied) async {
+    const operation = workspaceEditRollbackOperation;
+    final appliedRequest = applied.appliedRequest;
+    final body = _map(applied.projection);
+    final selected = applied.registration;
+    final now = DateTime.now();
+    if (applied.operation != workspaceEditApplyOperation ||
+        appliedRequest == null ||
+        !selected.current(now) ||
+        selected.visibility != 'full' ||
+        selected.approval == null ||
+        !_auditEventId.hasMatch(applied.auditId) ||
+        applied.auditId == _unavailableAuditEventId ||
+        body['operation'] != workspaceEditApplyOperation ||
+        body['request_hash'] != brokerPayloadHash(appliedRequest) ||
+        body['status'] != 'applied' ||
+        !_hash.hasMatch(_string(body['request_hash'])) ||
+        !_id.hasMatch(_string(body['transaction_id'])) ||
+        body['changed_files'] is! int ||
+        (body['changed_files'] as int) < 1 ||
+        (body['changed_files'] as int) > 32) {
+      _invalid();
+    }
+    final current = await list();
+    final matches = current.where((entry) => entry.id == selected.id).toList();
+    if (matches.length != 1 || !matches.single.sameGrant(selected)) {
+      _invalid();
+    }
+    final payload = <String, Object?>{
+      'version': 1,
+      'transaction_id': body['transaction_id'],
+      'applied_request_hash': body['request_hash'],
+      'applied_audit_id': applied.auditId,
+      'applied_request': appliedRequest,
+      'workspace_id': selected.id,
+      'registration_hash': selected.hash,
+      'approval_id': selected.approval,
+    };
+    final response = await _request(operation, payload);
+    final result = _map(response['body']);
+    _keys(result, [
+      'version', 'operation', 'request_hash', 'applied_request_hash',
+      'applied_audit_id', 'workspace_id', 'review_audit_id', 'diff_hash',
+      'transaction_id', 'changed_files', 'status',
+    ]);
+    final auditId = _string(response['audit_event_id']);
+    if (response['evidence_source'] != 'LIVE_RUNTIME' ||
+        !_auditEventId.hasMatch(auditId) ||
+        auditId == _unavailableAuditEventId ||
+        result['version'] != 1 ||
+        result['operation'] != operation ||
+        result['request_hash'] != brokerPayloadHash(payload) ||
+        result['applied_request_hash'] != body['request_hash'] ||
+        result['applied_audit_id'] != applied.auditId ||
+        result['workspace_id'] != selected.id ||
+        result['review_audit_id'] != body['review_audit_id'] ||
+        result['diff_hash'] != body['diff_hash'] ||
+        result['transaction_id'] != body['transaction_id'] ||
+        result['changed_files'] != body['changed_files'] ||
+        result['status'] != 'rolled_back') {
+      _invalid();
+    }
+    return WorkspaceView(matches.single, operation, '', result, auditId);
   }
 
   Future<WorkspaceView> read(WorkspaceRegistration selected, String path,

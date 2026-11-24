@@ -277,7 +277,7 @@ FFI直結は便利だが、信頼境界用途では弱い。
 
 ## 7. Local Validation / Release Gate 方針
 
-品質の成立条件・工程退出は、[現行v9採用記録](QE_2026-11-21/採用記録.md)が指定する仕様書・工程表・施工指示書に従う。owner / Codex が許可範囲内で明示実行するlocal validation・smoke・release verificationと、対象候補に結合したOS別製品証拠を分けて保持する。GitHub Actionsの成功だけで製品完成・五OS QA・出荷許可を判定しない。
+品質の成立条件・工程退出は、[現行v11品質工程](V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl)と[v11採用記録](V11_2026-11-24/採用記録.md)に従う。owner / Codex が委任範囲内で明示実行する構築確認と、品質工程で対象候補に結合する製品証拠を分けて保持する。GitHub Actionsの成功だけで製品完成・五OS QA・出荷許可を判定しない。
 
 `.github/workflows`には、既存のOwner許可による手動`workflow_dispatch`専用の次の8 workflowを保持する。必要な検証範囲・対象commitを固定して使用し、`push`／`pull_request`／`merge_group`の自動実行を導入しない。ファイルの存在は新たな実行許可を与えない。
 

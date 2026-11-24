@@ -314,6 +314,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       bool review = false,
       WorkspaceView? prepareTargetFor,
       WorkspaceView? applyTarget,
+      WorkspaceView? rollbackTarget,
       String? baselineHash}) async {
     if (!_isActive) return;
     _cancelViewMaintenance();
@@ -324,11 +325,17 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       _view = null;
       _busy = true;
       _selected = registration.id;
-      _message = applyTarget == null ? '承認済み範囲を取得中' : 'Owner確認と適用の結果を待っています。';
+      _message = rollbackTarget != null
+          ? 'Owner確認とRollbackの結果を待っています。'
+          : applyTarget == null
+              ? '承認済み範囲を取得中'
+              : 'Owner確認と適用の結果を待っています。';
     });
     try {
       final WorkspaceView view;
-      if (applyTarget != null) {
+      if (rollbackTarget != null) {
+        view = await widget.client.rollbackAppliedEdit(rollbackTarget);
+      } else if (applyTarget != null) {
         view = await widget.client.applyReviewedEdit(applyTarget);
       } else if (prepareTargetFor != null) {
         view = await widget.client.prepareEditTarget(prepareTargetFor, registration);
@@ -347,9 +354,11 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       setState(() {
         _view = view;
         _viewLimit = _elapsed.elapsedMilliseconds + 300000;
-        _message = applyTarget == null
-            ? '取得時点の表示です。承認状態を定期確認しています。'
-            : '審査済みの差分を適用しました。';
+        _message = rollbackTarget != null
+            ? '別のOwner確認で適用済み差分を巻き戻しました。'
+            : applyTarget == null
+                ? '取得時点の表示です。承認状態を定期確認しています。'
+                : '審査済みの差分を適用しました。';
       });
     } catch (error) {
       if (!mounted || generation != _generation) return;
@@ -357,9 +366,11 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         _view = null;
         _message = _failureMessage(
           error,
-          applyTarget == null
-              ? '取得または現在の承認を確認できません。登録状態を更新してください。'
-              : '適用結果を確認できません。再実行の前に監査と現在の差分を確認してください。',
+          rollbackTarget != null
+              ? 'Rollback結果を確認できません。再実行前に監査と現在の差分を確認してください。'
+              : applyTarget == null
+                  ? '取得または現在の承認を確認できません。登録状態を更新してください。'
+                  : '適用結果を確認できません。再実行の前に監査と現在の差分を確認してください。',
         );
       });
     } finally {
@@ -786,6 +797,19 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         ],
         if (view.operation == workspaceEditApplyOperation) ...[
           Text('適用済み ${projection!['changed_files']}件'),
+          Text('復旧記録 ${projection['transaction_id']}'),
+          OutlinedButton(
+            onPressed: _busy ||
+                    !view.registration.current(DateTime.now()) ||
+                    view.registration.visibility != 'full'
+                ? null
+                : () => _read(view.registration, '', false,
+                    rollbackTarget: view),
+            child: const Text('別のOwner確認でRollback'),
+          ),
+        ],
+        if (view.operation == workspaceEditRollbackOperation) ...[
+          Text('Rollback済み ${projection!['changed_files']}件'),
           Text('復旧記録 ${projection['transaction_id']}'),
         ],
         if (view.registration.visibility == 'full' &&

@@ -141,11 +141,11 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "a73c3aeb94a16168ca06dbdc785cb8dfda87172b4f295dc47544d2dddf0b19fe"
+      "sha256": "6cada33b06a12ef1e45d4d8c1c313c7a579a667a22544b861c71be468cc25bce"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
-      "sha256": "83a4beca874f9eaa78dd59142658963f816b3ee343b0560fb42a9d629ac5e355"
+      "sha256": "fa419824b5abf251eadcd9ab1af355388438f716fde8778b9e760a824ce76ee2"
     },
     {
       "path": "CONFIG.md",
@@ -161,7 +161,7 @@
     },
     {
       "path": "INSTALLER_STATUS.md",
-      "sha256": "86c1c15dfe0cdc8c040d0c3db593d8f19e3a5f4f69d19fee3f966fbe8e469d1e"
+      "sha256": "e1f5387bcd06322ed8c7583b89287b5de2ff1c2f22f2fcb70fc7bed8370a385a"
     },
     {
       "path": "LICENSE",
@@ -177,7 +177,7 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "b9bc966e673885868dd165eb20bd541ce163eef6884e2ebc96c67a3998b312ae"
+      "sha256": "aea1bb289585b6192d2b4e9b2842318fea581d747abe02993ac2d5513db92467"
     },
     {
       "path": "NOTICE",
@@ -185,19 +185,19 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "4df89719a75f40a3ba676b5b5a15844eb85b1d319a7835176f6b7a116c43d3a5"
+      "sha256": "ee08ea28fb79f5b44ebfe771436c012e08e76076270fc2c9cc2bf02d657aa818"
     },
     {
       "path": "README.md",
-      "sha256": "efa038d12c67a7a4550f2fabcc07a8b545bed4127c7d36606439eeccdb01420b"
+      "sha256": "fc61d8bcafdfbf8172afe49f44047bba8944f7b84f0daa1862c8db788295baef"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "6ed6776c27b365f561ec9b1671f2c397134ff4d1e9b50f642980edbe636100cb"
+      "sha256": "a206e6a97fdf430f0e8531c8b22d79877ad13233b263b4768e70834ccfd0a44a"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "a2557affc775a5bbed1ab44c2511c93cbaeacced043a1474ee9f82839518bfaa"
+      "sha256": "96505f685cee559fbc7e2e7eb9687966afd0ab1e14c12fdcae77faddc86e2bf4"
     },
     {
       "path": "SECURITY.md",
@@ -361,7 +361,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/workspace_inspector.dart",
-      "sha256": "aea337bc52c1bb81a61aae41cd43a613bbaa155b7774ac73df86fc5a3154414d"
+      "sha256": "5ae82444dedaabcb17f9bb9b58b02d34151f2ec87d51e7d2dc9a53bd891d3979"
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart",
@@ -397,7 +397,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "2f14aac3501f16ef49b0ea456677ff7783e021c0cd03dc7b277a21db51b20ce1"
+      "sha256": "19402f34f7ab62fd8de64273bdfff4ca8bd24b6ae5b05a85360bc17e77bf1b85"
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_health_client.dart",
@@ -469,7 +469,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
-      "sha256": "f75c9463807d8c2f2ce5c76481d4f4c2879378819bd7d28470b70048ca9ea1fa"
+      "sha256": "604111c25d8075d340f8830eccb830567b8d08e0a08696833bfbc3691ab4e320"
     },
     {
       "path": "apps/desktop_flutter/linux/.gitignore",
@@ -617,7 +617,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "81b6e1c14c80d249d6ab56749bb0125403f07ed3ab513fabe32ec0da1dfb8a00"
+      "sha256": "8cb36cf82d5947b9a30ef8090bb074925e7defdd2b8191e42775d87eef7fce27"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -929,7 +929,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp",
-      "sha256": "c5a2b31d715a13b2865115f0249ab4a71607c7e0130fe3986ca6dc3f3d4c8a3a"
+      "sha256": "ef2e7469fcb89eaf3d7e9bfa83223f95cb101d2fe9b581c65e9ce2b6c6f97baf"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.h",
@@ -1433,7 +1433,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "342d78f9e6d837344d088aca498a2f18c1662e3ef9fb438fe7d04a9d72d57331"
+      "sha256": "21c7d180bc6c10411a94f18c14dfbb81be456403993f32d922508ea80a36b470"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1449,7 +1449,7 @@
     },
     {
       "path": "docs/LANGUAGE_POLICY.md",
-      "sha256": "844dde9b4a43b8bd5017fa82d6b6eac0cab1f178a84a5308a72e0723b9b0df12"
+      "sha256": "c5d2b860b64208086b6a36d7e47be64f967ec7f0968aab685c2432756193f6c6"
     },
     {
       "path": "docs/MUTATION_VERIFICATION.md",
@@ -1661,7 +1661,7 @@
     },
     {
       "path": "docs/QE_2026-11-16/\u9032\u6357.md",
-      "sha256": "40b76b91ec0d9a8c75da3cbc1a70d5ae6fccbea29f09ba81f9992b5bc4bab1d6"
+      "sha256": "86876b93a394922e7f955eaa1d74695ea65684df39f82dbb7d04a817d8ecb288"
     },
     {
       "path": "docs/QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl",
@@ -1817,7 +1817,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "a11f5cad9081c81c72ef802a5624dfdf7bce2313a579c3e488697f209a44b4bb"
+      "sha256": "6bf3c56227fdb8e18c99e3ba56f0edf22dc6c59421084010c2efd4825884d0ff"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2033,7 +2033,7 @@
     },
     {
       "path": "docs/specs/gui-shell-ai-edit.md",
-      "sha256": "ca8803b440cccd7a2dac8af51d9d0ca273c34dc62ce543eca7b27e4deba38897"
+      "sha256": "ae8578bf1ce6b98801b27ce2b2526f329d228f84ed4df91490f0dac067b3cd67"
     },
     {
       "path": "docs/specs/gui-shell-compose.md",
@@ -4265,11 +4265,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/ai_edit_center.rs",
-      "sha256": "246543f5aa2e1939f39a9e60c4849303ed523574e1b5e4577865d41a26d1b2e4"
+      "sha256": "de069828a3e2ee64f107fe43dc991292750115d22788c3a36daced344a4ba895"
     },
     {
       "path": "native/rust_helper/src/broker/ai_edit_transaction.rs",
-      "sha256": "3b33d8afd95529a0d98fa9352e8fe0d2318665d3f24739fd2011134a4782b108"
+      "sha256": "ec1235f8ccb1b53f02c825f0626f501a104c1ce08037d866cd4ea3714a79eef2"
     },
     {
       "path": "native/rust_helper/src/broker/audit.rs",
@@ -4397,7 +4397,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "e61e1520928021e37bace9b8ad7ce35c606ffe7b3ce10d2d21bd786a19150b75"
+      "sha256": "7fb8bb692352c88c338683cce87494db59de64e20b1b43037362df19acb18f84"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -4437,7 +4437,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "7e2af3201a83a2cff7ad203c1f062d9f1a76cdb400126fe3de4b91806e3205b9"
+      "sha256": "a7f1697c06a0481ac3fdca9c8221daaf6c2d96c9c7448b46f78266fb9439569b"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -4453,7 +4453,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "1ee5309656d15dd3bda201dc7719ba05cd9f55fdc02891ec37bbc8f00fe0e4bb"
+      "sha256": "5578006541b0f83202ae8d239d5c76421c11b3b14a0e4eb55b08e274c3e39ce5"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4501,7 +4501,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "fc0b3e035610fc4f38ed566690f438ec9fef9d21363ec0dcb522121eff51bf53"
+      "sha256": "17d3b70995e9c5282a932aa6e8fa28fb63296d361f3063029be01ce1f3007947"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4925,7 +4925,7 @@
     },
     {
       "path": "packages/broker_ipc_client/lib/src/authenticated_loopback_broker_transport.dart",
-      "sha256": "2fa0be0ebd3bc692276be68cfc7466d0aba31ffe754cacef0e3125958185e407"
+      "sha256": "9b25428e42bbda2574a9ae4e3fad2e6ac7052073680e8c1a49c0f31d44a1638c"
     },
     {
       "path": "packages/broker_ipc_client/pubspec.yaml",
@@ -5573,11 +5573,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "38a95ca61541ea3ed4b24cd82342db210b6fc8d6aec1955f0ac0798c8de9c8e2"
+      "sha256": "768f4e71d0004649fc80560b5cd2b9297e9e71ea643c47eb6518f6e064a2a782"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "56192a84e66d487eb30a0caeac66dfe3d4492311af385d7b31c9d2c34cfdb126"
+      "sha256": "24f2296349a27c033ce178af3b198ee5f463ca786bab7e3f5a873c79bd87a09c"
     },
     {
       "path": "specs/linux_workspace_selection.schema.json",
@@ -6369,7 +6369,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "521f0912eb690cccdf3a0e65d28176f86855a224880476639dd2f0823639e3c0"
+      "sha256": "d63daa8672ae8638a78557d5d25d1b9d6a809e862d52e5c68b9b8f2daad99fc9"
     }
   ]
 }

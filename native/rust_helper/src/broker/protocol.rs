@@ -653,6 +653,8 @@ pub enum BrokerOperation {
     GuiShell編集適用先照合,
     #[serde(rename = "GUI Shell編集適用")]
     GuiShell編集適用,
+    #[serde(rename = "GUI Shell編集Rollback")]
+    GuiShell編集Rollback,
     #[serde(rename = "GUI Shell書出し")]
     GuiShell書出し,
     #[serde(rename = "更新一覧")]
@@ -846,6 +848,7 @@ impl BrokerOperation {
                 super::ai_edit_center::APPLY_TARGET_OPERATION
             }
             BrokerOperation::GuiShell編集適用 => super::ai_edit_center::APPLY_OPERATION,
+            BrokerOperation::GuiShell編集Rollback => super::ai_edit_center::ROLLBACK_OPERATION,
             BrokerOperation::GuiShell書出し => "GUI Shell書出し",
             BrokerOperation::更新一覧 => "更新一覧",
             BrokerOperation::更新候補取得 => "更新候補取得",
@@ -2078,6 +2081,7 @@ impl Broker {
                 BrokerOperation::GuiShell書出し
                     | BrokerOperation::GuiShell編集提案
                     | BrokerOperation::GuiShell編集適用
+                    | BrokerOperation::GuiShell編集Rollback
                     | BrokerOperation::A2A接続
                     | BrokerOperation::A2Aメッセージ送信
                     | BrokerOperation::A2Aタスク状態取得
@@ -2268,14 +2272,17 @@ impl Broker {
             );
         }
 
-        if envelope.operation == Some(BrokerOperation::GuiShell編集適用)
-            && (!owner || export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation)
+        if matches!(
+            envelope.operation,
+            Some(BrokerOperation::GuiShell編集適用 | BrokerOperation::GuiShell編集Rollback)
+        ) && (!owner
+            || export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation)
         {
             return self.reject_with_payload_hash(
                 &request_id,
                 &operation,
                 "desktop_native_owner_confirmation_required",
-                "編集適用には現在のRust DesktopネイティブOwner確認が必要",
+                "編集適用とRollbackには各操作に束縛した現在のRust DesktopネイティブOwner確認が必要",
                 true,
                 envelope.payload_hash.as_deref().unwrap_or("unknown"),
             );
@@ -2903,6 +2910,11 @@ impl Broker {
                 &payload_hash,
             ),
             BrokerOperation::GuiShell編集適用 => self.apply_reviewed_ai_edit(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &payload_hash,
+            ),
+            BrokerOperation::GuiShell編集Rollback => self.rollback_reviewed_ai_edit(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 &payload_hash,
@@ -3616,6 +3628,112 @@ impl Broker {
                     id,
                     APPLY_OPERATION,
                     "ai_edit_apply_rejected",
+                    reason,
+                    true,
+                    hash,
+                ),
+            }
+        }
+    }
+
+    fn rollback_reviewed_ai_edit(
+        &mut self,
+        id: &str,
+        payload: &Value,
+        hash: &str,
+    ) -> BrokerResponse {
+        use super::ai_edit_center::{RollbackRequest, ROLLBACK_OPERATION};
+        #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+        {
+            let _ = payload;
+            self.reject_with_payload_hash(
+                id,
+                ROLLBACK_OPERATION,
+                "ai_edit_rollback_unsupported",
+                "編集RollbackはDesktopで実行します",
+                false,
+                hash,
+            )
+        }
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+        {
+            let candidate = (|| {
+                let request = RollbackRequest::parse(payload)?;
+                request.verify_applied_receipt(self)?;
+                let workspace_root = self
+                    .作業領域
+                    .edit_workspace_identity(&request.workspace_id)
+                    .ok_or("Rollback対象Workspaceが未登録")?;
+                if self.対話.workspace_has_running_agent_task(workspace_root) {
+                    return Err("Rollback対象WorkspaceでAgent Taskが実行中");
+                }
+                let store = self
+                    .state_store
+                    .persistent_store
+                    .clone()
+                    .ok_or("編集Rollbackには永続保管先が必要")?;
+                Ok::<_, &'static str>(store)
+            })();
+            let store = match candidate {
+                Ok(store) => store,
+                Err(reason) => {
+                    return self.reject_with_payload_hash(
+                        id,
+                        ROLLBACK_OPERATION,
+                        "ai_edit_rollback_binding_invalid",
+                        reason,
+                        true,
+                        hash,
+                    )
+                }
+            };
+            let mut registry = std::mem::take(&mut self.作業領域);
+            let mut audit_failed = false;
+            let now = self.current_epoch_seconds();
+            let result = registry.rollback_reviewed_edit(
+                payload,
+                hash,
+                now,
+                &store,
+                &mut |decision, reason, digest| {
+                    let evidence = if decision == "accepted" {
+                        EVIDENCE_SOURCE_LIVE_RUNTIME
+                    } else {
+                        EVIDENCE_SOURCE_INTERNAL_STATE
+                    };
+                    self.append_audit(id, ROLLBACK_OPERATION, decision, reason, evidence, digest)
+                        .map(|event| event.event_id)
+                        .map_err(|_| {
+                            audit_failed = true;
+                            "編集Rollbackの監査を確定できない"
+                        })
+                },
+            );
+            if audit_failed {
+                return self.audit_store_failed_response(
+                    id,
+                    ROLLBACK_OPERATION,
+                    "編集Rollbackの監査を確定できない",
+                    "JournalとWorkspace差分を確認",
+                );
+            }
+            self.作業領域 = registry;
+            match result {
+                Ok((body, audit_event_id)) => BrokerResponse {
+                    request_id: id.into(),
+                    operation: ROLLBACK_OPERATION.into(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.into(),
+                    audit_event_id,
+                    error: None,
+                    health: None,
+                    body: Some(body),
+                    shutdown_requested: false,
+                },
+                Err(reason) => self.reject_with_payload_hash(
+                    id,
+                    ROLLBACK_OPERATION,
+                    "ai_edit_rollback_rejected",
                     reason,
                     true,
                     hash,

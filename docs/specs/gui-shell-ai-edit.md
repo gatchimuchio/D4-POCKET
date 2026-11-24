@@ -54,8 +54,20 @@ Brokerの `GUI Shell編集提案審査` は、現在のHost表示世代におけ
 
 適用中断または独立承認後のロールバック中断は、耐久記録とファイルの現状態を照合して復元する。照合できた対象だけを戻し、別の版が作られた場合はその版と退避済みの版を保持する。適用が確定した記録では、明示されたロールバック承認を待つ。
 
+同じ審査と物理Workspaceに結び付く既存Journalを検出した場合、再発行された適用要求hashを旧Journalへ流用しない。Broker保護鍵でJournalを検証し、記録済みの元hash・Workspace実体IDに束縛して未完了の補償回復だけを行い、新しい適用は拒否する。改ざん・別Workspace・外部版競合はfail-closedとし、回復状態をAuditへ記録する。
+
 ## Owner確認後の適用
 
 Workspace Inspectorの適用先照合が完了したら、「Owner確認して適用」で、対象パスと追加・置換・削除の内訳、審査差分のhashをネイティブ確認に表示する。Brokerは審査と適用先照合の耐久監査、現在の読取承認、ファイル版を照合する。対応する作業領域に実行中のAgent Taskがあれば適用を拒否する。同じ審査を同じ物理作業領域に適用できるのは一回である。
 
 適用には、作業領域と同じvolumeにあるBrokerの保護保管先を使用する。確認の消費を監査へ記録してから書き込む。適用後の版と復旧記録を確認し、完了監査を保存してから、画面に適用件数と復旧記録IDを表示する。完了監査の保存に失敗した場合は照合できる版を元へ戻し、監査エラーを返す。
+
+## 独立した明示Rollback
+
+適用成功結果には、Rollback要求を組み立てるための元適用要求・要求hash・Apply Audit IDを結果画面の一時状態として保持する。これらは対象とAuditの照合材料であり、旧Owner確認やApprovalとして再利用しない。Workspace Inspectorの「別のOwner確認でRollback」は専用の`GUI Shell編集Rollback` Broker操作を呼び出し、現在のHostに存在する成功Apply Audit、同じWorkspace登録、現在のfull Workspace Permission、適用中Agent Taskの不在を再確認する。
+
+Rust Desktop Nativeは元適用とは別のRollback要求hashに束縛した確認内容を表示する。確認後、Brokerは同一volumeの保護退避先とHMAC Journal、適用時の実体ID、各対象の現在hashを再照合する。追加fileは適用版だけを除去し、置換・削除fileは変更前版だけを復元する。別プロセスが作った版、root変更、登録・Permission失効、Audit不一致を検出した対象は上書きせず、差分とJournalを残して拒否する。
+
+Rollback開始意図を耐久Auditへ先に記録し、各移動の直前にも現在Permission期限を確認する。成功時は`rolled_back`、対象件数、Transaction IDと完了Auditだけを返す。中断したRollbackはJournalの`Reverting`／`RecoveryRequired`状態から、改めて現在Permissionと新しいNative確認を得た後に再開できる。再開時も既に復元済みの変更前版を再適用せず、各fileの現版と退避版を照合する。本文やCredentialは応答・Auditへ含めない。
+
+Rollback操作は現在、成功直後の結果画面から起動する。画面を閉じた後やアプリ再起動後に、過去の適用一覧からRollback対象を再発見するConsumerは未接続である。適用途中の自動補償Recoveryとは別の制約として保持する。

@@ -1,19 +1,19 @@
 # D4 Pocket 最終品質保証項目（`FINAL_QA_QUEUE`）
 
-継続証拠上の保留状態: `DEFERRED`（旧記録の状態を保持。今回、v9候補の工程・QAを再評価した結果ではなく、正式Final QAの開始宣言でもない）
+> 現行の要求・設計・実装工程・品質工程・実行指示は[2026-11-24 v11採用記録](V11_2026-11-24/採用記録.md)と[品質工程 v11](V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl)を参照。本書は旧Q0〜Q7 queueと過去結果の履歴であり、それ自体で現行の工程・合格条件・追加Gateを定めない。
 
-現行製品正本: [仕様 v9](QE_2026-11-21/01_D4Pocket_SPEC_v9_NLC04.jsonl)・[工程 v9](QE_2026-11-21/02_D4Pocket_PLAN_v9_NLC04.jsonl)・[施工指示 v9](QE_2026-11-21/03_D4Pocket_CODEX_v9_NLC04.jsonl)、適用範囲は[v9採用記録](QE_2026-11-21/採用記録.md)に固定する。[v8継続施工証拠](QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](QE_2026-11-14/進捗.md)は旧対象・時点の履歴と未閉包を保持し、新候補の合格証拠へ転記しない。QE方法論は[2026-10-22採用記録](QE_2026-10-22/採用記録.md)に保持する。本QueueのQ0〜Q7識別子、過去の検査履歴、Release Gateは変更しない。正式実施は採用工程の該当段階と同一候補に束縛する。Q5の五OS導入済み製品QAはE5、Q7の本人独立GOはE6に対応し、Q0〜Q7を一括してE4へ前倒ししない。
+履歴上の保留状態: `DEFERRED`（旧記録の状態であり、v11候補のQA状態を示さず、正式Final QAの開始宣言でもない）。[v8継続施工証拠](QE_2026-11-16/進捗.md)と[v5継続N/W受入証拠](QE_2026-11-14/進捗.md)は旧対象・時点の履歴と未閉包を保持し、新候補の合格証拠へ転記しない。QE方法論の当時の採用は[2026-10-22採用記録](QE_2026-10-22/採用記録.md)に保持する。本QueueのQ0〜Q7識別子、過去の検査履歴、Release Gateは履歴として保持する。Q5/E5・Q7/E6の対応はv9当時の工程対応であり、現行v11の工程対応を定めない。
 
 2026-10-09 P13 Workspace Inspector作業時の必須検査履歴: 全Rustはlib 518 PASS／1 FAIL／12 ignored、他target PASS。変更外`a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する`が`a2a_connection_failed`／「A2A Agent Card応答を読めない」でFAIL。根因未確定の既存`FQ-TEST-LOOPBACK`へ同分類で保持し、新native入口の局所2試験PASSとは分離する。旧fixtureを再試験・根因探索せず、全体FAILを上書きせず、Final QAを開始しない。
 
 2026-10-09 P13 Host作業時の必須検査履歴: 最終全Rustはlib 516 PASS／1 FAIL／12 ignored、他target PASS。変更外`bounded_catalog_fetch_rejects_declared_document_over_limit`がlocalhost TLSのOS error 10054／ConnectionResetでFAILし、単独再実行は1 PASS。根因未確定の既存`FQ-TEST-LOOPBACK`へ同分類で保存する。Hostのcurrent blockerへ追加せず、全体FAILを上書きせず、Final QAを開始しない。
 
 2026-10-09 P13 A2A作業時の必須検査履歴: 全Rust実行はlib target FAIL、他target PASS。短縮lib再確認は514 passed／1 failed／12 ignoredで、既存`failed_tool_result_is_not_replayed_as_another_exec_command`がHTTP応答途中のConnectionReset（expected 23274、received 0）。対象単独再実行は1 passed。根因未確定の既存`FQ-TEST-LOOPBACK`へ同分類で記録し、P13 A2A入口のregressionとは観測されない。全体FAILを成功へ書換えず、本記録だけを追加し、Final QA試験を開始しない。
-製品工程・Final QA要求正本は冒頭のv9三点であり、QE施工方法・BUILD_BATCH方法論は[2026-10-22 QE統合3点](QE_2026-10-22/採用記録.md)に保持する。両者の責任範囲を分け、旧版および過去のphase記録を現行の追加Gateへ昇格しない。rev5のAcceptance履歴は`docs/REV5_PRODUCT_PROGRESS.md`に保持する。
+本書に記録された製品工程・Final QAの範囲はv9当時のもの。現在の要求・工程・品質範囲はv11正本に従い、旧版や過去のphase記録を現行の追加Gateへ昇格しない。rev5のAcceptance履歴は`docs/REV5_PRODUCT_PROGRESS.md`に保持する。
 
 ## 0. 旧候補のFinal QA実施履歴（2026-10-07）
 
-次の表は、旧候補commit `ab746d4b33b003761f5ddcef60a88afa97132a40`に対する当時のQ0/Q1実施記録であり、現候補の状態ではない。v4適用時にも製品全体E3 `BUILD_COVERED`前のため正式Q0〜Q7を`DEFERRED`としていた。この表の旧結果をv9候補へ引き継がず、正式実施の開始条件は冒頭の現行正本に従う。
+次の表は、旧候補commit `ab746d4b33b003761f5ddcef60a88afa97132a40`に対する当時のQ0/Q1実施記録であり、現候補の状態ではない。v4適用時にも製品全体E3 `BUILD_COVERED`前のため正式Q0〜Q7を`DEFERRED`としていた。この表の旧結果を当時のv9候補へ引き継がず、当時の正式実施の開始条件に従った。
 
 | 段階 | 状態 | 対象／証拠 |
 | --- | --- | --- |
@@ -34,7 +34,7 @@ Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測
 
 ## 1. 運用規則
 
-この一覧はFinal QA用の保留記録であり、現行v9工程のE0〜E3に対する作業schedulerや開発blockerを新設する根拠にしない。過去のQ0／Q1／Q2証拠・失敗記録は削除・改変せず保持する。正式Q0〜Q7はv9工程表・施工指示書が定めるE4/E5/E6の該当開始条件とcandidate固定に従い、下記の旧段階表を追加の直列Gateにしない。
+この一覧はFinal QA用の旧保留記録であり、現行v11実装工程に対するschedulerや開発blockerを新設する根拠にしない。過去のQ0／Q1／Q2証拠・失敗記録は削除・改変せず保持する。現在の品質作業と退出条件はv11品質工程に従い、下記の旧段階表を追加の直列Gateにしない。
 
 安全・Authority・Permission・Approval・Audit・Recovery・secret境界はFinal QAまで無効化・迂回しない。既存証拠と過去のFAILは履歴として参照するが、異なる製品状態に対する現行試験結果へ昇格しない。MxC、OS、Provider等の外部component内部完全性をD4 Pocketの保証へ取り込まない。
 
@@ -94,7 +94,7 @@ Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測
 
 ## 3. rev5当時のFinal QA段階（履歴、非現行）
 
-以下は旧版の対象・開始条件を保存した表である。現在の五OS範囲、Q0〜Q7の工程対応・開始・退出は冒頭のv9三点を適用し、旧表のWindows限定範囲や番号順を現行の縮小・追加Gateに使わない。
+以下は旧版の対象・開始条件を保存した表である。現在の五OS範囲と品質作業の開始・退出はv11正本を適用し、旧表のWindows限定範囲や番号順を現行の縮小・追加Gateに使わない。
 
 | 段階 | 対象 | 開始条件 |
 | --- | --- | --- |

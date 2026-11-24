@@ -1,5 +1,7 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
+> **2026-11-24 正本追補**: 本書はrev5当時の機能受入れ・工程・証拠を保持する履歴資料。本文中の「現行」「未解決」「Release」等は記録日の状態を指し、現在の採用版・実装状態を示さない。現行の要求・設計・実装工程・品質工程・実装指示は [v11採用記録](V11_2026-11-24/採用記録.md) と [AGENTS.md](../AGENTS.md) を参照する。過去のPASS/FAIL・証拠・Release状態は当時の対象と時点のまま保持する。
+
 2026-11-10更新：Owner採用済み統合製品要求・W00〜W08の現行状態は現行[`QE進捗`](QE_2026-11-09/進捗.md)を参照する。本書はrev5製品／緩衝基盤の受入れ履歴と既存P・B条件の証拠を保持し、履歴を遡及変更しない。W00は`SCOPED_PASS`、W01/G1はWindows normal Release／Codex CLI限定でCLOSED。Linux normal Release／Codex CLIの`task_execution=supported`はrun [#282](https://github.com/gatchimuchio/D4-POCKET/actions/runs/42776654537)のbuildとrun [#283](https://github.com/gatchimuchio/D4-POCKET/actions/runs/42777397952)の限定installed test-build supervisionから確認した。これはLinux全体製品Acceptanceやnormal Release installed Taskの証拠ではない。`linux_native_product_support=unresolved`、`release_ready=false`と未解決release blockerを維持する。
 2026-11-11更新：Ubuntu 24.04.5 WSL2の選択Module Export fixtureでdebian_setup_first_installがLIVE_RUNTIME PASSし、同一source commitから独立生成したUbuntu 24.04.5 hosted runnerのmanual Actions run #42913311959も初回Setup導入・cleanup PASS。これは選択Export fixtureの初回Broker導入だけを示し、binary pruning、Linux native全製品対応、正式配布を閉じない。詳細証拠・hash・scopeは現行QE進捗を参照。linux_native_product_support=unresolved、release_ready=falseを維持する。
 

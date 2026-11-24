@@ -774,6 +774,8 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         crate::broker::ai_edit_center::owner_confirmation_summary(payload, &hash)?
     } else if operation == "GUI Shell編集適用" {
         crate::broker::ai_edit_center::apply_confirmation_summary(payload, &hash)?
+    } else if operation == "GUI Shell編集Rollback" {
+        crate::broker::ai_edit_center::rollback_confirmation_summary(payload, &hash)?
     } else if operation == "GUI Shell書出し" {
         let summary =
             crate::broker::export_center::owner_confirmation_summary(payload, &hash).ok()?;

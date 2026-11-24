@@ -145,7 +145,7 @@ impl EditTransaction<'_> {
             self.save(id, &record, false)?;
         }
         // 最初の記録から中断位置を再観測できる。途中で保存が止まっても元の版を保持する。
-        self.revert_files(id, &mut record)
+        self.revert_files(id, &mut record, &|| true)
     }
 
     pub(super) fn rollback(
@@ -155,16 +155,24 @@ impl EditTransaction<'_> {
         current: impl Fn() -> bool,
     ) -> Result<EditStatus, &'static str> {
         let mut record = self.load(id, plan_hash)?;
-        if record.status != EditStatus::Applied || !current() {
-            return Err("ロールバックに現在の独立承認と適用済み記録が必要");
+        if !current() {
+            return Err("ロールバックに現在の独立承認が必要");
         }
-        self.verify_applied(&record)?;
+        match record.status {
+            EditStatus::Applied => self.verify_applied(&record)?,
+            EditStatus::Reverting | EditStatus::RecoveryRequired => {}
+            EditStatus::Applying | EditStatus::Reverted => {
+                return Err("ロールバックに適用済みまたは回復可能な記録が必要");
+            }
+        }
         if !current() {
             return Err("ロールバックの着手前に承認期限を超過");
         }
-        record.status = EditStatus::Reverting;
-        self.save(id, &record, false)?;
-        self.revert_files(id, &mut record)
+        if record.status == EditStatus::Applied {
+            record.status = EditStatus::Reverting;
+            self.save(id, &record, false)?;
+        }
+        self.revert_files(id, &mut record, &current)
     }
 
     /// 既に着手した操作だけを補償する。確定済みの適用は独立承認を待つ。
@@ -172,10 +180,28 @@ impl EditTransaction<'_> {
         let mut record = self.load(id, plan_hash)?;
         match record.status {
             EditStatus::Applying | EditStatus::Reverting | EditStatus::RecoveryRequired => {
-                self.revert_files(id, &mut record)
+                self.revert_files(id, &mut record, &|| true)
             }
             status => Ok(status),
         }
+    }
+
+    /// HMACで認証された既存Journal自身の計画hashへ束縛して回復する。
+    /// 再発行された現在の操作hashを旧Journalへ誤って流用しない。
+    pub(super) fn recover_existing(&self, id: &str) -> Result<EditStatus, &'static str> {
+        let value = self
+            .store
+            .read_workspace_edit_record(id)?
+            .ok_or("編集復旧記録が存在しない")?;
+        let record: EditRecord =
+            serde_json::from_value(value).map_err(|_| "編集復旧記録の形式が不正")?;
+        if record.version != 1
+            || !valid_hash(&record.plan_hash)
+            || self.roots()? != (record.target, record.vault)
+        {
+            return Err("編集復旧記録の適用先または退避先が不一致");
+        }
+        self.recover(id, &record.plan_hash)
     }
 
     fn apply_file(
@@ -228,11 +254,23 @@ impl EditTransaction<'_> {
         Ok(())
     }
 
-    fn revert_files(&self, id: &str, record: &mut EditRecord) -> Result<EditStatus, &'static str> {
+    fn revert_files(
+        &self,
+        id: &str,
+        record: &mut EditRecord,
+        current: &impl Fn() -> bool,
+    ) -> Result<EditStatus, &'static str> {
         let mut complete = true;
         for (index, entry) in record.files.iter().enumerate().rev() {
-            if self.revert_file(index, entry).is_err() {
+            if !current() {
                 complete = false;
+                break;
+            }
+            if self.revert_file(index, entry, current).is_err() {
+                complete = false;
+                if !current() {
+                    break;
+                }
             }
         }
         record.status = if complete {
@@ -244,7 +282,15 @@ impl EditTransaction<'_> {
         Ok(record.status)
     }
 
-    fn revert_file(&self, index: usize, entry: &EditEntry) -> Result<(), &'static str> {
+    fn revert_file(
+        &self,
+        index: usize,
+        entry: &EditEntry,
+        current: &impl Fn() -> bool,
+    ) -> Result<(), &'static str> {
+        if !current() {
+            return Err("ロールバックの現在承認が失効");
+        }
         let actual = version_at(self.target, &entry.path)?;
         let backup = version_at(self.vault, &old_slot(index))?;
         if actual == entry.before && backup.is_none() {
@@ -263,18 +309,21 @@ impl EditTransaction<'_> {
                     after,
                     self.vault,
                     &reverted_slot(index),
-                    || true,
+                    current,
                 )
                 .map_err(|_| "適用後版の退避を確定できない")?;
         }
         if let Some(before) = &backup {
+            if !current() {
+                return Err("ロールバック中に現在承認が失効");
+            }
             self.vault
                 .move_planned_edit_version(
                     &old_slot(index),
                     before,
                     self.target,
                     &entry.path,
-                    || true,
+                    current,
                 )
                 .map_err(|_| "適用前版の復元を確定できない")?;
         }

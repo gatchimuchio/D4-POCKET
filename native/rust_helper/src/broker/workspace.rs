@@ -13,7 +13,8 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use super::ai_edit_center::{
-    ApplyTargetRequest, ReviewRequest, APPLY_TARGET_OPERATION, REVIEW_OPERATION,
+    ApplyRequest, ApplyTargetRequest, ReviewRequest, RollbackRequest, APPLY_TARGET_OPERATION,
+    REVIEW_OPERATION, ROLLBACK_OPERATION,
 };
 
 type Audit<'a> = dyn FnMut(&str, &str) -> Result<(), &'static str> + 'a;
@@ -1023,10 +1024,52 @@ impl WorkspaceRegistry {
         let transaction_id = key
             .strip_prefix("sha256:")
             .ok_or("編集適用IDの生成に失敗")?;
-        if store.read_workspace_edit_record(transaction_id)?.is_some() || !current() {
-            return Err("同じ審査の適用は使用済み、または現在の読取承認が失効");
-        }
         let vault_name = format!("edit-files-{transaction_id}");
+        if !current() {
+            return Err("現在の読取承認が失効");
+        }
+        if store.read_workspace_edit_record(transaction_id)?.is_some() {
+            let vault = WorkspaceReader::from_registered_dir(
+                store_root
+                    .open_dir_nofollow(&vault_name)
+                    .map_err(|_| "既存編集Journalの保護退避先を開けない")?,
+                &[],
+            )
+            .map_err(|_| "既存編集Journalの退避先実体が不正")?;
+            let transaction = EditTransaction {
+                store,
+                target: &target.reader,
+                vault: &vault,
+            };
+            audit(
+                "recorded",
+                "既存編集Journalを再読し、再適用せず中断分だけを補償復旧する",
+                plan_hash,
+            )?;
+            if !current() {
+                return Err("補償復旧の着手前に現在の読取承認が失効");
+            }
+            let status = transaction.recover_existing(transaction_id)?;
+            audit(
+                "recorded",
+                &format!("既存編集Journalの補償復旧状態を確定: {status:?}"),
+                plan_hash,
+            )?;
+            return match status {
+                EditStatus::Reverted => Err(
+                    "既存編集Journalの補償復旧状態を確認しました。今回の適用は行っていません。新しい提案・審査・一回Approvalが必要です",
+                ),
+                EditStatus::RecoveryRequired => {
+                    Err("補償復旧を完了できません。Workspace差分と復旧記録を確認してください")
+                }
+                EditStatus::Applied => {
+                    Err("同じ審査の編集は既に適用済みです。再適用しません")
+                }
+                EditStatus::Applying | EditStatus::Reverting => {
+                    Err("編集の補償復旧状態を確定できません。復旧記録を保持します")
+                }
+            };
+        }
         let mut builder = DirBuilder::new();
         #[cfg(unix)]
         {
@@ -1075,5 +1118,143 @@ impl WorkspaceRegistry {
             let _result = transaction.rollback(transaction_id, plan_hash, || true);
         }
         terminal.map(|event_id| (body, event_id))
+    }
+
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    pub(super) fn rollback_reviewed_edit(
+        &mut self,
+        payload: &Value,
+        rollback_request_hash: &str,
+        now: i64,
+        store: &super::store::BrokerPersistentStore,
+        audit: &mut dyn FnMut(&str, &str, &str) -> Result<String, &'static str>,
+    ) -> Result<(Value, String), &'static str> {
+        use super::ai_edit_transaction::{EditStatus, EditTransaction};
+        use cap_fs_ext::DirExt;
+
+        let request = RollbackRequest::parse(payload)?;
+        if super::protocol::canonical_payload_hash(Some(payload)) != rollback_request_hash {
+            return Err("Rollbackの現在要求hashが一致しない");
+        }
+        let (_, target_request, binding) = ApplyRequest::parse(&request.applied_request)?;
+        if self.last_now.is_some_and(|last| now < last) {
+            for entry in self.entries.values_mut() {
+                entry.grant = None;
+                entry.baseline = None;
+            }
+            return Err("時計後退を検出したためWorkspace Permissionを失効");
+        }
+        self.last_now = Some(now);
+        let target = self
+            .entries
+            .get_mut(&request.workspace_id)
+            .ok_or("Rollback対象Workspaceが未登録")?;
+        if target.registration_hash != request.registration_hash
+            || target_request.workspace_id != request.workspace_id
+        {
+            return Err("Rollback対象Workspaceの現在登録が一致しない");
+        }
+        let expired = target
+            .grant
+            .as_ref()
+            .is_none_or(|grant| now >= grant.expires || Instant::now() >= grant.deadline);
+        if expired {
+            target.grant = None;
+            return Err("Rollbackには現在のWorkspace Permissionが必要");
+        }
+        let grant = target.grant.as_ref().ok_or("Workspace Permissionがない")?;
+        if grant.id != request.approval_id || grant.visibility != "full" {
+            return Err("Rollback要求は現在のfull Workspace Permissionと一致しない");
+        }
+        let current = || now < grant.expires && Instant::now() < grant.deadline;
+        if !current() {
+            return Err("Rollbackの着手前にWorkspace Permissionが失効");
+        }
+
+        let expected_id = digest(&json!({
+            "review_audit_id": target_request.review_audit_id,
+            "target_device": target.root_device,
+            "target_file_id": target.root_file_id,
+        }));
+        if expected_id.strip_prefix("sha256:") != Some(request.transaction_id.as_str())
+            || super::protocol::canonical_payload_hash(Some(&request.applied_request))
+                != request.applied_request_hash
+        {
+            return Err("Rollback要求が元の適用Workspace・審査・hashと一致しない");
+        }
+
+        let (store_root, _, store_ancestry) =
+            super::workspace_root::open_isolated_root_with_ancestry(store.root(), &[])?;
+        let store_identity = store_ancestry
+            .last()
+            .ok_or("編集退避先の実体を確認できない")?;
+        let target_identity = super::workspace_root::DirectoryIdentity {
+            device: target.root_device,
+            file_id: target.root_file_id,
+        };
+        if store_identity.device != target.root_device
+            || store_ancestry.contains(&target_identity)
+            || target.root_ancestry.contains(store_identity)
+        {
+            return Err("編集Journalと退避先が現在のWorkspace rootから分離されていない");
+        }
+        let vault_name = format!("edit-files-{}", request.transaction_id);
+        let vault = WorkspaceReader::from_registered_dir(
+            store_root
+                .open_dir_nofollow(&vault_name)
+                .map_err(|_| "Rollbackの保護退避先を開けない")?,
+            &[],
+        )
+        .map_err(|_| "Rollbackの保護退避先実体が不正")?;
+        let transaction = EditTransaction {
+            store,
+            target: &target.reader,
+            vault: &vault,
+        };
+        let intent = format!(
+            "独立Owner確認済みRollbackを開始。transaction={} apply_hash={} files={}",
+            request.transaction_id,
+            request.applied_request_hash,
+            binding.files.len(),
+        );
+        audit("recorded", &intent, rollback_request_hash)?;
+        if !current() {
+            return Err("Rollbackの耐久意図記録後にWorkspace Permissionが失効");
+        }
+        let status = transaction.rollback(
+            &request.transaction_id,
+            &request.applied_request_hash,
+            current,
+        )?;
+        if status != EditStatus::Reverted {
+            audit(
+                "rejected",
+                &format!(
+                    "Rollbackが未完了。transaction={} status={status:?}",
+                    request.transaction_id
+                ),
+                rollback_request_hash,
+            )?;
+            return Err("Rollbackを完了できないためJournalとWorkspace差分を保持");
+        }
+        let body = json!({
+            "version": 1,
+            "operation": ROLLBACK_OPERATION,
+            "request_hash": rollback_request_hash,
+            "applied_request_hash": request.applied_request_hash,
+            "applied_audit_id": request.applied_audit_id,
+            "workspace_id": request.workspace_id,
+            "review_audit_id": target_request.review_audit_id,
+            "diff_hash": binding.diff_hash,
+            "transaction_id": request.transaction_id,
+            "changed_files": binding.files.len(),
+            "status": "rolled_back"
+        });
+        let event_id = audit(
+            "accepted",
+            "独立Approvalによる編集Rollbackと耐久Journalを確定",
+            &digest(&body),
+        )?;
+        Ok((body, event_id))
     }
 }

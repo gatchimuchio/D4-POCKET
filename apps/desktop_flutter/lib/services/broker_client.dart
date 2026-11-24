@@ -15,6 +15,7 @@ const _nativeOwnerConfirmationOperations = <String>{
   'GUI Shell書出し',
   'GUI Shell編集提案',
   'GUI Shell編集適用',
+  'GUI Shell編集Rollback',
   '回帰Case登録',
   '回帰Case削除',
   '回帰Case削除中断確認',

@@ -13,6 +13,7 @@ const OPERATION: &str = "GUI Shell編集提案";
 pub(super) const REVIEW_OPERATION: &str = "GUI Shell編集提案審査";
 pub(super) const APPLY_TARGET_OPERATION: &str = "GUI Shell編集適用先照合";
 pub(super) const APPLY_OPERATION: &str = "GUI Shell編集適用";
+pub(super) const ROLLBACK_OPERATION: &str = "GUI Shell編集Rollback";
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -190,6 +191,112 @@ impl ApplyRequest {
     }
 }
 
+/// 既に完了した適用だけを、別の現在Owner確認で巻き戻す要求。
+/// 埋め込みの適用要求とhashは対象特定・監査相関にだけ使い、旧Approvalを再利用しない。
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RollbackRequest {
+    version: u64,
+    pub(super) transaction_id: String,
+    pub(super) applied_request_hash: String,
+    pub(super) applied_audit_id: String,
+    pub(super) applied_request: Value,
+    pub(super) workspace_id: String,
+    pub(super) registration_hash: String,
+    pub(super) approval_id: String,
+}
+
+impl RollbackRequest {
+    pub(super) fn parse(payload: &Value) -> Result<Self, &'static str> {
+        let request: Self =
+            serde_json::from_value(payload.clone()).map_err(|_| "編集Rollback要求の形式が不正")?;
+        let (_, target, _) = ApplyRequest::parse(&request.applied_request)?;
+        if request.version != VERSION
+            || !valid_transaction_id(&request.transaction_id)
+            || !valid_hash(&request.applied_request_hash)
+            || !valid_identifier(&request.applied_audit_id)
+            || !super::workspace::identifier(&request.workspace_id)
+            || !valid_hash(&request.registration_hash)
+            || !valid_identifier(&request.approval_id)
+            || target.workspace_id != request.workspace_id
+            || super::protocol::canonical_payload_hash(Some(&request.applied_request))
+                != request.applied_request_hash
+        {
+            return Err("編集Rollbackの適用記録、Workspaceまたは現在Approvalが不正");
+        }
+        Ok(request)
+    }
+
+    pub(super) fn applied_context(
+        &self,
+    ) -> Result<(ApplyTargetRequest, ApplyBinding), &'static str> {
+        let (_, target, binding) = ApplyRequest::parse(&self.applied_request)?;
+        Ok((target, binding))
+    }
+
+    pub(super) fn verify_applied_receipt(&self, broker: &Broker) -> Result<(), &'static str> {
+        let (target, binding) = self.applied_context()?;
+        let event = current_host_receipt(broker, &self.applied_audit_id)?;
+        let expected = json!({
+            "version": 1,
+            "operation": APPLY_OPERATION,
+            "request_hash": self.applied_request_hash,
+            "workspace_id": target.workspace_id,
+            "review_audit_id": target.review_audit_id,
+            "diff_hash": binding.diff_hash,
+            "transaction_id": self.transaction_id,
+            "changed_files": binding.files.len(),
+            "status": "applied"
+        });
+        if event.operation != APPLY_OPERATION
+            || event.decision != "accepted"
+            || event.evidence_source != super::protocol::EVIDENCE_SOURCE_LIVE_RUNTIME
+            || event.reason != "編集適用と復旧記録の耐久確定"
+            || event.payload_hash != super::protocol::canonical_payload_hash(Some(&expected))
+        {
+            return Err("巻戻し対象の適用Audit receiptが現在Host・Journalと一致しない");
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn rollback_confirmation_summary(payload: &Value, payload_hash: &str) -> Option<String> {
+    let request = RollbackRequest::parse(payload).ok()?;
+    if !valid_hash(payload_hash)
+        || super::protocol::canonical_payload_hash(Some(payload)) != payload_hash
+    {
+        return None;
+    }
+    let (_, binding) = request.applied_context().ok()?;
+    let files = binding
+        .files
+        .iter()
+        .map(|file| {
+            let effect = match (&file.before_hash, &file.after_hash) {
+                (None, Some(_)) => "追加版を削除",
+                (Some(_), None) => "削除前の版を復元",
+                (Some(_), Some(_)) => "変更前の版を復元",
+                (None, None) => return None,
+            };
+            Some(format!("{effect}  {}", file.path))
+        })
+        .collect::<Option<Vec<_>>>()?
+        .join("\n");
+    Some(format!(
+        "別の現在Owner確認で、完了済みのGUI Shell編集を巻き戻します。\nWorkspace: {}\n現在の登録hash: {}\n現在のPermission ID: {}\nTransaction: {}\n適用Audit: {}\n適用要求hash: {}\n差分hash: {}\n対象: {}件\n{}\nRollback要求hash: {}\n\nBrokerは現在のWorkspace登録・Permission・root実体・耐久Journal・各file hashを再確認します。元の適用Approvalは再利用しません。",
+        request.workspace_id,
+        request.registration_hash,
+        request.approval_id,
+        request.transaction_id,
+        request.applied_audit_id,
+        request.applied_request_hash,
+        binding.diff_hash,
+        binding.files.len(),
+        files,
+        payload_hash,
+    ))
+}
+
 pub(crate) fn apply_confirmation_summary(payload: &Value, request_hash: &str) -> Option<String> {
     let (_, target, binding) = ApplyRequest::parse(payload).ok()?;
     if !valid_hash(request_hash) {
@@ -266,6 +373,13 @@ fn valid_hash(hash: &str) -> bool {
                 .bytes()
                 .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
     })
+}
+
+fn valid_transaction_id(id: &str) -> bool {
+    id.len() == 64
+        && id
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 pub(crate) fn owner_confirmation_summary(payload: &Value, payload_hash: &str) -> Option<String> {
