@@ -4,7 +4,7 @@
 
 基準main `140bff4b9fa197ad8acb30206048a6591610cb49`。Owner起動設定とAgent CLIの両Workspace登録経路から、Registryへ実際のabsolute root pathを渡す。Workspace Registryは登録時と一覧投影時にcanonical pathおよびdirectory handleのdevice/file IDを照合し、削除・置換・不一致時はpathを表示せずnullとする。Rust BrokerのWorkspace一覧→Flutter Workspace Client→Workspace Inspectorを結線し、Flutterにfilesystem accessを追加していない。DeviceLink projectionはroot pathを検証後に落とし、Workspace ID／Runtime IDのみ投影する。IPC response schemaと既存fixtureを同期した。
 
-`python -X utf8 tooling/run_cargo_isolated.py check --locked --offline --manifest-path native/rust_helper/Cargo.toml` PASS（既存警告9件）。Flutter desktop analyzeは隔離source snapshot SHA-256 `849ec1e0e95e7752e287da6eac28d9e658a015cdf06f752e1d27d2e16455affd`でPASS（exit 0、snapshot cleanup PASS）。Manifest照合、Schema JSON parse、`git diff --check`もPASS。Unit/E2E・品質QA・Installed Runtimeは未実施。本追補はWorkspace Inspectorへの登録root表示結線に限定し、W-C02全体や製品受入れ完了を主張しない。
+`python -X utf8 tooling/run_cargo_isolated.py check --locked --offline --manifest-path native/rust_helper/Cargo.toml` PASS（既存警告9件）。同隔離入口で`build --locked --offline --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_rust_helper`もPASS（既存警告9件、終了時の一時target除去を確認）。Flutter desktop analyzeは隔離source snapshot SHA-256 `849ec1e0e95e7752e287da6eac28d9e658a015cdf06f752e1d27d2e16455affd`でPASS（exit 0、snapshot cleanup PASS）。Manifest照合、Schema JSON parse、`git diff --check`もPASS。Unit/E2E・品質QA・Installed Runtimeは未実施。本追補はWorkspace Inspectorへの登録root表示結線とBroker executable構築に限定し、W-C02全体や製品受入れ完了を主張しない。
 
 ### v11施工追補：W-C06 Host／Task範囲のTrace投影（2026-11-25）
 
