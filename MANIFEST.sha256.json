@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "1d9dd889d151d563afa1b3599fda419bdabaef59b60afc39a8c9c02af96ab898"
+      "sha256": "89482967e06bd1eb6a8f38a67f3bdd7a4890b19704a97a48b9325d551ea98ae6"
     },
     {
       "path": "SECURITY.md",
@@ -4449,7 +4449,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "d59e303bb1cb8a08bea5727c747b6e485eb892eadb32c79a3fe35fea6a37ef47"
+      "sha256": "3b6d2bf628b2b2dd52ea71ce4da90a4f370dcc63b0237c65e58b004a5e671b5c"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",

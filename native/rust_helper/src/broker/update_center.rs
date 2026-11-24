@@ -814,12 +814,22 @@ fn product_uninstall_available(broker: &Broker) -> bool {
         return false;
     }
     #[cfg(target_os = "linux")]
-    return broker
-        .linux_uninstall_handoff
-        .as_ref()
-        .is_some_and(|handoff| handoff.is_available());
-    #[cfg(not(target_os = "linux"))]
-    true
+    {
+        return broker
+            .linux_uninstall_handoff
+            .as_ref()
+            .is_some_and(|handoff| handoff.is_available());
+    }
+    #[cfg(windows)]
+    {
+        true
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        // macOS has a separately generated Installer uninstaller package; this
+        // Broker endpoint has no macOS handoff and must not report availability.
+        false
+    }
 }
 
 fn request_product_uninstall(

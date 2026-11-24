@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：W-C10 Brokerアンインストール可用性のOS判定（2026-11-25）
+
+基準main `5d692fc5f2c55e0aed6900d9fb8eb82be94abb37`。Brokerの導入済み製品アンインストール可用性がLinux以外を一律`available`としていたため、macOSで実行できないBroker要求を利用可能と誤表示し得た。判定をWindows=既存経路、Linux=現在の終了handoff、その他OS=停止へ分け、macOSのBroker応答が実装済み経路に一致するよう修正した。macOSの別経路である`.pkg` Uninstaller生成は維持し、この修正をmacOS package導入・実行の検証へ読み替えない。
+
+隔離Rust `cargo check --locked --offline`はWindows hostでPASS（Exit 0、警告9件）。macOS native buildはNOT_RUN（`gh`未認証でworkflow dispatch不可、Computer UseもGitHub URLを安全に確定できず停止）。macOS Installer実行、Unit/E2E、品質QAも未実施。この変更はW-C10のBroker可用性投影のSource修正であり、W-C10またはW-H04全体の完了を主張しない。
+
 ### v11施工追補：W-C10 Setup DoctorのBroker導入状態読取（2026-11-25）
 
 基準main `99e64fe737fe33e5506cb668d772ab708acec6c5`。Setup Doctorの最新診断取得にBroker `UpdateClient.list()`を追加し、`証拠種別=INTERNAL_STATE`を確認したBroker状態から有効版、直前版、展開済み候補数、製品アンインストール操作の可用性を表示する。状態・証拠種別・versionが不正または未取得の場合はunknownを表示する。取得は読取専用で、install／repair／uninstallの作用は既存Settings→Broker経路を維持する。Broker transport変更・要求世代変更後に旧応答を反映しない。
