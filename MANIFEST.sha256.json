@@ -85,7 +85,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "0e6bf34ef51096b1a93a3130f355cff729411f04c9bf12df1c6d7103d823980f"
+      "sha256": "6bb16a7587da9915b207e4663985259b6ed5eed3907d875d375a239213b2b533"
     },
     {
       "path": ".github/workflows/ios-manual-product-candidate.yml",

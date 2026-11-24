@@ -564,7 +564,7 @@ jobs:
             flutter test --no-pub test/widget_test.dart --plain-name 'macOS CLI実行fileのOS選択は入力だけへ投影し登録を開始しない' 2>&1 | tee ../../evidence/cli-projection-test.txt
           fi
           if [ '${{ inputs.target }}' = 'macos_build_only' ]; then
-            flutter build macos --release --no-pub --no-codesign 2>&1 | tee ../../evidence/macos-build.txt
+            flutter build macos --release --no-pub 2>&1 | tee ../../evidence/macos-build.txt
           else
             flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-build.txt
           fi
