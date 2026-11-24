@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "03ed2850ade8cb865e4796f32d3ead2a7211594e09b732ab06ee3bc0a0add0c4"
+      "sha256": "1d9dd889d151d563afa1b3599fda419bdabaef59b60afc39a8c9c02af96ab898"
     },
     {
       "path": "SECURITY.md",
@@ -349,7 +349,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
-      "sha256": "bd77b5c2295071fe3eb3c335b073026f5154129adcd8d5f19cc394a736369a31"
+      "sha256": "261f138099b75e67da450583dd740f59409bfcb393d7116d95ad16709820924d"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/shared.dart",

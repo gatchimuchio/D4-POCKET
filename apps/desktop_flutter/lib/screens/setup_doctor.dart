@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models/generated_contracts.dart';
 import '../services/mcp_connection_client.dart';
 import '../services/shell_core_client.dart';
+import '../services/update_client.dart';
 import 'shared.dart';
 
 class SetupDoctor extends StatefulWidget {
@@ -24,11 +25,17 @@ class _SetupDoctorState extends State<SetupDoctor> {
   String? _reportId;
   String? _generatedAt;
   String? _refreshFailure;
+  Map<String, Object?>? _productUpdateSnapshot;
+  String? _productUpdateFailure;
 
   @override
   void didUpdateWidget(covariant SetupDoctor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.client, widget.client)) {
+    if (!identical(oldWidget.client, widget.client) ||
+        !identical(
+          oldWidget.client.brokerTransport,
+          widget.client.brokerTransport,
+        )) {
       _requestGeneration++;
       _isRefreshing = false;
       _refreshedStatus = null;
@@ -37,16 +44,24 @@ class _SetupDoctorState extends State<SetupDoctor> {
       _reportId = null;
       _generatedAt = null;
       _refreshFailure = null;
+      _productUpdateSnapshot = null;
+      _productUpdateFailure = null;
     }
   }
 
   Future<void> _refresh() async {
     final client = widget.client;
+    final transport = client.brokerTransport;
     final generation = ++_requestGeneration;
     setState(() => _isRefreshing = true);
     try {
       final report = await client.refreshSetupDoctorReport();
-      if (!mounted || generation != _requestGeneration) return;
+      if (!mounted ||
+          generation != _requestGeneration ||
+          !identical(client, widget.client) ||
+          !identical(transport, widget.client.brokerTransport)) {
+        return;
+      }
       setState(() {
         _refreshedStatus = report.status;
         _refreshedChecks = report.checks;
@@ -55,8 +70,14 @@ class _SetupDoctorState extends State<SetupDoctor> {
         _generatedAt = report.generatedAt;
         _refreshFailure = null;
       });
+      await _refreshProductInstallState(client, transport, generation);
     } on Object {
-      if (!mounted || generation != _requestGeneration) return;
+      if (!mounted ||
+          generation != _requestGeneration ||
+          !identical(client, widget.client) ||
+          !identical(transport, widget.client.brokerTransport)) {
+        return;
+      }
       setState(() {
         _refreshedStatus = 'unknown';
         _refreshedChecks = const <SetupDoctorCheckRecord>[];
@@ -65,11 +86,40 @@ class _SetupDoctorState extends State<SetupDoctor> {
         _generatedAt = null;
         _refreshFailure = '最新の診断を取得できません。Broker接続を確認して再試行してください。';
       });
+      await _refreshProductInstallState(client, transport, generation);
     } finally {
       if (mounted && generation == _requestGeneration) {
         setState(() => _isRefreshing = false);
       }
     }
+  }
+
+  Future<void> _refreshProductInstallState(
+    ShellCoreClient client,
+    BrokerTransport? transport,
+    int generation,
+  ) async {
+    Map<String, Object?>? report;
+    String? failure;
+    if (client.mode != 'broker' || transport == null) {
+      failure = '認証Broker接続がありません。現在状態はunknownです。';
+    } else {
+      try {
+        report = await UpdateClient(transport).list();
+      } on Object {
+        failure = 'Brokerから製品導入状態を取得できません。現在状態はunknownです。';
+      }
+    }
+    if (!mounted ||
+        generation != _requestGeneration ||
+        !identical(client, widget.client) ||
+        !identical(transport, widget.client.brokerTransport)) {
+      return;
+    }
+    setState(() {
+      _productUpdateSnapshot = report;
+      _productUpdateFailure = failure;
+    });
   }
 
   @override
@@ -183,6 +233,13 @@ class _SetupDoctorState extends State<SetupDoctor> {
                 ],
         ),
         SectionList(
+          title: '製品導入状態（Broker）',
+          rows: _productInstallStateRows(
+            _productUpdateSnapshot,
+            failure: _productUpdateFailure,
+          ),
+        ),
+        SectionList(
           title: '実行系接続',
           rows: snapshot.runtimes.isEmpty
               ? const ['接続済みの実行系はありません。']
@@ -203,6 +260,73 @@ class _SetupDoctorState extends State<SetupDoctor> {
       ],
     );
   }
+}
+
+List<String> _productInstallStateRows(
+  Map<String, Object?>? report, {
+  required String? failure,
+}) {
+  if (failure != null) return [failure];
+  if (report == null) {
+    return const ['未取得です。「Brokerから最新診断を取得」を実行すると現在状態を読み取ります。'];
+  }
+  if (report['証拠種別'] != 'INTERNAL_STATE') {
+    return const ['Broker応答の証拠種別を確認できないため、導入状態はunknownです。'];
+  }
+  final rollback = report['rollback状態'];
+  if (rollback is! Map) {
+    return const ['有効版情報をBroker応答から確認できないため、導入状態はunknownです。'];
+  }
+  final state = rollback['状態'];
+  if (state != 'available' && state != 'unavailable' && state != 'unknown') {
+    return const ['有効版情報の状態値が不明なため、導入状態はunknownです。'];
+  }
+
+  final rows = <String>['観測元: 認証Brokerの現在状態（INTERNAL_STATE）'];
+  final current = rollback['現在版'];
+  if (state != 'unknown' && current is Map) {
+    final version = current['提供版'];
+    if (version is String && version.isNotEmpty) {
+      rows.add('Broker有効版: $version');
+    } else {
+      rows.add('Broker有効版: unknown（version記録が不正）');
+    }
+  } else if (state == 'unavailable' && current == null) {
+    rows.add('Broker有効版record: なし');
+  } else {
+    rows.add('Broker有効版: unknown');
+  }
+
+  final previous = rollback['対象版'];
+  if (state == 'available' && previous is Map) {
+    final version = previous['提供版'];
+    rows.add(version is String && version.isNotEmpty
+        ? '直前版: $version'
+        : '直前版: unknown');
+  } else if (state == 'unavailable') {
+    rows.add('直前版: なし');
+  } else {
+    rows.add('直前版: unknown');
+  }
+
+  rows.add(switch (report['製品アンインストール操作']) {
+    'available' => '製品アンインストール操作: Brokerで利用可能',
+    'suspended' => '製品アンインストール操作: Brokerで停止中',
+    _ => '製品アンインストール操作: unknown',
+  });
+
+  final updates = report['更新一覧'];
+  if (updates is List) {
+    final staged = updates
+        .whereType<Map>()
+        .where((update) => UpdateClient.stageState(update) == 'version_staged')
+        .length;
+    rows.add('Brokerが記録する展開済み候補: $staged件');
+  } else {
+    rows.add('展開済み候補数: unknown');
+  }
+  rows.add('この表示は状態読取のみです。操作結果と実file状態はSettingsのBroker操作結果で確認します。');
+  return rows;
 }
 
 List<String> _executionReadinessRows(

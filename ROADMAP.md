@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：W-C10 Setup DoctorのBroker導入状態読取（2026-11-25）
+
+基準main `99e64fe737fe33e5506cb668d772ab708acec6c5`。Setup Doctorの最新診断取得にBroker `UpdateClient.list()`を追加し、`証拠種別=INTERNAL_STATE`を確認したBroker状態から有効版、直前版、展開済み候補数、製品アンインストール操作の可用性を表示する。状態・証拠種別・versionが不正または未取得の場合はunknownを表示する。取得は読取専用で、install／repair／uninstallの作用は既存Settings→Broker経路を維持する。Broker transport変更・要求世代変更後に旧応答を反映しない。
+
+`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshot SHA-256 `511c7d64c159ce794e31ce4167b0ea9477097c381ad1a64e3f6d04b2204636d5`でPASS（exit 0、snapshot cleanup PASS）。Unit/E2E・品質QA・Installed Runtimeは実施していない。この追補はSetup Doctor ConsumerのSource構築確認であり、W-C10全体や製品導入受入れ完了を主張しない。
+
 ### v11施工進捗：W-C10 Broker導入状態の再読込結線（2026-11-25）
 
 基準main `19ea9ac6aac431fb2cb11fb9a4aa109bc89ff768`。Update Centerの候補一覧へ、現在trustで検証された候補・active descriptor・固定version directory・展開完了Auditに基づく`導入状態`を追加した。stage directoryがない場合は`not_staged`、認証・path・状態が確定できない場合は`unknown`とし、画面内揮発状態を除去した。Settingsは操作後にBroker一覧を再取得し、対象候補の状態が一致した場合だけ成功を表示する。stage完了表示は有効化前の再検証を明記し、有効化時の既存package/stage検証を維持する。
