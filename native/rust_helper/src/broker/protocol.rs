@@ -609,6 +609,8 @@ pub enum BrokerOperation {
     Host一覧,
     #[serde(rename = "Host切替")]
     Host切替,
+    #[serde(rename = "Host停止")]
+    Host停止,
     #[serde(rename = "アダプター一覧")]
     アダプター一覧,
     #[serde(rename = "アダプター導入")]
@@ -826,6 +828,7 @@ impl BrokerOperation {
             BrokerOperation::Host登録 => "Host登録",
             BrokerOperation::Host一覧 => "Host一覧",
             BrokerOperation::Host切替 => "Host切替",
+            BrokerOperation::Host停止 => "Host停止",
             BrokerOperation::アダプター一覧 => "アダプター一覧",
             BrokerOperation::アダプター導入 => "アダプター導入",
             BrokerOperation::アダプター検証 => "アダプター検証",
@@ -2859,6 +2862,14 @@ impl Broker {
                 owner,
                 &payload_hash,
             ),
+            #[cfg(feature = "module_host_operations")]
+            BrokerOperation::Host停止 => super::host_center::stop_display_context(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
             operation @ (BrokerOperation::アダプター一覧
             | BrokerOperation::アダプター導入
             | BrokerOperation::アダプター検証
@@ -3200,7 +3211,7 @@ impl Broker {
                 self.optional_module_rejected(&request_id, &operation, &payload_hash)
             }
             #[cfg(not(feature = "module_host_operations"))]
-            BrokerOperation::Host登録 | BrokerOperation::Host切替 => {
+            BrokerOperation::Host登録 | BrokerOperation::Host切替 | BrokerOperation::Host停止 => {
                 self.optional_module_rejected(&request_id, &operation, &payload_hash)
             }
         }

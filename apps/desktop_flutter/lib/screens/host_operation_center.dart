@@ -33,6 +33,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
   String _capabilityMessage = 'Brokerの現在能力は読取表示です。remote Hostの能力は推測しません。';
   String _message = _initialMessage;
   int _clientGeneration = 0;
+  String? _stoppedHostId;
 
   @override
   void initState() {
@@ -50,6 +51,14 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
     required String? observedBrokerHostId,
   }) {
     _hosts = List<HostRegistryRecord>.unmodifiable(hosts);
+    if (_stoppedHostId != null) {
+      if (hosts.any((host) => host.hostId == _stoppedHostId)) {
+        _activeHostId = null;
+        _candidateHostId = null;
+        return;
+      }
+      _stoppedHostId = null;
+    }
     _activeHostId = observedBrokerHostId != null &&
             hosts.any((host) => host.hostId == observedBrokerHostId)
         ? observedBrokerHostId
@@ -67,9 +76,14 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
     super.didUpdateWidget(oldWidget);
     final oldSnapshot = oldWidget.client.getSnapshot();
     final snapshot = widget.client.getSnapshot();
-    if (identical(
-            oldWidget.client.brokerTransport, widget.client.brokerTransport) &&
-        oldWidget.client.mode == widget.client.mode &&
+    final clientIdentityChanged =
+        !identical(
+          oldWidget.client.brokerTransport,
+          widget.client.brokerTransport,
+        ) ||
+        oldWidget.client.mode != widget.client.mode;
+    if (clientIdentityChanged) _stoppedHostId = null;
+    if (!clientIdentityChanged &&
         identical(oldSnapshot.hosts, snapshot.hosts) &&
         identical(oldSnapshot.hostCapabilities, snapshot.hostCapabilities)) {
       return;
@@ -119,6 +133,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
           child: Text(
             'Host一覧はRust Brokerのmetadata-only projectionです。'
             'Host切替は表示対象を変えるだけで、Permission、Approval、Authority、Credentialを生成・共有しません。'
+            '表示コンテキスト停止はD4内の選択解除だけで、遠隔HostやRuntimeのProcessは停止しません。'
             'ローカル実測は、認証済みBrokerから受理したsnapshotでHost IDが一致する場合だけに限定します。',
           ),
         ),
@@ -136,6 +151,15 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
               ? _refreshCurrentHostCapability
               : null,
         ),
+        if (active != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: _busy ? null : () => _stopHostDisplayContext(active),
+              icon: const Icon(Icons.stop_circle_outlined),
+              label: const Text('表示コンテキスト停止'),
+            ),
+          ),
         if (hosts.isEmpty)
           const BorderedPanel(
             child: Text('登録済みHostがありません。Runtime／Agent一覧も未観測です。'),
@@ -220,6 +244,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
           await widget.client.selectHost(host.hostId, selectedHost: host);
       if (!mounted || generation != _clientGeneration) return;
       setState(() {
+        _stoppedHostId = null;
         _activeHostId = receipt.hostId;
         _candidateHostId = receipt.hostId;
         _message =
@@ -231,6 +256,43 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
       if (!mounted || generation != _clientGeneration) return;
       setState(() {
         _message = 'Host切替の結果を確認できません。Brokerから最新状態を取得してください。';
+        _busy = false;
+      });
+    }
+  }
+
+  Future<void> _stopHostDisplayContext(HostRegistryRecord host) async {
+    if (_activeHostId != host.hostId) return;
+    _clientGeneration++;
+    final generation = _clientGeneration;
+    final client = widget.client;
+    setState(() {
+      _busy = true;
+      _capabilityRefreshing = false;
+      _message = 'Host表示コンテキスト停止をBrokerへ要求しています。';
+    });
+    try {
+      final auditId = await client.stopHostDisplayContext(
+        host.hostId,
+        selectedHost: host,
+      );
+      if (!mounted || generation != _clientGeneration) return;
+      if (_activeHostId != host.hostId) return;
+      setState(() {
+        _stoppedHostId = host.hostId;
+        _activeHostId = null;
+        _candidateHostId = null;
+        _capabilityMessage =
+            'Host選択は停止中です。現在Broker能力は選択状態と独立した読取観測です。';
+        _message =
+            'D4内の表示コンテキストを解除しました。遠隔Host／Runtimeは停止していません。監査ID=$auditId';
+        _busy = false;
+      });
+      widget.onHostContextChanged?.call();
+    } on Object {
+      if (!mounted || generation != _clientGeneration) return;
+      setState(() {
+        _message = '停止結果を確認できません。Brokerの最新状態を取得してください。';
         _busy = false;
       });
     }

@@ -9,6 +9,7 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
 class _HostSwitchTransport implements BrokerTransport {
   Completer<void>? switchGate;
+  bool malformedStopReceipt = false;
   final operations = <String>[];
   final requests = <Map<String, Object?>>[];
 
@@ -19,29 +20,57 @@ class _HostSwitchTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     requests.add(Map<String, Object?>.from(payload ?? const {}));
-    if (operation != 'Host切替') {
-      throw StateError('unexpected operation');
+    if (operation == 'Host切替') {
+      final gate = switchGate;
+      if (gate != null) await gate.future;
+      final hostId = payload?['Host ID'] as String? ?? '';
+      return {
+        'operation': operation,
+        'status': 'accepted',
+        'error': null,
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'audit-host-switch-$hostId',
+        'body': {
+          '選択Host ID': hostId,
+          '接続状態': 'pending_review',
+          'Trust': 'pending_review',
+          '証拠種別': 'INTERNAL_STATE',
+          '権限生成': 'なし',
+          'authority_strip': true,
+          '承認状態': 'not_reused',
+          '監査ID': 'audit-host-switch-$hostId',
+        },
+      };
     }
-    final gate = switchGate;
-    if (gate != null) await gate.future;
-    final hostId = payload?['Host ID'] as String? ?? '';
-    return {
-      'operation': operation,
-      'status': 'accepted',
-      'error': null,
-      'evidence_source': 'INTERNAL_STATE',
-      'audit_event_id': 'audit-host-switch-$hostId',
-      'body': {
-        '選択Host ID': hostId,
-        '接続状態': 'pending_review',
-        'Trust': 'pending_review',
-        '証拠種別': 'INTERNAL_STATE',
-        '権限生成': 'なし',
-        'authority_strip': true,
-        '承認状態': 'not_reused',
-        '監査ID': 'audit-host-switch-$hostId',
-      },
-    };
+    if (operation == 'Host停止') {
+      final hostId = payload?['Host ID'] as String? ?? '';
+      final auditId = 'audit-host-stop-$hostId';
+      return {
+        'operation': operation,
+        'status': 'accepted',
+        'error': null,
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': auditId,
+        'body': {
+          '版': 1,
+          '操作': 'Host停止',
+          '停止対象Host ID': malformedStopReceipt ? 'host-wrong' : hostId,
+          '停止範囲': 'display_context_only',
+          '接続状態': 'pending_review',
+          'Trust': 'pending_review',
+          '公開範囲': 'metadata_only',
+          '証拠種別': 'INTERNAL_STATE',
+          '権限生成': 'なし',
+          'authority_strip': true,
+          '承認状態': 'not_reused',
+          '再利用禁止': ['Permission', 'Approval', 'Authority'],
+          '遠隔Host停止': false,
+          '復旧方法': 'Host一覧から再選択',
+          '監査ID': auditId,
+        },
+      };
+    }
+    throw StateError('unexpected operation');
   }
 }
 
@@ -150,6 +179,73 @@ void main() {
     expect(transport.requests.single['Host ID'], 'host-a-target');
     expect(notifications, 1);
     expect(find.textContaining('権限生成=なし'), findsOneWidget);
+  });
+
+  testWidgets('Host停止はBroker receiptを検証してD4の選択文脈だけを解除する', (tester) async {
+    final transport = _HostSwitchTransport();
+    var notifications = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: HostOperationCenter(
+          client: _client(transport, [
+            _host('host-a-current', 'Host A 現在'),
+            _host('host-a-target', 'Host A 切替先'),
+          ]),
+          onHostContextChanged: () => notifications++,
+        ),
+      ),
+    ));
+
+    await tester.tap(find.widgetWithText(ListTile, 'Host A 切替先').first);
+    await tester.pump();
+    final switchButton = find.widgetWithText(FilledButton, 'Host切替');
+    await tester.ensureVisible(switchButton);
+    await tester.tap(switchButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('表示コンテキスト停止'));
+    await tester.pumpAndSettle();
+
+    expect(transport.operations, ['Host切替', 'Host停止']);
+    expect(transport.requests.last, {'版': 1, 'Host ID': 'host-a-target'});
+    expect(notifications, 2);
+    expect(
+      find.textContaining('遠隔Host／Runtimeは停止していません'),
+      findsOneWidget,
+    );
+    expect(find.text('表示コンテキスト停止'), findsNothing);
+  });
+
+  testWidgets('Host停止receipt不一致では選択文脈を解除しない', (tester) async {
+    final transport = _HostSwitchTransport()..malformedStopReceipt = true;
+    var notifications = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: HostOperationCenter(
+          client: _client(transport, [
+            _host('host-a-current', 'Host A 現在'),
+            _host('host-a-target', 'Host A 切替先'),
+          ]),
+          onHostContextChanged: () => notifications++,
+        ),
+      ),
+    ));
+
+    await tester.tap(find.widgetWithText(ListTile, 'Host A 切替先').first);
+    await tester.pump();
+    final switchButton = find.widgetWithText(FilledButton, 'Host切替');
+    await tester.ensureVisible(switchButton);
+    await tester.tap(switchButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('表示コンテキスト停止'));
+    await tester.pumpAndSettle();
+
+    expect(transport.operations, ['Host切替', 'Host停止']);
+    expect(notifications, 1);
+    expect(find.text('表示コンテキスト停止'), findsOneWidget);
+    expect(
+      find.textContaining('停止結果を確認できません'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Host操作画面はBroker切替後に旧Hostと遅延切替結果を破棄する', (tester) async {

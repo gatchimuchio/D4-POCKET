@@ -16,6 +16,12 @@ Host metadataの証拠種別は`INTERNAL_STATE`であり、未接続HostのRunti
 
 Desktopは受理済みの表示切替を履歴とWorkspace Inspectorへ通知する。Inspectorは旧登録の選択、取得済み本文・差分、表示範囲の選択を消去し、現在の登録を取得する。旧Brokerまたは旧Host表示の承認応答を理由に、新しいWorkspaceの表示を更新したり操作を再送したりしない。
 
+## Host表示コンテキスト停止
+
+`Host停止`は、Host Centerが現在選択しているD4内の表示コンテキストだけを解除する通常認証済みIPC操作である。Rust Brokerは登録済みHost IDとmetadata-only状態を照合し、受信・受理を永続Auditへ記録する。受理後にDesktopは選択中Hostを解除し、Host切替と同じgeneration通知でWorkspace Inspector、History、Evaluationの旧表示と進行中の旧応答を無効化する。BrokerはHost停止をHost切替と同じsnapshot／AI Edit境界として扱い、停止前のCompose Catalogと適用receiptを再利用させない。現在のBroker能力は選択状態と独立した読取観測として保持する。未登録Host、owner control経路、未知field、Audit失敗では解除成功を表示しない。
+
+この操作はremote接続を切断せず、遠隔HostやRuntimeのprocessを停止しない。receiptは`停止範囲=display_context_only`、`遠隔Host停止=false`、`authority_strip=true`、`権限生成=なし`を固定し、Permission／Approval／Authorityを失効・移転・再利用する新しい規則も生成しない。解除した選択はHost一覧から再選択できる。Hostの実接続・process停止は別の実作用契約が成立するまで未対応として扱う。
+
 ## Runtime／Agent一覧
 
 選択Hostを現在のBroker実行Host（local）として扱えるのは、product初期化で受理した`snapshot_source=broker`のホスト能力観測とHost IDが一致する場合だけである。`mock`、fallback、診断、未検証snapshot、表示名、Host metadataだけではlocal／remote区分やlive状態を推定しない。

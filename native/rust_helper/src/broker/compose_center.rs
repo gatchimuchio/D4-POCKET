@@ -82,7 +82,10 @@ fn latest_host_switch_generation(broker: &Broker) -> String {
         .audit_events()
         .iter()
         .rev()
-        .find(|event| event.operation == "Host切替" && event.decision == "accepted")
+        .find(|event| {
+            matches!(event.operation.as_str(), "Host切替" | "Host停止")
+                && event.decision == "accepted"
+        })
         .map(|event| crate::audit_hash::sha256_tagged(event.event_id.as_bytes()))
         .unwrap_or_else(|| crate::audit_hash::sha256_tagged(b"host-context:no-switch"))
 }
@@ -1814,6 +1817,30 @@ mod tests {
                 "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             )
             .expect("Host切替Audit");
+
+        let response = call_with_snapshot(&mut broker, manifest(), &stale_hash);
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("gui_shell_compose_catalog_stale")
+        );
+    }
+
+    #[test]
+    fn ComposeはHost表示停止後に古いCatalogSnapshotを拒否する() {
+        let mut broker = Broker::new("session-1");
+        let snapshot = catalog_snapshot(&mut broker).expect("停止前Catalog");
+        let stale_hash = snapshot["snapshot_hash"].as_str().unwrap().to_string();
+        broker
+            .append_audit(
+                "host-stop-test",
+                "Host停止",
+                "accepted",
+                "Host表示コンテキストを解除",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
+            .expect("Host停止Audit");
 
         let response = call_with_snapshot(&mut broker, manifest(), &stale_hash);
         assert_eq!(response.status, BrokerStatus::Rejected);

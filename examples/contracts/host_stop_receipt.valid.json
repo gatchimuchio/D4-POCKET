@@ -1,0 +1,17 @@
+{
+  "版": 1,
+  "操作": "Host停止",
+  "停止対象Host ID": "host-windows-dev",
+  "停止範囲": "display_context_only",
+  "接続状態": "pending_review",
+  "Trust": "pending_review",
+  "公開範囲": "metadata_only",
+  "証拠種別": "INTERNAL_STATE",
+  "権限生成": "なし",
+  "authority_strip": true,
+  "承認状態": "not_reused",
+  "再利用禁止": ["Permission", "Approval", "Authority"],
+  "遠隔Host停止": false,
+  "復旧方法": "Host一覧から再選択",
+  "監査ID": "audit-host-stop-1"
+}

@@ -444,7 +444,10 @@ fn current_host_events(log: &super::audit::BrokerAuditLog) -> &[super::audit::Br
     let start = log
         .events()
         .iter()
-        .rposition(|event| event.operation == "Host切替" && event.decision == "accepted")
+        .rposition(|event| {
+            matches!(event.operation.as_str(), "Host切替" | "Host停止")
+                && event.decision == "accepted"
+        })
         .map_or(0, |index| index + 1);
     &log.events()[start..]
 }

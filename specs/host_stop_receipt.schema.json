@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/host_stop_receipt.schema.json",
+  "title": "Host表示コンテキスト停止receipt（HostStopReceipt）",
+  "description": "Host Center内の選択解除を監査する。remote接続、Host／Runtime process停止、Authority変更を行わない。",
+  "type": "object",
+  "required": ["版", "操作", "停止対象Host ID", "停止範囲", "接続状態", "Trust", "公開範囲", "証拠種別", "権限生成", "authority_strip", "承認状態", "再利用禁止", "遠隔Host停止", "復旧方法", "監査ID"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "操作": { "const": "Host停止" },
+    "停止対象Host ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "停止範囲": { "const": "display_context_only" },
+    "接続状態": { "const": "pending_review" },
+    "Trust": { "const": "pending_review" },
+    "公開範囲": { "const": "metadata_only" },
+    "証拠種別": { "const": "INTERNAL_STATE" },
+    "権限生成": { "const": "なし" },
+    "authority_strip": { "const": true },
+    "承認状態": { "const": "not_reused" },
+    "再利用禁止": {
+      "type": "array",
+      "const": ["Permission", "Approval", "Authority"],
+      "items": { "enum": ["Permission", "Approval", "Authority"] },
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true
+    },
+    "遠隔Host停止": { "const": false },
+    "復旧方法": { "const": "Host一覧から再選択" },
+    "監査ID": { "type": "string", "minLength": 1, "maxLength": 256 }
+  }
+}

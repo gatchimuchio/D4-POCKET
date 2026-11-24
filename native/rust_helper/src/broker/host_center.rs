@@ -17,6 +17,8 @@ const OP_REGISTER: &str = "Host登録";
 const OP_LIST: &str = "Host一覧";
 #[cfg(feature = "module_host_operations")]
 const OP_SWITCH: &str = "Host切替";
+#[cfg(feature = "module_host_operations")]
+const OP_STOP: &str = "Host停止";
 const VERSION: u64 = 1;
 const MAX_HOSTS: usize = 64;
 const MAX_RUNTIME_COUNT: u64 = 256;
@@ -69,6 +71,16 @@ struct RuntimeSummary {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct HostSwitchRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "Host ID")]
+    host_id: String,
+}
+
+#[cfg(feature = "module_host_operations")]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HostStopRequest {
     #[serde(rename = "版")]
     version: u64,
     #[serde(rename = "Host ID")]
@@ -169,6 +181,16 @@ fn parse_switch_request(payload: &Value) -> Result<HostSwitchRequest, String> {
         .map_err(|_| "Host切替payloadの構造が不正".to_string())?;
     if request.version != VERSION || !valid_host_id(&request.host_id) {
         return Err("Host切替payloadのHost IDまたは版が不正".to_string());
+    }
+    Ok(request)
+}
+
+#[cfg(feature = "module_host_operations")]
+fn parse_stop_request(payload: &Value) -> Result<HostStopRequest, String> {
+    let request: HostStopRequest = serde_json::from_value(payload.clone())
+        .map_err(|_| "Host停止payloadの構造が不正".to_string())?;
+    if request.version != VERSION || !valid_host_id(&request.host_id) {
+        return Err("Host停止payloadのHost IDまたは版が不正".to_string());
     }
     Ok(request)
 }
@@ -738,6 +760,134 @@ pub(super) fn switch(
     }
 }
 
+#[cfg(feature = "module_host_operations")]
+pub(super) fn stop_display_context(
+    broker: &mut Broker,
+    request_id: &str,
+    payload: &Value,
+    owner: bool,
+    payload_hash: &str,
+) -> BrokerResponse {
+    if owner {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_STOP,
+            "host_normal_channel_required",
+            "Host表示コンテキスト停止は通常IPCだけが実行できる",
+            true,
+            payload_hash,
+        );
+    }
+    let request = match parse_stop_request(payload) {
+        Ok(request) => request,
+        Err(message) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_STOP,
+                "host_stop_invalid",
+                &message,
+                true,
+                payload_hash,
+            )
+        }
+    };
+    let Some(host_receipt) = broker.hosts.get(&request.host_id) else {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_STOP,
+            "host_not_registered",
+            "未登録Hostの表示コンテキストを停止できない",
+            true,
+            payload_hash,
+        );
+    };
+    let receipt_matches = matches!(
+        validate_persisted_receipt(host_receipt),
+        Ok(host_id) if host_id == request.host_id
+    );
+    if !receipt_matches
+        || host_receipt.get("公開範囲") != Some(&Value::from("metadata_only"))
+        || host_receipt.get("証拠種別") != Some(&Value::from(EVIDENCE_SOURCE_INTERNAL_STATE))
+    {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_STOP,
+            "host_stop_state_invalid",
+            "Host registryの停止対象状態が不正",
+            true,
+            payload_hash,
+        );
+    }
+    if broker
+        .append_audit(
+            request_id,
+            OP_STOP,
+            "received",
+            "Host表示コンテキスト停止要求を受信。遠隔HostやRuntimeのProcessは停止しない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_STOP,
+            "host_audit_append_failed",
+            "Host停止の受信Auditを確定できない",
+        );
+    }
+    let body = json!({
+        "版": VERSION,
+        "操作": OP_STOP,
+        "停止対象Host ID": request.host_id,
+        "停止範囲": "display_context_only",
+        "接続状態": "pending_review",
+        "Trust": "pending_review",
+        "公開範囲": "metadata_only",
+        "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
+        "権限生成": "なし",
+        "authority_strip": true,
+        "承認状態": "not_reused",
+        "再利用禁止": ["Permission", "Approval", "Authority"],
+        "遠隔Host停止": false,
+        "復旧方法": "Host一覧から再選択",
+    });
+    let event = match broker.append_audit(
+        request_id,
+        OP_STOP,
+        "accepted",
+        "Host Centerの表示コンテキスト解除を受理。遠隔Host・Runtime停止や権限作用は行わない",
+        EVIDENCE_SOURCE_INTERNAL_STATE,
+        &super::protocol::canonical_payload_hash(Some(&body)),
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_STOP,
+                "host_audit_append_failed",
+                "Host停止の結果Auditを確定できない",
+            )
+        }
+    };
+    let mut receipt = body;
+    receipt
+        .as_object_mut()
+        .expect("Host停止receiptはobject")
+        .insert("監査ID".to_string(), Value::String(event.event_id.clone()));
+    BrokerResponse {
+        request_id: request_id.to_string(),
+        operation: OP_STOP.to_string(),
+        status: BrokerStatus::Accepted,
+        evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+        audit_event_id: event.event_id,
+        error: None,
+        health: None,
+        body: Some(receipt),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
 #[cfg(all(test, feature = "module_host_operations"))]
 mod tests {
     use super::*;
@@ -839,6 +989,90 @@ mod tests {
                 json!(["Permission", "Approval", "Authority"])
             );
         }
+        let _ = std::fs::remove_dir_all(store);
+    }
+
+    #[cfg(feature = "module_host_operations")]
+    #[test]
+    fn Host停止は登録Hostの表示コンテキストだけをAudit付きで解除する() {
+        let store = std::env::temp_dir().join(format!(
+            "gui-shell-host-stop-positive-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&store);
+        let mut broker = Broker::new_persistent("host-stop-positive", &store).expect("永続Broker");
+        let registered = register(
+            &mut broker,
+            "host-stop-register",
+            &valid_payload("host-stop"),
+            true,
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        );
+        assert_eq!(registered.status, BrokerStatus::Accepted);
+
+        let stopped = stop_display_context(
+            &mut broker,
+            "host-stop-request",
+            &json!({"版": 1, "Host ID": "host-stop"}),
+            false,
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        );
+        assert_eq!(stopped.status, BrokerStatus::Accepted);
+        let body = stopped.body.expect("Host停止receipt");
+        assert_eq!(body["停止対象Host ID"], "host-stop");
+        assert_eq!(body["停止範囲"], "display_context_only");
+        assert_eq!(body["遠隔Host停止"], false);
+        assert_eq!(body["権限生成"], "なし");
+        assert_eq!(body["authority_strip"], true);
+        assert_eq!(body["承認状態"], "not_reused");
+        assert_eq!(
+            body["再利用禁止"],
+            json!(["Permission", "Approval", "Authority"])
+        );
+        assert_eq!(body["監査ID"], stopped.audit_event_id);
+        let _ = std::fs::remove_dir_all(store);
+    }
+
+    #[cfg(feature = "module_host_operations")]
+    #[test]
+    fn Host停止はOwner経路未知Hostと未知fieldを拒否する() {
+        let store = std::env::temp_dir().join(format!(
+            "gui-shell-host-stop-negative-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&store);
+        let mut broker = Broker::new_persistent("host-stop-negative", &store).expect("永続Broker");
+        let registered = register(
+            &mut broker,
+            "host-stop-register",
+            &valid_payload("host-stop"),
+            true,
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        );
+        assert_eq!(registered.status, BrokerStatus::Accepted);
+
+        let owner = stop_display_context(
+            &mut broker,
+            "host-stop-owner",
+            &json!({"版": 1, "Host ID": "host-stop"}),
+            true,
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        );
+        assert_eq!(owner.status, BrokerStatus::Rejected);
+        let unknown = stop_display_context(
+            &mut broker,
+            "host-stop-unknown",
+            &json!({"版": 1, "Host ID": "host-unknown"}),
+            false,
+            "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        );
+        assert_eq!(unknown.status, BrokerStatus::Rejected);
+        assert!(parse_stop_request(&json!({
+            "版": 1,
+            "Host ID": "host-stop",
+            "permission_id": "authority-injection"
+        }))
+        .is_err());
         let _ = std::fs::remove_dir_all(store);
     }
 

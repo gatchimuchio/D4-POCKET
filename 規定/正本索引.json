@@ -527,7 +527,7 @@
     },
     {
       "path": "docs/specs/host-operation-surface.md",
-      "責任": "C18 Host一覧、Host切替、Host別Runtime／Agent観測境界、Host間Permission・Approval・Authority非再利用"
+      "責任": "C18 Host一覧、Host切替、表示コンテキスト停止、Host別Runtime／Agent観測境界、Host間Permission・Approval・Authority非再利用"
     },
     {
       "path": "docs/specs/adapter-management-surface.md",

@@ -110,6 +110,8 @@ REQUIRED = {
     "host_list.schema.json",
     "host_switch.schema.json",
     "host_switch_receipt.schema.json",
+    "host_stop.schema.json",
+    "host_stop_receipt.schema.json",
     "adapter_management_manifest.schema.json",
     "adapter_management_request.schema.json",
     "adapter_management_receipt.schema.json",

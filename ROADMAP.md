@@ -4,6 +4,12 @@
 
 現行正本は[要求仕様 v11](docs/V11_2026-11-24/01_D4Pocket_REQUIREMENTS_v11_JA.jsonl)・[設計仕様 v11](docs/V11_2026-11-24/02_D4Pocket_DESIGN_v11_JA.jsonl)・[実装開発工程 v11](docs/V11_2026-11-24/03_D4Pocket_IMPLEMENTATION_PLAN_v11_JA.jsonl)・[品質工程 v11](docs/V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl)・[実装開発実行指示 v11](docs/V11_2026-11-24/05_D4Pocket_IMPLEMENTATION_INSTRUCTIONS_v11_JA.jsonl)であり、採用範囲・原文固定は[v11採用記録](docs/V11_2026-11-24/採用記録.md)、常設施工方法は[AGENTS.md](AGENTS.md)に従う。v11は原要求188件（実装152・品質専用36）、本番結線54件、対象OS5種を保持し、実装・ビルドと独立品質業務を分離する。過去の進捗・検査・Release Blockerは対象SHAと時点に結合した履歴として保持し、v11採用だけで現在の実装完成・品質合格・公開を成立扱いしない。以下の過去記録は各見出しの対象版・時点に限る。
 
+### v11施工追補：W-B06 Host表示コンテキスト停止結線（2026-11-24）
+
+基準main `f3c8d9becebe49a5d35272e8792c36f693bb2d52`。Host CenterにD4内の表示コンテキスト停止操作を追加し、認証BrokerのHost停止要求・永続Audit receipt・response/schema検証・選択解除を接続した。停止はD4の表示選択だけを解除し、remote Host接続やRuntime processを停止しない。Host停止AuditをHost切替と同じ文脈境界に含め、停止前のCompose CatalogとAI Edit receiptを再利用しない。Optional Module pruningにもHost停止を接続した。
+
+`python -X utf8 tooling/schema_check/check_schemas.py`はSchema 189件／正常例183件／負例250件でPASS、`python -B -X utf8 tooling/current_governance_check.py`はv11五文書整合でPASS。Rust `cargo check --locked --offline --features module_host_operations`と`cargo check --locked --offline --no-default-features`は両方PASS（変更対象外コードの警告9件／8件）。隔離source snapshot `d199ed55cf6752079b1227783c219ea5d20319044cd02f4980af0c05c1dee570`のWindows Desktop Flutter analyzeもPASS（exit 0、snapshot cleanup PASS）。実装施工範囲のためUnit/E2E・製品QA・Installed Runtimeは未実施。Host停止操作のSource／Contract／Consumer／Build結線を示し、remote Host停止や製品受入れを主張しない。
+
 ### v11施工追補：Host初期表示のBroker観測束縛（2026-11-24）
 
 基準main `9c15fa793266d40eee92d2e65f43381958faf5cc`。Host一覧の先頭項目を無条件に現在の表示Hostとしていた初期化を改め、`snapshot_source=broker`の観測Host IDと登録一覧のHost IDが一致する場合だけ現在Hostとして表示する。不一致時は一覧の先頭を切替候補に残し、現在Host・Runtime／Agentのlive観測とは扱わない。Host操作面の切替・能力取得・権限境界は変更していない。

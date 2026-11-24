@@ -451,6 +451,92 @@ class ShellCoreClient {
     );
   }
 
+  Future<String> stopHostDisplayContext(
+    String hostId, {
+    HostRegistryRecord? selectedHost,
+  }) async {
+    if (!kGuiShellModuleHostOperations) {
+      throw const BrokerClientException(
+        'このAppにはHost Operations Moduleが含まれていません',
+      );
+    }
+    HostRegistryRecord? host =
+        selectedHost?.hostId == hostId ? selectedHost : null;
+    for (final item in snapshot.hosts) {
+      if (item.hostId == hostId) {
+        host = item;
+        break;
+      }
+    }
+    if (host == null) {
+      throw BrokerClientException('未登録Hostの表示コンテキストを停止できません: $hostId');
+    }
+    final transport = brokerTransport;
+    if (transport == null) {
+      throw const BrokerClientException(
+        'Host表示コンテキスト停止に認証済みBroker経路がありません',
+      );
+    }
+    final response = await transport.request(
+      'Host停止',
+      payload: {'版': 1, 'Host ID': hostId},
+    );
+    final auditId = response['audit_event_id'];
+    final bodyValue = response['body'];
+    if (response['operation'] != 'Host停止' ||
+        response['status'] != 'accepted' ||
+        response['evidence_source'] != 'INTERNAL_STATE' ||
+        response['error'] != null ||
+        auditId is! String ||
+        !_isSafeAuditIdentifier(auditId) ||
+        bodyValue is! Map) {
+      throw const BrokerClientException('Host表示コンテキスト停止のBroker応答を確認できません');
+    }
+    final body = Map<String, Object?>.from(bodyValue);
+    const fields = {
+      '版',
+      '操作',
+      '停止対象Host ID',
+      '停止範囲',
+      '接続状態',
+      'Trust',
+      '公開範囲',
+      '証拠種別',
+      '権限生成',
+      'authority_strip',
+      '承認状態',
+      '再利用禁止',
+      '遠隔Host停止',
+      '復旧方法',
+      '監査ID',
+    };
+    final reuse = body['再利用禁止'];
+    if (body.keys.toSet().length != fields.length ||
+        !body.keys.toSet().containsAll(fields) ||
+        body['版'] != 1 ||
+        body['操作'] != 'Host停止' ||
+        body['停止対象Host ID'] != hostId ||
+        body['停止範囲'] != 'display_context_only' ||
+        body['接続状態'] != 'pending_review' ||
+        body['Trust'] != 'pending_review' ||
+        body['公開範囲'] != 'metadata_only' ||
+        body['証拠種別'] != 'INTERNAL_STATE' ||
+        body['権限生成'] != 'なし' ||
+        body['authority_strip'] != true ||
+        body['承認状態'] != 'not_reused' ||
+        reuse is! List ||
+        reuse.length != 3 ||
+        reuse[0] != 'Permission' ||
+        reuse[1] != 'Approval' ||
+        reuse[2] != 'Authority' ||
+        body['遠隔Host停止'] != false ||
+        body['復旧方法'] != 'Host一覧から再選択' ||
+        body['監査ID'] != auditId) {
+      throw const BrokerClientException('Host停止receiptの契約が不正です');
+    }
+    return auditId;
+  }
+
   Future<AdapterManagementResult> manageAdapter(
     String adapterId,
     String operation, {

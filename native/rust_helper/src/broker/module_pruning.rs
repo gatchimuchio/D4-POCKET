@@ -70,7 +70,7 @@ fn module_for_operation(
             Some("shell.trace_inspector")
         }
         観測一覧 => Some("shell.observability"),
-        Host登録 | Host切替 => Some("shell.host_operations"),
+        Host登録 | Host切替 | Host停止 => Some("shell.host_operations"),
         // Host一覧 is part of the shared Broker startup projection, not the
         // optional Host Operations surface.
         _ => None,
@@ -128,6 +128,10 @@ mod tests {
         );
         assert_eq!(
             module_for_operation(&BrokerOperation::Host切替, None),
+            Some("shell.host_operations")
+        );
+        assert_eq!(
+            module_for_operation(&BrokerOperation::Host停止, None),
             Some("shell.host_operations")
         );
     }
@@ -209,6 +213,7 @@ mod tests {
             ("観測一覧", "shell.trace_inspector", true),
             ("Host登録", "shell.host_operations", false),
             ("Host切替", "shell.host_operations", false),
+            ("Host停止", "shell.host_operations", false),
         ];
 
         for (index, (operation, module_id, is_trace)) in cases.iter().enumerate() {
