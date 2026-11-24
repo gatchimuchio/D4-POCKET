@@ -4,6 +4,12 @@
 
 現行正本は[要求仕様 v11](docs/V11_2026-11-24/01_D4Pocket_REQUIREMENTS_v11_JA.jsonl)・[設計仕様 v11](docs/V11_2026-11-24/02_D4Pocket_DESIGN_v11_JA.jsonl)・[実装開発工程 v11](docs/V11_2026-11-24/03_D4Pocket_IMPLEMENTATION_PLAN_v11_JA.jsonl)・[品質工程 v11](docs/V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl)・[実装開発実行指示 v11](docs/V11_2026-11-24/05_D4Pocket_IMPLEMENTATION_INSTRUCTIONS_v11_JA.jsonl)であり、採用範囲・原文固定は[v11採用記録](docs/V11_2026-11-24/採用記録.md)、常設施工方法は[AGENTS.md](AGENTS.md)に従う。v11は原要求188件（実装152・品質専用36）、本番結線54件、対象OS5種を保持し、実装・ビルドと独立品質業務を分離する。過去の進捗・検査・Release Blockerは対象SHAと時点に結合した履歴として保持し、v11採用だけで現在の実装完成・品質合格・公開を成立扱いしない。以下の過去記録は各見出しの対象版・時点に限る。
 
+### v11施工追補：Host初期表示のBroker観測束縛（2026-11-24）
+
+基準main `9c15fa793266d40eee92d2e65f43381958faf5cc`。Host一覧の先頭項目を無条件に現在の表示Hostとしていた初期化を改め、`snapshot_source=broker`の観測Host IDと登録一覧のHost IDが一致する場合だけ現在Hostとして表示する。不一致時は一覧の先頭を切替候補に残し、現在Host・Runtime／Agentのlive観測とは扱わない。Host操作面の切替・能力取得・権限境界は変更していない。
+
+`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshotでPASS（Flutter analyze exit 0、snapshot cleanup PASS）。Unit/E2E・製品QA・Installed Runtimeは未実施。
+
 ### v11施工追補：W-J03 Source参照の現物束縛（2026-11-24）
 
 基準main `af3f21254e5967678421ee90a49ec9b0076a4428`。`tooling/current_governance_check.py`で実装152要求と54結線について、実装工程表と施工指示書のSource候補が一致し、候補がRepo内の実在fileを指すことを確認する構造を追加した。絶対path、path traversal、Repo外symlink、欠落file、directory参照は不成立として扱う。現行候補では152要求・54結線のSource参照がすべて一致し、参照先fileが存在する。

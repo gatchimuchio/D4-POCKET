@@ -38,14 +38,24 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
   void initState() {
     super.initState();
     final snapshot = widget.client.getSnapshot();
-    _setHosts(snapshot.hosts);
+    _setHosts(
+      snapshot.hosts,
+      observedBrokerHostId: _brokerObservedHostId(snapshot),
+    );
     _setHostCapabilities(snapshot.hostCapabilities);
   }
 
-  void _setHosts(List<HostRegistryRecord> hosts) {
+  void _setHosts(
+    List<HostRegistryRecord> hosts, {
+    required String? observedBrokerHostId,
+  }) {
     _hosts = List<HostRegistryRecord>.unmodifiable(hosts);
-    _activeHostId = hosts.isEmpty ? null : hosts.first.hostId;
-    _candidateHostId = _activeHostId;
+    _activeHostId = observedBrokerHostId != null &&
+            hosts.any((host) => host.hostId == observedBrokerHostId)
+        ? observedBrokerHostId
+        : null;
+    _candidateHostId =
+        _activeHostId ?? (hosts.isEmpty ? null : hosts.first.hostId);
   }
 
   void _setHostCapabilities(List<HostCapabilityRecord> capabilities) {
@@ -66,7 +76,10 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
     }
 
     _clientGeneration++;
-    _setHosts(snapshot.hosts);
+    _setHosts(
+      snapshot.hosts,
+      observedBrokerHostId: _brokerObservedHostId(snapshot),
+    );
     _setHostCapabilities(snapshot.hostCapabilities);
     _busy = false;
     _capabilityRefreshing = false;
