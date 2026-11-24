@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "8777f3e538426f230c493bdb45a09cd63a4924e150d1cc37129da859024bf5fb"
+      "sha256": "302c575d700a2db5515041698ad212a4d506f1623127032bc26af1d0a7ed08c5"
     },
     {
       "path": "SECURITY.md",
@@ -241,7 +241,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "be94ab6b8b8e927d145be89bf679f49cd19aed7e10948c88ce7dc5055d7b929b"
+      "sha256": "9a5bd707777d537e897e094662b64309c1f302d87efb85022e7db80495d3cc30"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -301,7 +301,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/host_operation_center.dart",
-      "sha256": "77cba7184c6411b16173ab57bd45053d6446b8871856790c25baad5485cfd618"
+      "sha256": "d82dcb9c642f02a46a39026fb2e112a727e60982f3aa421e16b82b7e31de88e8"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
@@ -317,7 +317,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/observability_center.dart",
-      "sha256": "8d10b4f8977cb66b0dbcea9438d80c790c46b11d4f7b47429b91d281bb5bdccd"
+      "sha256": "2b0bb44d78aa7ea9954efc41ac952e27153bdc695632ba46754e1858f510188a"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/permission_center.dart",
@@ -357,7 +357,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trace_inspector.dart",
-      "sha256": "479e63fe8758ad8aef3b3d3a7fb91ca79acf45157eab0537a2d84d6f9162a9e9"
+      "sha256": "5c38527cd5e5f0e7a32b9cb2b345f5f80c98c1f48d75fdd6f2c3a902ef295439"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trust_center.dart",
@@ -441,7 +441,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/observation_client.dart",
-      "sha256": "cf49264025c0506b11af339871f1c80845f48bf729c773f5d93471e1f1a69768"
+      "sha256": "7931ed29471a424e5a56c0d488658bac0bf40e4c1070770172022cbe40b615d0"
     },
     {
       "path": "apps/desktop_flutter/lib/services/profile_client.dart",
@@ -4409,7 +4409,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/observation_center.rs",
-      "sha256": "ee45c837bd024f0b7cc58fef5b9f6f0c13310ed5f77d01e9cdecdbc922fa6266"
+      "sha256": "4133340b255cb1520ab97d6e0ccbafdfd160a878b8d23566167615ff5db7da52"
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",

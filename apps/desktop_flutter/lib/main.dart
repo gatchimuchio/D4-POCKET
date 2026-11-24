@@ -231,6 +231,15 @@ class ShellHomePage extends StatefulWidget {
   State<ShellHomePage> createState() => _ShellHomePageState();
 }
 
+String? _shellObservedBrokerHostId(ShellCoreClient client) {
+  final snapshot = client.getSnapshot();
+  if (snapshot.snapshotSource != 'broker') return null;
+  final hostCapabilities = snapshot.hostCapabilities;
+  if (hostCapabilities.length != 1) return null;
+  final hostId = hostCapabilities.single.hostId.trim();
+  return hostId.isEmpty ? null : hostId;
+}
+
 class _ShellHomePageState extends State<ShellHomePage> {
   int selectedIndex = 0;
   final Set<int> _visitedPageIndexes = {0};
@@ -254,6 +263,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   int _latestStopRequestTaskContextGeneration = -1;
   String? _stopReceiptContextMessage;
   String? _notificationStopReceiptAuditId;
+  String? _observationHostId;
   final ValueNotifier<int> _hostContextGeneration = ValueNotifier<int>(0);
   int _taskContextGeneration = 0;
   final Map<String, ({String taskId, String status})> _taskContextBySession = {};
@@ -263,6 +273,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   @override
   void initState() {
     super.initState();
+    _observationHostId = _shellObservedBrokerHostId(widget.client);
     final transport = widget.client.brokerTransport;
     if (transport != null) {
       _agentTaskExecutionCoordinator = AgentTaskExecutionCoordinator(transport);
@@ -279,6 +290,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       oldWidget.client.brokerTransport,
       widget.client.brokerTransport,
     )) {
+      _observationHostId = _shellObservedBrokerHostId(widget.client);
       _brokerTransportGeneration++;
       _trayProjectionGeneration++;
       _clearStopRequestReceipt();
@@ -339,7 +351,19 @@ class _ShellHomePageState extends State<ShellHomePage> {
     });
   }
 
-  void _onHostContextChanged() {
+  List<String> get _currentObservationTaskIds {
+    final ids = _taskContextBySession.values
+        .map((task) => task.taskId)
+        .toSet()
+        .toList()
+      ..sort();
+    return ids;
+  }
+
+  void _onHostContextChanged(String? hostId) {
+    _observationHostId = hostId;
+    _taskContextBySession.clear();
+    _taskContextGeneration++;
     _hostContextGeneration.value++;
     _invalidateStopReceiptForContextChange(
       'Host表示Contextが変わったため、古い停止要求Receiptを破棄しました。Runtime停止は実行していません。',
@@ -711,17 +735,29 @@ class _ShellHomePageState extends State<ShellHomePage> {
       else
         const SizedBox.shrink(),
       if (kGuiShellModuleObservability)
-        ObservabilityCenter(client: widget.client)
+        ObservabilityCenter(
+          client: widget.client,
+          hostId: _observationHostId,
+          taskIds: _currentObservationTaskIds,
+          hostContextGeneration: _hostContextGeneration.value,
+          taskContextGeneration: _taskContextGeneration,
+        )
       else
         const SizedBox.shrink(),
       if (kGuiShellModuleTraceInspector)
-        TraceInspector(client: widget.client)
+        TraceInspector(
+          client: widget.client,
+          hostId: _observationHostId,
+          taskIds: _currentObservationTaskIds,
+          hostContextGeneration: _hostContextGeneration.value,
+          taskContextGeneration: _taskContextGeneration,
+        )
       else
         const SizedBox.shrink(),
       if (kGuiShellModuleHostOperations)
         HostOperationCenter(
           client: widget.client,
-          onHostContextChanged: _onHostContextChanged,
+          onObservedHostChanged: _onHostContextChanged,
         )
       else
         const SizedBox.shrink(),

@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：W-C06 Host／Task範囲のTrace投影（2026-11-25）
+
+基準main `aace6263c8da3171837a93e3c2f769ce8572ae9c`。Brokerのbounded Spanへ生成時Host ID／Task IDを内部保持し、観測一覧要求のHost／Task範囲で絞り込む。別Host要求は拒否し、Task範囲では対象Traceと既知の親Traceだけを返す。Task範囲が空ならTask非関連のBroker観測だけを返す。Trace Inspector／Observability CenterはBroker実測Hostと現在Task文脈を渡し、Host／Task／Broker世代の変更後は旧応答を破棄する。remote HostをローカルBroker観測として表示しない。ObservationList／Span v1応答Schemaは維持し、HostOperationCenterの従来callback型も維持した。
+
+`python -X utf8 tooling/run_cargo_isolated.py check --locked --offline --manifest-path native/rust_helper/Cargo.toml` PASS（既存の非対象警告9件）。`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze` PASS（source SHA-256 `40f2f23783aba5845375f078c34642cf2d0546a050134025f30c00b728323827`、隔離workspace cleanup PASS）。Unit/E2E・製品QA・Installed Runtimeは実施していない。本追補はW-C06のHost／Task範囲結線であり、W-C06全体や製品受入れ完了を主張しない。
+
 ### v11施工追補：W-C10 候補取得の永続Store表示結線（2026-11-25）
 
 基準main `048926667e85ec328f23366fc85194afd2b637cf`。Broker認証IPC入口には、永続Storeが必須なのに利用不能な場合、操作実行前に要求を拒否する既存ガードがある。Settingsの候補取得ボタンだけがUpdateListの`download実行`可用性を消費せず、Brokerが停止している状態でも操作可能に見えていた。Broker権限処理は変更せず、既存投影が`available`でない場合は候補取得を無効化し、永続Store停止を画面に表示する。

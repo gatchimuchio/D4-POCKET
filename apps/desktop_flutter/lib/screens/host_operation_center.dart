@@ -12,10 +12,12 @@ class HostOperationCenter extends StatefulWidget {
     super.key,
     required this.client,
     this.onHostContextChanged,
+    this.onObservedHostChanged,
   });
 
   final ShellCoreClient client;
   final VoidCallback? onHostContextChanged;
+  final ValueChanged<String?>? onObservedHostChanged;
 
   @override
   State<HostOperationCenter> createState() => _HostOperationCenterState();
@@ -75,6 +77,11 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
     _hostCapabilities = List<HostCapabilityRecord>.unmodifiable(capabilities);
   }
 
+  void _notifyHostContextChanged(String? observedHostId) {
+    widget.onHostContextChanged?.call();
+    widget.onObservedHostChanged?.call(observedHostId);
+  }
+
   @override
   void didUpdateWidget(covariant HostOperationCenter oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -121,7 +128,9 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
       final generation = _clientGeneration;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || generation != _clientGeneration) return;
-        widget.onHostContextChanged?.call();
+        _notifyHostContextChanged(
+          _activeHostId == observedBrokerHostId ? _activeHostId : null,
+        );
       });
     }
   }
@@ -276,7 +285,11 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
             'Host切替を監査しました。監査ID=${receipt.auditId} / 承認=${receipt.approvalState} / 権限生成=${receipt.authorityGenerated}';
         _busy = false;
       });
-      widget.onHostContextChanged?.call();
+      final observedBrokerHostId =
+          _brokerObservedHostId(widget.client.getSnapshot());
+      _notifyHostContextChanged(
+        receipt.hostId == observedBrokerHostId ? receipt.hostId : null,
+      );
     } on Object {
       if (!mounted || generation != _clientGeneration) return;
       setState(() {
@@ -313,7 +326,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
             'D4内の表示コンテキストを解除しました。遠隔Host／Runtimeは停止していません。監査ID=$auditId';
         _busy = false;
       });
-      widget.onHostContextChanged?.call();
+      _notifyHostContextChanged(null);
     } on Object {
       if (!mounted || generation != _clientGeneration) return;
       setState(() {

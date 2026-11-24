@@ -6,6 +6,7 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart'
 const int _maximumSpans = 256;
 const int _maximumTraceIdBytes = 128;
 const int _maximumMetrics = 16;
+const int _maximumTaskIds = 256;
 const String _observationScope = 'broker_audit_finalization';
 const String _auditSeparation = 'Audit=責任・安全・証拠; Observation=性能・挙動・運用状態';
 const Set<String> _observationBodyKeys = {
@@ -64,6 +65,8 @@ class ObservationClient {
   Future<Map<String, Object?>> list({
     int limit = 200,
     String? traceId,
+    String? hostId,
+    List<String>? taskIds,
   }) async {
     if (limit < 1 || limit > _maximumSpans) {
       throw const BrokerClientException('観測一覧の上限が契約範囲外です');
@@ -73,11 +76,26 @@ class ObservationClient {
             utf8.encode(traceId).length > _maximumTraceIdBytes)) {
       throw const BrokerClientException('TraceIDが契約範囲外です');
     }
+    if (hostId != null && !_validIdentifier(hostId)) {
+      throw const BrokerClientException('Host IDが契約範囲外です');
+    }
+    List<String>? normalizedTaskIds;
+    if (taskIds != null) {
+      if (hostId == null ||
+          taskIds.length > _maximumTaskIds ||
+          taskIds.any((taskId) => !_validIdentifier(taskId)) ||
+          taskIds.toSet().length != taskIds.length) {
+        throw const BrokerClientException('現在Task範囲が契約範囲外です');
+      }
+      normalizedTaskIds = List<String>.of(taskIds)..sort();
+    }
 
     final payload = <String, Object?>{
       '版': 1,
       '上限': limit,
       if (traceId != null) 'TraceID': traceId,
+      if (hostId != null) 'Host ID': hostId,
+      if (normalizedTaskIds != null) 'Task ID一覧': normalizedTaskIds,
     };
     late final Map<String, Object?> response;
     try {

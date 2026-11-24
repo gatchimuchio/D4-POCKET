@@ -5,9 +5,20 @@ import '../services/shell_core_client.dart';
 import 'shared.dart';
 
 class ObservabilityCenter extends StatefulWidget {
-  const ObservabilityCenter({super.key, required this.client});
+  const ObservabilityCenter({
+    super.key,
+    required this.client,
+    this.hostId,
+    this.taskIds,
+    this.hostContextGeneration = 0,
+    this.taskContextGeneration = 0,
+  });
 
   final ShellCoreClient client;
+  final String? hostId;
+  final List<String>? taskIds;
+  final int hostContextGeneration;
+  final int taskContextGeneration;
 
   @override
   State<ObservabilityCenter> createState() => _ObservabilityCenterState();
@@ -33,10 +44,15 @@ class _ObservabilityCenterState extends State<ObservabilityCenter> {
   @override
   void didUpdateWidget(covariant ObservabilityCenter oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (identical(
+    final clientChanged = !identical(
       oldWidget.client.brokerTransport,
       widget.client.brokerTransport,
-    )) {
+    );
+    final scopeChanged = oldWidget.hostId != widget.hostId ||
+        !_sameTaskIds(oldWidget.taskIds, widget.taskIds) ||
+        oldWidget.hostContextGeneration != widget.hostContextGeneration ||
+        oldWidget.taskContextGeneration != widget.taskContextGeneration;
+    if (!clientChanged && !scopeChanged) {
       return;
     }
 
@@ -45,21 +61,40 @@ class _ObservabilityCenterState extends State<ObservabilityCenter> {
     _refresh();
   }
 
+  bool _sameTaskIds(List<String>? left, List<String>? right) {
+    if (left == null || right == null) return left == null && right == null;
+    if (left.length != right.length) return false;
+    for (var index = 0; index < left.length; index++) {
+      if (left[index] != right[index]) return false;
+    }
+    return true;
+  }
+
   void _refresh() {
     final generation = ++_requestGeneration;
     final client = _observationClient;
-    if (client == null) {
+    final taskIds = widget.taskIds == null
+        ? null
+        : List<String>.unmodifiable(widget.taskIds!);
+    if (client == null || (taskIds != null && widget.hostId == null)) {
       _observationsFuture = null;
       return;
     }
-    _observationsFuture = _load(client, generation);
+    _observationsFuture = _load(
+      client,
+      generation,
+      hostId: widget.hostId,
+      taskIds: taskIds,
+    );
   }
 
   Future<Map<String, Object?>> _load(
     ObservationClient client,
-    int generation,
-  ) async {
-    final observations = await client.list();
+    int generation, {
+    required String? hostId,
+    required List<String>? taskIds,
+  }) async {
+    final observations = await client.list(hostId: hostId, taskIds: taskIds);
     return generation == _requestGeneration
         ? observations
         : const <String, Object?>{};
@@ -76,7 +111,13 @@ class _ObservabilityCenterState extends State<ObservabilityCenter> {
             'Span、Trace、Metricは性能・挙動・運用状態の内部観測です。Auditの責任・安全・証拠を置き換えず、観測から権限を生成しません。',
           ),
         ),
-        if (client == null)
+        if (widget.taskIds != null && widget.hostId == null)
+          const BorderedPanel(
+            child: Text(
+              '選択Hostが現在のBroker Hostと一致しないため、観測を表示しません。',
+            ),
+          )
+        else if (client == null)
           const BorderedPanel(
             child: Text(
               'Rust Broker接続がないため、観測を取得できません。snapshotを実測値の代替にはしません。',
@@ -129,6 +170,8 @@ class _ObservabilityCenterState extends State<ObservabilityCenter> {
               Text('Span: ${body['件数'] ?? 0}'),
               Text('Trace: ${traces.length}'),
               Text('Metric: ${metrics.length}'),
+              if (widget.hostId != null)
+                Text('Host: ${widget.hostId} / 現在Task: ${widget.taskIds?.length ?? '未指定'}'),
               OutlinedButton(
                 onPressed: () => setState(_refresh),
                 child: const Text('更新'),
@@ -148,6 +191,8 @@ class _ObservabilityCenterState extends State<ObservabilityCenter> {
               Text('Window (UTC): ${_windowText(spans)}'),
               Text('Source: ${_sourceText(body, traces)}'),
               Text('Scope: ${body['観測範囲'] ?? 'unknown'}'),
+              if (widget.hostId != null)
+                Text('要求Context: Host=${widget.hostId} / Task=${widget.taskIds?.length ?? '未指定'}件'),
             ],
           ),
         ),

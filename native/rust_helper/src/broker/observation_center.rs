@@ -12,12 +12,13 @@ use super::protocol::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
 const VERSION: u64 = 1;
 const MAX_SPANS: usize = 1024;
 const MAX_RESPONSE_SPANS: usize = 256;
+const MAX_SCOPE_TASK_IDS: usize = 256;
 const MAX_TASK_TRACE_BINDINGS: usize = 128;
 const MAX_PENDING_FOLLOWUPS: usize = 8;
 const PENDING_FOLLOWUP_TTL: Duration = Duration::from_secs(300);
@@ -30,6 +31,7 @@ pub(crate) struct ObservationCenter {
     next_sequence: u64,
     next_trace_sequence: u64,
     spans: VecDeque<ObservationSpan>,
+    span_scopes: HashMap<String, ObservationSpanScope>,
     task_trace_ids: HashMap<String, String>,
     task_trace_order: VecDeque<String>,
     trace_parent_ids: HashMap<String, String>,
@@ -57,6 +59,18 @@ struct ObservationSpan {
     status: String,
     error_kind: Option<String>,
     related_audit_id: String,
+}
+
+#[derive(Debug)]
+struct ObservationSpanScope {
+    host_id: String,
+    task_id: Option<String>,
+}
+
+#[derive(Debug, Default)]
+struct ObservationRequestScope {
+    host_id: Option<String>,
+    task_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,6 +108,11 @@ impl ObservationCenter {
             }
             None => self.next_trace_id(),
         };
+        let task_id = task_record.map(|record| record.task_id);
+        let span_scope = ObservationSpanScope {
+            host_id: current_host_id(),
+            task_id,
+        };
         let ended_at_epoch_millis = started_at_epoch_millis
             .saturating_add(i64::try_from(duration_millis).unwrap_or(i64::MAX));
         let error_kind = match event.decision.as_str() {
@@ -101,7 +120,7 @@ impl ObservationCenter {
             _ => None,
         };
         self.spans.push_back(ObservationSpan {
-            span_id,
+            span_id: span_id.clone(),
             trace_id,
             parent_span_id: None,
             target: "Broker".to_string(),
@@ -113,14 +132,77 @@ impl ObservationCenter {
             error_kind,
             related_audit_id: event.event_id.clone(),
         });
+        self.span_scopes.insert(span_id, span_scope);
         while self.spans.len() > MAX_SPANS {
-            self.spans.pop_front();
+            if let Some(removed) = self.spans.pop_front() {
+                self.span_scopes.remove(&removed.span_id);
+            }
         }
     }
 
+    #[cfg(test)]
     fn response_body(&self, request: &ListRequest) -> Value {
+        self.response_body_scoped(request, &ObservationRequestScope::default())
+    }
+
+    fn response_body_scoped(
+        &self,
+        request: &ListRequest,
+        scope: &ObservationRequestScope,
+    ) -> Value {
         let limit = request.limit.unwrap_or(MAX_RESPONSE_SPANS);
+        let mut scoped_trace_ids = HashSet::new();
+        if let Some(task_ids) = scope.task_ids.as_ref() {
+            for span in &self.spans {
+                let Some(span_scope) = self.span_scopes.get(&span.span_id) else {
+                    continue;
+                };
+                let host_matches = scope
+                    .host_id
+                    .as_ref()
+                    .map(|host_id| host_id == &span_scope.host_id)
+                    .unwrap_or(true);
+                if host_matches
+                    && span_scope
+                        .task_id
+                        .as_ref()
+                        .is_some_and(|task_id| task_ids.contains(task_id))
+                {
+                    scoped_trace_ids.insert(span.trace_id.clone());
+                }
+            }
+            let mut ancestors = scoped_trace_ids.iter().cloned().collect::<Vec<_>>();
+            while let Some(trace_id) = ancestors.pop() {
+                if let Some(parent_trace_id) = self.trace_parent_ids.get(&trace_id) {
+                    if scoped_trace_ids.insert(parent_trace_id.clone()) {
+                        ancestors.push(parent_trace_id.clone());
+                    }
+                }
+            }
+        }
         let spans = self.spans.iter().rev();
+        let spans = spans.filter(|span| {
+            let Some(span_scope) = self.span_scopes.get(&span.span_id) else {
+                return false;
+            };
+            let host_matches = scope
+                .host_id
+                .as_ref()
+                .map(|host_id| host_id == &span_scope.host_id)
+                .unwrap_or(true);
+            let task_matches = scope
+                .task_ids
+                .as_ref()
+                .map(|task_ids| {
+                    if task_ids.is_empty() {
+                        span_scope.task_id.is_none()
+                    } else {
+                        scoped_trace_ids.contains(&span.trace_id)
+                    }
+                })
+                .unwrap_or(true);
+            host_matches && task_matches
+        });
         #[cfg(feature = "module_trace_inspector")]
         let spans = spans.filter(|span| {
             request
@@ -163,6 +245,9 @@ impl ObservationCenter {
         let trace_id = self.trace_for_task(task_id, None);
         if let Some(span) = self.spans.get_mut(index) {
             span.trace_id = trace_id;
+            if let Some(scope) = self.span_scopes.get_mut(&span.span_id) {
+                scope.task_id = Some(task_id.to_owned());
+            }
         }
     }
 
@@ -343,6 +428,49 @@ fn valid_correlation_id(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"_.:-".contains(&byte))
 }
 
+fn current_host_id() -> String {
+    super::host_capability::current()["ホストID"]
+        .as_str()
+        .unwrap_or("gui-shell-local-unknown")
+        .to_owned()
+}
+
+fn parse_request_scope(payload: &Value) -> Result<(Value, ObservationRequestScope), ()> {
+    let Some(object) = payload.as_object() else {
+        return Err(());
+    };
+    let host_id = match object.get("Host ID") {
+        None => None,
+        Some(Value::String(value)) if valid_correlation_id(value) => Some(value.clone()),
+        _ => return Err(()),
+    };
+    let task_ids = match object.get("Task ID一覧") {
+        None => None,
+        Some(Value::Array(values)) if values.len() <= MAX_SCOPE_TASK_IDS => {
+            let mut seen = HashSet::new();
+            let mut ids = Vec::with_capacity(values.len());
+            for value in values {
+                let Some(task_id) = value.as_str() else {
+                    return Err(());
+                };
+                if !valid_correlation_id(task_id) || !seen.insert(task_id) {
+                    return Err(());
+                }
+                ids.push(task_id.to_owned());
+            }
+            Some(ids)
+        }
+        _ => return Err(()),
+    };
+    let mut base_payload = payload.clone();
+    let Some(base_object) = base_payload.as_object_mut() else {
+        return Err(());
+    };
+    base_object.remove("Host ID");
+    base_object.remove("Task ID一覧");
+    Ok((base_payload, ObservationRequestScope { host_id, task_ids }))
+}
+
 fn valid_tagged_hash(value: &str) -> bool {
     value.len() == 71
         && value.starts_with("sha256:")
@@ -471,7 +599,20 @@ pub(super) fn dispatch(
             payload_hash,
         );
     }
-    let request = match serde_json::from_value::<ListRequest>(payload.clone()) {
+    let (request_payload, scope) = match parse_request_scope(payload) {
+        Ok(parsed) => parsed,
+        Err(()) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_LIST,
+                "observation_list_invalid",
+                "観測一覧のHost／Task範囲が不正",
+                true,
+                payload_hash,
+            )
+        }
+    };
+    let request = match serde_json::from_value::<ListRequest>(request_payload) {
         Ok(request) if request.version == VERSION => request,
         _ => {
             return broker.reject_with_payload_hash(
@@ -495,6 +636,20 @@ pub(super) fn dispatch(
             payload_hash,
         );
     }
+    if scope
+        .host_id
+        .as_deref()
+        .is_some_and(|host_id| host_id != current_host_id())
+    {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_LIST,
+            "observation_host_scope_unavailable",
+            "現在のBroker Host以外の観測は取得できない",
+            true,
+            payload_hash,
+        );
+    }
     #[cfg(feature = "module_trace_inspector")]
     if request
         .trace_id
@@ -510,7 +665,7 @@ pub(super) fn dispatch(
             payload_hash,
         );
     }
-    let body = broker.observations.response_body(&request);
+    let body = broker.observations.response_body_scoped(&request, &scope);
     let audit_payload_hash = canonical_payload_hash(Some(&body));
     let audit_event = match broker.append_audit(
         request_id,

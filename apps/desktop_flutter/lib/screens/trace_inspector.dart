@@ -7,9 +7,20 @@ import '../services/shell_core_client.dart';
 import 'shared.dart';
 
 class TraceInspector extends StatefulWidget {
-  const TraceInspector({super.key, required this.client});
+  const TraceInspector({
+    super.key,
+    required this.client,
+    this.hostId,
+    this.taskIds,
+    this.hostContextGeneration = 0,
+    this.taskContextGeneration = 0,
+  });
 
   final ShellCoreClient client;
+  final String? hostId;
+  final List<String>? taskIds;
+  final int hostContextGeneration;
+  final int taskContextGeneration;
 
   @override
   State<TraceInspector> createState() => _TraceInspectorState();
@@ -36,10 +47,15 @@ class _TraceInspectorState extends State<TraceInspector> {
   @override
   void didUpdateWidget(covariant TraceInspector oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (identical(
+    final clientChanged = !identical(
       oldWidget.client.brokerTransport,
       widget.client.brokerTransport,
-    )) {
+    );
+    final scopeChanged = oldWidget.hostId != widget.hostId ||
+        !_sameTaskIds(oldWidget.taskIds, widget.taskIds) ||
+        oldWidget.hostContextGeneration != widget.hostContextGeneration ||
+        oldWidget.taskContextGeneration != widget.taskContextGeneration;
+    if (!clientChanged && !scopeChanged) {
       return;
     }
 
@@ -49,23 +65,44 @@ class _TraceInspectorState extends State<TraceInspector> {
     _refresh();
   }
 
+  bool _sameTaskIds(List<String>? left, List<String>? right) {
+    if (left == null || right == null) return left == null && right == null;
+    if (left.length != right.length) return false;
+    for (var index = 0; index < left.length; index++) {
+      if (left[index] != right[index]) return false;
+    }
+    return true;
+  }
+
   void _refresh() {
     final generation = ++_requestGeneration;
     final client = _observationClient;
-    if (client == null) {
+    final taskIds = widget.taskIds == null
+        ? null
+        : List<String>.unmodifiable(widget.taskIds!);
+    if (client == null || (taskIds != null && widget.hostId == null)) {
       _tracesFuture = null;
       return;
     }
-    _tracesFuture = _load(client, generation);
+    _tracesFuture = _load(
+      client,
+      generation,
+      hostId: widget.hostId,
+      taskIds: taskIds,
+    );
   }
 
   Future<Map<String, Object?>> _load(
     ObservationClient client,
-    int generation,
-  ) async {
+    int generation, {
+    required String? hostId,
+    required List<String>? taskIds,
+  }) async {
     final observations = await client.list(
       limit: 256,
       traceId: _selectedTraceId,
+      hostId: hostId,
+      taskIds: taskIds,
     );
     return generation == _requestGeneration
         ? observations
@@ -93,7 +130,13 @@ class _TraceInspectorState extends State<TraceInspector> {
             'Trace表示からPermission、Approval、Authority、Capability、Credentialを生成しません。',
           ),
         ),
-        if (client == null)
+        if (widget.taskIds != null && widget.hostId == null)
+          const BorderedPanel(
+            child: Text(
+              '選択Hostが現在のBroker Hostと一致しないため、Traceを表示しません。',
+            ),
+          )
+        else if (client == null)
           const BorderedPanel(
             child: Text(
               'Rust Broker接続がないため、Traceを取得できません。snapshotをTraceの根拠にはしません。',
@@ -150,6 +193,8 @@ class _TraceInspectorState extends State<TraceInspector> {
               Text('Trace: ${traceIds.length}'),
               Text('Span: ${spans.length}'),
               Text('Metric: ${metrics.length}'),
+              if (widget.hostId != null)
+                Text('Host: ${widget.hostId} / 現在Task: ${widget.taskIds?.length ?? '未指定'}'),
               if (traceIds.isNotEmpty)
                 DropdownButton<String?>(
                   value: _selectedTraceId,
