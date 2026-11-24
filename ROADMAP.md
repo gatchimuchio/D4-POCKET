@@ -4,6 +4,12 @@
 
 現行正本は[要求仕様 v11](docs/V11_2026-11-24/01_D4Pocket_REQUIREMENTS_v11_JA.jsonl)・[設計仕様 v11](docs/V11_2026-11-24/02_D4Pocket_DESIGN_v11_JA.jsonl)・[実装開発工程 v11](docs/V11_2026-11-24/03_D4Pocket_IMPLEMENTATION_PLAN_v11_JA.jsonl)・[品質工程 v11](docs/V11_2026-11-24/04_D4Pocket_QUALITY_PLAN_v11_JA.jsonl)・[実装開発実行指示 v11](docs/V11_2026-11-24/05_D4Pocket_IMPLEMENTATION_INSTRUCTIONS_v11_JA.jsonl)であり、採用範囲・原文固定は[v11採用記録](docs/V11_2026-11-24/採用記録.md)、常設施工方法は[AGENTS.md](AGENTS.md)に従う。v11は原要求188件（実装152・品質専用36）、本番結線54件、対象OS5種を保持し、実装・ビルドと独立品質業務を分離する。過去の進捗・検査・Release Blockerは対象SHAと時点に結合した履歴として保持し、v11採用だけで現在の実装完成・品質合格・公開を成立扱いしない。以下の過去記録は各見出しの対象版・時点に限る。
 
+### v11施工追補：Runtime資源のProblems UI接続（2026-11-24）
+
+基準main `6a2220ef457b186adae1c3986a329ee61ad54fc3`で、Problems画面に既存のBroker Runtime一覧とRuntime Resource Clientを接続した。利用者が登録Runtimeを更新・選択し、一回観測を要求した場合だけ、Broker応答の時刻・PID binding・登録／観測Audit IDとCPU、RAM、I/O、遅延、失敗件数を表示する。未計測値は`unknown`のまま理由と証拠種別を表示する。画面離脱・Broker接続変更・Runtime変更では旧応答を破棄し、常時pollingを行わない。
+
+変更後の`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離一時source snapshotでPASS（Flutter analyze exit 0、snapshot cleanup PASS）。Unit/E2E、実Runtime、installed製品、OS別QAはこの施工単位で実施していない。この記録はProblems UIへのSource/Consumer接続を示し、実Runtimeや製品QAの成立を主張しない。
+
 ### v11施工追補：AI Edit Rollback候補の再発見接続（2026-11-24）
 
 施工開始main `3cfc6edd8c408765275d9519a2efbaa88f8194b2`を基準に、成功した適用のHMAC Journalへ元Apply要求を保存し、Workspace Inspectorから`GUI Shell編集Rollback候補一覧`をBroker経由で取得するConsumerを接続した。候補は現在Hostの完全一致Apply Audit receipt、現在Workspace root／full Permission、Journalと退避先、適用file bindingを照合する。Appliedの競合候補は無効化し、`Reverting`／`RecoveryRequired`は新しい現在Permission・別Native確認のもとで既存Rollback経路へ渡す。旧Journal形式version 1や現Hostの完了Apply Audit receiptを特定できないJournalは、そのページの`unavailable_count`で明示し、候補として再構成しない。候補一覧は最大4件／ページ、Journal directory走査は最大65,536 entry。

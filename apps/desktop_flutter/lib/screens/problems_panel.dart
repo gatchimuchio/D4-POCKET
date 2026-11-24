@@ -4,13 +4,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/generated_contracts.dart';
+import '../services/runtime_resource_client.dart';
 import '../services/shell_core_client.dart';
 import 'shared.dart';
 
 class ProblemsPanel extends StatefulWidget {
-  const ProblemsPanel({super.key, required this.client, this.active = true});
+  const ProblemsPanel({
+    super.key,
+    required this.client,
+    this.resourceClient,
+    this.connectResource = connectRuntimeResourceClient,
+    this.active = true,
+  });
 
   final ShellCoreClient client;
+  final RuntimeResourceClient? resourceClient;
+  final RuntimeResourceClientConnector connectResource;
   final bool active;
 
   @override
@@ -116,6 +125,13 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
     return ShellPage(
       title: '問題一覧',
       children: [
+        if (brokerMode)
+          _RuntimeResourceProblemsSection(
+            client: client,
+            resourceClient: widget.resourceClient,
+            connectResource: widget.connectResource,
+            active: widget.active,
+          ),
         if (brokerMode)
           const SectionList(
             title: 'Broker診断の表示範囲',
@@ -324,6 +340,295 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
         ),
       ],
     );
+  }
+}
+
+const _runtimeResourceMetrics = <String, String>{
+  'CPU利用率Percent': 'CPU利用率 (%)',
+  'RAMWorkingSetBytes': 'RAM Working Set (bytes)',
+  'RAMPrivateBytes': 'RAM Private (bytes)',
+  'DiskIOBytes': 'Disk I/O (bytes)',
+  'NetworkIOBytes': 'Network I/O (bytes)',
+  '平均応答Millis': '平均応答 (ms)',
+  '失敗要求数': '失敗要求数 (件)',
+};
+
+class _RuntimeResourceProblemsSection extends StatefulWidget {
+  const _RuntimeResourceProblemsSection({
+    required this.client,
+    required this.resourceClient,
+    required this.connectResource,
+    required this.active,
+  });
+
+  final ShellCoreClient client;
+  final RuntimeResourceClient? resourceClient;
+  final RuntimeResourceClientConnector connectResource;
+  final bool active;
+
+  @override
+  State<_RuntimeResourceProblemsSection> createState() =>
+      _RuntimeResourceProblemsSectionState();
+}
+
+class _RuntimeResourceProblemsSectionState
+    extends State<_RuntimeResourceProblemsSection> {
+  RuntimeResourceClient? _resourceClient;
+  List<String>? _runtimeIds;
+  String? _selectedRuntimeId;
+  RuntimeResourceObservation? _observation;
+  String _message = 'Broker登録Runtime一覧を取得してください。';
+  bool _loadingRuntimes = false;
+  bool _observing = false;
+  int _generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _resourceClient = widget.resourceClient;
+  }
+
+  @override
+  void didUpdateWidget(covariant _RuntimeResourceProblemsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.client, widget.client) ||
+        oldWidget.resourceClient != widget.resourceClient ||
+        oldWidget.connectResource != widget.connectResource) {
+      _generation++;
+      _resourceClient = widget.resourceClient;
+      _runtimeIds = null;
+      _selectedRuntimeId = null;
+      _observation = null;
+      _loadingRuntimes = false;
+      _observing = false;
+      _message = 'Broker接続条件が変わりました。Runtime一覧を再取得してください。';
+    } else if (oldWidget.active && !widget.active) {
+      _generation++;
+      _loadingRuntimes = false;
+      _observing = false;
+      _observation = null;
+      _message = '画面を離れたため、前回の資源観測を破棄しました。';
+    }
+  }
+
+  Future<void> _refreshRuntimeIds() async {
+    if (!widget.active || _loadingRuntimes || _observing) return;
+    final client = widget.client;
+    final generation = ++_generation;
+    final previousSelection = _selectedRuntimeId;
+    setState(() {
+      _loadingRuntimes = true;
+      _observation = null;
+      _message = 'Brokerから登録済みRuntime一覧を取得しています。';
+    });
+    try {
+      final runtimeIds = await client.refreshRuntimeCatalog();
+      if (!mounted ||
+          generation != _generation ||
+          !identical(client, widget.client)) {
+        return;
+      }
+      setState(() {
+        _runtimeIds = runtimeIds;
+        _selectedRuntimeId = runtimeIds.contains(previousSelection)
+            ? previousSelection
+            : (runtimeIds.isEmpty ? null : runtimeIds.first);
+        _message = runtimeIds.isEmpty
+            ? 'Brokerに登録済みRuntimeはありません。'
+            : 'Broker登録済みRuntime ${runtimeIds.length}件を取得しました。';
+      });
+    } catch (_) {
+      if (!mounted ||
+          generation != _generation ||
+          !identical(client, widget.client)) {
+        return;
+      }
+      setState(() {
+        _runtimeIds = null;
+        _selectedRuntimeId = null;
+        _observation = null;
+        _message = 'Runtime一覧を確認できません。権限状態を推測せず停止しています。';
+      });
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _loadingRuntimes = false);
+      }
+    }
+  }
+
+  void _selectRuntime(String? runtimeId) {
+    if (runtimeId == null || !_runtimeIds!.contains(runtimeId)) return;
+    _generation++;
+    setState(() {
+      _selectedRuntimeId = runtimeId;
+      _observation = null;
+      _message = 'Runtimeを変更しました。現在の対象を一回観測してください。';
+    });
+  }
+
+  Future<void> _observeResources() async {
+    final runtimeId = _selectedRuntimeId;
+    final runtimeIds = _runtimeIds;
+    if (!widget.active ||
+        runtimeId == null ||
+        runtimeIds == null ||
+        !runtimeIds.contains(runtimeId) ||
+        !RuntimeResourceClient.validRuntimeId(runtimeId) ||
+        _loadingRuntimes ||
+        _observing) {
+      return;
+    }
+    final client = widget.client;
+    final generation = ++_generation;
+    setState(() {
+      _observing = true;
+      _observation = null;
+      _message = '選択Runtimeの資源をBrokerへ一回要求しています。';
+    });
+    try {
+      var resourceClient = _resourceClient ?? widget.resourceClient;
+      if (resourceClient == null) {
+        resourceClient = await widget.connectResource();
+        if (!_isCurrent(client, generation, runtimeId)) return;
+        _resourceClient = resourceClient;
+      }
+      final observation = await resourceClient.observe(runtimeId);
+      if (!_isCurrent(client, generation, runtimeId)) return;
+      setState(() {
+        _observation = observation;
+        _message = '一回観測を受信しました。';
+      });
+    } catch (_) {
+      if (_isCurrent(client, generation, runtimeId)) {
+        setState(() {
+          _observation = null;
+          _message = '資源観測の応答または監査結合を確認できません。状態は不明です。';
+        });
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _observing = false);
+      }
+    }
+  }
+
+  bool _isCurrent(
+    ShellCoreClient client,
+    int generation,
+    String runtimeId,
+  ) =>
+      mounted &&
+      widget.active &&
+      generation == _generation &&
+      identical(client, widget.client) &&
+      runtimeId == _selectedRuntimeId &&
+      _runtimeIds?.contains(runtimeId) == true;
+
+  @override
+  Widget build(BuildContext context) {
+    final runtimeIds = _runtimeIds;
+    final observation = _observation;
+    final busy = _loadingRuntimes || _observing;
+    final rows = observation == null
+        ? <String>[]
+        : <String>[
+            'Runtime ID: ${observation.runtimeId}',
+            '観測時刻: ${DateTime.fromMillisecondsSinceEpoch(observation.observedAtUnixMillis, isUtc: true).toLocal().toIso8601String()}',
+            'PID結合: ${observation.binding.status} / 根拠=${observation.binding.basis}',
+            if (observation.binding.pid != null)
+              'Broker観測PID: ${observation.binding.pid}',
+            '登録監査ID: ${observation.binding.registrationAuditId}',
+            '資源観測監査ID: ${observation.auditId}',
+            for (final entry in _runtimeResourceMetrics.entries)
+              _metricRow(observation, entry.key, entry.value),
+          ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionList(
+          title: 'Runtime資源の現在観測',
+          rows: [
+            'Broker登録Runtimeに対する監査付き一回観測です。常時pollingは行わず、取得できない値は0ではなく不明として表示します。',
+          ],
+        ),
+        if (runtimeIds != null && runtimeIds.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: SizedBox(
+              width: 420,
+              child: DropdownButtonFormField<String>(
+                key: const ValueKey('problems-resource-runtime-selection'),
+                initialValue: runtimeIds.contains(_selectedRuntimeId)
+                    ? _selectedRuntimeId
+                    : runtimeIds.first,
+                decoration: const InputDecoration(
+                  labelText: 'Broker登録済みRuntime',
+                ),
+                items: [
+                  for (final id in runtimeIds)
+                    DropdownMenuItem(value: id, child: Text(id)),
+                ],
+                onChanged: busy ? null : _selectRuntime,
+              ),
+            ),
+          ),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              key: const ValueKey('problems-resource-runtime-refresh'),
+              onPressed: !widget.active || busy
+                  ? null
+                  : () => unawaited(_refreshRuntimeIds()),
+              icon: _loadingRuntimes
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              label: const Text('登録Runtimeを取得'),
+            ),
+            FilledButton.icon(
+              key: const ValueKey('problems-resource-observe'),
+              onPressed: runtimeIds == null ||
+                      runtimeIds.isEmpty ||
+                      _selectedRuntimeId == null ||
+                      !widget.active ||
+                      busy
+                  ? null
+                  : () => unawaited(_observeResources()),
+              icon: _observing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.monitor_heart_outlined),
+              label: const Text('資源を一回観測'),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(_message),
+        ),
+        if (observation != null) SectionList(title: 'Broker観測結果', rows: rows),
+      ],
+    );
+  }
+
+  String _metricRow(
+    RuntimeResourceObservation observation,
+    String key,
+    String label,
+  ) {
+    final metric = observation.metric(key);
+    if (!metric.isMeasured) {
+      return '$label: 不明 / 証拠=${metric.evidenceSource} / 理由=${metric.reason ?? '未提示'}';
+    }
+    return '$label: ${metric.value} / 証拠=${metric.evidenceSource}';
   }
 }
 

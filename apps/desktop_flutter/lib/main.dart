@@ -493,7 +493,13 @@ class _ShellHomePageState extends State<ShellHomePage> {
       ApprovalCenter(client: widget.client),
       AuditViewer(client: widget.client),
       RecoveryCenter(client: widget.client, active: selectedIndex == 8),
-      ProblemsPanel(client: widget.client, active: selectedIndex == 9),
+      ProblemsPanel(
+        client: widget.client,
+        resourceClient: widget.runtimeResourceClient,
+        connectResource:
+            widget.runtimeResourceConnect ?? connectRuntimeResourceClient,
+        active: selectedIndex == 9,
+      ),
       EvidenceCenter(client: widget.client),
       WorkspaceInspectorHostScope(
         generation: _hostContextGeneration,
