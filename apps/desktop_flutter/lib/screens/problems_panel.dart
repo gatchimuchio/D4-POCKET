@@ -14,12 +14,16 @@ class ProblemsPanel extends StatefulWidget {
     required this.client,
     this.resourceClient,
     this.connectResource = connectRuntimeResourceClient,
+    this.stopReceipt,
+    this.onStopReceiptChanged,
     this.active = true,
   });
 
   final ShellCoreClient client;
   final RuntimeResourceClient? resourceClient;
   final RuntimeResourceClientConnector connectResource;
+  final TrayStopResult? stopReceipt;
+  final ValueChanged<TrayStopResult?>? onStopReceiptChanged;
   final bool active;
 
   @override
@@ -69,6 +73,10 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
         _isRefreshing = false;
       }
     }
+    if (oldWidget.stopReceipt != widget.stopReceipt &&
+        widget.stopReceipt == null) {
+      _stopReceipt = null;
+    }
   }
 
   bool _isCurrentStopRequest(
@@ -97,6 +105,7 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
       _stopReceipt = null;
       _stopRequestMessage = '現在のBrokerへ停止要求を送信しています。停止自体は実行しません。';
     });
+    widget.onStopReceiptChanged?.call(null);
     try {
       final receipt = await client.requestAllRuntimeStop();
       if (!_isCurrentStopRequest(client, transport, generation)) return;
@@ -104,6 +113,7 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
         _stopReceipt = receipt;
         _stopRequestMessage = '現在のBrokerから停止要求Receiptを受け取りました。';
       });
+      widget.onStopReceiptChanged?.call(receipt);
     } on Object {
       if (!_isCurrentStopRequest(client, transport, generation)) return;
       setState(() {
@@ -111,6 +121,7 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
         _stopRequestMessage =
             '停止要求の結果を確認できません。現在のBroker状態を確認してください。自動再送はしていません。';
       });
+      widget.onStopReceiptChanged?.call(null);
     } finally {
       if (_isCurrentStopRequest(client, transport, generation)) {
         setState(() => _isSubmittingStopRequest = false);
@@ -337,7 +348,7 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
   }
 
   Widget _stopRequestSection() {
-    final receipt = _stopReceipt;
+    final receipt = widget.stopReceipt ?? _stopReceipt;
     final canRequest =
         widget.active &&
         widget.client.brokerTransport != null &&
@@ -375,8 +386,9 @@ class _ProblemsPanelState extends State<ProblemsPanel> {
           BorderedPanel(child: Text(_stopRequestMessage!)),
         if (receipt != null)
           SectionList(
-            title: '現在のBroker停止要求Receipt',
+            title: '現在のBroker接続の停止要求Receipt',
             rows: [
+              '対象範囲: Brokerに登録された全Runtime（個別Host／Taskには結合しません）',
               '応答状態: ${receipt.status}',
               '対象Runtime数: ${receipt.targetCount}',
               '停止実行済み: ${receipt.stopPerformed ? 'はい' : 'いいえ'}',

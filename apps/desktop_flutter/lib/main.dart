@@ -247,6 +247,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
   bool _trayRefreshRequested = false;
   int _trayProjectionGeneration = 0;
   int _brokerTransportGeneration = 0;
+  TrayStopResult? _latestStopRequestReceipt;
+  Object? _latestStopRequestTransport;
+  int _latestStopRequestBrokerGeneration = -1;
   final ValueNotifier<int> _hostContextGeneration = ValueNotifier<int>(0);
   AgentTaskExecutionCoordinator? _agentTaskExecutionCoordinator;
 
@@ -270,6 +273,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
     )) {
       _brokerTransportGeneration++;
       _trayProjectionGeneration++;
+      _latestStopRequestReceipt = null;
+      _latestStopRequestTransport = null;
+      _latestStopRequestBrokerGeneration = -1;
       _pendingAiEditProposal = null;
       _pendingA2aArtifactHandoff = null;
       _agentTaskExecutionCoordinator?.dispose();
@@ -413,6 +419,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     if (action != 'stop_request') return;
     final brokerTransport = widget.client.brokerTransport;
     final brokerGeneration = _brokerTransportGeneration;
+    _recordStopRequestReceipt(null, brokerTransport, brokerGeneration);
     try {
       final result = await widget.client.requestAllRuntimeStop();
       if (!mounted) return;
@@ -421,6 +428,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         _showStaleTrayStopResult();
         return;
       }
+      _recordStopRequestReceipt(result, brokerTransport, brokerGeneration);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 12),
@@ -448,6 +456,33 @@ class _ShellHomePageState extends State<ShellHomePage> {
       );
     }
   }
+
+  void _recordStopRequestReceipt(
+    TrayStopResult? receipt,
+    Object? brokerTransport,
+    int brokerGeneration,
+  ) {
+    if (!mounted ||
+        brokerGeneration != _brokerTransportGeneration ||
+        !identical(widget.client.brokerTransport, brokerTransport)) {
+      return;
+    }
+    setState(() {
+      _latestStopRequestReceipt = receipt;
+      _latestStopRequestTransport = receipt == null ? null : brokerTransport;
+      _latestStopRequestBrokerGeneration =
+          receipt == null ? -1 : brokerGeneration;
+    });
+  }
+
+  TrayStopResult? get _currentStopRequestReceipt =>
+      _latestStopRequestBrokerGeneration == _brokerTransportGeneration &&
+              identical(
+                _latestStopRequestTransport,
+                widget.client.brokerTransport,
+              )
+          ? _latestStopRequestReceipt
+          : null;
 
   void _showStaleTrayStopResult() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -508,6 +543,12 @@ class _ShellHomePageState extends State<ShellHomePage> {
         resourceClient: widget.runtimeResourceClient,
         connectResource:
             widget.runtimeResourceConnect ?? connectRuntimeResourceClient,
+        stopReceipt: _currentStopRequestReceipt,
+        onStopReceiptChanged: (receipt) => _recordStopRequestReceipt(
+          receipt,
+          widget.client.brokerTransport,
+          _brokerTransportGeneration,
+        ),
         active: selectedIndex == 9,
       ),
       EvidenceCenter(client: widget.client),

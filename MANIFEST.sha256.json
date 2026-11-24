@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "2e7779fab88c18edc0c32c57179cbbb5bdd629d166420f435eb047fe9abd98dc"
+      "sha256": "639b85053894a20c841c470edbac47b8db53262b3070874697e6af87c6ce7356"
     },
     {
       "path": "SECURITY.md",
@@ -241,7 +241,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "eba0c3488d8eb1633739b80c0e6de5cd7b039961dc3ef02fb28db37e0a5b9473"
+      "sha256": "53a61b76addc8ed92aecfc1d8b3e6277e9c7945f0ea6c02a343fd809f2126dac"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -325,7 +325,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/problems_panel.dart",
-      "sha256": "6db0f18914b6086a63898b67b05d06e429b9fcb488f8e1e835af77624ab5060a"
+      "sha256": "5ea531a9bcc2d1347e4d4e58eeb3704e35d799197575822bce961d2befe3cb5f"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/provider_credential_metadata_panel.dart",
