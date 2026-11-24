@@ -77,6 +77,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
   @override
   Widget build(BuildContext context) {
     final snapshot = widget.client.getSnapshot();
+    final observedBrokerHostId = _brokerObservedHostId(snapshot);
     final displaySnapshot =
         snapshot.copyWith(hostCapabilities: _hostCapabilities);
     final hosts = _hosts;
@@ -113,7 +114,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
           brokerObserved: snapshot.snapshotSource == 'broker',
           refreshing: _capabilityRefreshing,
           message: _capabilityMessage,
-          onRefresh: snapshot.snapshotSource == 'broker' &&
+          onRefresh: observedBrokerHostId != null &&
                   widget.client.mode == 'broker' &&
                   widget.client.brokerTransport != null &&
                   kGuiShellModuleHostCapabilities &&
@@ -153,13 +154,30 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
   Future<void> _refreshCurrentHostCapability() async {
     final generation = _clientGeneration;
     final client = widget.client;
+    final expectedHostId = _brokerObservedHostId(client.getSnapshot());
+    if (expectedHostId == null) {
+      setState(() {
+        _capabilityMessage =
+            '照合可能なBroker観測Host IDがないため、能力を再取得しません。';
+      });
+      return;
+    }
     setState(() {
       _capabilityRefreshing = true;
       _capabilityMessage = '認証済みBrokerから現在Host能力を取得しています。';
     });
     try {
-      final capability = await client.refreshCurrentHostCapability();
+      final capability = await client.refreshCurrentHostCapability(
+        expectedHostId: expectedHostId,
+      );
       if (!mounted || generation != _clientGeneration) return;
+      if (_brokerObservedHostId(client.getSnapshot()) != expectedHostId) {
+        setState(() {
+          _capabilityMessage =
+              '再取得中にBroker観測Hostが変化したため、結果を表示せず最後の受理済み能力を保持します。';
+        });
+        return;
+      }
       setState(() {
         _hostCapabilities = List<HostCapabilityRecord>.unmodifiable([capability]);
         _capabilityMessage = 'Brokerの現在Host能力を再取得しました。';
@@ -168,7 +186,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
       if (!mounted || generation != _clientGeneration) return;
       setState(() {
         _capabilityMessage =
-            '能力の更新を確認できません。表示値は最後に受理したBroker応答時点のものです。';
+            '応答のHost ID一致または更新を確認できません。表示値は最後に受理したBroker応答時点のものです。';
       });
     } finally {
       if (mounted && generation == _clientGeneration) {
@@ -381,6 +399,15 @@ class _HostRegistrationDialogState extends State<_HostRegistrationDialog> {
               child: const Text('Owner確認して登録'))
         ],
       );
+}
+
+String? _brokerObservedHostId(ShellSnapshot snapshot) {
+  if (snapshot.snapshotSource != 'broker' ||
+      snapshot.hostCapabilities.length != 1) {
+    return null;
+  }
+  final hostId = snapshot.hostCapabilities.single.hostId;
+  return hostId.trim().isEmpty ? null : hostId;
 }
 
 class _HostOperationLayout extends StatelessWidget {

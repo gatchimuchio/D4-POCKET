@@ -293,7 +293,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/host_operation_center.dart",
-      "sha256": "c24c9a2c711b092246746552c74cbc5a14f35545bd835db5b226c8e4c287c290"
+      "sha256": "59e08cd23b42b890ac0cf1c46c3d11008b8e8424b4a44cb4dc69dca4f9870920"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
@@ -457,7 +457,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "86d3c8bcc8d03adca3af430db4bc2787da8b0cea904e4b0f4cba841d8a67b169"
+      "sha256": "20e2ef3178f5138c641630fe45b0b7332752a2f49e2c837f2afe3f0d139e9260"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",

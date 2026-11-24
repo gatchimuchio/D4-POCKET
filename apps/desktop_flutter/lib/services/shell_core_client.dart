@@ -688,7 +688,9 @@ class ShellCoreClient {
         .toList(growable: false);
   }
 
-  Future<HostCapabilityRecord> refreshCurrentHostCapability() async {
+  Future<HostCapabilityRecord> refreshCurrentHostCapability({
+    required String expectedHostId,
+  }) async {
     final transport = brokerTransport;
     if (mode != 'broker' ||
         transport == null ||
@@ -697,8 +699,18 @@ class ShellCoreClient {
         '現在Host能力は利用可能な製品Broker経路から取得できません',
       );
     }
+    if (expectedHostId.trim().isEmpty) {
+      throw const BrokerClientException(
+        '現在Host能力を照合するBroker観測Host IDがありません',
+      );
+    }
     final response = await transport.request('ホスト能力');
     final capabilityBody = _validatedHostCapabilityResponse(response);
+    if (capabilityBody['ホストID'] != expectedHostId) {
+      throw const BrokerClientException(
+        '現在Host能力のHost IDが受理済みBroker snapshotと一致しません',
+      );
+    }
     return HostCapabilityRecord.fromJson(
       _hostCapabilitySnapshotJson(capabilityBody),
     );
