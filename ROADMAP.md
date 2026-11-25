@@ -6,6 +6,12 @@ Actions [run #355](https://github.com/gatchimuchio/D4-POCKET/actions/runs/456473
 
 `current_host_id`を`module_host_capabilities`の有無で分岐し、Module除去時はComposeと同じ`gui-shell-local-{platform}`の決定的なfallbackを使うよう修正した。これは観測のHost scopeだけを埋め、Authorityやpermissionを発行しない。Windows上の隔離Cargo checkで`--no-default-features --features linux-desktop-broker,module_observability`構成を確認し、Manifest整合もPASSした。このcheckは対象feature構成のRust compile確認でありLinux buildの代替ではなかった。修正commit `22198da3fccb5428ca2e0983517e829770b0a152`をUbuntu 24.04 GitHub-hosted runnerがclean checkoutし、`product_build`のLinux Release Export／package生成とbuild-evidence整合確認が手動Actions [run #356](https://github.com/gatchimuchio/D4-POCKET/actions/runs/45681023824)でPASSした。build step後の隔離生成物cleanupとpost-run clean checkoutもPASSした。Unit test、GUI smoke、installed acceptanceはscopeどおりskipされ、artifactはActionsに保存されていない。これはLinux Release構築成立の証拠であり、Runtime／Installed Product／品質受入を主張しない。
 
+### v11施工追補：A2A Stream能力表示を実Consumerへ整合（2026-11-26）
+
+編集基点main `68c4ebda9a137943127ec49707f38233c3c4c594`。Agent CardのStream projectionが、Windows／Linux Desktopの認証Broker・native Owner確認付き`SendStreamingMessage` Consumer接続済みにもかかわらず、固定理由「実購読consumerは未接続」で常に`unsupported`を返していた。投影を、Agent Cardのstreaming宣言・認証情報なしの実行可能なA2A v1.0 JSON-RPC interface・Windows／Linux Desktopの三条件が揃う場合だけsupportedとし、条件外は対象理由を示して`unsupported`を維持するよう修正した。Trust・Permission・Authorityは生成しない。
+
+`python -B -X utf8 tooling/run_cargo_isolated.py check --locked --offline --manifest-path native/rust_helper/Cargo.toml`はWindows上でPASS（exit 0、既存warning 7件）。`git diff --check`もPASS。Unit/E2E・品質QA・Installed Runtimeは未実施。本変更はA2A Stream capability projectionのSource整合であり、W-B05全体やA2A製品受入れの完了を主張しない。
+
 ### v11実装：Linux product_buildから品質検査を分離（2026-11-26）
 
 `product_build`はLinux Release Export／package生成だけを選ぶscopeだが、共通shell入口がLinux Status NotifierのC++ testと5つのPython unittestを無条件実行していた。`product_build`ではこれらを実行せず、Release Export／package生成とbuild evidenceの整合確認だけを行うよう条件分岐した。通常の受入scopeでは既存testとGUI smokeを維持する。build-onlyの報告文も実際の実行範囲へ合わせた。

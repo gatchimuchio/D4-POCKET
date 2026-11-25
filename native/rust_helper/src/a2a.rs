@@ -1948,6 +1948,7 @@ fn project_agent_card(
         ));
     }
     let mut projected_interfaces = Vec::new();
+    let mut stream_interface_supported = false;
     for interface in interfaces {
         let interface = interface
             .as_object()
@@ -1973,6 +1974,7 @@ fn project_agent_card(
             && protocol_version == "1.0"
             && unauthenticated
             && parse_endpoint(&interface_url).is_ok();
+        stream_interface_supported |= executable;
         let (status, reason) = if executable {
             (
                 "supported",
@@ -2009,9 +2011,25 @@ fn project_agent_card(
         bool_field_alias(capabilities, "extendedAgentCard", "extended_agent_card");
     let skills = project_skills(object.get("skills"))?;
     let streams = if streaming {
+        let stream_status = if !cfg!(any(target_os = "windows", target_os = "linux")) {
+            json!({
+                "status": "unsupported",
+                "reason": "A2A Stream native Owner経路はWindows／Linux Desktopのみ対応"
+            })
+        } else if !stream_interface_supported {
+            json!({
+                "status": "unsupported",
+                "reason": "認証情報なしのA2A v1.0 JSON-RPC interfaceが実行条件を満たさない"
+            })
+        } else {
+            json!({
+                "status": "supported",
+                "reason": "Windows／Linux Desktopの認証Brokerからnative Owner確認付きSendStreamingMessage consumerを利用可能"
+            })
+        };
         vec![json!({
             "stream_id": format!("{agent_id}-stream"), "task_id": format!("{agent_id}-card"), "mode": "sse",
-            "status": {"status": "unsupported", "reason": "Agent Cardはstreamingを宣言するが、実購読consumerは未接続"},
+            "status": stream_status,
             "event_types": ["task_status_update", "artifact_update"], "resumable": false, "authority_strip": true
         })]
     } else {
