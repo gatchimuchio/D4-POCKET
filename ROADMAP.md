@@ -4,7 +4,7 @@
 
 `product_build`はLinux Release Export／package生成だけを選ぶscopeだが、共通shell入口がLinux Status NotifierのC++ testと5つのPython unittestを無条件実行していた。`product_build`ではこれらを実行せず、Release Export／package生成とbuild evidenceの整合確認だけを行うよう条件分岐した。通常の受入scopeでは既存testとGUI smokeを維持する。build-onlyの報告文も実際の実行範囲へ合わせた。
 
-構築確認はbash構文、Manifest整合、Git差分を対象とする。Linux Release Export／packageの実ビルドはこの編集時点では未実行。次の通常`workflow_dispatch`で`product_build`を選び、成果物生成だけを確認する。これはRuntime／Installed Product／品質受入の証明ではない。
+2026-11-26の`product_build`手動Actions [run #45644528732](https://github.com/gatchimuchio/D4-POCKET/actions/runs/45644528732) は、依存取得後のLinux Release構築中に`gui_shell_rust_helper`のコンパイル失敗で停止した。scopeどおりUnit test／GUI smoke／installed acceptanceは実行されていない。Flutterの通常出力にRustの根因診断が含まれなかったため、Linux Exportのsize-analysis buildをverbose化して詳細を採取し、根因を修正して再構築する。成果物生成は未成立であり、Runtime／Installed Product／品質受入を証明しない。
 
 ### v11施工追補：第二Runtime Claude Code CLIのBroker／Agent Center結線（2026-11-25）
 

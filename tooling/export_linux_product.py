@@ -1019,6 +1019,7 @@ def build_linux_product(
             size_analysis_input_directory = temporary_root / "size-analysis-inputs"
             size_analysis_input_directory.mkdir(mode=0o700)
             flutter_size_analysis_arguments = [
+                "--verbose",
                 "build",
                 "linux",
                 "--release",

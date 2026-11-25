@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "cdf8b86e2685f3a226442ceb371626837386c66622c5446330941cf7f0320c0b"
+      "sha256": "dbf713a53e089ffbead7ed6f1cec9c534008adece3cf147831c33b35898a4dd2"
     },
     {
       "path": "SECURITY.md",
@@ -6061,7 +6061,7 @@
     },
     {
       "path": "tooling/export_linux_product.py",
-      "sha256": "d59077340b373c6176fe2fb229efc702dc5e26c9cdb9e7d3114c4e97ffb8d4a5"
+      "sha256": "4db512de2921090577a5f16df9456734e03f91d18aa771ed5691572cbd907681"
     },
     {
       "path": "tooling/export_macos_product.py",
