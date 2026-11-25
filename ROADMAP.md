@@ -1,5 +1,13 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：Adapter危険等級の署名・Broker・Owner確認結線（2026-11-26）
+
+Adapter Manifestとcatalog receiptに危険等級`低／中／高／重大／未評価`を追加し、署名対象byteへ結合した。新規導入・更新では危険等級を明示必須とし、既存保存recordに値がない場合だけ`未評価`へ保守的に読み替える。`未評価`は有効化とRuntime実行の両方をBrokerで拒否する。等級・互換性はPublisherの申告としてRuntime CenterとWindows/macOSのnative Owner確認に表示する。署名は申告内容との結合を確認するが、等級や互換性の正しさを保証しない。
+
+既存AdapterのOwner操作前にFlutterがBroker catalogを再読込し、発行者・version・互換性・危険等級・既知の危険を確認projectionへ載せる。BrokerはOwner作用時に現在のAdapter hashとprojection全項目をrecordへ照合し、不一致・stale表示を拒否する。通常IPCはprojectionなしでも従来どおりOwner再承認待ちで状態を変更しない。
+
+K12は未完了。今回成立したのは危険等級の固定・表示・署名結合と実行前拒否であり、外部Adapter artifactの取得・実ファイル配置／削除は従来どおり未接続である。Publisher申告はBrokerによるリスク評価ではない。
+
 ### v11施工追補：Adapter管理Runtimeの検証前実行をBrokerで遮断（2026-11-26）
 
 既存のAdapter管理は、署名付きManifestのカタログ登録・検証・有効化状態を持つ一方、実行経路は明示的な隔離状態しか拒否していなかった。そのため、管理対象Runtimeが未検証、互換性宣言が`incompatible`／`unknown`、またはOwner有効化前でも、Task・Runtime開始経路へ到達し得た。

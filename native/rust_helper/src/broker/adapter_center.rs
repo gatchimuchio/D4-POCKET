@@ -33,6 +33,11 @@ pub(crate) struct OwnerConfirmationSummary {
     pub operation: String,
     pub adapter_id: String,
     pub adapter_hash: String,
+    pub publisher: String,
+    pub adapter_version: String,
+    pub compatibility: String,
+    pub risk_grade: String,
+    pub known_risks: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, Deserialize)]
@@ -49,6 +54,7 @@ pub(crate) struct OwnerManifestConfirmationSummary {
     pub permission_diff: Vec<String>,
     pub known_risks: Vec<String>,
     pub compatibility: String,
+    pub risk_grade: String,
     pub signer_fingerprint: String,
     pub signed_bytes_hash: String,
     pub signed_bytes_length: usize,
@@ -79,6 +85,8 @@ pub(super) struct AdapterManifest {
     permission_diff: Vec<String>,
     #[serde(rename = "既知の危険")]
     known_risks: Vec<String>,
+    #[serde(rename = "危険等級", default = "unrated_risk_grade")]
+    risk_grade: String,
     #[serde(rename = "互換性")]
     compatibility: String,
     authority_strip: bool,
@@ -128,6 +136,23 @@ struct AdapterManagementRequest {
     adapter_hash: Option<String>,
     #[serde(rename = "Manifest")]
     manifest: Option<AdapterManifest>,
+    #[serde(rename = "確認表示")]
+    confirmation: Option<AdapterConfirmationProjection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AdapterConfirmationProjection {
+    #[serde(rename = "発行者")]
+    publisher: String,
+    #[serde(rename = "version")]
+    adapter_version: String,
+    #[serde(rename = "互換性")]
+    compatibility: String,
+    #[serde(rename = "危険等級")]
+    risk_grade: String,
+    #[serde(rename = "既知の危険")]
+    known_risks: Vec<String>,
 }
 
 pub(super) fn load_persistent_adapters(
@@ -293,21 +318,35 @@ fn mutate(
                 )
             }
         };
+    let manifest_risk_grade_is_present = payload
+        .get("Manifest")
+        .and_then(Value::as_object)
+        .and_then(|manifest| manifest.get("危険等級"))
+        .and_then(Value::as_str)
+        .is_some();
     let operation_shape_is_valid = match operation {
         OP_INSTALL => {
             request.adapter_id.is_none()
                 && request.adapter_hash.is_none()
                 && request.manifest.is_some()
+                && manifest_risk_grade_is_present
+                && request.confirmation.is_none()
         }
         OP_UPDATE => {
             request.adapter_id.is_none()
                 && request.adapter_hash.as_deref().is_some_and(valid_hash)
                 && request.manifest.is_some()
+                && manifest_risk_grade_is_present
+                && request.confirmation.is_none()
         }
         _ => {
             request.manifest.is_none()
                 && request.adapter_id.as_deref().is_some_and(valid_identifier)
                 && request.adapter_hash.as_deref().is_some_and(valid_hash)
+                && match request.confirmation.as_ref() {
+                    Some(confirmation) => validate_confirmation_projection(confirmation),
+                    None => !owner,
+                }
         }
     };
     if !operation_shape_is_valid {
@@ -340,6 +379,50 @@ fn mutate(
             hash,
             "Adapter管理はowner control承認なしに状態を変更しない",
         );
+    }
+    if !matches!(operation, OP_INSTALL | OP_UPDATE) {
+        let adapter_id = request.adapter_id.as_deref().unwrap_or_default();
+        let expected_hash = request.adapter_hash.as_deref().unwrap_or_default();
+        let Some(value) = broker.adapters.get(adapter_id) else {
+            return reject(
+                broker,
+                request_id,
+                operation,
+                "adapter_not_found",
+                "確認対象Adapterが現在catalogにありません",
+                hash,
+            );
+        };
+        let Ok(record) = serde_json::from_value::<AdapterRecord>(value.clone()) else {
+            return reject(
+                broker,
+                request_id,
+                operation,
+                "adapter_state_invalid",
+                "確認対象Adapterの現在状態が不正です",
+                hash,
+            );
+        };
+        let Some(confirmation) = request.confirmation.as_ref() else {
+            return reject(
+                broker,
+                request_id,
+                operation,
+                "adapter_request_invalid",
+                "native Owner確認表示がありません",
+                hash,
+            );
+        };
+        if record.hash != expected_hash || !confirmation_matches_record(confirmation, &record) {
+            return reject(
+                broker,
+                request_id,
+                operation,
+                "adapter_confirmation_stale",
+                "native Owner確認表示が現在のAdapter manifestと一致しません",
+                hash,
+            );
+        }
     }
     match operation {
         OP_INSTALL => install(broker, request.manifest, request_id, hash),
@@ -422,13 +505,22 @@ pub(crate) fn owner_confirmation_summary(
     }
     let adapter_id = request.adapter_id?;
     let adapter_hash = request.adapter_hash?;
-    if !valid_identifier(&adapter_id) || !valid_hash(&adapter_hash) {
+    let confirmation = request.confirmation?;
+    if !valid_identifier(&adapter_id)
+        || !valid_hash(&adapter_hash)
+        || !validate_confirmation_projection(&confirmation)
+    {
         return None;
     }
     Some(OwnerConfirmationSummary {
         operation: operation.to_owned(),
         adapter_id,
         adapter_hash,
+        publisher: confirmation.publisher,
+        adapter_version: confirmation.adapter_version,
+        compatibility: confirmation.compatibility,
+        risk_grade: confirmation.risk_grade,
+        known_risks: confirmation.known_risks,
     })
 }
 
@@ -437,6 +529,15 @@ pub(crate) fn owner_manifest_confirmation_summary(
     payload: &Value,
 ) -> Option<OwnerManifestConfirmationSummary> {
     if !matches!(operation, "導入" | "更新") {
+        return None;
+    }
+    if payload
+        .get("Manifest")
+        .and_then(Value::as_object)
+        .and_then(|manifest| manifest.get("危険等級"))
+        .and_then(Value::as_str)
+        .is_none()
+    {
         return None;
     }
     let request: AdapterManagementRequest = serde_json::from_value(payload.clone()).ok()?;
@@ -473,6 +574,7 @@ pub(crate) fn owner_manifest_confirmation_summary(
         manifest.runtime_id.chars().count(),
         manifest.publisher.chars().count(),
         manifest.adapter_version.chars().count(),
+        manifest.risk_grade.chars().count(),
         manifest
             .requested_capabilities
             .iter()
@@ -509,6 +611,7 @@ pub(crate) fn owner_manifest_confirmation_summary(
         permission_diff: manifest.permission_diff,
         known_risks: manifest.known_risks,
         compatibility: manifest.compatibility,
+        risk_grade: manifest.risk_grade,
         signer_fingerprint: manifest.signer_fingerprint,
         signed_bytes_hash: crate::audit_hash::sha256_tagged(&signed_bytes),
         signed_bytes_length: signed_bytes.len(),
@@ -525,6 +628,42 @@ fn owner_manifest_display_text_is_valid(value: &str, max_characters: usize) -> b
             !character.is_control()
                 && !matches!(codepoint, 0x061c | 0x200e | 0x200f | 0x202a..=0x202e | 0x2066..=0x206f)
         })
+}
+
+fn validate_confirmation_projection(value: &AdapterConfirmationProjection) -> bool {
+    owner_manifest_display_text_is_valid(&value.publisher, 256)
+        && owner_manifest_display_text_is_valid(&value.adapter_version, 128)
+        && matches!(
+            value.compatibility.as_str(),
+            "compatible" | "incompatible" | "unknown"
+        )
+        && valid_risk_grade(&value.risk_grade)
+        && value.known_risks.len() <= 64
+        && value
+            .known_risks
+            .iter()
+            .all(|risk| owner_manifest_display_text_is_valid(risk, 512))
+        && value.publisher.chars().count()
+            + value.adapter_version.chars().count()
+            + value.compatibility.chars().count()
+            + value.risk_grade.chars().count()
+            + value
+                .known_risks
+                .iter()
+                .map(|risk| risk.chars().count())
+                .sum::<usize>()
+            <= 4096
+}
+
+fn confirmation_matches_record(
+    value: &AdapterConfirmationProjection,
+    record: &AdapterRecord,
+) -> bool {
+    value.publisher == record.manifest.publisher
+        && value.adapter_version == record.manifest.adapter_version
+        && value.compatibility == record.manifest.compatibility
+        && value.risk_grade == record.manifest.risk_grade
+        && value.known_risks == record.manifest.known_risks
 }
 
 fn install(
@@ -866,6 +1005,9 @@ fn enable(
             if record.manifest.compatibility != "compatible" {
                 return Err("署名済み互換性宣言がcompatibleのAdapterだけを有効化できる");
             }
+            if record.manifest.risk_grade == "未評価" {
+                return Err("発行者申告の危険等級が未評価のAdapterは有効化できない");
+            }
             record.management_state = "enabled".into();
             record.active_state = "active".into();
             Ok(())
@@ -1133,6 +1275,7 @@ fn receipt(record: &AdapterRecord) -> Value {
         "要求Capability": record.manifest.requested_capabilities,
         "許可差分": record.manifest.permission_diff,
         "既知の危険": record.manifest.known_risks,
+        "危険等級": record.manifest.risk_grade,
         "互換性": record.manifest.compatibility,
         "hash": record.hash,
         "署名状態": record.signature_status,
@@ -1185,6 +1328,7 @@ fn validate_manifest(manifest: &AdapterManifest) -> Result<(), &'static str> {
         || manifest.requested_capabilities.len() > 64
         || manifest.permission_diff.len() > 64
         || manifest.known_risks.len() > 64
+        || !valid_risk_grade(&manifest.risk_grade)
         || !matches!(
             manifest.compatibility.as_str(),
             "compatible" | "incompatible" | "unknown"
@@ -1254,6 +1398,7 @@ fn signed_payload_bytes(manifest: &AdapterManifest) -> Vec<u8> {
         "要求Capability": manifest.requested_capabilities,
         "許可差分": manifest.permission_diff,
         "既知の危険": manifest.known_risks,
+        "危険等級": manifest.risk_grade,
         "互換性": manifest.compatibility,
         "authority_strip": true,
         "signed_manifest": true,
@@ -1271,6 +1416,14 @@ fn valid_identifier(value: &str) -> bool {
             character.is_ascii_alphanumeric() || matches!(character, '_' | '.' | '-')
         })
         && value.chars().count() <= 128
+}
+
+fn unrated_risk_grade() -> String {
+    "未評価".to_owned()
+}
+
+fn valid_risk_grade(value: &str) -> bool {
+    matches!(value, "低" | "中" | "高" | "重大" | "未評価")
 }
 
 fn valid_hash(value: &str) -> bool {
@@ -1297,7 +1450,7 @@ pub(super) fn runtime_is_quarantined(broker: &Broker, runtime_id: &str) -> bool 
     })
 }
 
-/// Adapter管理対象Runtimeは、署名検証・互換性宣言compatible・Owner有効化がそろうまで実行しない。
+/// Adapter管理対象Runtimeは、署名検証・互換性宣言compatible・危険等級申告・Owner有効化がそろうまで実行しない。
 /// Adapter管理recordを持たない既存の組込Runtimeにはこの追加条件を適用しない。
 pub(super) fn runtime_execution_block_reason(
     broker: &Broker,
@@ -1321,6 +1474,12 @@ pub(super) fn runtime_execution_block_reason(
             return Some((
                 "adapter_incompatible",
                 "署名済みManifestの互換性宣言がcompatibleでないAdapterの実行を拒否しました",
+            ));
+        }
+        if record.manifest.risk_grade == "未評価" {
+            return Some((
+                "adapter_risk_unrated",
+                "発行者申告の危険等級が未評価のAdapterは実行できません",
             ));
         }
         if record.management_state != "enabled" || record.active_state != "active" {
@@ -1448,6 +1607,7 @@ mod tests {
             requested_capabilities: vec!["runtime.read".into()],
             permission_diff: vec!["none".into()],
             known_risks: vec!["fixture".into()],
+            risk_grade: "高".into(),
             compatibility: "compatible".into(),
             authority_strip: true,
             signed_manifest: true,
@@ -1462,9 +1622,28 @@ mod tests {
     fn response(
         broker: &mut Broker,
         operation: BrokerOperation,
-        payload: Value,
+        mut payload: Value,
         owner: bool,
     ) -> BrokerResponse {
+        if matches!(
+            operation.as_str(),
+            OP_VERIFY | OP_ENABLE | OP_DISABLE | OP_QUARANTINE | OP_REMOVE
+        ) && payload.get("確認表示").is_none()
+        {
+            if let Some(adapter_id) = payload.get("Adapter ID").and_then(Value::as_str) {
+                if let Some(value) = broker.adapters.get(adapter_id) {
+                    if let Ok(record) = serde_json::from_value::<AdapterRecord>(value.clone()) {
+                        payload["確認表示"] = json!({
+                            "発行者": record.manifest.publisher,
+                            "version": record.manifest.adapter_version,
+                            "互換性": record.manifest.compatibility,
+                            "危険等級": record.manifest.risk_grade,
+                            "既知の危険": record.manifest.known_risks,
+                        });
+                    }
+                }
+            }
+        }
         dispatch(broker, operation, &payload, owner, "adapter-test", hash())
     }
 
@@ -1517,6 +1696,13 @@ mod tests {
             "操作": "隔離",
             "Adapter ID": "fixture_adapter",
             "Adapter hash": hash(),
+            "確認表示": {
+                "発行者": "fixture",
+                "version": "1.0.0",
+                "互換性": "compatible",
+                "危険等級": "高",
+                "既知の危険": ["fixture"],
+            },
         });
         let request = json!({
             "request_id": "adapter-native-owner-confirmed",
@@ -1544,6 +1730,13 @@ mod tests {
                     "操作": operation,
                     "Adapter ID": "fixture_adapter",
                     "Adapter hash": adapter_hash,
+                    "確認表示": {
+                        "発行者": "fixture",
+                        "version": "1.0.0",
+                        "互換性": "compatible",
+                        "危険等級": "高",
+                        "既知の危険": ["fixture"],
+                    },
                 }),
             )
             .expect("既存Adapter record操作の確認summary");
@@ -1561,6 +1754,13 @@ mod tests {
                 "操作": "隔離",
                 "Adapter ID": "fixture_adapter",
                 "Adapter hash": hash(),
+                "確認表示": {
+                    "発行者": "fixture",
+                    "version": "1.0.0",
+                    "互換性": "compatible",
+                    "危険等級": "高",
+                    "既知の危険": ["fixture"],
+                },
                 "owner": true,
             })
         )

@@ -3,5 +3,12 @@
   "操作": "検証",
   "Adapter ID": "mock_local_llm_adapter",
   "Adapter hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "確認表示": {
+    "発行者": "fixture publisher",
+    "version": "1.0.0",
+    "互換性": "compatible",
+    "危険等級": "高",
+    "既知の危険": ["fixture only"]
+  },
   "authority": "owner"
 }

@@ -567,6 +567,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
           Text(_runtimeDependencyObservation(snapshot, adapter)),
           Text(
               '内容露出（Content Exposure）: ${adapter.contentExposure} / 互換性: ${adapter.compatibility}'),
+          Text('危険等級（発行者申告）: ${adapter.riskGrade}'),
           Text('要求Capability: ${adapter.requestedCapabilities.join(', ')}'),
           Text('許可差分: ${adapter.permissionDiff.join(', ')}'),
           Text('既知の危険: ${adapter.knownRisks.join(', ')}'),
@@ -1693,6 +1694,10 @@ class _AdapterManifestEntryDialogState
             const SizedBox(height: 10),
             const Text(
               '署名対象byte・署名は確認画面に表示せず、hashで識別します。Manifest本文はAuditへ記録しません。',
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '危険等級は発行者申告です（低／中／高／重大／未評価）。Brokerの安全性評価ではありません。未評価のAdapterは有効化できません。',
             ),
             const SizedBox(height: 10),
             TextField(

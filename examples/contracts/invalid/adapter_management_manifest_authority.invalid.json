@@ -10,6 +10,7 @@
   "要求Capability": [],
   "許可差分": [],
   "既知の危険": [],
+  "危険等級": "高",
   "互換性": "compatible",
   "authority_strip": false,
   "signed_manifest": true,

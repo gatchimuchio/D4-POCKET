@@ -9,7 +9,8 @@
     "操作": {},
     "Adapter ID": {},
     "Adapter hash": {},
-    "Manifest": {}
+    "Manifest": {},
+    "確認表示": {}
   },
   "oneOf": [
     {
@@ -18,7 +19,19 @@
         "版": { "const": 1 },
         "操作": { "enum": ["検証", "有効化", "無効化", "隔離", "削除"] },
         "Adapter ID": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
-        "Adapter hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+        "Adapter hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "確認表示": {
+          "type": "object",
+          "required": ["発行者", "version", "互換性", "危険等級", "既知の危険"],
+          "additionalProperties": false,
+          "properties": {
+            "発行者": { "type": "string", "minLength": 1, "maxLength": 256 },
+            "version": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "互換性": { "enum": ["compatible", "incompatible", "unknown"] },
+            "危険等級": { "enum": ["低", "中", "高", "重大", "未評価"] },
+            "既知の危険": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 512 } }
+          }
+        }
       },
       "additionalProperties": false
     },

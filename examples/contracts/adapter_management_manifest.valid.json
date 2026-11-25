@@ -7,9 +7,17 @@
   "version": "1.0.0",
   "transport": "mock",
   "Content Exposure": "redacted",
-  "要求Capability": ["runtime.read", "model.chat"],
-  "許可差分": ["content_visibility:summary->redacted"],
-  "既知の危険": ["fixture only"],
+  "要求Capability": [
+    "runtime.read",
+    "model.chat"
+  ],
+  "許可差分": [
+    "content_visibility:summary->redacted"
+  ],
+  "既知の危険": [
+    "fixture only"
+  ],
+  "危険等級": "高",
   "互換性": "compatible",
   "authority_strip": true,
   "signed_manifest": true,

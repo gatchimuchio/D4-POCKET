@@ -901,8 +901,16 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         adapter_center::owner_confirmation_summary(operation.strip_prefix("アダプター")?, payload)
     {
         format!(
-            "Adapter {}をこのBrokerのcatalogへ要求します。\nAdapter: {}\n現在Adapter hash: {}\n要求hash: {}\n\nBrokerが現在のrecord、hash、署名と状態条件を再評価します。外部codeの起動・Permission・Approval・Credential・trustの付与は行いません。削除はcatalogのrecordだけが対象です。",
-            summary.operation, summary.adapter_id, summary.adapter_hash, hash,
+            "Adapter {}をこのBrokerのcatalogへ要求します。\nAdapter: {}\n現在Adapter hash: {}\n発行者申告: {}\nversion申告: {}\n互換性申告: {}\n危険等級申告: {}\n既知の危険申告: {}\n要求hash: {}\n\n危険等級・互換性・既知の危険は発行者申告であり、Brokerの安全性評価ではありません。Brokerが現在のrecord、hash、申告表示、状態条件を再評価します。外部codeの起動・Permission・Approval・Credential・trustの付与は行いません。削除はcatalogのrecordだけが対象です。",
+            summary.operation,
+            summary.adapter_id,
+            summary.adapter_hash,
+            summary.publisher,
+            summary.adapter_version,
+            summary.compatibility,
+            summary.risk_grade,
+            summary.known_risks.join(" / "),
+            hash,
         )
     } else {
         let summary = adapter_center::owner_manifest_confirmation_summary(
@@ -910,7 +918,7 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
             payload,
         )?;
         format!(
-            "Adapter {}をこのBrokerのcatalogへ登録します。\nAdapter: {}\nRuntime: {}\n発行者: {}\n版: {}\n接続: {}\n内容露出: {}\n要求Capability: {}\n許可差分（要求のみ）: {}\n既知の危険: {}\n互換性: {}\n署名者: {}\n署名対象hash: {}\n現在Adapter hash: {}\n要求hash: {}\n\n外部codeの起動・Permission・Approval・Credential・trustの付与は行いません。署名の検証・有効化は別操作です。",
+            "Adapter {}をこのBrokerのcatalogへ登録します。\nAdapter: {}\nRuntime: {}\n発行者（申告）: {}\n版: {}\n接続: {}\n内容露出: {}\n要求Capability: {}\n許可差分（要求のみ）: {}\n既知の危険（発行者申告）: {}\n互換性（発行者申告）: {}\n危険等級（発行者申告）: {}\n署名者: {}\n署名対象hash: {}\n現在Adapter hash: {}\n要求hash: {}\n\n危険等級・互換性の正しさは署名では保証されません。外部codeの起動・Permission・Approval・Credential・trustの付与は行いません。署名の検証・有効化は別操作です。",
             summary.operation,
             summary.adapter_id,
             summary.runtime_id,
@@ -922,6 +930,7 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
             summary.permission_diff.join(" / "),
             summary.known_risks.join(" / "),
             summary.compatibility,
+            summary.risk_grade,
             summary.signer_fingerprint,
             summary.signed_bytes_hash,
             summary.current_adapter_hash.as_deref().unwrap_or("新規"),

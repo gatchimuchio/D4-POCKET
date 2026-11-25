@@ -200,6 +200,11 @@ enum DesktopOwnerOperationSummary {
         operation: String,
         adapter_id: String,
         adapter_hash: String,
+        publisher: String,
+        adapter_version: String,
+        compatibility: String,
+        risk_grade: String,
+        known_risks: Vec<String>,
         payload_hash: String,
     },
     AdapterManifestManagement {
@@ -1910,6 +1915,11 @@ fn owner_operation_candidate_with_product_identity(
                 operation: summary.operation,
                 adapter_id: summary.adapter_id,
                 adapter_hash: summary.adapter_hash,
+                publisher: summary.publisher,
+                adapter_version: summary.adapter_version,
+                compatibility: summary.compatibility,
+                risk_grade: summary.risk_grade,
+                known_risks: summary.known_risks,
                 payload_hash,
             }
         }
@@ -3240,6 +3250,11 @@ fn owner_confirmation_text_for_identity(
             operation,
             adapter_id,
             adapter_hash,
+            publisher,
+            adapter_version,
+            compatibility,
+            risk_grade,
+            known_risks,
             payload_hash,
         } => {
             let effect = match operation.as_str() {
@@ -3260,11 +3275,25 @@ fn owner_confirmation_text_for_identity(
                 }
                 _ => "未対応操作のため、状態は変更しません。",
             };
+            let known_risks = if known_risks.is_empty() {
+                "（なし）".to_owned()
+            } else {
+                known_risks
+                    .iter()
+                    .map(|value| format!("• {}", owner_confirmation_value(value)))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
             format!(
-                "Adapter管理操作「{}」を実行しますか？\n\nAdapter ID: {}\n現在のAdapter hash: {}\n\n{}\n\nBrokerは処理直前に現在のAdapter hashと状態条件を再確認します。結果はRust BrokerのAuditへ記録し、権限生成はありません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                "Adapter管理操作「{}」を実行しますか？\n\nAdapter ID: {}\n現在のAdapter hash: {}\n発行者申告: {}\nAdapter version申告: {}\n互換性申告: {}\n危険等級申告: {}\n既知の危険申告:\n{}\n\n{}\n\n危険等級・互換性・既知の危険は発行者の申告であり、Brokerによる安全性評価ではありません。Brokerは処理直前に現在のAdapter hash、申告表示、状態条件を再確認します。結果はRust BrokerのAuditへ記録し、権限生成はありません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
                 owner_confirmation_value(operation),
                 owner_confirmation_value(adapter_id),
                 adapter_hash,
+                owner_confirmation_value(publisher),
+                owner_confirmation_value(adapter_version),
+                owner_confirmation_value(compatibility),
+                owner_confirmation_value(risk_grade),
+                known_risks,
                 effect,
                 payload_hash
             )
@@ -3290,7 +3319,7 @@ fn owner_confirmation_text_for_identity(
                 .map(owner_confirmation_value)
                 .unwrap_or_else(|| "（新規登録）".to_owned());
             format!(
-                "Adapter Manifestの{}をBroker catalogへ登録しますか？\n\nAdapter ID: {}\nRuntime ID: {}\n発行者（申告）: {}\nsource: {}\nversion: {}\ntransport: {}\nContent Exposure: {}\n互換性（申告）: {}\n署名者fingerprint（申告）: {}\n\n要求Capability（申告）:\n{}\n許可差分（申告）:\n{}\n既知の危険（申告）:\n{}\n\n署名対象byte: {} bytes / {}\n署名byte hash: {}\n更新対象の現在Adapter hash: {}\n\nこの操作はManifestをBroker内catalogへmetadata-onlyで登録します。外部download、filesystemへの書込・削除、process起動は行いません。表示内容は未信頼Manifestの申告であり、この確認は署名検証、発行者Trust、Permission、Approval、Authorityを成立・付与しません。署名検証は別のBroker操作です。検証済みでないAdapterは有効化できません。結果はAuditへ記録されます。\n\npayload hash:\n{}",
+                "Adapter Manifestの{}をBroker catalogへ登録しますか？\n\nAdapter ID: {}\nRuntime ID: {}\n発行者（申告）: {}\nsource: {}\nversion: {}\ntransport: {}\nContent Exposure: {}\n互換性（発行者申告）: {}\n危険等級（発行者申告）: {}\n署名者fingerprint（申告）: {}\n\n要求Capability（申告）:\n{}\n許可差分（申告）:\n{}\n既知の危険（発行者申告）:\n{}\n\n署名対象byte: {} bytes / {}\n署名byte hash: {}\n更新対象の現在Adapter hash: {}\n\nこの操作はManifestをBroker内catalogへmetadata-onlyで登録します。外部download、filesystemへの書込・削除、process起動は行いません。表示内容は未信頼Manifestの申告であり、この確認は署名検証、発行者Trust、Permission、Approval、Authorityを成立・付与しません。署名は申告内容との結合を検証しますが、危険等級や互換性の正しさを保証しません。署名検証は別のBroker操作です。未評価または検証済みでないAdapterは有効化できません。結果はAuditへ記録されます。\n\npayload hash:\n{}",
                 owner_confirmation_value(&summary.operation),
                 owner_confirmation_value(&summary.adapter_id),
                 owner_confirmation_value(&summary.runtime_id),
@@ -3300,6 +3329,7 @@ fn owner_confirmation_text_for_identity(
                 owner_confirmation_value(&summary.transport),
                 owner_confirmation_value(&summary.content_exposure),
                 owner_confirmation_value(&summary.compatibility),
+                owner_confirmation_value(&summary.risk_grade),
                 owner_confirmation_value(&summary.signer_fingerprint),
                 list(&summary.requested_capabilities),
                 list(&summary.permission_diff),
@@ -4856,6 +4886,11 @@ mod tests {
                 operation,
                 adapter_id,
                 adapter_hash,
+                publisher,
+                adapter_version,
+                compatibility,
+                risk_grade,
+                known_risks,
                 payload_hash,
             } => json!({
                 "summary": {
@@ -4863,6 +4898,11 @@ mod tests {
                     "operation": operation,
                     "adapter_id": adapter_id,
                     "adapter_hash": adapter_hash,
+                    "publisher": publisher,
+                    "adapter_version": adapter_version,
+                    "compatibility": compatibility,
+                    "risk_grade": risk_grade,
+                    "known_risks": known_risks,
                     "payload_hash": payload_hash
                 },
                 "confirm": confirm
@@ -5357,6 +5397,11 @@ mod tests {
             operation: "隔離".into(),
             adapter_id: "adapter-ui-fixture".into(),
             adapter_hash: format!("sha256:{}", "a".repeat(64)),
+            publisher: "fixture publisher".into(),
+            adapter_version: "1.0.0".into(),
+            compatibility: "compatible".into(),
+            risk_grade: "高".into(),
+            known_risks: vec!["fixture risk".into()],
             payload_hash: sha256_tagged(b"adapter-owner-ui-payload"),
         };
         let prompt = owner_confirmation_text(&summary);
@@ -5729,6 +5774,11 @@ mod tests {
                 operation: String,
                 adapter_id: String,
                 adapter_hash: String,
+                publisher: String,
+                adapter_version: String,
+                compatibility: String,
+                risk_grade: String,
+                known_risks: Vec<String>,
                 payload_hash: String,
             },
             AdapterManifestManagement {
@@ -5905,11 +5955,21 @@ mod tests {
                 operation,
                 adapter_id,
                 adapter_hash,
+                publisher,
+                adapter_version,
+                compatibility,
+                risk_grade,
+                known_risks,
                 payload_hash,
             } => DesktopOwnerOperationSummary::AdapterManagement {
                 operation,
                 adapter_id,
                 adapter_hash,
+                publisher,
+                adapter_version,
+                compatibility,
+                risk_grade,
+                known_risks,
                 payload_hash,
             },
             TestSummary::AdapterManifestManagement {
@@ -6359,12 +6419,23 @@ mod tests {
             "要求Capability": ["runtime.read", "model.chat"],
             "許可差分": ["content_visibility:none->summary"],
             "既知の危険": ["fixture does not verify publisher trust"],
+            "危険等級": "高",
             "互換性": "compatible",
             "authority_strip": true,
             "signed_manifest": true,
             "署名対象": hex::encode(signed_bytes),
             "署名": "ab".repeat(64),
             "署名者fingerprint": format!("sha256:{}", "c".repeat(64))
+        })
+    }
+
+    fn adapter_confirmation_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "発行者": "fixture publisher",
+            "version": "1.0.0",
+            "互換性": "compatible",
+            "危険等級": "高",
+            "既知の危険": ["fixture does not verify publisher trust"],
         })
     }
 
@@ -8593,6 +8664,7 @@ mod tests {
                 "操作": operation,
                 "Adapter ID": "fixture_adapter",
                 "Adapter hash": adapter_hash.clone(),
+                "確認表示": adapter_confirmation_fixture(),
             });
             let request = desktop_owner_request(
                 broker_operation,
@@ -8609,6 +8681,11 @@ mod tests {
                 operation: confirmed_operation,
                 adapter_id,
                 adapter_hash: confirmed_hash,
+                publisher,
+                adapter_version,
+                compatibility,
+                risk_grade,
+                known_risks,
                 payload_hash,
             } = summary
             else {
@@ -8623,6 +8700,11 @@ mod tests {
                     operation: confirmed_operation,
                     adapter_id,
                     adapter_hash: confirmed_hash,
+                    publisher,
+                    adapter_version,
+                    compatibility,
+                    risk_grade,
+                    known_risks,
                     payload_hash,
                 });
             assert!(prompt.contains("fixture_adapter"));
@@ -8636,6 +8718,7 @@ mod tests {
             "操作": "隔離",
             "Adapter ID": "fixture_adapter",
             "Adapter hash": adapter_hash,
+            "確認表示": adapter_confirmation_fixture(),
         });
         let invalid_payloads = [
             {
@@ -8835,6 +8918,7 @@ mod tests {
                 "操作": "隔離",
                 "Adapter ID": "missing_adapter",
                 "Adapter hash": adapter_hash,
+                "確認表示": adapter_confirmation_fixture(),
             }),
         );
         let mut decline_prompt_count = 0;
@@ -8851,6 +8935,7 @@ mod tests {
                     adapter_id,
                     adapter_hash: confirmed_hash,
                     payload_hash,
+                    ..
                 } = summary
                 else {
                     panic!("Adapter操作はAdapter専用native確認を使う")
@@ -8882,6 +8967,7 @@ mod tests {
                 "操作": "隔離",
                 "Adapter ID": "missing_adapter",
                 "Adapter hash": adapter_hash,
+                "確認表示": adapter_confirmation_fixture(),
             }),
         );
         let mut confirm_prompt_count = 0;

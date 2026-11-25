@@ -6204,6 +6204,7 @@ void main() {
       }),
       _brokerAcceptedBody('approval_edit', {'ok': false}),
       _brokerCommandSuspendedResponse(),
+      _brokerAdapterListInternalResponse(),
       _brokerAdapterSuspendedResponse(),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
@@ -6326,6 +6327,7 @@ void main() {
       ..._shellCoreProductBootstrapResponses(),
       _brokerAdapterManifestMutationResponse('導入', 'ui_fixture_adapter'),
       list,
+      list,
       _brokerAdapterSuspendedResponse(adapterId: 'ui_fixture_adapter'),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
@@ -6355,6 +6357,13 @@ void main() {
       '操作': '検証',
       'Adapter ID': 'ui_fixture_adapter',
       'Adapter hash': record['hash'],
+      '確認表示': {
+        '発行者': record['発行者'],
+        'version': record['version'],
+        '互換性': record['互換性'],
+        '危険等級': record['危険等級'],
+        '既知の危険': record['既知の危険'],
+      },
     });
     expect(find.textContaining('owner_reapproval_required'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -7439,6 +7448,7 @@ Map<String, Object?> _brokerAdapterListResponse() {
         '要求Capability': ['runtime.read', 'model.chat'],
         '許可差分': ['content_visibility:summary->redacted'],
         '既知の危険': ['fixture only'],
+        '危険等級': '高',
         '互換性': 'compatible',
         'hash': 'sha256:${List.filled(64, '1').join()}',
         '署名状態': 'unconfigured',
@@ -7499,6 +7509,7 @@ Map<String, Object?> _adapterManifestFixture({
       '要求Capability': ['runtime.read'],
       '許可差分': ['content_visibility:none->summary'],
       '既知の危険': ['試験用未検証発行者'],
+      '危険等級': '高',
       '互換性': 'compatible',
       'authority_strip': true,
       'signed_manifest': true,

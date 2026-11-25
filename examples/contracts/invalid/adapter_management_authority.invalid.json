@@ -10,9 +10,14 @@
     "version": "1.0.0",
     "transport": "mock",
     "Content Exposure": "full",
-    "要求Capability": ["runtime.read"],
-    "許可差分": ["authority=all"],
+    "要求Capability": [
+      "runtime.read"
+    ],
+    "許可差分": [
+      "authority=all"
+    ],
     "既知の危険": [],
+    "危険等級": "高",
     "互換性": "compatible",
     "authority_strip": false,
     "signed_manifest": true,

@@ -113,7 +113,7 @@ void main() {
     await tester.ensureVisible(verifyButton);
     await tester.tap(verifyButton);
     await tester.pump();
-    expect(oldTransport.requests, ['アダプター検証']);
+    expect(oldTransport.requests, ['アダプター一覧', 'アダプター検証']);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -289,7 +289,57 @@ class _AdapterTransport implements BrokerTransport {
   }) async {
     requests.add(operation);
     if (failure != null) throw failure!;
+    if (operation == 'アダプター一覧') return _adapterListResponse();
     if (responseCompleter != null) return responseCompleter!.future;
     return response!;
   }
 }
+
+Map<String, Object?> _adapterListResponse() => {
+      'request_id': 'adapter-list-request',
+      'operation': 'アダプター一覧',
+      'status': 'accepted',
+      'evidence_source': 'INTERNAL_STATE',
+      'audit_event_id': 'audit-adapter-list',
+      'error': null,
+      'health': null,
+      'body': {
+        '版': 1,
+        'Adapter一覧': [
+          {
+            '版': 1,
+            'Adapter ID': 'fixture_adapter',
+            'Runtime ID': 'fixture_runtime',
+            '発行者': 'fixture publisher',
+            'source': 'owner_manifest',
+            'version': '1.0.0',
+            'transport': 'mock',
+            'Content Exposure': 'redacted',
+            '要求Capability': <String>[],
+            '許可差分': <String>[],
+            '既知の危険': <String>[],
+            '危険等級': '高',
+            '互換性': 'compatible',
+            'hash': 'sha256:${'1' * 64}',
+            '署名状態': 'unverified',
+            '検証状態': 'pending_review',
+            '管理状態': 'installed',
+            '有効状態': 'inactive',
+            '更新可能': false,
+            '公開範囲': 'metadata_only',
+            '証拠種別': 'INTERNAL_STATE',
+            '権限生成': 'なし',
+            'authority_strip': true,
+            '最終検証': null,
+            '監査ID': 'audit-adapter-state',
+            '復旧ID': 'recover-adapter-management',
+          },
+        ],
+        '件数': 1,
+        '公開範囲': 'metadata_only',
+        '証拠種別': 'INTERNAL_STATE',
+        '権限生成': 'なし',
+        'authority_strip': true,
+      },
+      'shutdown_requested': false,
+    };

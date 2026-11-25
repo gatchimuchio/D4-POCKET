@@ -561,6 +561,7 @@ class AdapterCatalogRecord {
     this.contentExposure = 'unknown',
     this.permissionDiff = const [],
     this.compatibility = 'unknown',
+    this.riskGrade = '未評価',
     this.signatureStatus = 'unknown',
     this.verificationStatus = 'unknown',
     this.managementState = 'unknown',
@@ -590,6 +591,7 @@ class AdapterCatalogRecord {
   final String contentExposure;
   final List<String> permissionDiff;
   final String compatibility;
+  final String riskGrade;
   final String signatureStatus;
   final String verificationStatus;
   final String managementState;
@@ -620,6 +622,7 @@ class AdapterCatalogRecord {
       contentExposure: json['content_exposure'] as String? ?? 'unknown',
       permissionDiff: _stringList(json['permission_diff']),
       compatibility: json['compatibility'] as String? ?? 'unknown',
+      riskGrade: json['risk_grade'] as String? ?? '未評価',
       signatureStatus: json['signature_status'] as String? ?? 'unknown',
       verificationStatus: json['verification_status'] as String? ?? 'unknown',
       managementState: json['management_state'] as String? ?? 'unknown',

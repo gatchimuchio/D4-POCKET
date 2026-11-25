@@ -545,8 +545,8 @@ class ShellCoreClient {
     final initial = snapshot.adapterCatalog.where(
       (item) => item.adapterId == adapterId,
     );
-    // 起動後に導入・更新したrecordは画面が最後に取得した値へ束縛する。
-    // 選択metadataはAuthorityではなく、Brokerが現在hashと状態を再評価する。
+    // 画面の選択はAdapter IDの指定にだけ使う。Owner確認用metadataは
+    // 操作直前にBroker catalogから再取得し、Brokerが作用時にもhashと値を再照合する。
     final adapter = selectedAdapter ?? (initial.isEmpty ? null : initial.first);
     if (adapter == null ||
         adapter.adapterId != adapterId ||
@@ -590,13 +590,32 @@ class ShellCoreClient {
     if (brokerOperation == null) {
       throw BrokerClientException('未対応のAdapter操作です: $operation');
     }
+    final currentCatalog = await refreshAdapterCatalog();
+    final currentMatches = currentCatalog.where(
+      (item) => item.adapterId == adapter.adapterId,
+    );
+    if (currentMatches.length != 1) {
+      throw const BrokerClientException(
+          '現在Broker catalogに対象Adapterがないか、IDが重複しています');
+    }
+    final currentAdapter = currentMatches.single;
+    if (!RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(currentAdapter.hash)) {
+      throw const BrokerClientException('現在Adapter hashが不正です');
+    }
     final response = await transport.request(
       brokerOperation,
       payload: {
         '版': 1,
         '操作': operation,
-        'Adapter ID': adapter.adapterId,
-        'Adapter hash': adapter.hash,
+        'Adapter ID': currentAdapter.adapterId,
+        'Adapter hash': currentAdapter.hash,
+        '確認表示': {
+          '発行者': currentAdapter.publisher,
+          'version': currentAdapter.version,
+          '互換性': currentAdapter.compatibility,
+          '危険等級': currentAdapter.riskGrade,
+          '既知の危険': currentAdapter.knownRisks,
+        },
       },
     );
     final status = response['status'];
@@ -1454,6 +1473,7 @@ Map<String, Object?> _adapterCatalogRecordSnapshotJson(Map item) {
     'known_risks': raw['既知の危険'] is List
         ? List<Object?>.from(raw['既知の危険'] as List)
         : const <Object?>[],
+    'risk_grade': raw['危険等級']?.toString() ?? '未評価',
     'source': raw['source']?.toString() ?? 'unknown',
     'transport': raw['transport']?.toString() ?? 'unknown',
     'content_exposure': raw['Content Exposure']?.toString() ?? 'unknown',

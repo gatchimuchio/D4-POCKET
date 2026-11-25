@@ -20,7 +20,9 @@ Desktop Runtime Center
 
 macOSは`docs/specs/macos-desktop-channel.md`の限定契約に従い、継承匿名pipe→Rust所有OS確認→同じBroker Owner receiverへ接続する。対象IDとhashの再検査、署名未検証の有効化拒否、catalog内作用を維持する。以下のWindows transportをmacOSへ流用しない。
 
-Desktop Runtime Centerからの`検証`、`有効化`、`無効化`、`隔離`、`削除`は、通常IPCだけでは状態変更しない。Windows Flutter RunnerのPID結合named pipeからRust Desktop起動器へ要求を送り、起動器が操作、Adapter ID、現在hash、payload hashをnative Owner dialogに表示する。承認後だけ、同じ要求をBrokerのOwner操作queueへ渡す。Brokerは処理直前に現在のrecord、hash、状態条件を再照合し、結果をAuditへ記録する。Windows Runnerの確認応答待ち時間はこの5操作に限って延長する。
+Desktop Runtime Centerからの`検証`、`有効化`、`無効化`、`隔離`、`削除`は、通常IPCだけでは状態変更しない。通常IPC要求はOwner表示projectionなしでも`owner_reapproval_required`で停止する。FlutterはOwner操作直前にBroker catalogを再読込し、発行者、version、互換性、危険等級、既知の危険を現在recordから確認表示へ束縛する。Windows Flutter RunnerのPID結合named pipeからRust Desktop起動器へ要求を送り、起動器が操作、Adapter ID、現在hash、発行者申告、payload hashをnative Owner dialogに表示する。承認後だけ、同じ要求をBrokerのOwner操作queueへ渡す。Brokerは処理直前に現在record、hash、確認表示、状態条件を再照合し、古い・不一致の確認表示を拒否する。結果をAuditへ記録する。Windows Runnerの確認応答待ち時間はこの5操作に限って延長する。
+
+表示する危険等級は`低`、`中`、`高`、`重大`、`未評価`のPublisher申告である。Manifest署名はこの申告値を署名対象へ結合するが、等級や互換性の正しさを保証せず、Brokerによる安全性評価でもない。`未評価`のAdapterはOwner有効化およびRuntime実行を拒否する。既存保存recordに危険等級がない場合は`未評価`として読み込み、既存値を推測で補わない。
 
 native dialogの拒否は状態を変更せず、通常Broker経路の`Suspended` receiptとAuditで終わる。承認はOwner明示操作の記録であり、Permission、Approval、Credential、Trustを生成しない。5操作が変更するのはBroker内catalogだけで、外部file、process、既存process、Runtime実行状態には作用しない。Manifestの`導入`と`更新`は、次節の別のDesktop接続単位で扱う。
 
@@ -28,13 +30,13 @@ native dialogの拒否は状態を変更せず、通常Broker経路の`Suspended
 
 Runtime Centerは、利用者が提示したManifest JSONを上限48 KiBで既存のBroker transportへ渡す。FlutterはJSON objectと要求の大きさを確認するだけで、署名検証、Trust、Permission、Approvalを決定しない。`アダプター導入`と`アダプター更新`はPID結合named pipeを経てRust Desktop起動器のnative Owner dialogへ進み、確認後だけBroker Owner操作queueへ渡る。通常IPCから直接送られた同操作は`owner_reapproval_required`で停止する。
 
-native確認画面は、Adapter／Runtime ID、申告発行者、source、version、transport、Content Exposure、互換性、署名者fingerprint、全要求Capability、全許可差分、全既知リスク、署名対象byte長とhash、signature hash、要求全体hashを表示する。更新では更新対象の現在Adapter hashも表示する。署名対象byteとsignatureの実値は表示しない。申告値は未信頼として示し、Owner確認が署名検証、発行者Trust、Permission、Approval、Authorityを成立・付与しないこと、署名検証が別Broker操作であることを明示する。
+native確認画面は、Adapter／Runtime ID、申告発行者、source、version、transport、Content Exposure、互換性、危険等級、署名者fingerprint、全要求Capability、全許可差分、全既知リスク、署名対象byte長とhash、signature hash、要求全体hashを表示する。更新では更新対象の現在Adapter hashも表示する。署名対象byteとsignatureの実値は表示しない。申告値は未信頼として示し、Owner確認が署名検証、発行者Trust、Permission、Approval、Authorityを成立・付与しないこと、署名検証が別Broker操作であることを明示する。危険等級・互換性の申告値の正しさは署名で保証されない。
 
 導入・更新が変更するのはBroker catalog metadataとAuditだけであり、外部download、filesystem書込・削除、process起動は行わない。更新ManifestのAdapter IDは指定対象と一致しなければならない。Brokerは処理時に現在record hashを再照合し、古いhash、有効化中、隔離済みのrecordを拒否する。署名状態が未検証・未設定の登録は可能だが、Broker署名検証に成功するまで有効化できない。拒否は状態を変更せず、Auditを伴う。
 
 ## 検証と状態
 
-導入・更新は、native Owner確認後にownerが提示したManifestをBroker内部catalogへ登録するmetadata操作である。署名、発行者、source、version、hash、要求Capability、許可差分、既知の危険、互換性、Content Exposureを保存する。署名の真偽はManifestやUIの申告ではなく、Broker所有のEd25519 trustと正本byteで別途検証する。検証済みでないAdapterは有効化できない。
+導入・更新は、native Owner確認後にownerが提示したManifestをBroker内部catalogへ登録するmetadata操作である。署名、発行者、source、version、hash、要求Capability、許可差分、既知の危険、危険等級、互換性、Content Exposureを保存する。危険等級は署名対象へ含め、Publisherの申告であることをFlutterとnative確認面に表示する。署名の真偽はManifestやUIの申告ではなく、Broker所有のEd25519 trustと正本byteで別途検証する。検証済みでないAdapterと`未評価`のAdapterは有効化できない。Runtime実行時にもBrokerが現在の危険等級を再確認する。
 
 隔離済みAdapterのRuntime IDは、実行系登録、lifecycle、資源観測、対話操作から再利用しない。削除はcatalog recordの除去だけであり、外部artifactのfilesystem削除を行わない。したがって外部artifactの実導入・実削除・process管理は本単位の未接続範囲である。
 
