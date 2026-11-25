@@ -863,6 +863,9 @@ fn enable(
             if record.verification_status != "verified" || record.signature_status != "verified" {
                 return Err("署名検証済みAdapterだけを有効化できる");
             }
+            if record.manifest.compatibility != "compatible" {
+                return Err("署名済み互換性宣言がcompatibleのAdapterだけを有効化できる");
+            }
             record.management_state = "enabled".into();
             record.active_state = "active".into();
             Ok(())
@@ -1291,6 +1294,42 @@ pub(super) fn runtime_is_quarantined(broker: &Broker, runtime_id: &str) -> bool 
             .is_some_and(|record| {
                 record.manifest.runtime_id == runtime_id && record.management_state == "quarantined"
             })
+    })
+}
+
+/// Adapter管理対象Runtimeは、署名検証・互換性宣言compatible・Owner有効化がそろうまで実行しない。
+/// Adapter管理recordを持たない既存の組込Runtimeにはこの追加条件を適用しない。
+pub(super) fn runtime_execution_block_reason(
+    broker: &Broker,
+    runtime_id: &str,
+) -> Option<(&'static str, &'static str)> {
+    broker.adapters.values().find_map(|value| {
+        let record = serde_json::from_value::<AdapterRecord>(value.clone()).ok()?;
+        if record.manifest.runtime_id != runtime_id {
+            return None;
+        }
+        if record.management_state == "quarantined" || record.active_state == "blocked" {
+            return Some(("adapter_quarantined", "隔離済みAdapterの実行を拒否しました"));
+        }
+        if record.signature_status != "verified" || record.verification_status != "verified" {
+            return Some((
+                "adapter_not_verified",
+                "Broker署名検証が完了していないAdapterの実行を拒否しました",
+            ));
+        }
+        if record.manifest.compatibility != "compatible" {
+            return Some((
+                "adapter_incompatible",
+                "署名済みManifestの互換性宣言がcompatibleでないAdapterの実行を拒否しました",
+            ));
+        }
+        if record.management_state != "enabled" || record.active_state != "active" {
+            return Some((
+                "adapter_disabled",
+                "Ownerが有効化していないAdapterの実行を拒否しました",
+            ));
+        }
+        None
     })
 }
 

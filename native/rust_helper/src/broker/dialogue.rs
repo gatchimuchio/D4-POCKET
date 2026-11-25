@@ -25,6 +25,7 @@ pub enum 対話失敗 {
     監査失敗,
     取消,
     隔離済み,
+    アダプター未準備,
     作業領域不在,
     AgentTask非対応,
 }
@@ -41,6 +42,7 @@ impl 対話失敗 {
             Self::監査失敗 => "監査失敗",
             Self::取消 => "取消",
             Self::隔離済み => "実行系隔離済み",
+            Self::アダプター未準備 => "Adapter未検証または無効化",
             Self::作業領域不在 => "作業領域不在",
             Self::AgentTask非対応 => "AgentTask実行非対応",
         }
@@ -54,6 +56,7 @@ impl 対話失敗 {
             Self::セッション不一致 | Self::取消 | Self::期限超過 => "新規セッション",
             Self::通信失敗 | Self::応答不正 => "接続再確認",
             Self::隔離済み => "RecoveryActionによる隔離判断を確認",
+            Self::アダプター未準備 => "Adapterの署名検証・互換性宣言確認・Owner有効化",
             Self::作業領域不在 => "RuntimeとWorkspaceの登録対応を再確認",
             Self::AgentTask非対応 => "Agent Task実行対応済みRuntimeを選択",
         }

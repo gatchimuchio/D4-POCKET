@@ -1836,6 +1836,9 @@ impl Broker {
         {
             return Err(対話失敗::隔離済み);
         }
+        if super::adapter_center::runtime_execution_block_reason(self, 名前).is_some() {
+            return Err(対話失敗::アダプター未準備);
+        }
         let 観測対象 = adapter.観測対象();
         self.対話.登録(名前, adapter)?;
         let 登録監査 = match self.append_audit(
@@ -5280,6 +5283,23 @@ impl Broker {
                 payload_hash,
             );
         }
+        if matches!(
+            request.action,
+            LifecycleAction::Start | LifecycleAction::Restart | LifecycleAction::Resume
+        ) {
+            if let Some((code, message)) =
+                super::adapter_center::runtime_execution_block_reason(self, &request.runtime_id)
+            {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation.as_str(),
+                    code,
+                    message,
+                    true,
+                    payload_hash,
+                );
+            }
+        }
         let body = match self.ライフサイクル.request_approval(
             &request.runtime_id,
             request.action,
@@ -5376,21 +5396,40 @@ impl Broker {
                 )
             }
         };
-        if self
+        let approval_runtime_id = self
             .ライフサイクル
-            .approval_runtime_id(&request.approval_id)
-            .is_some_and(|runtime_id| {
-                super::adapter_center::runtime_is_quarantined(self, runtime_id)
-            })
-        {
-            return self.reject_with_payload_hash(
-                request_id,
-                operation.as_str(),
-                "adapter_quarantined",
-                "隔離済みAdapterのlifecycle承認を拒否しました",
-                true,
-                payload_hash,
-            );
+            .approval_runtime_id(&request.approval_id);
+        let approval_action = self
+            .ライフサイクル
+            .approval_action(&request.approval_id);
+        if let (Some(runtime_id), Some(action)) = (approval_runtime_id, approval_action) {
+            if super::adapter_center::runtime_is_quarantined(self, runtime_id) {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation.as_str(),
+                    "adapter_quarantined",
+                    "隔離済みAdapterのlifecycle承認を拒否しました",
+                    true,
+                    payload_hash,
+                );
+            }
+            if matches!(
+                action,
+                LifecycleAction::Start | LifecycleAction::Restart | LifecycleAction::Resume
+            ) {
+                if let Some((code, message)) =
+                    super::adapter_center::runtime_execution_block_reason(self, runtime_id)
+                {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        operation.as_str(),
+                        code,
+                        message,
+                        true,
+                        payload_hash,
+                    );
+                }
+            }
         }
         let body = match self.ライフサイクル.approve(
             &request.approval_id,
@@ -5460,6 +5499,23 @@ impl Broker {
                 true,
                 payload_hash,
             );
+        }
+        if matches!(
+            request.action,
+            LifecycleAction::Start | LifecycleAction::Restart | LifecycleAction::Resume
+        ) {
+            if let Some((code, message)) =
+                super::adapter_center::runtime_execution_block_reason(self, &request.runtime_id)
+            {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation.as_str(),
+                    code,
+                    message,
+                    true,
+                    payload_hash,
+                );
+            }
         }
         if let Err(error) = self.ライフサイクル.preflight_execution(
             &request.runtime_id,
@@ -5819,19 +5875,19 @@ impl Broker {
                 payload_hash,
             );
         }
-        if payload
+        if let Some((code, message)) = payload
             .get("実行系ID")
             .or_else(|| payload.get("agent_runtime_id"))
             .and_then(Value::as_str)
-            .is_some_and(|runtime_id| {
-                super::adapter_center::runtime_is_quarantined(self, runtime_id)
+            .and_then(|runtime_id| {
+                super::adapter_center::runtime_execution_block_reason(self, runtime_id)
             })
         {
             return self.reject_with_payload_hash(
                 request_id,
                 operation.as_str(),
-                "adapter_quarantined",
-                "隔離済みAdapterの対話操作を拒否しました",
+                code,
+                message,
                 true,
                 payload_hash,
             );

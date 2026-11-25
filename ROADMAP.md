@@ -1,5 +1,15 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：Adapter管理Runtimeの検証前実行をBrokerで遮断（2026-11-26）
+
+既存のAdapter管理は、署名付きManifestのカタログ登録・検証・有効化状態を持つ一方、実行経路は明示的な隔離状態しか拒否していなかった。そのため、管理対象Runtimeが未検証、互換性宣言が`incompatible`／`unknown`、またはOwner有効化前でも、Task・Runtime開始経路へ到達し得た。
+
+Brokerは管理対象Runtimeについて、Broker署名検証済み、署名対象の互換性宣言が`compatible`、管理状態`enabled`、有効状態`active`の全てが現在成立するまで、Adapter登録、会話／Task操作、RuntimeのStart／Restart／Resume承認・承認消費・実行を拒否する。状態は各Broker作用時に再参照する。未管理の組込Runtimeは従来どおり扱い、Adapter metadataからPermission／Approval／Authorityは生成しない。
+
+この施工は検証前隔離と実行時の状態結合に限定する。互換性は署名対象Manifestの宣言値との照合であり、OS／製品版との実互換性測定を意味しない。Adapterの導入・更新・削除は引き続きBroker catalog record操作で、外部Adapter artifactの取得・実ファイル配置／削除は未接続。自由記述の既知リスクは表示されるが、正規化された危険等級は未実装のため、K12全体は未完了。
+
+構築確認：`python -X utf8 tooling/run_cargo_isolated.py check --locked --offline --manifest-path native/rust_helper/Cargo.toml` PASS（Windows、最終Source反映後に再実施）。変更Rustファイルの`rustfmt --check` PASS。`git diff --check` PASS。Unit/E2E・独立品質工程は未実施。本追補はAdapter管理状態による実行前Broker遮断に限定し、K12全体または製品受入れの完了を主張しない。
+
 ### v11施工：Linux Module pruning下の観測Host ID参照修正（2026-11-26）
 
 Actions [run #355](https://github.com/gatchimuchio/D4-POCKET/actions/runs/45647311964) のLinux `product_build`は、verbose Rust診断で`observation_center.rs`がfeature optionalな`host_capability`を無条件参照していることを検出した（`E0433`）。Linux ExportはModulePlanを反映して`--no-default-features`で構築するため、`shell.observability`を含み`module_host_capabilities`を選択外にした構成でコンパイルできなかった。
