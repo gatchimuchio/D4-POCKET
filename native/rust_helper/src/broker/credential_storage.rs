@@ -15,6 +15,7 @@ pub(super) trait 資格情報保存先 {
     fn 点検(&self, id: &str) -> Result<Option<(String, u64)>, ()>;
     fn 読取(&self, id: &str, hash: &str) -> Result<Zeroizing<Vec<u8>>, ()>;
     fn 新規破棄(&self, id: &str, hash: &str) -> bool;
+    fn 削除一致(&self, id: &str, hash: &str) -> Result<(), ()>;
 }
 
 #[cfg(windows)]
@@ -37,6 +38,22 @@ impl 資格情報保存先 for crate::protected_store::ProtectedStore {
             .ok()
             .and_then(|prepared| prepared.commit().ok())
             .is_some()
+    }
+    fn 削除一致(&self, id: &str, hash: &str) -> Result<(), ()> {
+        match self.点検(id)? {
+            None => return Ok(()),
+            Some((actual, _)) if actual == hash => {}
+            Some(_) => return Err(()),
+        }
+        self.prepare_delete(crate::protected_store::Purpose::Credential, id, hash)
+            .map_err(|_| ())?
+            .commit()
+            .map_err(|_| ())?;
+        if self.点検(id)?.is_none() {
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 }
 
@@ -535,6 +552,91 @@ impl 資格情報保存先 for LinuxCredentialStore {
             })
             .await
             .is_ok_and(|result| result.is_ok())
+        })
+    }
+
+    fn 削除一致(&self, id: &str, hash: &str) -> Result<(), ()> {
+        use secret_service::{EncryptionType, SecretService};
+        let key_lookup = self.lookup_key(id, "key");
+        let ciphertext_lookup = self.lookup_key(id, "ciphertext");
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|_| ())?;
+        runtime.block_on(async {
+            tokio::time::timeout(Self::TIMEOUT, async {
+                let service = SecretService::connect(EncryptionType::Dh)
+                    .await
+                    .map_err(|_| ())?;
+                let collection = service.get_default_collection().await.map_err(|_| ())?;
+                if collection.is_locked().await.map_err(|_| ())? {
+                    return Err(());
+                }
+                let key_items = collection
+                    .search_items(self.attributes(&key_lookup))
+                    .await
+                    .map_err(|_| ())?;
+                let ciphertext_items = collection
+                    .search_items(self.attributes(&ciphertext_lookup))
+                    .await
+                    .map_err(|_| ())?;
+                if key_items.len() > 1 || ciphertext_items.len() > 1 {
+                    return Err(());
+                }
+                if key_items.is_empty() && ciphertext_items.is_empty() {
+                    return Ok(());
+                }
+
+                if let Some(ciphertext_item) = ciphertext_items.first() {
+                    if ciphertext_item.is_locked().await.map_err(|_| ())? {
+                        return Err(());
+                    }
+                    let ciphertext =
+                        Zeroizing::new(ciphertext_item.get_secret().await.map_err(|_| ())?);
+                    if crate::audit_hash::sha256_tagged(ciphertext.as_slice()) != hash
+                        || ciphertext.len() < 33
+                        || ciphertext.len() > 33 + Self::MAX_SECRET_BYTES
+                        || !ciphertext.starts_with(Self::HEADER)
+                    {
+                        return Err(());
+                    }
+                    if let Some(key_item) = key_items.first() {
+                        if key_item.is_locked().await.map_err(|_| ())? {
+                            return Err(());
+                        }
+                        let key = Zeroizing::new(key_item.get_secret().await.map_err(|_| ())?);
+                        self.open_envelope(id, &ciphertext, &key, hash)?;
+                    }
+                    ciphertext_item.delete().await.map_err(|_| ())?;
+                }
+
+                if let Some(key_item) = key_items.first() {
+                    if key_item.is_locked().await.map_err(|_| ())? {
+                        return Err(());
+                    }
+                    let key = Zeroizing::new(key_item.get_secret().await.map_err(|_| ())?);
+                    if key.len() != 32 {
+                        return Err(());
+                    }
+                    key_item.delete().await.map_err(|_| ())?;
+                }
+
+                let remaining_keys = collection
+                    .search_items(self.attributes(&key_lookup))
+                    .await
+                    .map_err(|_| ())?;
+                let remaining_ciphertexts = collection
+                    .search_items(self.attributes(&ciphertext_lookup))
+                    .await
+                    .map_err(|_| ())?;
+                if remaining_keys.is_empty() && remaining_ciphertexts.is_empty() {
+                    Ok(())
+                } else {
+                    Err(())
+                }
+            })
+            .await
+            .map_err(|_| ())?
         })
     }
 }
@@ -1077,5 +1179,63 @@ impl 資格情報保存先 for MacOSCredentialStore {
         }
         // 未公開の新規IDだけを呼出し側が渡す。通常の論理失効はこの操作を使わない。
         self.os.delete(id, Part::Ciphertext).is_ok() && self.os.delete(id, Part::Key).is_ok()
+    }
+
+    fn 削除一致(&self, id: &str, hash: &str) -> Result<(), ()> {
+        use gui_shell_macos_keychain::{Error, Part};
+        let ciphertext = match self.os.read(id, Part::Ciphertext) {
+            Ok(value) => Some(value),
+            Err(Error::Missing) => None,
+            Err(_) => return Err(()),
+        };
+        let key = match self.os.read(id, Part::Key) {
+            Ok(value) => Some(value),
+            Err(Error::Missing) => None,
+            Err(_) => return Err(()),
+        };
+        if ciphertext.is_none() && key.is_none() {
+            return Ok(());
+        }
+        if let Some(ciphertext) = ciphertext.as_ref() {
+            if ciphertext.len() < 34
+                || ciphertext.len() > 65_569
+                || !ciphertext.starts_with(b"D4KV1")
+                || crate::audit_hash::sha256_tagged(ciphertext) != hash
+            {
+                return Err(());
+            }
+            if let Some(key) = key.as_ref() {
+                if key.len() != 32 {
+                    return Err(());
+                }
+                let nonce: [u8; 12] = ciphertext[5..17].try_into().map_err(|_| ())?;
+                let cipher = ring::aead::LessSafeKey::new(
+                    ring::aead::UnboundKey::new(&ring::aead::AES_256_GCM, key)
+                        .map_err(|_| ())?,
+                );
+                let mut sealed = Zeroizing::new(ciphertext[17..].to_vec());
+                cipher
+                    .open_in_place(
+                        ring::aead::Nonce::assume_unique_for_key(nonce),
+                        ring::aead::Aad::from(self.context(id)),
+                        &mut sealed,
+                    )
+                    .map_err(|_| ())?;
+            }
+            self.os.delete(id, Part::Ciphertext).map_err(|_| ())?;
+        }
+        if let Some(key) = key.as_ref() {
+            if key.len() != 32 {
+                return Err(());
+            }
+            self.os.delete(id, Part::Key).map_err(|_| ())?;
+        }
+        if !self.os.exists(id, Part::Ciphertext).map_err(|_| ())?
+            && !self.os.exists(id, Part::Key).map_err(|_| ())?
+        {
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 }

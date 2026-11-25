@@ -149,6 +149,14 @@ enum DesktopOwnerOperationSummary {
         created_audit_id: String,
         payload_hash: String,
     },
+    CredentialDeletion {
+        credential_id: String,
+        purpose: String,
+        target: String,
+        ciphertext_hash: String,
+        created_audit_id: String,
+        payload_hash: String,
+    },
     ProviderCredentialRegistration {
         credential_id: String,
         purpose: String,
@@ -2419,6 +2427,37 @@ fn owner_operation_candidate_with_product_identity(
                 payload_hash,
             }
         }
+        BrokerOperation::資格情報削除 => {
+            let request: CredentialRevocationOwnerRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if request.version != 1
+                || request.credential_id.len() != 32
+                || !request
+                    .credential_id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                || request.purpose.is_empty()
+                || request.purpose.len() > 256
+                || request.purpose.chars().any(char::is_control)
+                || request.target.is_empty()
+                || request.target.len() > 256
+                || request.target.chars().any(char::is_control)
+                || !is_tagged_sha256(&request.ciphertext_hash)
+                || request.created_audit_id.is_empty()
+                || request.created_audit_id.len() > 256
+                || request.created_audit_id.chars().any(char::is_control)
+            {
+                return None;
+            }
+            DesktopOwnerOperationSummary::CredentialDeletion {
+                credential_id: request.credential_id,
+                purpose: request.purpose,
+                target: request.target,
+                ciphertext_hash: request.ciphertext_hash,
+                created_audit_id: request.created_audit_id,
+                payload_hash,
+            }
+        }
         _ => return None,
     };
     let normalized = normalize_channel_request(input.as_bytes(), &endpoint.session_id);
@@ -3535,6 +3574,22 @@ fn owner_confirmation_text_for_identity(
             payload_hash,
         } => format!(
             "指定Credentialを論理失効させますか？\n\nCredential ID: {}\n用途: {}\n接続対象: {}\n登録監査ID: {}\n暗号文hash: {}\n\nこの操作は永続Auditへ失効状態を記録し、以後のMCP注入を拒否します。Brokerは表示した登録監査ID・暗号文hash・用途・接続対象を処理時に再照合します。暗号文fileは削除せず保管を継続します。失効はこの操作では取消できません。再利用が必要なら別IDで登録してください。暗号文の物理削除とRecoveryは別操作で、ここでは実行しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            owner_confirmation_value(credential_id),
+            owner_confirmation_value(purpose),
+            owner_confirmation_value(target),
+            owner_confirmation_value(created_audit_id),
+            owner_confirmation_value(ciphertext_hash),
+            payload_hash
+        ),
+        DesktopOwnerOperationSummary::CredentialDeletion {
+            credential_id,
+            purpose,
+            target,
+            ciphertext_hash,
+            created_audit_id,
+            payload_hash,
+        } => format!(
+            "失効済みCredentialをWindows DPAPI保管庫から削除しますか？\n\nCredential ID: {}\n用途: {}\n接続対象: {}\n登録監査ID: {}\n暗号文hash: {}\n\nBrokerは永続Audit・失効状態・現在の暗号文hashを再照合し、同じIDのVault itemを削除します。Auditの登録・失効・削除記録は保持します。削除は取消できず、媒体上のbit消去は保証しません。前回処理が中断している場合は同じ対象の削除Recoveryを続行します。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
             owner_confirmation_value(credential_id),
             owner_confirmation_value(purpose),
             owner_confirmation_value(target),

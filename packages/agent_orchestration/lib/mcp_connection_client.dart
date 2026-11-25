@@ -425,12 +425,18 @@ class McpConnectionClient {
 
   Future<List<McpCredentialSummary>> listProviderCredentials() async =>
       List.unmodifiable(
+        (await listProviderCredentialMetadata()).where(
+          (entry) => entry.status == '有効',
+        ),
+      );
+
+  Future<List<McpCredentialSummary>> listProviderCredentialMetadata() async =>
+      List.unmodifiable(
         (await _listCredentials()).where(
           (entry) =>
               entry.purpose == 'provider_api_key' &&
               entry.target == 'openai_codex_cli' &&
-              entry.kind == 'api_key' &&
-              entry.status == '有効',
+              entry.kind == 'api_key',
         ),
       );
 
@@ -512,12 +518,12 @@ class McpConnectionClient {
                 'macos_keychain',
                 'linux_secret_service',
               }.contains(entry['保管方式']) ||
-              !const {'有効', '失効'}.contains(entry['状態']) ||
+              !const {'有効', '失効', '削除中', '削除済み'}.contains(entry['状態']) ||
               createdAt is! int ||
               createdAt < 1 ||
               (lastUsedAt != null && (lastUsedAt is! int || lastUsedAt < 0)) ||
               (entry['状態'] == '有効' && revokedAt != null) ||
-              (entry['状態'] == '失効' &&
+              (entry['状態'] != '有効' &&
                   (revokedAt is! int || revokedAt < createdAt)) ||
               ciphertextHash is! String ||
               !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(ciphertextHash) ||
@@ -647,6 +653,100 @@ class McpConnectionClient {
       lastUsedAt: lastUsedAt as int?,
       ciphertextHash: ciphertextHash,
       createdAuditId: createdAuditId,
+      storage: credential.storage,
+    );
+  }
+
+  Future<McpCredentialSummary> deleteCredential({
+    required McpCredentialSummary credential,
+  }) async {
+    if (!_validCredentialId(credential.credentialId) ||
+        !const {
+          'windows_dpapi',
+          'macos_keychain',
+          'linux_secret_service',
+        }.contains(credential.storage) ||
+        !const {'失効', '削除中'}.contains(credential.status) ||
+        credential.purpose.isEmpty ||
+        credential.purpose.length > 256 ||
+        _containsControl(credential.purpose) ||
+        credential.target.isEmpty ||
+        credential.target.length > 256 ||
+        _containsControl(credential.target) ||
+        !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(credential.ciphertextHash) ||
+        credential.createdAuditId.isEmpty ||
+        credential.createdAuditId.length > 256 ||
+        _containsControl(credential.createdAuditId)) {
+      throw const BrokerClientException('削除対象Credential metadataの形式が不正です');
+    }
+    final response = await _transport.request(
+      '資格情報削除',
+      payload: {
+        '版': 1,
+        '資格情報ID': credential.credentialId,
+        '用途': credential.purpose,
+        '接続対象': credential.target,
+        '暗号文hash': credential.ciphertextHash,
+        '作成監査ID': credential.createdAuditId,
+      },
+    );
+    final body = _acceptedBody(response, '資格情報削除');
+    const fields = {
+      '版',
+      '資格情報ID',
+      '用途',
+      '接続対象',
+      '種類',
+      '保管方式',
+      '状態',
+      '作成時刻UnixMillis',
+      '最終使用時刻UnixMillis',
+      '失効時刻UnixMillis',
+      '暗号文hash',
+      '作成監査ID',
+      '公開範囲',
+      '証拠種別',
+    };
+    final createdAt = body['作成時刻UnixMillis'];
+    final lastUsedAt = body['最終使用時刻UnixMillis'];
+    final revokedAt = body['失効時刻UnixMillis'];
+    if (body.length != fields.length ||
+        !body.keys.toSet().containsAll(fields) ||
+        body['版'] != 1 ||
+        body['資格情報ID'] != credential.credentialId ||
+        body['用途'] != credential.purpose ||
+        body['接続対象'] != credential.target ||
+        !const {
+          'api_key',
+          'oauth',
+          'basic',
+          'ssh',
+          'custom',
+        }.contains(body['種類']) ||
+        body['保管方式'] != credential.storage ||
+        body['状態'] != '削除済み' ||
+        createdAt is! int ||
+        createdAt < 1 ||
+        (lastUsedAt != null && (lastUsedAt is! int || lastUsedAt < 0)) ||
+        revokedAt is! int ||
+        revokedAt < createdAt ||
+        body['暗号文hash'] != credential.ciphertextHash ||
+        body['作成監査ID'] != credential.createdAuditId ||
+        body['公開範囲'] != 'metadata_only' ||
+        body['証拠種別'] != 'INTERNAL_STATE' ||
+        response['evidence_source'] != 'INTERNAL_STATE') {
+      throw const BrokerClientException('Credential削除receiptの公開境界が不正です');
+    }
+    return McpCredentialSummary(
+      credentialId: credential.credentialId,
+      purpose: credential.purpose,
+      target: credential.target,
+      kind: body['種類'] as String,
+      status: '削除済み',
+      revokedAt: revokedAt,
+      lastUsedAt: lastUsedAt as int?,
+      ciphertextHash: credential.ciphertextHash,
+      createdAuditId: credential.createdAuditId,
       storage: credential.storage,
     );
   }

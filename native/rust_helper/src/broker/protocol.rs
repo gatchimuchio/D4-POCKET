@@ -586,6 +586,8 @@ pub enum BrokerOperation {
     資格情報一覧,
     #[serde(rename = "資格情報失効")]
     資格情報失効,
+    #[serde(rename = "資格情報削除")]
+    資格情報削除,
     #[serde(rename = "MCP接続")]
     MCP接続,
     #[serde(rename = "MCP切断")]
@@ -818,6 +820,7 @@ impl BrokerOperation {
             BrokerOperation::資格情報登録 => "資格情報登録",
             BrokerOperation::資格情報一覧 => "資格情報一覧",
             BrokerOperation::資格情報失効 => "資格情報失効",
+            BrokerOperation::資格情報削除 => "資格情報削除",
             BrokerOperation::MCP接続 => "MCP接続",
             BrokerOperation::MCP切断 => "MCP切断",
             BrokerOperation::MCP接続一覧 => "MCP接続一覧",
@@ -2123,6 +2126,7 @@ impl Broker {
                     | BrokerOperation::回帰Case削除中断確認
                     | BrokerOperation::回帰Case登録
                     | BrokerOperation::資格情報失効
+                    | BrokerOperation::資格情報削除
                     | BrokerOperation::更新download要求
                     | BrokerOperation::更新適用要求
                     | BrokerOperation::更新有効版切替要求
@@ -2140,6 +2144,7 @@ impl Broker {
                     Some(
                         BrokerOperation::Host登録
                             | BrokerOperation::資格情報登録
+                            | BrokerOperation::資格情報削除
                             | BrokerOperation::MCP接続
                             | BrokerOperation::MCP切断
                             | BrokerOperation::作業領域承認
@@ -2153,6 +2158,7 @@ impl Broker {
                     envelope.operation,
                     Some(
                         BrokerOperation::資格情報登録
+                            | BrokerOperation::資格情報削除
                             | BrokerOperation::MCP接続
                             | BrokerOperation::MCP切断
                             | BrokerOperation::Host登録
@@ -2164,7 +2170,11 @@ impl Broker {
         // Windows Launcherは秘密値をnative入力で受け取り、内容を隠したOwner確認後に
         // 既存Broker owner queueへ資格情報登録だけを渡す。
         let operation_is_allowlisted = operation_is_allowlisted
-            || (cfg!(windows) && matches!(envelope.operation, Some(BrokerOperation::資格情報登録)));
+            || (cfg!(windows)
+                && matches!(
+                    envelope.operation,
+                    Some(BrokerOperation::資格情報登録 | BrokerOperation::資格情報削除)
+                ));
         if !operation_is_allowlisted
             || envelope.session_id.as_deref() != Some(self.session_id.as_str())
             || !metadata_is_desktop
@@ -2406,6 +2416,19 @@ impl Broker {
                 &operation,
                 "desktop_native_owner_confirmation_required",
                 "資格情報失効はRust Desktopのnative Owner確認経路だけで許可します",
+                true,
+                envelope.payload_hash.as_deref().unwrap_or("unknown"),
+            );
+        }
+
+        if envelope.operation == Some(BrokerOperation::資格情報削除)
+            && export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation
+        {
+            return self.reject_with_payload_hash(
+                &request_id,
+                &operation,
+                "desktop_native_owner_confirmation_required",
+                "資格情報削除はRust Desktopのnative Owner確認経路だけで許可します",
                 true,
                 envelope.payload_hash.as_deref().unwrap_or("unknown"),
             );
@@ -2777,6 +2800,22 @@ impl Broker {
             BrokerOperation::資格情報失効 => self.reject_with_payload_hash(
                 &request_id,
                 "資格情報失効",
+                "credential_platform_unsupported",
+                "このplatformの資格情報保存先は未対応です",
+                true,
+                &payload_hash,
+            ),
+            #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+            BrokerOperation::資格情報削除 => self.資格情報削除処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+            BrokerOperation::資格情報削除 => self.reject_with_payload_hash(
+                &request_id,
+                "資格情報削除",
                 "credential_platform_unsupported",
                 "このplatformの資格情報保存先は未対応です",
                 true,

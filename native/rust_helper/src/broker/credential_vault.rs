@@ -1,7 +1,7 @@
 //! C7 資格情報保管庫のowner登録・失効、metadata一覧、統治済みMCP利用。
 //!
 //! このmoduleは秘密値をRuntime、Flutter、Audit reason、応答へ返さない。秘密値の
-//! 対象限定MCP／承認済みCodex Provider以外への注入、更新、物理削除、接続先変更は未接続に保つ。
+//! 対象限定MCP／承認済みCodex Provider以外への注入、更新、接続先変更は未接続に保つ。
 #![cfg(any(windows, target_os = "linux", target_os = "macos"))]
 #![allow(non_snake_case)]
 
@@ -14,6 +14,8 @@ use std::collections::BTreeMap;
 const VERSION: u64 = 1;
 const RECORD_PREFIX: &str = "資格情報記録:";
 const REVOCATION_PREFIX: &str = "資格情報失効記録:";
+const DELETION_INTENT_PREFIX: &str = "資格情報削除要求:";
+const DELETION_PREFIX: &str = "資格情報削除記録:";
 const MCP_USE_PREFIX: &str = "MCP資格情報使用:";
 const PROVIDER_USE_PREFIX: &str = "提供元資格情報使用:";
 const MAX_TEXT_BYTES: usize = 256;
@@ -59,6 +61,23 @@ fn secret_string<'de, D: serde::Deserializer<'de>>(
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RevocationRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "資格情報ID")]
+    credential_id: String,
+    #[serde(rename = "用途")]
+    purpose: String,
+    #[serde(rename = "接続対象")]
+    target: String,
+    #[serde(rename = "暗号文hash")]
+    ciphertext_hash: String,
+    #[serde(rename = "作成監査ID")]
+    created_audit_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DeletionRequest {
     #[serde(rename = "版")]
     version: u64,
     #[serde(rename = "資格情報ID")]
@@ -152,9 +171,36 @@ struct CredentialRevocationRecord {
     revoked_at: i64,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CredentialDeletionIntentRecord {
+    version: u64,
+    credential_id: String,
+    created_audit_id: String,
+    ciphertext_hash: String,
+    requested_at: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CredentialDeletionRecord {
+    version: u64,
+    credential_id: String,
+    created_audit_id: String,
+    ciphertext_hash: String,
+    request_audit_id: String,
+    deleted_at: i64,
+}
+
+struct PendingCredentialDeletion {
+    record: CredentialDeletionIntentRecord,
+    audit_id: String,
+}
+
 struct CredentialLedger {
     entries: Vec<StoredCredential>,
     last_use: BTreeMap<String, i64>,
+    pending_deletions: BTreeMap<String, PendingCredentialDeletion>,
 }
 
 impl Broker {
@@ -690,8 +736,12 @@ impl Broker {
         };
         let mut entries = ledger.entries;
         let last_use = ledger.last_use;
+        let pending_deletions = ledger.pending_deletions;
         for entry in &mut entries {
             entry.public.last_used_at = last_use.get(&entry.public.credential_id).copied();
+            if pending_deletions.contains_key(&entry.public.credential_id) {
+                entry.public.status = "削除中".to_string();
+            }
         }
         if self
             .append_audit(
@@ -715,6 +765,9 @@ impl Broker {
             let store = self.資格情報保存先().expect("資格情報保存先の登録確認済み");
             entries
                 .iter()
+                .filter(|entry| {
+                    !matches!(entry.public.status.as_str(), "削除中" | "削除済み")
+                })
                 .find_map(|entry| match store.点検(&entry.storage_id) {
                     Ok(Some((hash, _))) if hash == entry.public.ciphertext_hash => None,
                     Ok(Some(_)) => Some((
@@ -966,6 +1019,274 @@ impl Broker {
         }
     }
 
+    pub(super) fn 資格情報削除処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        owner: bool,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        const OPERATION: &str = "資格情報削除";
+        if !owner {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_owner_required",
+                "資格情報削除にはnative Owner確認が必要です",
+                true,
+                payload_hash,
+            );
+        }
+        if !self.state_store.persistence_ready() {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "broker_persistence_unavailable",
+                "資格情報削除には永続Auditが必要です",
+                true,
+                payload_hash,
+            );
+        }
+        let request = match serde_json::from_value::<DeletionRequest>(payload.clone()) {
+            Ok(value)
+                if value.version == VERSION
+                    && hex_identifier(&value.credential_id)
+                    && safe_text(&value.purpose, MAX_TEXT_BYTES)
+                    && safe_text(&value.target, MAX_TEXT_BYTES)
+                    && super::protocol::is_tagged_sha256(&value.ciphertext_hash)
+                    && !value.created_audit_id.is_empty()
+                    && value.created_audit_id.len() <= 256
+                    && !value.created_audit_id.chars().any(char::is_control) =>
+            {
+                value
+            }
+            _ => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "credential_deletion_invalid",
+                    "資格情報削除要求の版または識別子が不正です",
+                    true,
+                    payload_hash,
+                )
+            }
+        };
+        let log = match self.state_store.verified_audit_log() {
+            Ok(Some(log)) if log == self.audit_log => log,
+            _ => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "credential_audit_invalid",
+                    "削除前に永続資格情報Auditを再確認してください",
+                )
+            }
+        };
+        let ledger = match credential_ledger(&log) {
+            Ok(value) => value,
+            Err(_) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "credential_audit_invalid",
+                    "資格情報Auditを検証できないため削除を停止しました",
+                )
+            }
+        };
+        let pending = ledger
+            .pending_deletions
+            .get(&request.credential_id)
+            .map(|pending| (pending.record.clone(), pending.audit_id.clone()));
+        let last_use = ledger.last_use;
+        let Some(mut entry) = ledger
+            .entries
+            .into_iter()
+            .find(|entry| entry.public.credential_id == request.credential_id)
+        else {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_not_found",
+                "登録Auditに一致する資格情報がありません",
+                true,
+                payload_hash,
+            );
+        };
+        if entry.public.status == "削除済み" {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_already_deleted",
+                "資格情報はすでに削除済みです",
+                true,
+                payload_hash,
+            );
+        }
+        if entry.public.status != "失効" || entry.public.revoked_at.is_none() {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_revoke_required",
+                "物理削除の前に資格情報を失効してください",
+                true,
+                payload_hash,
+            );
+        }
+        if entry.public.purpose != request.purpose
+            || entry.public.target != request.target
+            || entry.public.ciphertext_hash != request.ciphertext_hash
+            || entry.public.created_audit_id != request.created_audit_id
+        {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_metadata_stale",
+                "Owner確認時の資格情報metadataと現在の登録Auditが一致しません",
+                true,
+                payload_hash,
+            );
+        }
+        if let Some((pending_record, _)) = pending.as_ref() {
+            if pending_record.version != VERSION
+                || pending_record.credential_id != request.credential_id
+                || pending_record.created_audit_id != request.created_audit_id
+                || pending_record.ciphertext_hash != request.ciphertext_hash
+            {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "credential_deletion_recovery_mismatch",
+                    "保留中の削除要求と現在metadataが一致しないため復旧を停止しました",
+                    true,
+                    payload_hash,
+                );
+            }
+        } else {
+            let existing = self
+                .資格情報保存先()
+                .and_then(|store| store.点検(&entry.storage_id).ok().flatten());
+            if !matches!(existing, Some((ref hash, _)) if hash == &request.ciphertext_hash) {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "credential_storage_changed",
+                    "失効済み資格情報の現在recordを照合できないため削除しません",
+                    true,
+                    payload_hash,
+                );
+            }
+        }
+
+        entry.public.last_used_at = last_use.get(&request.credential_id).copied();
+        let intent = CredentialDeletionIntentRecord {
+            version: VERSION,
+            credential_id: request.credential_id.clone(),
+            created_audit_id: request.created_audit_id.clone(),
+            ciphertext_hash: request.ciphertext_hash.clone(),
+            requested_at: self
+                .current_epoch_millis()
+                .max(entry.public.revoked_at.unwrap_or(entry.public.created_at)),
+        };
+        let intent_reason = match serde_json::to_string(&intent) {
+            Ok(value) => format!("{DELETION_INTENT_PREFIX}{value}"),
+            Err(_) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "credential_deletion_intent_invalid",
+                    "資格情報削除の再開記録を作成できません",
+                )
+            }
+        };
+        let intent_event = match self.append_audit(
+            request_id,
+            OPERATION,
+            "received",
+            &intent_reason,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        ) {
+            Ok(event) => event,
+            Err(_) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "credential_audit_append_failed",
+                    "資格情報削除の再開記録を永続化できません",
+                )
+            }
+        };
+
+        let removed = self
+            .資格情報保存先()
+            .is_some_and(|store| store.削除一致(&entry.storage_id, &request.ciphertext_hash).is_ok());
+        let absent = removed
+            && self
+                .資格情報保存先()
+                .is_some_and(|store| matches!(store.点検(&entry.storage_id), Ok(None)));
+        if !absent {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_deletion_recovery_pending",
+                "削除要求はAuditへ保存済みですがVaultからの除去を確認できません。再開には新しいnative Owner確認が必要です",
+                true,
+                payload_hash,
+            );
+        }
+
+        let record = CredentialDeletionRecord {
+            version: VERSION,
+            credential_id: request.credential_id,
+            created_audit_id: request.created_audit_id,
+            ciphertext_hash: request.ciphertext_hash,
+            request_audit_id: intent_event.event_id,
+            deleted_at: self.current_epoch_millis().max(intent.requested_at),
+        };
+        let reason = match serde_json::to_string(&record) {
+            Ok(value) => format!("{DELETION_PREFIX}{value}"),
+            Err(_) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "credential_deletion_record_invalid",
+                    "資格情報削除結果を確定できません",
+                )
+            }
+        };
+        entry.public.status = "削除済み".to_string();
+        let body = serde_json::to_value(&entry.public).expect("公開資格情報metadataはJSON化可能");
+        let event = match self.append_audit(
+            request_id,
+            OPERATION,
+            "accepted",
+            &reason,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &canonical_payload_hash(Some(&body)),
+        ) {
+            Ok(event) => event,
+            Err(_) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "credential_audit_append_failed",
+                    "Vault削除後の結果Auditを確定できません。再開には新しいnative Owner確認が必要です",
+                )
+            }
+        };
+        BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: OPERATION.to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+            audit_event_id: event.event_id,
+            error: None,
+            health: None,
+            body: Some(body),
+            shutdown_requested: self.shutdown_requested,
+        }
+    }
+
     fn 新規資格情報暗号文を破棄(
         &self,
         storage_id: &str,
@@ -1002,6 +1323,7 @@ fn parse_registration(payload: &Value) -> Result<Registration, &'static str> {
 fn credential_ledger(log: &BrokerAuditLog) -> Result<CredentialLedger, ()> {
     let mut by_id: BTreeMap<String, StoredCredential> = BTreeMap::new();
     let mut last_use = BTreeMap::new();
+    let mut pending_deletions: BTreeMap<String, PendingCredentialDeletion> = BTreeMap::new();
     for event in log.events() {
         match (event.operation.as_str(), event.decision.as_str()) {
             ("資格情報登録", "accepted") => {
@@ -1052,6 +1374,52 @@ fn credential_ledger(log: &BrokerAuditLog) -> Result<CredentialLedger, ()> {
                 }
                 entry.public.status = "失効".to_string();
                 entry.public.revoked_at = Some(record.revoked_at);
+            }
+            ("資格情報削除", "received") => {
+                let encoded = event
+                    .reason
+                    .strip_prefix(DELETION_INTENT_PREFIX)
+                    .ok_or(())?;
+                let record: CredentialDeletionIntentRecord =
+                    serde_json::from_str(encoded).map_err(|_| ())?;
+                let entry = by_id.get(&record.credential_id).ok_or(())?;
+                if record.version != VERSION
+                    || !hex_identifier(&record.credential_id)
+                    || record.created_audit_id != entry.public.created_audit_id
+                    || record.ciphertext_hash != entry.public.ciphertext_hash
+                    || record.requested_at < entry.public.revoked_at.ok_or(())?
+                    || entry.public.status != "失効"
+                {
+                    return Err(());
+                }
+                pending_deletions.insert(
+                    record.credential_id.clone(),
+                    PendingCredentialDeletion {
+                        record,
+                        audit_id: event.event_id.clone(),
+                    },
+                );
+            }
+            ("資格情報削除", "accepted") => {
+                let encoded = event.reason.strip_prefix(DELETION_PREFIX).ok_or(())?;
+                let record: CredentialDeletionRecord =
+                    serde_json::from_str(encoded).map_err(|_| ())?;
+                let pending = pending_deletions.get(&record.credential_id).ok_or(())?;
+                let entry = by_id.get_mut(&record.credential_id).ok_or(())?;
+                if record.version != VERSION
+                    || !hex_identifier(&record.credential_id)
+                    || record.created_audit_id != entry.public.created_audit_id
+                    || record.ciphertext_hash != entry.public.ciphertext_hash
+                    || record.request_audit_id != pending.audit_id
+                    || record.request_audit_id.is_empty()
+                    || record.deleted_at < pending.record.requested_at
+                    || record.deleted_at < entry.public.revoked_at.ok_or(())?
+                    || entry.public.status != "失効"
+                {
+                    return Err(());
+                }
+                entry.public.status = "削除済み".to_string();
+                pending_deletions.remove(&record.credential_id);
             }
             ("MCP Credential使用", "accepted") => {
                 let encoded = event.reason.strip_prefix(MCP_USE_PREFIX).ok_or(())?;
@@ -1107,6 +1475,7 @@ fn credential_ledger(log: &BrokerAuditLog) -> Result<CredentialLedger, ()> {
     Ok(CredentialLedger {
         entries: by_id.into_values().collect(),
         last_use,
+        pending_deletions,
     })
 }
 

@@ -29,6 +29,7 @@ const _nativeConfirmationOperations = <String>{
   '回帰Case削除',
   '回帰Case削除中断確認',
   '資格情報失効',
+  '資格情報削除',
   'A2A接続',
   'A2Aメッセージ送信',
   'A2Aタスク状態取得',

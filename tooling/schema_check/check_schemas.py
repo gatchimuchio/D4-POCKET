@@ -82,6 +82,7 @@ REQUIRED = {
     "regression_case_delete_recovery_receipt.schema.json",
     "credential_registration.schema.json",
     "credential_revocation_request.schema.json",
+    "credential_deletion_request.schema.json",
     "credential_receipt.schema.json",
     "credential_list.schema.json",
     "mcp_contract.schema.json",

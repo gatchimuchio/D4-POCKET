@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "f2e579050c2454d23d0ec3b8f52dca4a66a45072568a6e1b256fd25856b003d6"
+      "sha256": "f3b755e6e5abb21f0f60d8a9a6d1b2ca128cc9224b6efba2c5efb4dbc75aea5b"
     },
     {
       "path": "SECURITY.md",
@@ -305,7 +305,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
-      "sha256": "e74880df931055f3e3e55f7ae142a4548147f1475d432ef644a3cd61042b8d96"
+      "sha256": "069f1b6db41ed2702ba5e89952a51c12fd84f130124aea03c5c2d2ae33ead966"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mobile_agent_task_inbox.dart",
@@ -329,7 +329,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/provider_credential_metadata_panel.dart",
-      "sha256": "64d11eb02e03983ba56fe4f282e9dcba5e4f3fa3de0600b948f8a7f864dd866a"
+      "sha256": "cef7138835e4ad163cd544de9e62f7e1896cbdaf39234a7746bef66ad2d4ac4f"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/recovery_center.dart",
@@ -405,7 +405,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "19402f34f7ab62fd8de64273bdfff4ca8bd24b6ae5b05a85360bc17e77bf1b85"
+      "sha256": "ee1eadf850bbbfc9f6292c9ff196a87d60f4c562d009f3cb3cf2540baa68f157"
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_health_client.dart",
@@ -625,7 +625,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "8cb36cf82d5947b9a30ef8090bb074925e7defdd2b8191e42775d87eef7fce27"
+      "sha256": "96ca5657643c8be1e147e65b67564710f4e84800442eb3a1056be96e925eba9e"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -2508,6 +2508,10 @@
       "sha256": "882edbdf0cbf0ad4565a580a950f67a2c8e92d50684671a521d99e9d122f0caf"
     },
     {
+      "path": "examples/contracts/credential_deletion_request.valid.json",
+      "sha256": "352b027faec34bf1e69d5e55c2a1275347d9b018f8596be587b185b8d601daa7"
+    },
+    {
       "path": "examples/contracts/credential_list.valid.json",
       "sha256": "7aad825e34763a8aafb18bbd6b8b6c6c64bd0687016c6ed9b4f6211b1ab26f83"
     },
@@ -4193,7 +4197,7 @@
     },
     {
       "path": "native/rust_helper/README.md",
-      "sha256": "b66ef3c08abd3a37c3b54b6953f6a9b3c8e25da91c2085efd076f83e91d2ceac"
+      "sha256": "55eba3e0bb10b864b25922b3978869753009058319498a770eab877c3db43904"
     },
     {
       "path": "native/rust_helper/audit_hash/README.md",
@@ -4345,11 +4349,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/credential_storage.rs",
-      "sha256": "5ddd032a236fad0af5d17dc6454c0bc18c2fe803575801c90c897f4d96763747"
+      "sha256": "21f37237d23925fbf6fc146c32ec9a9ac9e8f3e687707b52e1025b060a044b71"
     },
     {
       "path": "native/rust_helper/src/broker/credential_vault.rs",
-      "sha256": "b4d2da1eb5939ef4b30d81962c067482d2fa1a2b0035f017271c33590f70e9f6"
+      "sha256": "6a0496c9067069c104f2772aa6114d63b4d9e4daa12b97e6745af51a270fdbef"
     },
     {
       "path": "native/rust_helper/src/broker/device_link.rs",
@@ -4429,7 +4433,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "59bd4844816951a2441e79e7e9a98e225f36f070c1fcf8e317241711c56f8165"
+      "sha256": "8092caf3cda7d5880ead16873b6b3de1f8211404a6787e845fe2a1a356c3dfc9"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -4485,7 +4489,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "7da52f8bb0805fb501925c28c41bcebac5929f52b1c16415a25af8aed6eb52da"
+      "sha256": "b35e13ea09f4f8012e9b14f7ff443cc0df9a4a44518f368048226d8ea09dc3c2"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4533,7 +4537,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "9079b691a084077fc1d29051c9eb22c77268325983de98c441308649adec7ddd"
+      "sha256": "9d20191a7f522c3525329f0596b7432a276937e8adc01ee68ef1514215500d4f"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4861,7 +4865,7 @@
     },
     {
       "path": "packages/agent_orchestration/lib/mcp_connection_client.dart",
-      "sha256": "be2182fd67e00074c50d1aa8257b2f3f6a35cb513dd3341fc142dcab006a5e76"
+      "sha256": "e335477ba1cbad50cdf702cf7785c1d8c7bfecd8fa8560bd03a8fb4e4807255a"
     },
     {
       "path": "packages/agent_orchestration/lib/mobile_agent_task_client.dart",
@@ -4957,7 +4961,7 @@
     },
     {
       "path": "packages/broker_ipc_client/lib/src/authenticated_loopback_broker_transport.dart",
-      "sha256": "9b25428e42bbda2574a9ae4e3fad2e6ac7052073680e8c1a49c0f31d44a1638c"
+      "sha256": "b53771c176ecfdf088484a93b7d88d3f68a03e113070ab4bfed092b502554c61"
     },
     {
       "path": "packages/broker_ipc_client/pubspec.yaml",
@@ -5404,16 +5408,20 @@
       "sha256": "037b544a8f26ab65efc2c216d619055dd86361339252a7f55a0783edc466639d"
     },
     {
+      "path": "specs/credential_deletion_request.schema.json",
+      "sha256": "55da37de567cd17d012658477c4452fd532b0c53874d409a6fcfa71614709e7a"
+    },
+    {
       "path": "specs/credential_list.schema.json",
-      "sha256": "0471afc16dd09978f805beff81266a67e7829c77bebb0ca9b7826d2d82c7b73f"
+      "sha256": "dc9e9f1cf066ae2586f57afe1970fb21ec99994d824c477c3424eb024f06db29"
     },
     {
       "path": "specs/credential_receipt.schema.json",
-      "sha256": "01102dae7fa1868bb06957a73c0efda34d18c1106e826297651b46fce0e067c1"
+      "sha256": "11f4da37976a720e9610840b609e61e247ee2755eda9850fef024a3435e53dcf"
     },
     {
       "path": "specs/credential_registration.schema.json",
-      "sha256": "bf1c6a13f9d1331bc7702501403f14e2d6dd37a996da798c6fae03ffdd9f8b54"
+      "sha256": "4d668f9087ffee68eb0dc39bee28d9c35a4fbc160143c6718ca41fa22d6ec61c"
     },
     {
       "path": "specs/credential_revocation_request.schema.json",
@@ -5613,11 +5621,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "eb04cc81efb31e437ee08a05d9d0fcb1bfbf795493f3423c83d33e8ff2b10514"
+      "sha256": "88709d6b550452f87d894158b977146b815d3fec6493df632dc9ccd962e0c328"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "9b4a0e4952f6d496b816ce0c790f6c726ff4a9820c0166f07e72dc263c822f67"
+      "sha256": "50552171168ec62bacc4a25e34f821dea1d371551f66419a0bb2f4dc27b2e9f0"
     },
     {
       "path": "specs/linux_workspace_selection.schema.json",
@@ -6193,7 +6201,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "6712ea2b9588f6ac2cfc977e9840fc04869200b7c7ae5c6317f8e2e16d72b230"
+      "sha256": "e22ac73d73e160755ec255687673a8fa4686e2d5d61dd650b81153c06b7f25fa"
     },
     {
       "path": "tooling/shell_snapshot.py",

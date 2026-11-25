@@ -34,6 +34,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   String? _credentialTargetServerId;
   String? _selectedCredentialId;
   String? _revokingCredentialId;
+  String? _deletingCredentialId;
   bool _loading = false;
   bool _connecting = false;
   bool _registeringCredential = false;
@@ -56,6 +57,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     final previousMutationMayBePending = _registeringCredential ||
         _connecting ||
         _revokingCredentialId != null ||
+        _deletingCredentialId != null ||
         _disconnectingServerId != null ||
         _callingToolServerId != null;
     _transportGeneration++;
@@ -76,6 +78,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     _disconnectingServerId = null;
     _callingToolServerId = null;
     _revokingCredentialId = null;
+    _deletingCredentialId = null;
     _message = previousMutationMayBePending
         ? 'Broker切替前のMCP作用結果は不明です。旧Brokerの状態とAuditを確認してください。新Brokerへの引継ぎや自動再送はしていません。'
         : null;
@@ -165,8 +168,10 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                 key: ValueKey(linux
                     ? 'linux-native-credential-register'
                     : 'macos-native-credential-register'),
-                onPressed:
-                    _loading || _connecting || _revokingCredentialId != null
+                onPressed: _loading ||
+                        _connecting ||
+                        _revokingCredentialId != null ||
+                        _deletingCredentialId != null
                         ? null
                         : () => _registerNativeCredential(client),
                 icon: const Icon(Icons.lock_outline),
@@ -229,7 +234,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               DropdownButtonFormField<String>(
                 key: const ValueKey('mcp-credential-selection'),
                 initialValue: _credentials!.any(
-                        (entry) => entry.credentialId == _selectedCredentialId)
+                        (entry) =>
+                            entry.credentialId == _selectedCredentialId &&
+                            entry.status == '有効')
                     ? _selectedCredentialId
                     : null,
                 decoration: const InputDecoration(
@@ -280,6 +287,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                           onPressed: _loading ||
                                   _connecting ||
                                   _revokingCredentialId != null ||
+                                  _deletingCredentialId != null ||
                                   _disconnectingServerId != null ||
                                   _callingToolServerId != null
                               ? null
@@ -293,7 +301,33 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                                 )
                               : const Icon(Icons.key_off_outlined),
                         )
-                      : const Text('失効済み'),
+                      : credential.status == '失効' ||
+                              credential.status == '削除中'
+                          ? TextButton.icon(
+                              key: ValueKey(
+                                  'mcp-credential-delete-${credential.credentialId}'),
+                              label: Text(credential.status == '削除中'
+                                  ? '削除を再開'
+                                  : 'Vaultから削除'),
+                              onPressed: _loading ||
+                                      _connecting ||
+                                      _revokingCredentialId != null ||
+                                      _deletingCredentialId != null ||
+                                      _disconnectingServerId != null ||
+                                      _callingToolServerId != null
+                                  ? null
+                                  : () => _deleteCredential(client, credential),
+                              icon: _deletingCredentialId ==
+                                      credential.credentialId
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.delete_outline),
+                            )
+                          : const Text('削除済み'),
                 ),
             ],
             const SizedBox(height: 8),
@@ -723,6 +757,36 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     } finally {
       if (_isCurrentClient(client, generation)) {
         setState(() => _revokingCredentialId = null);
+      }
+    }
+  }
+
+  Future<void> _deleteCredential(
+    McpConnectionClient client,
+    McpCredentialSummary credential,
+  ) async {
+    final generation = _transportGeneration;
+    if (!_isCurrentClient(client, generation)) return;
+    setState(() {
+      _deletingCredentialId = credential.credentialId;
+      _message = null;
+    });
+    try {
+      await client.deleteCredential(credential: credential);
+      if (!_isCurrentClient(client, generation)) return;
+      await _loadCredentials(client);
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _message =
+            'CredentialのVault itemを削除し、Audit metadataを確定しました。媒体上のbit消去は保証しません。');
+      }
+    } on Object {
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _message =
+            'Vault削除の確定を確認できません。metadata一覧を再読込し、削除中なら新しいnative Owner確認で同じ対象を再開してください。');
+      }
+    } finally {
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _deletingCredentialId = null);
       }
     }
   }

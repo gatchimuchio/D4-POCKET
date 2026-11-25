@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：失効済みCredentialのDesktop Vault削除（2026-11-26）
+
+現行K07とW-C07／W-F02に沿って、Windows DPAPI・macOS Keychain・Linux Secret Serviceに保管された資格情報について、既存の失効操作と分離したVault item削除をBroker／native Owner UI／Settings・MCP接続面へ結線した。削除対象は現在metadataと暗号文hashが一致する失効済みrecordだけ。Brokerは永続Auditへ削除intentを先行記録し、同じIDのVault item不在を確認した後に削除tombstoneを追記する。途中で止まった場合は`削除中`として表示し、新しいnative Owner確認で同じID・hashだけを再開する。Linux／macOSのOwner確認では、既存の失効操作と新しい削除操作の両方について、表示hashの64桁16進値まで検査する。通常応答へ秘密値は返さず、登録・失効・削除Audit metadataを保持する。媒体上のbit消去は保証しない。Android／iOSの資格情報削除、Credential更新、製品Runtime／Installed Product受入れは本変更の対象外で、K07全体の完了を示さない。
+
+構築確認：Windows `python -X utf8 tooling/run_cargo_isolated.py check --locked --offline --manifest-path native/rust_helper/Cargo.toml` PASS（既存warning 7件）。同じ隔離入口によるWindows `gui_shell_rust_helper` Broker実行binary build PASS（既存warning 7件）。WSL Ubuntu 24.04上でLinux `cargo check --locked --offline` PASS（既存warning 46件、Secret Service依存を含む）、同じ隔離入口によるLinux `gui_shell_rust_helper` Broker実行binary build PASS（既存warning 46件）。WindowsからのLinux cross-checkは`x86_64-linux-gnu-gcc`不在でFAILしたが、Linux native check／buildはPASS。`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze` PASS（最終source SHA-256 `2088d39ebbae18f34b2e691cd61b8f5662b140bdd0e1e139d2edb8a9ac739dd2`、隔離workspace cleanup PASS）。変更JSON 7件のsyntax parseと`git diff --check` PASS。Rustfmt対象5ファイル全体のcheckは広範な差分でFAILし、一括再整形は行わなかった。macOS build、Unit/E2E／独立品質工程／Installed Product受入れは未実施。本追補はDesktop資格情報削除経路のSource構築に限り、K07全体や製品受入れ完了を主張しない。
+
 ### v11施工追補：Adapter危険等級の署名・Broker・Owner確認結線（2026-11-26）
 
 Adapter Manifestとcatalog receiptに危険等級`低／中／高／重大／未評価`を追加し、署名対象byteへ結合した。新規導入・更新では危険等級を明示必須とし、既存保存recordに値がない場合だけ`未評価`へ保守的に読み替える。`未評価`は有効化とRuntime実行の両方をBrokerで拒否する。等級・互換性はPublisherの申告としてRuntime CenterとWindows/macOSのnative Owner確認に表示する。署名は申告内容との結合を確認するが、等級や互換性の正しさを保証しない。

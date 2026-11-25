@@ -131,7 +131,7 @@ final class BrokerProcessChannel {
     let a2aOperation = ["A2A接続", "A2Aメッセージ送信"].contains(operation ?? "")
     let osSelection = operation == "作業領域OS選択" || operation == "AgentCLI実行fileOS選択"
     let credentialInput = operation == "資格情報登録"
-    let timeout = credentialInput ? 610 : (mcpOperation ? 335 : (a2aOperation ? 315 : (operation == "AgentCLI実行系作業領域登録" ? 320 : (operation == "資格情報失効" || osSelection || ownerOperations.contains(operation ?? "") ? 305 : 5))))
+    let timeout = credentialInput ? 610 : (mcpOperation ? 335 : (a2aOperation ? 315 : (operation == "AgentCLI実行系作業領域登録" ? 320 : (operation == "資格情報失効" || operation == "資格情報削除" || osSelection || ownerOperations.contains(operation ?? "") ? 305 : 5))))
     DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(timeout)) { complete(nil) }
     queue.async { [weak self] in
       guard let self else { return }
