@@ -3,6 +3,7 @@ use serde::Deserialize;
 pub mod codex_cli;
 pub mod mcp_stdio;
 pub mod minidora;
+pub(crate) mod openai_responses_relay;
 mod process_tree;
 
 #[derive(Clone, Debug, Deserialize)]

@@ -5,6 +5,7 @@
 //! Owner承認済みAgent Taskは登録Workspaceから導出した限定permission profileを使う。
 #![allow(non_snake_case)]
 
+use super::openai_responses_relay::OpenAiResponsesRelay;
 use super::process_tree;
 use crate::audit_hash::sha256_tagged;
 use crate::broker::dialogue::{
@@ -24,6 +25,7 @@ use std::fs;
 use std::io::{Read, Write};
 #[cfg(feature = "r2-e2e")]
 use std::net::{SocketAddr, TcpStream};
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -703,6 +705,8 @@ impl CodexCliAdapter {
             &request.入力,
             self.model_id.as_deref(),
             credential.as_deref().map(Vec::as_slice),
+            cancel,
+            deadline,
             CodexSandbox::ReadOnly,
             None,
             &[],
@@ -717,6 +721,8 @@ impl CodexCliAdapter {
             &request.入力,
             self.model_id.as_deref(),
             credential.as_deref().map(Vec::as_slice),
+            cancel,
+            deadline,
             CodexSandbox::ReadOnly,
             None,
             &[],
@@ -1566,6 +1572,26 @@ impl WorkspaceTaskScratch {
     }
 }
 
+struct SpawnedCodexTask {
+    // Drop順を維持し、まずAgent Processを止めてからBroker relayを閉じる。
+    supervised: process_tree::SupervisedChild,
+    _provider_relay: Option<OpenAiResponsesRelay>,
+}
+
+impl Deref for SpawnedCodexTask {
+    type Target = process_tree::SupervisedChild;
+
+    fn deref(&self) -> &Self::Target {
+        &self.supervised
+    }
+}
+
+impl DerefMut for SpawnedCodexTask {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.supervised
+    }
+}
+
 fn spawn_codex_task(
     executable: &Path,
     workspace: &Path,
@@ -1573,35 +1599,86 @@ fn spawn_codex_task(
     input: &str,
     model_id: Option<&str>,
     provider_credential: Option<&[u8]>,
+    cancel: &AtomicBool,
+    deadline: Instant,
     sandbox: CodexSandbox,
     scratch: Option<&WorkspaceTaskScratch>,
     secret_paths: &[String],
     enable_mcp_task_tool: bool,
     #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
-) -> Result<process_tree::SupervisedChild, 対話失敗> {
+) -> Result<SpawnedCodexTask, 対話失敗> {
     let workspace_guard = pin_registered_workspace(workspace, expected_workspace)?;
+    #[cfg(test)]
+    let provider_relay: Option<OpenAiResponsesRelay> = None;
+    #[cfg(all(not(test), feature = "r2-e2e"))]
+    let provider_relay = if test_responses_api.is_none() {
+        provider_credential
+            .map(|credential| {
+                OpenAiResponsesRelay::start(
+                    credential,
+                    model_id.ok_or(対話失敗::要求不正)?,
+                    deadline,
+                    cancel,
+                )
+                .map_err(|_| 対話失敗::通信失敗)
+            })
+            .transpose()?
+    } else {
+        None
+    };
+    #[cfg(all(not(test), not(feature = "r2-e2e")))]
+    let provider_relay = provider_credential
+        .map(|credential| {
+            OpenAiResponsesRelay::start(
+                credential,
+                model_id.ok_or(対話失敗::要求不正)?,
+                deadline,
+                cancel,
+            )
+            .map_err(|_| 対話失敗::通信失敗)
+        })
+        .transpose()?;
+    #[cfg(test)]
+    let cli_provider_credential = provider_credential;
+    #[cfg(all(not(test), feature = "r2-e2e"))]
+    let cli_provider_credential: Option<&[u8]> = {
+        if test_responses_api.is_some_and(|api| api.requires_openai_auth) {
+            // 実Credentialをfixtureへ渡さない。認証付きfixtureは合成key専用のunit testで扱う。
+            return Err(対話失敗::権限拒否);
+        }
+        None
+    };
+    #[cfg(all(not(test), not(feature = "r2-e2e")))]
+    let cli_provider_credential: Option<&[u8]> = None;
+    #[cfg(test)]
+    let _ = (cancel, deadline);
+    let provider_config_overrides = provider_relay
+        .as_ref()
+        .map(OpenAiResponsesRelay::codex_config_overrides);
     #[cfg(any(test, feature = "r2-e2e"))]
-    let task_command = build_codex_command_with_model_and_task_tool(
+    let task_command = build_codex_command_with_provider_overrides(
         executable,
         workspace,
         sandbox,
         scratch.map(WorkspaceTaskScratch::path),
         secret_paths,
         model_id,
-        provider_credential,
+        cli_provider_credential,
         enable_mcp_task_tool,
+        provider_config_overrides.as_deref(),
         test_responses_api,
     )?;
     #[cfg(not(any(test, feature = "r2-e2e")))]
-    let task_command = build_codex_command_with_model_and_task_tool(
+    let task_command = build_codex_command_with_provider_overrides(
         executable,
         workspace,
         sandbox,
         scratch.map(WorkspaceTaskScratch::path),
         secret_paths,
         model_id,
-        provider_credential,
+        cli_provider_credential,
         enable_mcp_task_tool,
+        provider_config_overrides.as_deref(),
     )?;
     if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
         // Scratch作成後のWorkspace変化をもう一度確認し、CLI起動直前の秘密別名を拒否する。
@@ -1612,10 +1689,10 @@ fn spawn_codex_task(
     drop(workspace_guard);
     let mut child = match child_result {
         Ok(child) => child,
-        Err(error) => {
+        Err(_error) => {
             #[cfg(feature = "r2-e2e")]
             if let Some(test_api) = test_responses_api {
-                report_r2_e2e_os_failure(test_api, "codex_process_spawn", error.kind());
+                report_r2_e2e_os_failure(test_api, "codex_process_spawn", _error.kind());
             }
             return Err(対話失敗::通信失敗);
         }
@@ -1627,15 +1704,18 @@ fn spawn_codex_task(
         }
         return Err(対話失敗::通信失敗);
     };
-    if let Err(error) = stdin.write_all(input.as_bytes()) {
+    if let Err(_error) = stdin.write_all(input.as_bytes()) {
         #[cfg(feature = "r2-e2e")]
         if let Some(test_api) = test_responses_api {
-            report_r2_e2e_os_failure(test_api, "codex_stdin_write", error.kind());
+            report_r2_e2e_os_failure(test_api, "codex_stdin_write", _error.kind());
         }
         return Err(対話失敗::通信失敗);
     }
     drop(stdin);
-    Ok(child)
+    Ok(SpawnedCodexTask {
+        supervised: child,
+        _provider_relay: provider_relay,
+    })
 }
 
 #[cfg(test)]
@@ -1685,6 +1765,7 @@ fn build_codex_command_with_model(
     )
 }
 
+#[cfg(test)]
 fn build_codex_command_with_model_and_task_tool(
     executable: &Path,
     workspace: &Path,
@@ -1694,6 +1775,33 @@ fn build_codex_command_with_model_and_task_tool(
     model_id: Option<&str>,
     provider_credential: Option<&[u8]>,
     enable_mcp_task_tool: bool,
+    #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
+) -> Result<Command, 対話失敗> {
+    build_codex_command_with_provider_overrides(
+        executable,
+        workspace,
+        sandbox,
+        scratch,
+        secret_paths,
+        model_id,
+        provider_credential,
+        enable_mcp_task_tool,
+        None,
+        #[cfg(any(test, feature = "r2-e2e"))]
+        test_responses_api,
+    )
+}
+
+fn build_codex_command_with_provider_overrides(
+    executable: &Path,
+    workspace: &Path,
+    sandbox: CodexSandbox,
+    scratch: Option<&Path>,
+    secret_paths: &[String],
+    model_id: Option<&str>,
+    provider_credential: Option<&[u8]>,
+    enable_mcp_task_tool: bool,
+    provider_config_overrides: Option<&[String]>,
     #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<Command, 対話失敗> {
     if model_id.is_some_and(|model| !valid_model_id(model)) {
@@ -1708,6 +1816,12 @@ fn build_codex_command_with_model_and_task_tool(
         .transpose()?;
     let workspace_path = workspace.to_str().ok_or(対話失敗::要求不正)?;
     let mut task_command = command(executable, workspace);
+    #[cfg(not(test))]
+    if provider_credential.is_some() {
+        // Release / E2E構成でProvider秘密をCodex processへ直接渡す経路を拒否する。
+        return Err(対話失敗::権限拒否);
+    }
+    #[cfg(test)]
     if let Some(credential) = provider_credential {
         let credential = std::str::from_utf8(credential).map_err(|_| 対話失敗::権限拒否)?;
         if credential.is_empty() || credential.bytes().any(|byte| byte.is_ascii_control()) {
@@ -1763,6 +1877,12 @@ fn build_codex_command_with_model_and_task_tool(
             .env("all_proxy", &proxy)
             .env("no_proxy", "127.0.0.1,localhost")
             .env("RUST_LOG", "warn");
+    }
+    if let Some(overrides) = provider_config_overrides {
+        for setting in overrides {
+            // API keyはCLIへ渡さず、Task限定loopback channelだけをCodexへ設定する。
+            task_command.arg("-c").arg(setting);
+        }
     }
     if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
         // 作用先はBrokerがTask単位で予約したscratchだけ。ここでは認可しない。
@@ -1993,6 +2113,8 @@ fn run_agent_task(
         instruction,
         model_id,
         provider_credential,
+        cancel,
+        deadline,
         CodexSandbox::WorkspaceWrite,
         Some(scratch),
         secret_paths,
@@ -2007,6 +2129,8 @@ fn run_agent_task(
         instruction,
         model_id,
         provider_credential,
+        cancel,
+        deadline,
         CodexSandbox::WorkspaceWrite,
         Some(scratch),
         secret_paths,
@@ -4131,6 +4255,8 @@ exit 0
                 "synthetic fixture task",
                 None,
                 None,
+                &AtomicBool::new(false),
+                Instant::now() + Duration::from_secs(5),
                 CodexSandbox::WorkspaceWrite,
                 Some(&scratch),
                 &secrets,

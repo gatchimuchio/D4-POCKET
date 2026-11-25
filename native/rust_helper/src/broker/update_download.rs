@@ -740,6 +740,29 @@ fn build_download_client(
     build_download_client_with_header_limit(host, addresses, additional_roots, timeout, 0)
 }
 
+pub(crate) fn resolve_public_https_addresses(
+    host: &str,
+    cancel: &AtomicBool,
+    deadline: std::time::Instant,
+) -> Result<Vec<SocketAddr>, DownloadError> {
+    resolve_public_addresses(host, 443, cancel, deadline)
+}
+
+pub(crate) fn build_pinned_public_https_client(
+    host: &str,
+    addresses: &[SocketAddr],
+    timeout: Duration,
+) -> Result<Client, DownloadError> {
+    if addresses.is_empty()
+        || addresses
+            .iter()
+            .any(|address| address.port() != 443 || !is_public_address(address.ip()))
+    {
+        return Err(DownloadError::NonPublicAddress);
+    }
+    build_download_client(host, addresses, &[], timeout)
+}
+
 fn build_download_client_with_header_limit(
     host: &str,
     addresses: &[SocketAddr],
