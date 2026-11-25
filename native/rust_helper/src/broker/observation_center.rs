@@ -428,11 +428,25 @@ fn valid_correlation_id(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"_.:-".contains(&byte))
 }
 
+#[cfg(feature = "module_host_capabilities")]
 fn current_host_id() -> String {
     super::host_capability::current()["ホストID"]
         .as_str()
         .unwrap_or("gui-shell-local-unknown")
         .to_owned()
+}
+
+#[cfg(not(feature = "module_host_capabilities"))]
+fn current_host_id() -> String {
+    let platform = match std::env::consts::OS {
+        "windows" => "windows",
+        "macos" => "macos",
+        "linux" => "linux",
+        "android" => "android",
+        "ios" => "ios",
+        _ => "unknown",
+    };
+    format!("gui-shell-local-{platform}")
 }
 
 fn parse_request_scope(payload: &Value) -> Result<(Value, ObservationRequestScope), ()> {

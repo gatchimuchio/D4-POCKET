@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工：Linux Module pruning下の観測Host ID参照修正（2026-11-26）
+
+Actions [run #355](https://github.com/gatchimuchio/D4-POCKET/actions/runs/45647311964) のLinux `product_build`は、verbose Rust診断で`observation_center.rs`がfeature optionalな`host_capability`を無条件参照していることを検出した（`E0433`）。Linux ExportはModulePlanを反映して`--no-default-features`で構築するため、`shell.observability`を含み`module_host_capabilities`を選択外にした構成でコンパイルできなかった。
+
+`current_host_id`を`module_host_capabilities`の有無で分岐し、Module除去時はComposeと同じ`gui-shell-local-{platform}`の決定的なfallbackを使うよう修正した。これは観測のHost scopeだけを埋め、Authorityやpermissionを発行しない。Windows上の隔離Cargo checkで`--no-default-features --features linux-desktop-broker,module_observability`構成を確認し、Manifest整合もPASSした。このcheckは対象feature構成のRust compile確認でありLinux buildの代替ではない。修正commitのLinux product buildはこれから実行する。Unit/E2E/QAは実施していない。
+
 ### v11実装：Linux product_buildから品質検査を分離（2026-11-26）
 
 `product_build`はLinux Release Export／package生成だけを選ぶscopeだが、共通shell入口がLinux Status NotifierのC++ testと5つのPython unittestを無条件実行していた。`product_build`ではこれらを実行せず、Release Export／package生成とbuild evidenceの整合確認だけを行うよう条件分岐した。通常の受入scopeでは既存testとGUI smokeを維持する。build-onlyの報告文も実際の実行範囲へ合わせた。
