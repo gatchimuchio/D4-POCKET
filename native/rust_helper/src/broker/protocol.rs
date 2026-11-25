@@ -2155,6 +2155,10 @@ impl Broker {
                             | BrokerOperation::作業領域全体基準点保存
                     )
                 ));
+        // Windows Launcherは秘密値をnative入力で受け取り、内容を隠したOwner確認後に
+        // 既存Broker owner queueへ資格情報登録だけを渡す。
+        let operation_is_allowlisted = operation_is_allowlisted
+            || (cfg!(windows) && matches!(envelope.operation, Some(BrokerOperation::資格情報登録)));
         if !operation_is_allowlisted
             || envelope.session_id.as_deref() != Some(self.session_id.as_str())
             || !metadata_is_desktop
@@ -7918,7 +7922,7 @@ mod tests {
 
     #[test]
     #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
-    fn macos_credential_registration_is_bound_to_real_desktop_owner_gate() {
+    fn credential_registration_is_bound_to_real_desktop_owner_gate() {
         let baseline = BrokerRequestEnvelope::health("credential-gate", "credential-gate-nonce");
         let request = json!({
             "request_id": baseline.request_id,
@@ -7936,11 +7940,7 @@ mod tests {
         let confirmed = test_broker().desktop_owner_operation_json(&request.to_string());
         assert_eq!(
             confirmed.error.unwrap().code,
-            if cfg!(any(target_os = "linux", target_os = "macos")) {
-                "broker_persistence_unavailable"
-            } else {
-                "desktop_owner_operation_invalid"
-            }
+            "broker_persistence_unavailable"
         );
         for field in ["session_id", "metadata"] {
             let mut injected = request.clone();
