@@ -148,6 +148,9 @@ pub(crate) fn agent_cli_registration_summary(payload: &Value) -> Option<String> 
     }
     let authentication_summary = match request.provider_model_selection.authentication_source() {
         "codex_cli_managed" => "認証方式: Codex CLI管理設定（登録時は認証しません）".to_owned(),
+        "claude_code_cli_managed" => {
+            "認証方式: Claude Code CLI管理認証（D4 Pocketは秘密値を受け取りません）".to_owned()
+        }
         "broker_credential_vault" => {
             #[cfg(target_os = "linux")]
             {

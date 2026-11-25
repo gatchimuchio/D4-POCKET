@@ -3015,6 +3015,9 @@ fn owner_confirmation_text_for_identity(
                         .map(owner_confirmation_value)
                         .unwrap_or_else(|| "不正・未指定".into())
                 )
+            } else if authentication_source == "claude_code_cli_managed" {
+                "認証: Claude Code CLI管理認証を使用（D4 Pocketは秘密値を受け取らない）"
+                    .into()
             } else {
                 "認証: Codex CLI管理設定を使用（D4 Pocketは秘密値を受け取らない）".into()
             },

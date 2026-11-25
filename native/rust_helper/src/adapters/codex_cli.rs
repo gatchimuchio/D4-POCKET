@@ -1165,7 +1165,7 @@ impl 実行系Adapter for CodexCliAdapter {
     }
 }
 
-fn host_platform() -> &'static str {
+pub(super) fn host_platform() -> &'static str {
     if cfg!(windows) {
         "windows"
     } else if cfg!(target_os = "macos") {
@@ -1294,7 +1294,7 @@ fn workspace_write_interface_present(output: &[u8]) -> bool {
     exec_interface_present(output) && String::from_utf8_lossy(output).contains("workspace-write")
 }
 
-fn valid_model_id(value: &str) -> bool {
+pub(super) fn valid_model_id(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
         && value.bytes().enumerate().all(|(index, byte)| {
@@ -1332,7 +1332,7 @@ enum CodexSandbox {
     WorkspaceWrite,
 }
 
-struct WorkspaceTaskScratch {
+pub(super) struct WorkspaceTaskScratch {
     _workspace_guard: crate::broker::workspace_root::WorkspacePathGuard,
     _workspace_dir: Dir,
     scratch_dir: Option<Dir>,
@@ -1459,7 +1459,7 @@ fn activate_task_scratch_directory(
 }
 
 impl WorkspaceTaskScratch {
-    fn create(
+    pub(super) fn create(
         workspace: &Path,
         expected: crate::broker::workspace_root::DirectoryIdentity,
         context: &crate::broker::agent_task_scratch::AgentTaskScratchContext,
@@ -1553,11 +1553,11 @@ impl WorkspaceTaskScratch {
         Err(対話失敗::通信失敗)
     }
 
-    fn path(&self) -> &Path {
+    pub(super) fn path(&self) -> &Path {
         &self.path
     }
 
-    fn cleanup_after_task_quiesced(&mut self) -> Result<(), 対話失敗> {
+    pub(super) fn cleanup_after_task_quiesced(&mut self) -> Result<(), 対話失敗> {
         self.journal
             .mark_task_finished(&self.record_id)
             .map_err(|_| 対話失敗::通信失敗)?;
@@ -2388,7 +2388,7 @@ fn classify_loopback_test_stderr(stderr: &[u8]) -> &'static str {
     }
 }
 
-fn pin_registered_workspace(
+pub(super) fn pin_registered_workspace(
     workspace: &Path,
     expected: crate::broker::workspace_root::DirectoryIdentity,
 ) -> Result<crate::broker::workspace_root::WorkspacePathGuard, 対話失敗> {
@@ -2400,7 +2400,7 @@ fn pin_registered_workspace(
     Ok(guard)
 }
 
-fn validate_task_secret_paths(
+pub(super) fn validate_task_secret_paths(
     workspace: &Path,
     expected: crate::broker::workspace_root::DirectoryIdentity,
     secret_paths: &[String],
@@ -2426,7 +2426,7 @@ fn terminate(child: &mut Child) {
     let _ = child.wait();
 }
 
-fn bounded_read<R: Read>(mut reader: R) -> Result<Vec<u8>, ()> {
+pub(super) fn bounded_read<R: Read>(mut reader: R) -> Result<Vec<u8>, ()> {
     let mut output = Vec::new();
     let mut buffer = [0u8; 8192];
     loop {
@@ -2520,7 +2520,7 @@ fn parse_jsonl_with_mcp(output: &[u8]) -> Result<(String, String, Option<String>
     ))
 }
 
-fn trace_id(request_id: &str) -> String {
+pub(super) fn trace_id(request_id: &str) -> String {
     sha256_tagged(request_id.as_bytes())
         .trim_start_matches("sha256:")
         .chars()

@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：第二Runtime Claude Code CLIのBroker／Agent Center結線（2026-11-25）
+
+基準main `2230de7a1a0ac2fd48e93434737e3208f56f1434`。既存Codex CLIと異なる`anthropic_claude_code_cli`をProvider/Model Contract、Rust Adapter、native Owner確認、Broker登録、Agent Center UIへ接続した。CLI管理認証だけを選択でき、資格情報値をD4 Brokerから渡さない。Task実行は登録Workspaceに制限し、Task専用scratchと登録secret pathをCLIのfile permissionへ結び、shell/code/MCP、ユーザー・プロジェクト設定、session保存を無効化する。Cancel／deadline／process tree停止とscratch回収は既存Broker管理経路へ接続した。
+
+構築確認：`python -X utf8 tooling/run_cargo_isolated.py check --locked --offline --manifest-path native/rust_helper/Cargo.toml` PASS、同じ入口の`build --locked --offline --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_rust_helper` PASS（既存warning 7件）。`python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze`は隔離source snapshotでPASS（source SHA-256 `f5b15d66f9a16025990a0574f6d8160d90ac228cdde8bd874e8585d1d05f4fe2`、workspace cleanup PASS）。Unit/E2E・品質QA・installed product・Provider認証・実Claude Task／モデル要求は実施していない。したがって本追補はSource／Contract／Consumerの構築確認に限り、N03／W-B02の二Runtime実動作や製品完成を主張しない。
+
 ### v11施工追補：W-C10 Broker更新状態の明示再読込（2026-11-25）
 
 基準main `8c8cd7779350b3b546e24d427ac45fed55edd747`。Settingsの更新センターは初回一覧と操作直後のBroker状態を表示していたが、バックグラウンドdownloadの進行／完了後にBroker一覧を読み直す通常操作がなく、配布元への候補再取得を使わずに現在状態を確認できなかった。読み取り専用の「Broker状態を再読込」を追加し、一覧取得中・操作中・画面非表示中は無効化した。既存の配布元候補取得は別操作として維持し、再読込では新たなネットワーク取得を行わない。

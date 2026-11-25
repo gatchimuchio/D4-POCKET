@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 pub mod codex_cli;
+pub mod claude_code_cli;
 pub mod mcp_stdio;
 pub mod minidora;
 pub(crate) mod openai_responses_relay;
@@ -21,19 +22,21 @@ pub(crate) struct ProviderModelSelection {
 impl ProviderModelSelection {
     pub(crate) fn is_valid(&self) -> bool {
         self.version == 1
-            && self.provider_id == "openai_codex_cli"
             && !self.automatic_fallback
             && !self.model_id.is_empty()
             && self.model_id.len() <= 128
             && self.model_id.bytes().enumerate().all(|(index, byte)| {
                 byte.is_ascii_alphanumeric() || (index > 0 && b"._:/-".contains(&byte))
             })
-            && match self.authentication_source.as_str() {
-                "codex_cli_managed" => self.credential_id.is_none(),
-                "broker_credential_vault" => self
+            && match (self.provider_id.as_str(), self.authentication_source.as_str()) {
+                ("openai_codex_cli", "codex_cli_managed") => self.credential_id.is_none(),
+                ("openai_codex_cli", "broker_credential_vault") => self
                     .credential_id
                     .as_deref()
                     .is_some_and(valid_credential_id),
+                ("anthropic_claude_code_cli", "claude_code_cli_managed") => {
+                    self.credential_id.is_none()
+                }
                 _ => false,
             }
     }
@@ -61,6 +64,9 @@ pub(crate) fn supports_cli_adapter(adapter_id: &str) -> bool {
 pub(crate) fn cli_adapter_confirmation_scope(adapter_id: &str) -> Option<&'static str> {
     match adapter_id {
         "codex-cli" => Some("--version と exec --help（--model対応）"),
+        "claude-code-cli" => {
+            Some("--version と --help（restricted / safe-mode / 非永続JSON Task対応）")
+        }
         _ => None,
     }
 }
@@ -85,6 +91,17 @@ pub(crate) fn create_cli_adapter(
                 )?,
             ) as std::sync::Arc<dyn crate::broker::dialogue::実行系Adapter>,
         ),
+        "claude-code-cli"
+            if provider_model_selection.provider_id == "anthropic_claude_code_cli" =>
+        {
+            Ok(std::sync::Arc::new(
+                claude_code_cli::ClaudeCodeCliAdapter::new(
+                    executable,
+                    workspace,
+                    &provider_model_selection.model_id,
+                )?,
+            ) as std::sync::Arc<dyn crate::broker::dialogue::実行系Adapter>)
+        }
         _ => Err("未対応のCLI Adapter ID".to_owned()),
     }
 }
@@ -99,6 +116,17 @@ pub(crate) fn cli_registration_error_reason(error: &str) -> &'static str {
         "Codex CLI probeを起動できない" => "Codex CLI probeの起動に失敗",
         "Codex CLI probeが期限を超過した" => "Codex CLI probeが期限超過",
         "Codex CLI probeの出力が上限を超えた" => "Codex CLI probe出力が上限超過",
+        "Claude Code CLIのversion interfaceを確認できない" => {
+            "Claude Code CLI version応答の検証に失敗"
+        }
+        "Claude Code CLIのTask interfaceを確認できない" => {
+            "Claude Code CLI Task interfaceの検証に失敗"
+        }
+        "Claude Code CLI probeを起動できない" => "Claude Code CLI probeの起動に失敗",
+        "Claude Code CLI probeが期限を超過した" => "Claude Code CLI probeが期限超過",
+        "Claude Code CLI probeの出力が上限を超えた" => {
+            "Claude Code CLI probe出力が上限超過"
+        }
         _ => "Owner確認後のAgent CLI interface検査に失敗",
     }
 }

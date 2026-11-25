@@ -261,10 +261,10 @@ class _AgentCenterState extends State<_AgentCenterScreen>
   final TextEditingController _a2aArtifactTaskContextController =
       TextEditingController();
   late List<AgentSessionRecord> _sessions;
-  final List<_CodexRegistrationInput> _registrations = [];
+  final List<_CliRegistrationInput> _registrations = [];
   StreamSubscription<AgentTaskExecutionUpdate>? _taskExecutionUpdates;
 
-  _CodexRegistrationInput? get _registered =>
+  _CliRegistrationInput? get _registered =>
       _registrations.isEmpty ? null : _registrations.last;
 
   @override
@@ -393,11 +393,13 @@ class _AgentCenterState extends State<_AgentCenterScreen>
     _handoffPreview = null;
   }
 
-  Future<void> _registerCodexRuntime() async {
-    final input = await showDialog<_CodexRegistrationInput>(
+  Future<void> _registerCliRuntime(_CliProviderDefinition provider) async {
+    final input = await showDialog<_CliRegistrationInput>(
       context: context,
-      builder: (context) =>
-          _CodexRegistrationDialog(transport: widget.client.brokerTransport),
+      builder: (context) => _CliRegistrationDialog(
+        transport: widget.client.brokerTransport,
+        provider: provider,
+      ),
     );
     if (!mounted || input == null) return;
     if (_registrations.any(
@@ -483,7 +485,7 @@ class _AgentCenterState extends State<_AgentCenterScreen>
   }
 
   Future<void> _startRegisteredSession([
-    _CodexRegistrationInput? requestedRegistration,
+    _CliRegistrationInput? requestedRegistration,
   ]) async {
     final registration = requestedRegistration ?? _registered;
     final transport = widget.client.brokerTransport;
@@ -3086,17 +3088,21 @@ class _AgentCenterState extends State<_AgentCenterScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Codex実行系と作業領域',
+                  '外部Agent Runtimeと作業領域',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Broker起動中だけの登録です。Rust BrokerがOwner確認後にCodex CLIのinterfaceを検査します。これはTask実行・Permission・Approval・Trustを有効にしません。',
+                  'Broker起動中だけ登録します。Rust Brokerがnative Owner確認後にCLI interfaceを検査します。Provider接続・模型利用可否は調べず、Task実行・Permission・Approval・Trustも有効にしません。',
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed:
-                      _registrationPending ? null : _registerCodexRuntime,
+                      _registrationPending
+                          ? null
+                          : () => _registerCliRuntime(
+                                _CliProviderDefinition.codex,
+                              ),
                   icon: _registrationPending
                       ? const SizedBox(
                           width: 16,
@@ -3104,7 +3110,18 @@ class _AgentCenterState extends State<_AgentCenterScreen>
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.add),
-                  label: Text(_registrationPending ? 'Broker応答待ち' : '登録を開始'),
+                  label: Text(
+                    _registrationPending ? 'Broker応答待ち' : 'Codex CLIを登録',
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _registrationPending
+                      ? null
+                      : () => _registerCliRuntime(
+                            _CliProviderDefinition.claude,
+                          ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Claude Code CLIを登録'),
                 ),
                 if (_registrationStatus != null) ...[
                   const SizedBox(height: 8),
@@ -3116,8 +3133,8 @@ class _AgentCenterState extends State<_AgentCenterScreen>
                     title: 'Broker内登録: ${registration.runtimeId}',
                     rows: [
                       '作業領域ID: ${registration.workspaceId}',
-                      '提供元・模型識別子: OpenAI（Codex CLI経由） / ${registration.modelId}',
-                      '利用者設定の認証: Codex CLI管理設定を使用（D4 Pocketは秘密値を保持しない）',
+                      '提供元・模型識別子: ${registration.provider.displayName} / ${registration.modelId}',
+                      '認証方式: ${registration.authenticationLabel}',
                       '提供元接続・模型利用可否: 不明（CLI接続面のみ確認）',
                       '自動代替実行: 無効',
                       'Task実行: ${registration.taskExecutionStatus}',
@@ -3559,10 +3576,57 @@ class _AgentCenterState extends State<_AgentCenterScreen>
   }
 }
 
-class _CodexRegistrationInput {
-  const _CodexRegistrationInput({
+class _CliProviderDefinition {
+  const _CliProviderDefinition({
+    required this.adapterId,
+    required this.providerId,
+    required this.displayName,
+    required this.defaultRuntimeId,
+    required this.authenticationSource,
+    required this.authenticationLabel,
+    required this.cliLabel,
+    this.defaultModelId = '',
+    this.allowBrokerCredential = false,
+  });
+
+  static const codex = _CliProviderDefinition(
+    adapterId: 'codex-cli',
+    providerId: 'openai_codex_cli',
+    displayName: 'OpenAI（Codex CLI経由）',
+    defaultRuntimeId: 'codex-local',
+    authenticationSource: 'codex_cli_managed',
+    authenticationLabel: 'Codex CLI管理設定',
+    cliLabel: 'Codex CLI実行file',
+    allowBrokerCredential: true,
+  );
+
+  static const claude = _CliProviderDefinition(
+    adapterId: 'claude-code-cli',
+    providerId: 'anthropic_claude_code_cli',
+    displayName: 'Anthropic（Claude Code CLI経由）',
+    defaultRuntimeId: 'claude-code-local',
+    authenticationSource: 'claude_code_cli_managed',
+    authenticationLabel: 'Claude Code CLI管理認証',
+    cliLabel: 'Claude Code CLI実行file',
+    defaultModelId: 'sonnet',
+  );
+
+  final String adapterId;
+  final String providerId;
+  final String displayName;
+  final String defaultRuntimeId;
+  final String authenticationSource;
+  final String authenticationLabel;
+  final String cliLabel;
+  final String defaultModelId;
+  final bool allowBrokerCredential;
+}
+
+class _CliRegistrationInput {
+  const _CliRegistrationInput({
+    required this.provider,
     required this.runtimeId,
-    required this.codexCliPath,
+    required this.cliPath,
     required this.workspaceId,
     required this.workspaceRoot,
     required this.secretPaths,
@@ -3572,8 +3636,9 @@ class _CodexRegistrationInput {
     this.taskExecutionStatus = 'unknown',
   });
 
+  final _CliProviderDefinition provider;
   final String runtimeId;
-  final String codexCliPath;
+  final String cliPath;
   final String workspaceId;
   final String workspaceRoot;
   final List<String> secretPaths;
@@ -3582,10 +3647,15 @@ class _CodexRegistrationInput {
   final String? credentialId;
   final String taskExecutionStatus;
 
-  _CodexRegistrationInput withTaskExecutionStatus(String status) =>
-      _CodexRegistrationInput(
+  String get authenticationLabel => authenticationSource == 'broker_credential_vault'
+      ? 'D4 Pocket資格情報保管庫（ID参照のみ）'
+      : provider.authenticationLabel;
+
+  _CliRegistrationInput withTaskExecutionStatus(String status) =>
+      _CliRegistrationInput(
+        provider: provider,
         runtimeId: runtimeId,
-        codexCliPath: codexCliPath,
+        cliPath: cliPath,
         workspaceId: workspaceId,
         workspaceRoot: workspaceRoot,
         secretPaths: secretPaths,
@@ -3597,15 +3667,15 @@ class _CodexRegistrationInput {
 
   Map<String, Object?> toPayload() => {
         'version': 1,
-        'adapter_id': 'codex-cli',
+        'adapter_id': provider.adapterId,
         'runtime_id': runtimeId,
-        'cli_path': codexCliPath,
+        'cli_path': cliPath,
         'workspace_id': workspaceId,
         'workspace_root': workspaceRoot,
         'secret_paths': secretPaths,
         'provider_model_selection': {
           'version': 1,
-          'provider_id': 'openai_codex_cli',
+          'provider_id': provider.providerId,
           'model_id': modelId,
           'authentication_source': authenticationSource,
           if (credentialId != null) 'credential_id': credentialId,
@@ -3614,31 +3684,42 @@ class _CodexRegistrationInput {
       };
 }
 
-class _CodexRegistrationDialog extends StatefulWidget {
-  const _CodexRegistrationDialog({required this.transport});
+class _CliRegistrationDialog extends StatefulWidget {
+  const _CliRegistrationDialog({
+    required this.transport,
+    required this.provider,
+  });
 
   final BrokerTransport? transport;
+  final _CliProviderDefinition provider;
 
   @override
-  State<_CodexRegistrationDialog> createState() =>
-      _CodexRegistrationDialogState();
+  State<_CliRegistrationDialog> createState() => _CliRegistrationDialogState();
 }
 
-class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
+class _CliRegistrationDialogState extends State<_CliRegistrationDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _runtimeId = TextEditingController(text: 'codex-local');
+  late final TextEditingController _runtimeId;
   final _cliPath = TextEditingController();
   final _workspaceId = TextEditingController(text: 'workspace-local');
   final _workspaceRoot = TextEditingController();
   final _secretPaths = TextEditingController();
-  final _modelId = TextEditingController();
-  String _authenticationSource = 'codex_cli_managed';
+  late final TextEditingController _modelId;
+  late String _authenticationSource;
   String? _credentialId;
   Future<List<McpCredentialSummary>>? _providerCredentials;
   bool _providerCredentialRegistrationPending = false;
   String? _providerCredentialRegistrationMessage;
   bool _workspaceSelectionPending = false;
   String? _workspaceSelectionMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _runtimeId = TextEditingController(text: widget.provider.defaultRuntimeId);
+    _modelId = TextEditingController(text: widget.provider.defaultModelId);
+    _authenticationSource = widget.provider.authenticationSource;
+  }
 
   Future<void> _selectWorkspace({bool cli = false}) async {
     final transport = widget.transport;
@@ -3775,7 +3856,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: const Text('Codex実行系をBrokerへ登録'),
+        title: Text('${widget.provider.displayName}をBrokerへ登録'),
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
@@ -3784,67 +3865,76 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    '利用できる提供元はCodex CLI経由のOpenAIのみです。模型識別子はCodex CLIへそのまま渡します。登録時に提供元接続・模型利用可否は検査しません。認証は既存Codex CLI設定、またはD4 Pocket Brokerの資格情報ID参照から選びます。秘密値はこの画面へ取得せず、自動代替実行は行いません。',
+                  Text(
+                    '選択したCLIをBrokerへ登録します。模型識別子はCLIへ渡します。登録時にProvider接続・模型利用可否は検査しません。認証は${widget.provider.authenticationLabel}を使い、D4 Pocketへ秘密値を渡しません。自動代替実行は行いません。',
                   ),
                   const SizedBox(height: 12),
-                  const ListTile(
+                  ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text('提供元'),
-                    subtitle: Text('OpenAI（Codex CLI経由・現在の実装経路）'),
-                    trailing: Icon(Icons.lock_outline),
+                    title: const Text('提供元'),
+                    subtitle: Text(widget.provider.displayName),
+                    trailing: const Icon(Icons.lock_outline),
                   ),
                   TextFormField(
                     controller: _modelId,
                     decoration: const InputDecoration(
                       labelText: '模型識別子',
-                      hintText: 'Codex CLIの設定と同じ識別子を入力',
-                      helperText: '登録時に実在性・利用権限は確認しません。',
+                      helperText: 'CLIへそのまま渡します。実在性・利用権限は登録時に確認しません。',
                     ),
                     validator: _modelIdValidator,
                   ),
                   const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '認証方式',
-                      style: Theme.of(context).textTheme.titleSmall,
+                  if (widget.provider.allowBrokerCredential) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '認証方式',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
                     ),
-                  ),
-                  RadioGroup<String>(
-                    groupValue: _authenticationSource,
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() {
-                        _authenticationSource = value;
-                        if (value == 'codex_cli_managed') {
-                          _credentialId = null;
-                        } else {
-                          _providerCredentials ??= _loadProviderCredentials();
-                        }
-                      });
-                    },
-                    child: const Column(
-                      children: [
-                        RadioListTile<String>(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text('Codex CLI管理設定'),
-                          subtitle: Text('現在のCodex CLI認証を使用'),
-                          value: 'codex_cli_managed',
-                        ),
-                        RadioListTile<String>(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text('D4 Pocket資格情報保管庫'),
-                          subtitle: Text(
-                            '登録済みOpenAI API keyをBrokerから参照（秘密値は表示しない）',
+                    RadioGroup<String>(
+                      groupValue: _authenticationSource,
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() {
+                          _authenticationSource = value;
+                          if (value == 'codex_cli_managed') {
+                            _credentialId = null;
+                          } else {
+                            _providerCredentials ??= _loadProviderCredentials();
+                          }
+                        });
+                      },
+                      child: const Column(
+                        children: [
+                          RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('Codex CLI管理設定'),
+                            subtitle: Text('現在のCodex CLI認証を使用'),
+                            value: 'codex_cli_managed',
                           ),
-                          value: 'broker_credential_vault',
-                        ),
-                      ],
+                          RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('D4 Pocket資格情報保管庫'),
+                            subtitle: Text(
+                              '登録済みOpenAI API keyをBrokerから参照（秘密値は表示しない）',
+                            ),
+                            value: 'broker_credential_vault',
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  if (_authenticationSource == 'broker_credential_vault')
-                    _providerCredentialSelector(),
+                    if (_authenticationSource == 'broker_credential_vault')
+                      _providerCredentialSelector(),
+                  ] else
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('認証方式'),
+                      subtitle: Text(
+                        '${widget.provider.authenticationLabel}を使用。認証情報の状態は取得しません。',
+                      ),
+                      trailing: const Icon(Icons.lock_outline),
+                    ),
                   TextFormField(
                     controller: _runtimeId,
                     decoration: const InputDecoration(
@@ -3855,8 +3945,8 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                   TextFormField(
                     controller: _cliPath,
                     decoration: const InputDecoration(
-                      labelText: 'Codex CLI実行fileの絶対path',
-                      hintText: r'C:\Tools\Codex\codex.exe',
+                      labelText: 'CLI実行fileの絶対path',
+                      hintText: r'C:\Tools\Agent\agent.exe',
                     ),
                     validator: _required,
                   ),
@@ -3907,7 +3997,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                           ? null
                           : () => _selectWorkspace(cli: true),
                       icon: const Icon(Icons.file_open),
-                      label: const Text('OSでCLI実行fileを選択'),
+                      label: Text('OSで${widget.provider.cliLabel}を選択'),
                     ),
                 ],
               ),
@@ -3938,9 +4028,10 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                         .toList(growable: false);
                     if (secrets.length > 16) return;
                     Navigator.of(context).pop(
-                      _CodexRegistrationInput(
+                      _CliRegistrationInput(
+                        provider: widget.provider,
                         runtimeId: _runtimeId.text.trim(),
-                        codexCliPath: _cliPath.text.trim(),
+                        cliPath: _cliPath.text.trim(),
                         workspaceId: _workspaceId.text.trim(),
                         workspaceRoot: _workspaceRoot.text.trim(),
                         secretPaths: secrets,

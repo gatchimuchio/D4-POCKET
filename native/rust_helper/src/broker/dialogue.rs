@@ -332,6 +332,7 @@ impl AgentAdapterMetadata {
                 "oauth_reference",
                 "local_credential_reference",
                 "codex_cli_managed",
+                "claude_code_cli_managed",
                 "unsupported",
                 "unknown",
             ]
