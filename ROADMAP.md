@@ -4,7 +4,7 @@
 
 Actions [run #355](https://github.com/gatchimuchio/D4-POCKET/actions/runs/45647311964) のLinux `product_build`は、verbose Rust診断で`observation_center.rs`がfeature optionalな`host_capability`を無条件参照していることを検出した（`E0433`）。Linux ExportはModulePlanを反映して`--no-default-features`で構築するため、`shell.observability`を含み`module_host_capabilities`を選択外にした構成でコンパイルできなかった。
 
-`current_host_id`を`module_host_capabilities`の有無で分岐し、Module除去時はComposeと同じ`gui-shell-local-{platform}`の決定的なfallbackを使うよう修正した。これは観測のHost scopeだけを埋め、Authorityやpermissionを発行しない。Windows上の隔離Cargo checkで`--no-default-features --features linux-desktop-broker,module_observability`構成を確認し、Manifest整合もPASSした。このcheckは対象feature構成のRust compile確認でありLinux buildの代替ではない。修正commitのLinux product buildはこれから実行する。Unit/E2E/QAは実施していない。
+`current_host_id`を`module_host_capabilities`の有無で分岐し、Module除去時はComposeと同じ`gui-shell-local-{platform}`の決定的なfallbackを使うよう修正した。これは観測のHost scopeだけを埋め、Authorityやpermissionを発行しない。Windows上の隔離Cargo checkで`--no-default-features --features linux-desktop-broker,module_observability`構成を確認し、Manifest整合もPASSした。このcheckは対象feature構成のRust compile確認でありLinux buildの代替ではなかった。修正commit `22198da3fccb5428ca2e0983517e829770b0a152`をUbuntu 24.04 GitHub-hosted runnerがclean checkoutし、`product_build`のLinux Release Export／package生成とbuild-evidence整合確認が手動Actions [run #356](https://github.com/gatchimuchio/D4-POCKET/actions/runs/45681023824)でPASSした。build step後の隔離生成物cleanupとpost-run clean checkoutもPASSした。Unit test、GUI smoke、installed acceptanceはscopeどおりskipされ、artifactはActionsに保存されていない。これはLinux Release構築成立の証拠であり、Runtime／Installed Product／品質受入を主張しない。
 
 ### v11実装：Linux product_buildから品質検査を分離（2026-11-26）
 
