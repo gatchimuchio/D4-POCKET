@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11実装：Linux product_buildから品質検査を分離（2026-11-26）
+
+`product_build`はLinux Release Export／package生成だけを選ぶscopeだが、共通shell入口がLinux Status NotifierのC++ testと5つのPython unittestを無条件実行していた。`product_build`ではこれらを実行せず、Release Export／package生成とbuild evidenceの整合確認だけを行うよう条件分岐した。通常の受入scopeでは既存testとGUI smokeを維持する。build-onlyの報告文も実際の実行範囲へ合わせた。
+
+構築確認はbash構文、Manifest整合、Git差分を対象とする。Linux Release Export／packageの実ビルドはこの編集時点では未実行。次の通常`workflow_dispatch`で`product_build`を選び、成果物生成だけを確認する。これはRuntime／Installed Product／品質受入の証明ではない。
+
 ### v11施工追補：第二Runtime Claude Code CLIのBroker／Agent Center結線（2026-11-25）
 
 基準main `2230de7a1a0ac2fd48e93434737e3208f56f1434`。既存Codex CLIと異なる`anthropic_claude_code_cli`をProvider/Model Contract、Rust Adapter、native Owner確認、Broker登録、Agent Center UIへ接続した。CLI管理認証だけを選択でき、資格情報値をD4 Brokerから渡さない。Task実行は登録Workspaceに制限し、Task専用scratchと登録secret pathをCLIのfile permissionへ結び、shell/code/MCP、ユーザー・プロジェクト設定、session保存を無効化する。Cancel／deadline／process tree停止とscratch回収は既存Broker管理経路へ接続した。

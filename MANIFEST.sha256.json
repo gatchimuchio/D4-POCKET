@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "f623b4d7db97624aae51c88010599fa0f0c5618d925913928336040c99cc8897"
+      "sha256": "cdf8b86e2685f3a226442ceb371626837386c66622c5446330941cf7f0320c0b"
     },
     {
       "path": "SECURITY.md",
@@ -6109,7 +6109,7 @@
     },
     {
       "path": "tooling/linux_manual_export_build.sh",
-      "sha256": "d5eb389dcf4ad0ff6d1afd62019769fffd7564b436f86b3ac5a0e36f6840bd0a"
+      "sha256": "6700b782fbce235d8d8621f418e38968e61bb960f31bf6b0c151eb60d7562f1a"
     },
     {
       "path": "tooling/long_run_validation.py",

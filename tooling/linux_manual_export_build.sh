@@ -25,12 +25,14 @@ if [ "$D4P_ACCEPTANCE_SCOPE" = 'host_registration' ]; then
   fixture_arguments+=(--include-host-operations)
 fi
 python3 tooling/tests/create_linux_export_fixture.py "${fixture_arguments[@]}"
-g++ -std=c++14 -Wall -Wextra -Werror \
-  tooling/tests/linux_status_notifier_test.cc \
-  apps/desktop_flutter/linux/runner/linux_status_notifier.cc \
-  -o "$D4P_EXPORT_ROOT/linux-status-notifier-test" \
-  $(pkg-config --cflags --libs gio-2.0)
-"$D4P_EXPORT_ROOT/linux-status-notifier-test"
+if [ "$D4P_ACCEPTANCE_SCOPE" != 'product_build' ]; then
+  g++ -std=c++14 -Wall -Wextra -Werror \
+    tooling/tests/linux_status_notifier_test.cc \
+    apps/desktop_flutter/linux/runner/linux_status_notifier.cc \
+    -o "$D4P_EXPORT_ROOT/linux-status-notifier-test" \
+    $(pkg-config --cflags --libs gio-2.0)
+  "$D4P_EXPORT_ROOT/linux-status-notifier-test"
+fi
 export_arguments=(
   --receipt "$fixture_root/d4_pocket_export_receipt.json"
   --manifest-file "$fixture_root/d4-pocket-app-11111111111111111111111111111111.json"
@@ -58,15 +60,17 @@ if [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_lifecycle' ]; then
     | tee "$D4P_EXPORT_ROOT/update-candidate-result.json"
 fi
 python3 tooling/linux_export_workflow.py verify-build-result "$output_root" "$(git rev-parse HEAD)" "$D4P_ACCEPTANCE_SCOPE" | tee "$D4P_EXPORT_ROOT/build-result.json"
-python3 -m unittest tooling.tests.test_linux_workflow_helpers
-python3 -m unittest tooling.tests.test_linux_gtk_bundle_smoke
-python3 -m unittest tooling.tests.test_linux_installed_product_smoke
-python3 -m unittest tooling.tests.test_export_linux_product
-python3 -m unittest tooling.tests.test_linux_portable_archive
-if [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_package' ] || \
-   [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_first_install' ] || \
-   [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_lifecycle' ]; then
-  python3 -m unittest tooling.tests.test_linux_deb_setup_package
+if [ "$D4P_ACCEPTANCE_SCOPE" != 'product_build' ]; then
+  python3 -m unittest tooling.tests.test_linux_workflow_helpers
+  python3 -m unittest tooling.tests.test_linux_gtk_bundle_smoke
+  python3 -m unittest tooling.tests.test_linux_installed_product_smoke
+  python3 -m unittest tooling.tests.test_export_linux_product
+  python3 -m unittest tooling.tests.test_linux_portable_archive
+  if [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_package' ] || \
+     [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_first_install' ] || \
+     [ "$D4P_ACCEPTANCE_SCOPE" = 'debian_setup_lifecycle' ]; then
+    python3 -m unittest tooling.tests.test_linux_deb_setup_package
+  fi
 fi
 if [ "$D4P_ACCEPTANCE_SCOPE" = 'portable_archive' ]; then
   archive_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["portable_archive"]["file_name"])' "$output_root/d4_pocket_linux_export_build.json")"
@@ -113,7 +117,7 @@ fi
   if [ "$D4P_ACCEPTANCE_SCOPE" = 'runtime_provenance' ]; then
     printf -- '- Portable X11／Wayland smoke was skipped because this scope verifies the installed product provenance; previously accepted scopes are not replayed.\n'
   elif [ "$D4P_ACCEPTANCE_SCOPE" = 'product_build' ]; then
-    printf -- '- Build-only scope: Linux Release export／package compilation and export helper unit tests ran. Portable launcher smoke and every installed-product Acceptance scope were skipped. This does not establish runtime or product acceptance.\n'
+    printf -- '- Build-only scope: Linux Release export／package generation and build-evidence consistency verification ran. Unit tests, GUI smoke, and installed-product acceptance were skipped. This does not establish runtime or product acceptance.\n'
   elif [ "$D4P_ACCEPTANCE_SCOPE" = 'wayland_rendering' ]; then
     printf -- '- Portable smoke was skipped; the dedicated installed-product Wayland surface-rendering acceptance runs below.\n'
   elif [ "$D4P_ACCEPTANCE_SCOPE" = 'portable_archive' ]; then
