@@ -255,6 +255,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
   bool _trayRefreshInFlight = false;
   bool _trayRefreshRequested = false;
   int _trayProjectionGeneration = 0;
+  int? _nativeNotificationSourceGeneration;
+  int _lastCriticalNotificationOrder = -1;
+  bool _criticalNotificationBaselineEstablished = false;
   int _brokerTransportGeneration = 0;
   TrayStopResult? _latestStopRequestReceipt;
   Object? _latestStopRequestTransport;
@@ -306,11 +309,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
           transport == null ? null : AgentTaskExecutionCoordinator(transport);
       _bindTaskContextUpdates();
       if (_trayClient.available) {
-        if (_trayWindowVisible) {
-          unawaited(_refreshWindowsTrayProjection());
-        } else {
-          unawaited(_publishUnavailableWindowsTrayProjection());
-        }
+        unawaited(_refreshWindowsTrayProjection());
       }
     }
   }
@@ -396,24 +395,16 @@ class _ShellHomePageState extends State<ShellHomePage> {
       onAction: _handleWindowsTrayAction,
       onVisibilityChanged: (visible) {
         _setWindowsTrayVisibility(visible);
-        if (visible) unawaited(_refreshWindowsTrayProjection());
       },
     );
     if (!mounted) return;
     if (!_trayClient.available) return;
-    if (!_trayWindowVisible) {
-      await _publishUnavailableWindowsTrayProjection();
-      return;
-    }
     await _refreshWindowsTrayProjection();
     _startWindowsTrayRefreshTimer();
   }
 
   void _startWindowsTrayRefreshTimer() {
-    if (!mounted ||
-        !_trayClient.available ||
-        !_trayWindowVisible ||
-        _trayRefreshTimer != null) {
+    if (!mounted || !_trayClient.available || _trayRefreshTimer != null) {
       return;
     }
     _trayRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -433,19 +424,22 @@ class _ShellHomePageState extends State<ShellHomePage> {
       final visibleBefore = await _trayClient.isWindowVisible();
       if (!mounted) return;
       if (visibilityGeneration != _trayProjectionGeneration) return;
-      if (visibleBefore != true) {
-        _setWindowsTrayVisibility(false);
+      if (visibleBefore == null) {
+        await _publishUnavailableWindowsTrayProjection();
         return;
       }
-      if (!_trayWindowVisible) _setWindowsTrayVisibility(true);
+      if (_trayWindowVisible != visibleBefore) {
+        _setWindowsTrayVisibility(visibleBefore);
+      }
       final generation = _trayProjectionGeneration;
       final brokerTransport = widget.client.brokerTransport;
       final projection = await WindowsTrayProjection.fromBroker(
         brokerTransport,
-        windowVisible: true,
+        windowVisible: visibleBefore,
+        pollNotificationsWhenHidden: true,
+        notificationSourceGeneration: _brokerTransportGeneration,
       );
       if (!mounted ||
-          !_trayWindowVisible ||
           generation != _trayProjectionGeneration ||
           !identical(widget.client.brokerTransport, brokerTransport)) {
         return;
@@ -454,26 +448,29 @@ class _ShellHomePageState extends State<ShellHomePage> {
       final visibleAfter = await _trayClient.isWindowVisible();
       if (!mounted) return;
       if (visibleAfterGeneration != _trayProjectionGeneration) return;
-      if (visibleAfter != true) {
-        _setWindowsTrayVisibility(false);
+      if (visibleAfter == null) {
+        await _publishUnavailableWindowsTrayProjection();
         return;
       }
-      if (!_trayWindowVisible ||
-          generation != _trayProjectionGeneration ||
+      if (visibleAfter != visibleBefore) {
+        _setWindowsTrayVisibility(visibleAfter);
+        return;
+      }
+      if (generation != _trayProjectionGeneration ||
           !identical(widget.client.brokerTransport, brokerTransport)) {
         return;
       }
+      await _consumeNativeNotificationProjection(
+        projection,
+        windowVisible: visibleBefore,
+      );
       await _trayClient.publish(projection);
     } finally {
       _trayRefreshInFlight = false;
       final refreshRequested = _trayRefreshRequested;
       _trayRefreshRequested = false;
       if (refreshRequested && mounted && _trayClient.available) {
-        if (_trayWindowVisible) {
-          unawaited(_refreshWindowsTrayProjection());
-        } else {
-          unawaited(_publishUnavailableWindowsTrayProjection());
-        }
+        unawaited(_refreshWindowsTrayProjection());
       }
     }
   }
@@ -482,13 +479,51 @@ class _ShellHomePageState extends State<ShellHomePage> {
     if (_trayWindowVisible == visible) return;
     _trayWindowVisible = visible;
     _trayProjectionGeneration += 1;
-    if (visible) {
-      _startWindowsTrayRefreshTimer();
+    _startWindowsTrayRefreshTimer();
+    if (_trayClient.available) unawaited(_refreshWindowsTrayProjection());
+  }
+
+  Future<void> _consumeNativeNotificationProjection(
+    WindowsTrayProjection projection, {
+    required bool windowVisible,
+  }) async {
+    if (!kGuiShellModuleNotifications) return;
+    final count = projection.criticalNotificationCount;
+    if (count is! int || count < 0 || count > 256) return;
+
+    final sourceGeneration = projection.notificationSourceGeneration;
+    if (_nativeNotificationSourceGeneration != sourceGeneration) {
+      _nativeNotificationSourceGeneration = sourceGeneration;
+      _lastCriticalNotificationOrder = -1;
+      _criticalNotificationBaselineEstablished = false;
+    }
+    if (count == 0) {
+      _lastCriticalNotificationOrder = -1;
+      _criticalNotificationBaselineEstablished = true;
       return;
     }
-    _trayRefreshTimer?.cancel();
-    _trayRefreshTimer = null;
-    unawaited(_publishUnavailableWindowsTrayProjection());
+
+    final currentOrder = projection.latestCriticalNotificationOrder;
+    if (currentOrder < 0) return;
+    if (!_criticalNotificationBaselineEstablished) {
+      _lastCriticalNotificationOrder = currentOrder;
+      _criticalNotificationBaselineEstablished = true;
+      return;
+    }
+    if (currentOrder < _lastCriticalNotificationOrder) {
+      _lastCriticalNotificationOrder = currentOrder;
+      return;
+    }
+    if (windowVisible || currentOrder == _lastCriticalNotificationOrder) {
+      _lastCriticalNotificationOrder = currentOrder;
+      return;
+    }
+
+    final notificationAccepted =
+        await _trayClient.showCriticalNotification();
+    if (notificationAccepted) {
+      _lastCriticalNotificationOrder = currentOrder;
+    }
   }
 
   Future<void> _publishUnavailableWindowsTrayProjection() async {
@@ -500,6 +535,12 @@ class _ShellHomePageState extends State<ShellHomePage> {
   }
 
   Future<void> _handleWindowsTrayAction(String action) async {
+    if (action == 'open_notifications') {
+      if (mounted) _selectPage(16);
+      await _refreshWindowsTrayProjection();
+      _startWindowsTrayRefreshTimer();
+      return;
+    }
     if (action == 'open') {
       if (mounted) _selectPage(0);
       await _refreshWindowsTrayProjection();

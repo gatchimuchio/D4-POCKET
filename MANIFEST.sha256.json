@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "f3b755e6e5abb21f0f60d8a9a6d1b2ca128cc9224b6efba2c5efb4dbc75aea5b"
+      "sha256": "78225183c555d80541444f3a9345716a1f6eeca2998440a9249b3307514000c7"
     },
     {
       "path": "SECURITY.md",
@@ -241,7 +241,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "d8ae8d16cf202e7bc9741b5abd2144f20e9c1c494d9aafe133f8a3a015952ba5"
+      "sha256": "82e2ba732c65445d504b976d972feffc0627bda4f706f35c5b63fc41fab5b608"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -473,7 +473,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
-      "sha256": "6cd89ef060b003ce4238a2b94a953447300ba33a698c505ee278aba55b42fd3f"
+      "sha256": "75a42306b5b40913acd4a9e02a816e225e60f172688063d2d40bce405b9697fa"
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
@@ -969,11 +969,11 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/tray_controller.cpp",
-      "sha256": "f0571200890b867f2a99a835c0c7f2d3791e2ca15b969a62756efddbf9afb4aa"
+      "sha256": "fabdeda735b6a8e6413e50bc5a55fceb2ec67e38402ea8f47bc23b79f90906b2"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/tray_controller.h",
-      "sha256": "2c0b2c22b193ec366e4911ec85878b4a85b59c3715d82ce7c4df5244ed0f83d8"
+      "sha256": "211f81a529283c864b9a29fbf91ccb479997c5006e28cc9c758d19299eebf2d9"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/utils.cpp",
@@ -1957,7 +1957,7 @@
     },
     {
       "path": "docs/specs/agent-coordination.md",
-      "sha256": "c24cf025f48d9bd874571f541fcceee5851ba7f70e4d1d68201860d8cfb34c22"
+      "sha256": "9bc0f02f1610480f1c1ff3b3bbe746b8041c9d484925dff0755962162682170c"
     },
     {
       "path": "docs/specs/agent-runtime.md",
@@ -2141,7 +2141,7 @@
     },
     {
       "path": "docs/specs/notification-center.md",
-      "sha256": "43334669bd7d0d12877b3c8e17208ca23507d261dfc193663ad9df90afe13bd5"
+      "sha256": "9ac723f872ba23c6cd739b90177f38668167feae48414419e0d01a105d336edf"
     },
     {
       "path": "docs/specs/observability-center.md",
@@ -2205,7 +2205,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "7d31b46c0a32c48812f2d351ac401e6081287ee806b19ad6b8b7430b8d6e448d"
+      "sha256": "ffbfd8f43c57ea5703ecee4d3afaa19d013a674ce7bb49ac5a0d9bcb1b6b1f3c"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -4473,7 +4473,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "9fe39b42e9082f1000c46d09c153bc836de519c12de340c2141847709a7d49fe"
+      "sha256": "e6d60c2b385b9e9ecdabd345827a59fa408cf16d1edda6d69c2531a8d374670d"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -4669,11 +4669,11 @@
     },
     {
       "path": "native/rust_helper/tests/unit/workspace_protocol.rs",
-      "sha256": "a1f87a71889d197cc629cf8196ba5a3a43b71a078c852accbef60fce4da78aa0"
+      "sha256": "2b0d27eb715548230fadf9e8521e7e36c218eedfa06594d7b812b88807f5e464"
     },
     {
       "path": "native/rust_helper/tests/unit/workspace_registry.rs",
-      "sha256": "9f2f0ee506b28b8b12fbdca7ad4fb10b65f916fafd2d46d515e63155b89a3cff"
+      "sha256": "dd3dd93357fde1672b536fe886c3ea9372d3165eefca417e5d053dd454d66612"
     },
     {
       "path": "native/rust_helper/tests/workspace_diff.rs",

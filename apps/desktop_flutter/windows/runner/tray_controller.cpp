@@ -156,6 +156,10 @@ void TrayController::HandleMethodCall(
     result->Success();
     return;
   }
+  if (call.method_name() == "notifyCritical") {
+    result->Success(flutter::EncodableValue(ShowCriticalNotification()));
+    return;
+  }
   result->NotImplemented();
 }
 
@@ -164,14 +168,36 @@ void TrayController::UpdateMenuProjection(
   const auto* map = std::get_if<flutter::EncodableMap>(&arguments);
   if (map == nullptr) return;
   stop_request_supported_ = BoolValue(*map, "stop_request_supported");
-  if (window_ == nullptr || !IsWindowVisible(window_)) {
+  if (window_ == nullptr) return;
+  if (!IsWindowVisible(window_)) {
     HandleWindowVisibility(false);
+    critical_notification_count_ =
+        CountValue(*map, "critical_notification_count");
     return;
   }
   runtime_status_ = StringValue(*map, "runtime_status", kUnknown);
   pending_approval_count_ = CountValue(*map, "pending_approval_count");
   critical_notification_count_ =
       CountValue(*map, "critical_notification_count");
+}
+
+bool TrayController::ShowCriticalNotification() {
+  if (!icon_added_ || window_ == nullptr || !IsWindow(window_) ||
+      IsWindowVisible(window_)) {
+    return false;
+  }
+  NOTIFYICONDATAW data{};
+  data.cbSize = sizeof(data);
+  data.hWnd = window_;
+  data.uID = kTrayIconId;
+  data.uFlags = NIF_INFO;
+  data.dwInfoFlags = NIIF_INFO | NIIF_RESPECT_QUIET_TIME;
+  wcsncpy_s(data.szInfoTitle, ARRAYSIZE(data.szInfoTitle), L"D4 Pocket",
+            _TRUNCATE);
+  wcsncpy_s(data.szInfo, ARRAYSIZE(data.szInfo),
+            L"\u65B0\u3057\u3044\u91CD\u8981\u901A\u77E5\u304C\u3042\u308A\u307E\u3059\u3002D4 Pocket\u3092\u958B\u3044\u3066\u901A\u77E5\u30BB\u30F3\u30BF\u30FC\u3067\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+            _TRUNCATE);
+  return Shell_NotifyIconW(NIM_MODIFY, &data) != FALSE;
 }
 
 void TrayController::NotifyAction(const std::string& action) {
@@ -186,6 +212,13 @@ void TrayController::OpenWindow() {
   ShowWindow(window_, SW_RESTORE);
   SetForegroundWindow(window_);
   NotifyAction("open");
+}
+
+void TrayController::OpenNotificationCenter() {
+  if (window_ == nullptr) return;
+  ShowWindow(window_, SW_RESTORE);
+  SetForegroundWindow(window_);
+  NotifyAction("open_notifications");
 }
 
 void TrayController::RequestExit() {
@@ -235,11 +268,21 @@ bool TrayController::HandleMessage(UINT message,
                                    WPARAM /*wparam*/,
                                    LPARAM lparam) {
   if (message != kTrayCallbackMessage) return false;
-  if (lparam == WM_LBUTTONUP || lparam == WM_LBUTTONDBLCLK) {
+  const auto raw_event = static_cast<UINT_PTR>(lparam);
+  const UINT icon_id = HIWORD(raw_event);
+  if (icon_id != 0 && icon_id != kTrayIconId) return true;
+  const UINT event = icon_id == 0 ? static_cast<UINT>(raw_event)
+                                  : LOWORD(raw_event);
+  if (event == NIN_BALLOONUSERCLICK) {
+    OpenNotificationCenter();
+    return true;
+  }
+  if (event == WM_LBUTTONUP || event == WM_LBUTTONDBLCLK ||
+      event == NIN_SELECT || event == NIN_KEYSELECT) {
     OpenWindow();
     return true;
   }
-  if (lparam == WM_RBUTTONUP) {
+  if (event == WM_RBUTTONUP || event == WM_CONTEXTMENU) {
     ShowMenu();
     return true;
   }

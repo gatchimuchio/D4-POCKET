@@ -1556,3 +1556,9 @@ Rustが生成するTask permission profileで、異なる合成Workspace／scrat
 ### 同一CODEX_HOMEの追試（2026-10-01）
 
 同一の合成`CODEX_HOME`を共有する同時MxC sandbox child間でも、TEMP目印の相互読取は7回中7回拒否された。さらに両child終了後に同じhomeで起動した後続childから、両方の先行目印が3回中3回`FileNotFoundException`となった。これは後続childのTEMPから読めない観測であり、TEMP rootの物理的一意性、物理削除、production Broker／Agent Taskを証明しない。詳細と失敗履歴は`docs/REV3_PROGRESS.md`および`docs/specs/agent-coordination.md`に記録する。関連`release_blocker`、`task_execution=unsupported`、`release_ready=false`を維持する。
+
+### 2026-11-26 Windows Native通知の通知一覧連携（v11実装）
+
+既存の認証Broker通知一覧をWindows Trayへ接続した。Trayが起動した後は30秒間隔で通知一覧を読み、Window非表示中はBroker healthをpollせず、未読重大通知の新しい作成順だけを監視する。Native Runnerには引数なし命令だけを送り、Shell通知には固定のタイトル／本文を表示する。通知本文、Task／Audit ID、hash、path、理由、payloadはOSへ送らない。通知クリックは通知センター画面へ移動するだけで、権限・Approval・停止作用を行わない。ShellがQuiet Time等で通知を抑制した場合の表示完了は保証しない。
+
+Flutter Desktop解析と隔離Windows Release buildはいずれもPASS。構築成果物`gui_shell_desktop.exe`は165,376 bytes、SHA-256 `8e7841559073f334d625e431439daea34abf0add662d2efd82893dbf13fce435`。構築元はmain `04675726fdb18a5ad52807b67b8e86bda6ac25af`と作業差分を持つ隔離Source SHA `d4569be62d44305bddc46099fb29fb12eea78b5d4e1be84fa784169bb62eae98`。一時workspaceは自動cleanup済み。これは構築確認であり、installed runtime実行・Shell上の実表示確認ではない。macOS/Linux Native Presenterは本作業の対象外。詳細な実装境界は`docs/specs/notification-center.md`を参照する。

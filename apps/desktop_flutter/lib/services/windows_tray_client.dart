@@ -15,6 +15,8 @@ class WindowsTrayProjection {
     required this.runtimeStatus,
     required this.pendingApprovalCount,
     required this.criticalNotificationCount,
+    required this.latestCriticalNotificationOrder,
+    required this.notificationSourceGeneration,
     required this.evidenceSource,
     required this.stopRequestSupported,
   });
@@ -22,6 +24,8 @@ class WindowsTrayProjection {
   final String runtimeStatus;
   final Object pendingApprovalCount;
   final Object criticalNotificationCount;
+  final int latestCriticalNotificationOrder;
+  final int notificationSourceGeneration;
   final String evidenceSource;
   final bool stopRequestSupported;
 
@@ -37,13 +41,15 @@ class WindowsTrayProjection {
   static Future<WindowsTrayProjection> fromBroker(
     BrokerTransport? transport, {
     bool windowVisible = true,
+    bool pollNotificationsWhenHidden = false,
+    int notificationSourceGeneration = 0,
   }) async {
-    if (!windowVisible) {
+    if (!windowVisible && !pollNotificationsWhenHidden) {
       return unavailable(stopRequestSupported: transport != null);
     }
     var runtimeStatus = '不明';
     var evidenceSource = '不明';
-    if (transport != null) {
+    if (windowVisible && transport != null) {
       try {
         final health = await BrokerHealthClient.read(transport);
         runtimeStatus =
@@ -57,6 +63,7 @@ class WindowsTrayProjection {
       }
     }
     Object criticalCount = '不明';
+    var latestCriticalOrder = -1;
     if (transport != null && kGuiShellModuleNotifications) {
       try {
         final body = await NotificationClient(transport).list(
@@ -67,15 +74,35 @@ class WindowsTrayProjection {
         if (value is int && value >= 0 && value <= 256) {
           criticalCount = value;
           evidenceSource = 'INTERNAL_STATE';
+          final rawItems = body['通知一覧'];
+          if (rawItems is List) {
+            for (final rawItem in rawItems) {
+              if (rawItem is! Map) continue;
+              final item = Map<String, Object?>.from(rawItem);
+              final order = item['作成順'];
+              if (item['severity'] != 'critical' ||
+                  item['状態'] != 'unread' ||
+                  order is! int ||
+                  order < 0) {
+                continue;
+              }
+              if (order > latestCriticalOrder) {
+                latestCriticalOrder = order;
+              }
+            }
+          }
         }
       } on Object {
         criticalCount = '不明';
+        latestCriticalOrder = -1;
       }
     }
     return WindowsTrayProjection(
       runtimeStatus: runtimeStatus,
       pendingApprovalCount: '不明',
       criticalNotificationCount: criticalCount,
+      latestCriticalNotificationOrder: latestCriticalOrder,
+      notificationSourceGeneration: notificationSourceGeneration,
       evidenceSource: evidenceSource,
       stopRequestSupported: transport != null,
     );
@@ -88,6 +115,8 @@ class WindowsTrayProjection {
         runtimeStatus: '不明',
         pendingApprovalCount: '不明',
         criticalNotificationCount: '不明',
+        latestCriticalNotificationOrder: -1,
+        notificationSourceGeneration: 0,
         evidenceSource: '不明',
         stopRequestSupported: stopRequestSupported,
       );
@@ -154,6 +183,19 @@ class WindowsTrayClient {
       _available = false;
     } on PlatformException {
       _available = false;
+    }
+  }
+
+  Future<bool> showCriticalNotification() async {
+    if (!_available) return false;
+    try {
+      return await _channel.invokeMethod<bool>('notifyCritical') ?? false;
+    } on MissingPluginException {
+      _available = false;
+      return false;
+    } on PlatformException {
+      _available = false;
+      return false;
     }
   }
 

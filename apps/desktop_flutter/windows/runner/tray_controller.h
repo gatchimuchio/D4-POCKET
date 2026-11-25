@@ -32,6 +32,8 @@ class TrayController {
   void ShowMenu();
   void NotifyAction(const std::string& action);
   void OpenWindow();
+  void OpenNotificationCenter();
+  bool ShowCriticalNotification();
   void RequestExit();
   bool AddIcon();
   void RemoveIcon();
