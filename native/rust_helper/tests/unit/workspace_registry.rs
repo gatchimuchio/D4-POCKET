@@ -130,7 +130,7 @@ fn 別Agentの同一rootと親子rootを拒否し独立rootを許可する() {
                 Ok(())
             },
         ),
-        Err("別Agentとの同一物理作業領域共有を拒否"),
+        Err("別Workspaceとの同一物理root共有を拒否"),
     );
     let (child_root, child_ancestry) = open_scoped(&child);
     assert_eq!(
@@ -145,7 +145,7 @@ fn 別Agentの同一rootと親子rootを拒否し独立rootを許可する() {
                 Ok(())
             },
         ),
-        Err("別Agentとの親子Workspace範囲重複を拒否"),
+        Err("別Workspaceとの親子root範囲重複を拒否"),
     );
     assert_eq!(
         audit_calls, 1,
@@ -190,7 +190,7 @@ fn 別Agentの同一rootと親子rootを拒否し独立rootを許可する() {
             Some(parent_ancestry),
             &mut |_, _| Ok(())
         ),
-        Err("別Agentとの親子Workspace範囲重複を拒否"),
+        Err("別Workspaceとの親子root範囲重複を拒否"),
     );
     drop(reverse);
 
@@ -231,7 +231,7 @@ fn 別Agentの同一rootと親子rootを拒否し独立rootを許可する() {
             Some(independent_ancestry),
             &mut |_, _| Ok(())
         ),
-        Err("別AgentとのWorkspace分離範囲を確認できないため登録を拒否"),
+        Err("登録済みWorkspaceとの分離範囲を確認できないため追加登録を拒否"),
     );
     drop(incomplete);
     std::fs::remove_dir_all(shared).unwrap();

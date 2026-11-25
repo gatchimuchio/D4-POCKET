@@ -445,32 +445,28 @@ impl WorkspaceRegistry {
             Some(_) => return Err("作業領域の親子識別範囲が不正または未観測"),
             None => (vec![root_identity], false),
         };
-        let other_runtimes: Vec<&RegisteredWorkspace> = self
-            .entries
-            .values()
-            .filter(|entry| entry.runtime != runtime)
-            .collect();
-        if other_runtimes
+        let other_workspaces: Vec<&RegisteredWorkspace> = self.entries.values().collect();
+        if other_workspaces
             .iter()
             .any(|entry| entry.root_device == root_device && entry.root_file_id == root_file_id)
         {
-            return Err("別Agentとの同一物理作業領域共有を拒否");
+            return Err("別Workspaceとの同一物理root共有を拒否");
         }
-        if other_runtimes
+        if other_workspaces
             .iter()
             .any(|entry| !entry.root_ancestry_complete)
-            || (!other_runtimes.is_empty() && !root_ancestry_complete)
+            || (!other_workspaces.is_empty() && !root_ancestry_complete)
         {
-            return Err("別AgentとのWorkspace分離範囲を確認できないため登録を拒否");
+            return Err("登録済みWorkspaceとの分離範囲を確認できないため追加登録を拒否");
         }
-        if other_runtimes.iter().any(|entry| {
+        if other_workspaces.iter().any(|entry| {
             let existing_root = super::workspace_root::DirectoryIdentity {
                 device: entry.root_device,
                 file_id: entry.root_file_id,
             };
             entry.root_ancestry.contains(&root_identity) || root_ancestry.contains(&existing_root)
         }) {
-            return Err("別Agentとの親子Workspace範囲重複を拒否");
+            return Err("別Workspaceとの親子root範囲重複を拒否");
         }
         let reader = WorkspaceReader::from_registered_dir(root, secrets)
             .map_err(|_| "作業領域の除外指定が不正")?;

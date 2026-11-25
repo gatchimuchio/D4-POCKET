@@ -314,12 +314,12 @@ fn workspace_startup_rejects_parent_child_roots_and_records_rejection_audit() {
             &startup("agent-runtime-b", "child-workspace", &child),
             &protected
         ),
-        Err("別Agentとの親子Workspace範囲重複を拒否"),
+        Err("別Workspaceとの親子root範囲重複を拒否"),
     );
     let rejection = broker.audit_events().last().unwrap();
     assert_eq!(rejection.operation, "作業領域登録");
     assert_eq!(rejection.decision, "rejected");
-    assert_eq!(rejection.reason, "別Agentとの親子Workspace範囲重複を拒否");
+    assert_eq!(rejection.reason, "別Workspaceとの親子root範囲重複を拒否");
     let listed = request(&mut broker, "作業領域一覧", json!({}), false);
     assert_eq!(listed.status, BrokerStatus::Accepted);
     assert_eq!(listed.body.unwrap()["作業領域"], json!([]));
