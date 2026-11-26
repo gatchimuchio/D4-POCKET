@@ -498,6 +498,18 @@ jobs:
           if [ '${{ inputs.target }}' = 'macos_build_only' ]; then
             cargo +1.95.0 build --locked --release --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker 2>&1 | tee evidence/macos-rust-build.txt
             cargo +1.95.0 build --locked --release --manifest-path native/macos_owner/Cargo.toml --lib 2>&1 | tee evidence/macos-rust-ui-build.txt
+            case "$(uname -m)" in
+              arm64|aarch64) cross_target=x86_64-apple-darwin ;;
+              x86_64) cross_target=aarch64-apple-darwin ;;
+              *) echo "unsupported macOS build host architecture: $(uname -m)" >&2; exit 1 ;;
+            esac
+            rustup +1.95.0 target add "$cross_target"
+            cargo +1.95.0 build --locked --release --manifest-path native/macos_owner/Cargo.toml --lib --target "$cross_target" 2>&1 | tee evidence/macos-rust-ui-cross-build.txt
+            universal_archive="$RUNNER_TEMP/libgui_shell_macos_owner-universal.a"
+            lipo -create native/macos_owner/target/release/libgui_shell_macos_owner.a "native/macos_owner/target/$cross_target/release/libgui_shell_macos_owner.a" -output "$universal_archive"
+            lipo -verify_arch arm64 x86_64 "$universal_archive"
+            install -m 644 "$universal_archive" native/macos_owner/target/release/libgui_shell_macos_owner.a
+            lipo -verify_arch arm64 x86_64 native/macos_owner/target/release/libgui_shell_macos_owner.a
           else
             cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker 2>&1 | tee evidence/macos-rust-build.txt
             cargo +1.95.0 build --locked --manifest-path native/macos_owner/Cargo.toml --lib 2>&1 | tee evidence/macos-rust-ui-build.txt
