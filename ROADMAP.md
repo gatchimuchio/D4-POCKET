@@ -4,7 +4,9 @@
 
 既存のDesktop通知要求はWindows Runnerだけに受口があり、macOS/Linuxでは未実装Methodとなるため通知要求が失敗していた。Dart側はNative通知の個別失敗でTray全体を利用不可にしないよう変更した。macOSは`UNUserNotificationCenter`を使い、OS通知許可を尊重して固定の一般通知だけを登録する。Linuxは既存Session D-Busからfreedesktop Notificationsへ固定文を非同期送信し、Action signalが現在通知IDと一致したときだけWindowを復帰して通知センターへ遷移する。いずれもTask／Audit内容をOSへ渡さず、クリックは画面遷移だけでAuthorityを生じさせない。
 
-この施工の構築確認とGit反映結果は、作業単位完了時に追記する。OS通知の実表示・macOSのOS許可・Linux各通知サービスのAction提供は製品Runtime受入れとして未確認である。
+Linux manual `product_build` の [Actions run #45728128613](https://github.com/gatchimuchio/D4-POCKET/actions/runs/45728128613) は `125b25f7` をUbuntu 24.04でclean checkoutしPASSした。Linux Release Export、Rust Broker、`linux_tray_controller.cc`のC++ compile/link、bundle/package生成が成立し、artifact tree SHA-256は`6799574053680424655feb4de132fea7e49d77b3a8efaf76bd44d700b231072c`。試験工程はscope条件で実行せず、installed product／OS通知表示は未確認。隔離build root削除とpost-run clean checkoutもPASS。
+
+macOS `macos_build_only` の [Actions run #45728132729](https://github.com/gatchimuchio/D4-POCKET/actions/runs/45728132729) は初回FAIL。Deployment Target 10.15に対し新コードがmacOS 11専用`.banner`を無条件指定したため、macOS 10.15向け`.alert`と11以降の`.banner`をavailability分岐した。修正SourceのRelease build結果は後続runで追記する。OS通知の実表示・macOSのOS許可・Linux各通知サービスのAction提供は製品Runtime受入れとして未確認である。
 
 ### v11施工追補：失効済みCredentialのDesktop Vault削除（2026-11-26）
 

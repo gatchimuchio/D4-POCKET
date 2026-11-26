@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "732316d29ea058314e7b5ba79ae672e6294d27ae21cd6864fe02e5413ed07164"
+      "sha256": "10b68093ecf6e014c1879995807c58f61c4c137e53a037d02069066ca5030ed2"
     },
     {
       "path": "SECURITY.md",
@@ -657,7 +657,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/MainFlutterWindow.swift",
-      "sha256": "6df80d378c54a531a9235483c2e4a767fc25f2b27d4831eb3addcca8ab88d075"
+      "sha256": "43e5f245016f2f7144d4b02809c503c888af696e4732619c8973dd54e95a8c95"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Release.entitlements",
