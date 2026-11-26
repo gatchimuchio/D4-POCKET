@@ -10,7 +10,7 @@
 
 ## 実装経路
 
-Desktop Flutterの通知画面 → 通常認証済みBroker IPC → Rust Notification Center → 監査eventの限定射影と`notifications.json`の表示状態。Windowsでは、同じBrokerの未読・重大通知射影をWindows Tray Runnerへ渡し、新しい重大通知がWindow非表示中に確認された場合だけNative通知を表示する。
+Desktop Flutterの通知画面 → 通常認証済みBroker IPC → Rust Notification Center → 監査eventの限定射影と`notifications.json`の表示状態。Windows/macOS/Linuxでは、同じBrokerの未読・重大通知射影を既存Native Tray経路へ渡し、新しい重大通知がWindow非表示中に確認された場合だけNative通知を要求する。
 
 提供する操作は`通知一覧`、`通知既読`、`通知破棄`、`通知全既読`である。既読・破棄は現在の通知hashへ結合し、再起動後もBrokerが再読込する。通知の「開く」は既存GUI画面へのnavigationだけで、sensitive actionを直接実行しない。
 
@@ -22,11 +22,19 @@ Windows Tray Runnerは、30秒間隔で現在Brokerの`通知一覧`を再読込
 
 Window非表示中に、現在Brokerの未読重大通知でAudit作成順が直前の基準値より新しくなった場合、Runnerへ本文を渡さず、引数なしの通知命令だけを送る。Native Runnerは固定タイトル・固定本文の通知領域balloonを表示する。通知本文、source、Task ID、Audit ID、通知hash、path、理由、payloadをOS通知へ出さない。起動時とBroker世代変更時は既存通知を基準値として初期化し、過去通知を新着として再表示しない。Window表示中に見つかった通知はNative通知せず、次の基準値へ反映する。
 
-Native通知のクリックはWindowを復帰し、通知センターへ画面遷移するだけである。Permission、Approval、Stop、その他の作用を実行しない。Windows Shellが通知を抑制した場合の表示完了は保証しない。このShell表示は製品UIの限定通知であり、Broker Host Capability `native_notification`をRuntime作用可能へ昇格させない。macOS/LinuxのNative通知Presenterは別施工である。
+Native通知のクリックはWindowを復帰し、通知センターへ画面遷移するだけである。Permission、Approval、Stop、その他の作用を実行しない。Windows Shellが通知を抑制した場合の表示完了は保証しない。このShell表示は製品UIの限定通知であり、Broker Host Capability `native_notification`をRuntime作用可能へ昇格させない。
+
+## macOS/Linux Native通知
+
+macOSは`UNUserNotificationCenter`へ固定タイトル・固定本文を登録する。OSの通知許可が未決定の場合は通常のalert／sound許可だけを要求し、拒否・抑制・登録失敗を成功扱いしない。通知クリックはWindowを復帰して通知センターへ移動する。
+
+Linuxは既存Session D-Busからfreedesktop Notificationsの`Notify`を非同期に呼ぶ。直近通知のIDで置換し、最大一件だけを維持する。本文・タイトルは固定で、通知sourceや監査内容をNative APIへ渡さない。既定Actionが通知サービスから返された場合だけWindowを復帰し、通知センターへ画面遷移する。通知サービスがAction信号を返さない場合、クリック遷移は保証しない。
+
+両OSともNative通知が許可されない、通知サービスがない、または登録APIが失敗した場合は、その通知要求のみ失敗として返す。Tray全体を利用不可にしない。OSが通知を抑制・非表示にする可能性があるため、API受付結果を利用者が実際に見た証拠として扱わない。クリックは画面遷移だけで、Permission、Approval、Stop、その他の作用を実行しない。
 
 ## 上限と失敗
 
-監査走査は直近4096 event、返却は最大256件に制限する。通知表示状態の未知field、重複ID、hash不正、malformed file、stale hashはfail-closedで扱う。Windows Native通知はShellの通知領域APIを使い、通知領域アイコンが利用できない場合は表示しない。macOS/LinuxのNative通知Presenterは未接続である。
+監査走査は直近4096 event、返却は最大256件に制限する。通知表示状態の未知field、重複ID、hash不正、malformed file、stale hashはfail-closedで扱う。Windows Native通知はShellの通知領域APIを使い、通知領域アイコンが利用できない場合は表示しない。macOSはOS許可状態、LinuxはSession D-Bus通知サービスの可用性に従う。
 
 Desktop Client／画面はBroker拒否文、transport例外、malformed response由来の例外詳細を操作者向け表示へ流さず、固定の通知失敗文へ正規化する。診断詳細を新しいログやAuditへ複製しない。
 

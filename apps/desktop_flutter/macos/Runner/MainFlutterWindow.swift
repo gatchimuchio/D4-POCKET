@@ -1,6 +1,7 @@
 import Cocoa
 import CoreFoundation
 import FlutterMacOS
+import UserNotifications
 
 class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private(set) var brokerChannel: BrokerProcessChannel?
@@ -40,7 +41,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   }
 }
 
-private final class DesktopTrayController: NSObject {
+private final class DesktopTrayController: NSObject, UNUserNotificationCenterDelegate {
   private weak var window: NSWindow?
   private let channel: FlutterMethodChannel
   private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -54,6 +55,7 @@ private final class DesktopTrayController: NSObject {
     self.window = window
     channel = FlutterMethodChannel(name: "gui_shell/tray", binaryMessenger: messenger)
     super.init()
+    UNUserNotificationCenter.current().delegate = self
 
     let menu = NSMenu()
     let openItem = NSMenuItem(title: "D4 Pocketを開く", action: #selector(openWindow), keyEquivalent: "")
@@ -103,6 +105,8 @@ private final class DesktopTrayController: NSObject {
       case "publish":
         self.updateProjection(call.arguments)
         result(nil)
+      case "notifyCritical":
+        self.showCriticalNotification(result)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -187,6 +191,86 @@ private final class DesktopTrayController: NSObject {
     stopItem.isEnabled = boundedBoolean(projection["stop_request_supported"])
   }
 
+  private func showCriticalNotification(_ result: @escaping FlutterResult) {
+    let center = UNUserNotificationCenter.current()
+    center.getNotificationSettings { [weak self] settings in
+      guard let self else {
+        DispatchQueue.main.async { result(false) }
+        return
+      }
+      switch settings.authorizationStatus {
+      case .authorized, .provisional:
+        self.scheduleCriticalNotification(center, result: result)
+      case .notDetermined:
+        center.requestAuthorization(options: [.alert, .sound]) { [weak self] granted, _ in
+          guard granted, let self else {
+            DispatchQueue.main.async { result(false) }
+            return
+          }
+          self.scheduleCriticalNotification(center, result: result)
+        }
+      default:
+        DispatchQueue.main.async { result(false) }
+      }
+    }
+  }
+
+  private func scheduleCriticalNotification(
+    _ center: UNUserNotificationCenter,
+    result: @escaping FlutterResult
+  ) {
+    let content = UNMutableNotificationContent()
+    content.title = "D4 Pocket"
+    content.body = "新しい重要通知があります。D4 Pocketを開いて通知センターで確認してください。"
+    content.sound = .default
+    content.threadIdentifier = "D4 Pocket"
+    let request = UNNotificationRequest(
+      identifier: Self.criticalNotificationIdentifier,
+      content: content,
+      trigger: nil
+    )
+    center.removeDeliveredNotifications(
+      withIdentifiers: [Self.criticalNotificationIdentifier]
+    )
+    center.add(request) { error in
+      DispatchQueue.main.async { result(error == nil) }
+    }
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    completionHandler([.banner, .sound])
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    guard response.notification.request.identifier == Self.criticalNotificationIdentifier,
+          response.actionIdentifier == UNNotificationDefaultActionIdentifier
+    else {
+      completionHandler()
+      return
+    }
+    DispatchQueue.main.async { [weak self] in
+      self?.openNotificationCenter()
+      completionHandler()
+    }
+  }
+
+  private func openNotificationCenter() {
+    guard let window else { return }
+    NSApp.unhide(nil)
+    NSApp.activate(ignoringOtherApps: true)
+    window.makeKeyAndOrderFront(nil)
+    updateVisibility(windowVisible)
+    channel.invokeMethod("onTrayAction", arguments: "open_notifications")
+  }
+
   @objc private func openWindow() {
     guard let window else { return }
     NSApp.unhide(nil)
@@ -204,4 +288,6 @@ private final class DesktopTrayController: NSObject {
   @objc private func terminateApplication() {
     NSApp.terminate(nil)
   }
+
+  private static let criticalNotificationIdentifier = "d4-pocket-critical-notification"
 }

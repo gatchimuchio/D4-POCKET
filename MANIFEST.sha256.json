@@ -205,7 +205,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "78225183c555d80541444f3a9345716a1f6eeca2998440a9249b3307514000c7"
+      "sha256": "732316d29ea058314e7b5ba79ae672e6294d27ae21cd6864fe02e5413ed07164"
     },
     {
       "path": "SECURITY.md",
@@ -473,7 +473,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
-      "sha256": "75a42306b5b40913acd4a9e02a816e225e60f172688063d2d40bce405b9697fa"
+      "sha256": "8e4b15e04c9a6786a14a5c31808c850aea52534440c690796e7ebc31710fa8b0"
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
@@ -525,7 +525,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/linux_tray_controller.cc",
-      "sha256": "a86d79e01d9e7c77fe9d80a83a3e4723e6f2d06a1ef12b56a29f10c2a91a33ec"
+      "sha256": "73d3b194b71418d5a3835fe5bf568f00702481b7b5f1045a60465a462f80679a"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/linux_tray_controller.h",
@@ -657,7 +657,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/MainFlutterWindow.swift",
-      "sha256": "c198caa542d53018d6174e5f7cff4c8dc0b937024957ea60ce78b2c7bf2d6349"
+      "sha256": "6df80d378c54a531a9235483c2e4a767fc25f2b27d4831eb3addcca8ab88d075"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Release.entitlements",
@@ -2141,7 +2141,7 @@
     },
     {
       "path": "docs/specs/notification-center.md",
-      "sha256": "9ac723f872ba23c6cd739b90177f38668167feae48414419e0d01a105d336edf"
+      "sha256": "fe7144cea603c303698501d7b1728512c9bf7ceaa71ca593d07f4895127d996d"
     },
     {
       "path": "docs/specs/observability-center.md",

@@ -191,10 +191,8 @@ class WindowsTrayClient {
     try {
       return await _channel.invokeMethod<bool>('notifyCritical') ?? false;
     } on MissingPluginException {
-      _available = false;
       return false;
     } on PlatformException {
-      _available = false;
       return false;
     }
   }

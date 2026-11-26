@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+### v11施工追補：macOS/Linux Native通知を既存Tray経路へ接続（2026-11-26）
+
+既存のDesktop通知要求はWindows Runnerだけに受口があり、macOS/Linuxでは未実装Methodとなるため通知要求が失敗していた。Dart側はNative通知の個別失敗でTray全体を利用不可にしないよう変更した。macOSは`UNUserNotificationCenter`を使い、OS通知許可を尊重して固定の一般通知だけを登録する。Linuxは既存Session D-Busからfreedesktop Notificationsへ固定文を非同期送信し、Action signalが現在通知IDと一致したときだけWindowを復帰して通知センターへ遷移する。いずれもTask／Audit内容をOSへ渡さず、クリックは画面遷移だけでAuthorityを生じさせない。
+
+この施工の構築確認とGit反映結果は、作業単位完了時に追記する。OS通知の実表示・macOSのOS許可・Linux各通知サービスのAction提供は製品Runtime受入れとして未確認である。
+
 ### v11施工追補：失効済みCredentialのDesktop Vault削除（2026-11-26）
 
 現行K07とW-C07／W-F02に沿って、Windows DPAPI・macOS Keychain・Linux Secret Serviceに保管された資格情報について、既存の失効操作と分離したVault item削除をBroker／native Owner UI／Settings・MCP接続面へ結線した。削除対象は現在metadataと暗号文hashが一致する失効済みrecordだけ。Brokerは永続Auditへ削除intentを先行記録し、同じIDのVault item不在を確認した後に削除tombstoneを追記する。途中で止まった場合は`削除中`として表示し、新しいnative Owner確認で同じID・hashだけを再開する。Linux／macOSのOwner確認では、既存の失効操作と新しい削除操作の両方について、表示hashの64桁16進値まで検査する。通常応答へ秘密値は返さず、登録・失効・削除Audit metadataを保持する。媒体上のbit消去は保証しない。Android／iOSの資格情報削除、Credential更新、製品Runtime／Installed Product受入れは本変更の対象外で、K07全体の完了を示さない。

@@ -12,6 +12,44 @@ namespace {
 
 constexpr char kTrayChannelName[] = "gui_shell/tray";
 constexpr char kUnknown[] = "不明";
+constexpr char kNotificationBusName[] = "org.freedesktop.Notifications";
+constexpr char kNotificationObjectPath[] = "/org/freedesktop/Notifications";
+constexpr char kNotificationInterface[] = "org.freedesktop.Notifications";
+constexpr char kCriticalNotificationBody[] =
+    "新しい重要通知があります。D4 Pocketを開いて通知センターで確認してください。";
+
+struct LinuxNotificationState {
+  bool alive = true;
+  guint notification_id = 0;
+};
+
+struct PendingNotificationCall {
+  FlMethodCall* method_call;
+  std::shared_ptr<LinuxNotificationState> state;
+};
+
+void NotificationCallFinished(GObject* source_object, GAsyncResult* result,
+                              gpointer user_data) {
+  std::unique_ptr<PendingNotificationCall> pending(
+      static_cast<PendingNotificationCall*>(user_data));
+  g_autoptr(GError) error = nullptr;
+  g_autoptr(GVariant) response = g_dbus_connection_call_finish(
+      G_DBUS_CONNECTION(source_object), result, &error);
+  bool accepted = false;
+  if (response != nullptr && pending->state->alive) {
+    guint notification_id = 0;
+    g_variant_get(response, "(u)", &notification_id);
+    pending->state->notification_id = notification_id;
+    accepted = true;
+  }
+  g_autoptr(FlValue) value = fl_value_new_bool(accepted);
+  fl_method_call_respond_success(pending->method_call, value, nullptr);
+  g_object_unref(pending->method_call);
+}
+
+void NotificationActionInvoked(GDBusConnection*, const gchar*, const gchar*,
+                               const gchar*, const gchar*, GVariant*,
+                               gpointer);
 
 std::string bounded_string(FlValue* map, const char* key,
                            const std::string& fallback) {
@@ -75,13 +113,16 @@ struct LinuxTrayController {
                      G_CALLBACK(WindowStateEvent), this);
 
     g_autoptr(GError) error = nullptr;
-    GDBusConnection* bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
-    if (bus != nullptr) {
+    notifications_bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
+    if (notifications_bus != nullptr) {
       notifier.Start(
-          bus,
+          notifications_bus,
           [this](const std::string& action) { HandleAction(action); },
           [this](bool available) { HandleAvailability(available); });
-      g_object_unref(bus);
+      notification_action_subscription = g_dbus_connection_signal_subscribe(
+          notifications_bus, kNotificationBusName, kNotificationInterface,
+          "ActionInvoked", kNotificationObjectPath, nullptr,
+          G_DBUS_SIGNAL_FLAGS_NONE, NotificationActionInvoked, this, nullptr);
     }
     RefreshVisibility();
   }
@@ -91,6 +132,14 @@ struct LinuxTrayController {
       g_signal_handlers_disconnect_by_data(window, this);
     }
     notifier.Stop();
+    notification_state->alive = false;
+    if (notifications_bus != nullptr) {
+      if (notification_action_subscription != 0) {
+        g_dbus_connection_signal_unsubscribe(
+            notifications_bus, notification_action_subscription);
+      }
+      g_object_unref(notifications_bus);
+    }
     if (application_held) g_application_release(application);
     if (channel != nullptr) {
       fl_method_channel_set_method_call_handler(channel, nullptr, nullptr,
@@ -136,7 +185,37 @@ struct LinuxTrayController {
       fl_method_call_respond_success(call, nullptr, nullptr);
       return;
     }
+    if (g_strcmp0(method, "notifyCritical") == 0) {
+      self->ShowCriticalNotification(call);
+      return;
+    }
     fl_method_call_respond_not_implemented(call, nullptr);
+  }
+
+  void ShowCriticalNotification(FlMethodCall* call) {
+    if (notifications_bus == nullptr || !notification_state->alive) {
+      g_autoptr(FlValue) result = fl_value_new_bool(false);
+      fl_method_call_respond_success(call, result, nullptr);
+      return;
+    }
+
+    GVariantBuilder actions;
+    g_variant_builder_init(&actions, G_VARIANT_TYPE("as"));
+    g_variant_builder_add(&actions, "s", "default");
+    g_variant_builder_add(&actions, "s", "開く");
+    GVariantBuilder hints;
+    g_variant_builder_init(&hints, G_VARIANT_TYPE("a{sv}"));
+    GVariant* parameters = g_variant_new(
+        "(susss@as@a{sv}i)", "D4 Pocket", notification_state->notification_id,
+        "dialog-information", "D4 Pocket", kCriticalNotificationBody,
+        g_variant_builder_end(&actions), g_variant_builder_end(&hints), 5000);
+    auto* pending = new PendingNotificationCall{
+        FL_METHOD_CALL(g_object_ref(call)), notification_state};
+    g_dbus_connection_call(
+        notifications_bus, kNotificationBusName, kNotificationObjectPath,
+        kNotificationInterface, "Notify", parameters,
+        G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE, 3000, nullptr,
+        NotificationCallFinished, pending);
   }
 
   static gboolean DeleteEvent(GtkWidget*, GdkEvent*, gpointer user_data) {
@@ -234,6 +313,22 @@ struct LinuxTrayController {
     }
   }
 
+  void HandleNotificationAction(guint notification_id,
+                                const std::string& action) {
+    if (!notification_state->alive ||
+        notification_id != notification_state->notification_id ||
+        action != "default") {
+      return;
+    }
+    if (window != nullptr) {
+      gtk_widget_show(GTK_WIDGET(window));
+      gtk_window_deiconify(window);
+      gtk_window_present(window);
+      RefreshVisibility();
+    }
+    NotifyAction("open_notifications");
+  }
+
   void NotifyAction(const std::string& action) {
     if (!channel_initialized) return;
     g_autoptr(FlValue) argument = fl_value_new_string(action.c_str());
@@ -244,6 +339,10 @@ struct LinuxTrayController {
   GtkWindow* window;
   GApplication* application;
   FlMethodChannel* channel = nullptr;
+  GDBusConnection* notifications_bus = nullptr;
+  guint notification_action_subscription = 0;
+  std::shared_ptr<LinuxNotificationState> notification_state =
+      std::make_shared<LinuxNotificationState>();
   LinuxStatusNotifier notifier;
   bool channel_initialized = false;
   bool application_held = false;
@@ -253,6 +352,21 @@ struct LinuxTrayController {
   bool last_visible = false;
   bool last_stop_request_supported = false;
 };
+
+namespace {
+
+void NotificationActionInvoked(GDBusConnection*, const gchar*, const gchar*,
+                               const gchar*, const gchar*, GVariant* parameters,
+                               gpointer user_data) {
+  auto* self = static_cast<LinuxTrayController*>(user_data);
+  guint notification_id = 0;
+  const gchar* action = nullptr;
+  g_variant_get(parameters, "(u&s)", &notification_id, &action);
+  self->HandleNotificationAction(notification_id,
+                                 action == nullptr ? "" : action);
+}
+
+}  // namespace
 
 LinuxTrayController* linux_tray_controller_new(FlPluginRegistry* registry,
                                                GtkWindow* window,
