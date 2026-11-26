@@ -507,9 +507,9 @@ jobs:
             cargo +1.95.0 build --locked --release --manifest-path native/macos_owner/Cargo.toml --lib --target "$cross_target" 2>&1 | tee evidence/macos-rust-ui-cross-build.txt
             universal_archive="$RUNNER_TEMP/libgui_shell_macos_owner-universal.a"
             lipo -create native/macos_owner/target/release/libgui_shell_macos_owner.a "native/macos_owner/target/$cross_target/release/libgui_shell_macos_owner.a" -output "$universal_archive"
-            lipo -verify_arch arm64 x86_64 "$universal_archive"
+            test "$(lipo -archs "$universal_archive" | tr ' ' '\n' | LC_ALL=C sort | paste -sd ' ' -)" = "arm64 x86_64"
             install -m 644 "$universal_archive" native/macos_owner/target/release/libgui_shell_macos_owner.a
-            lipo -verify_arch arm64 x86_64 native/macos_owner/target/release/libgui_shell_macos_owner.a
+            test "$(lipo -archs native/macos_owner/target/release/libgui_shell_macos_owner.a | tr ' ' '\n' | LC_ALL=C sort | paste -sd ' ' -)" = "arm64 x86_64"
           else
             cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker 2>&1 | tee evidence/macos-rust-build.txt
             cargo +1.95.0 build --locked --manifest-path native/macos_owner/Cargo.toml --lib 2>&1 | tee evidence/macos-rust-ui-build.txt
